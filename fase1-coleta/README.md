@@ -39,6 +39,32 @@ do chassi por baixo). O campo "marca" do nosso schema captura a encarroçadora (
 portal chama de "Marca" na navegação); o chassi fica disponível como informação adicional, mas ainda
 não tem uma coluna própria no schema — avaliar se vale adicionar em `anuncio` numa próxima iteração.
 
+## Caminho de deploy no HostGator (Plano M)
+
+Conferi as especificações reais do Plano M (hospedagem compartilhada, cPanel). Dois pontos
+importantes que mudam a implementação em relação ao caminho genérico (VPS/Postgres) descrito
+mais abaixo:
+
+1. **Banco de dados**: hospedagem compartilhada cPanel normalmente só oferece MySQL/MariaDB,
+   não Postgres. Use `schema_mysql.sql` em vez de `schema.sql`.
+2. **Limite de CPU**: o plano restringe a 25% de uso por períodos ≥90 segundos. Por isso
+   `scraper_hostgator.py` (em vez de `scraper.py`) inclui uma pausa de 2 segundos entre cada
+   revenda visitada — mais lento, mas dentro do limite do plano e mais gentil com o portal.
+
+Passos no cPanel:
+1. **Banco de Dados MySQL** → criar um banco (ex: `oper_radar`) e um usuário com todas as
+   permissões nesse banco. O cPanel prefixa ambos com o nome da sua conta
+   (ex: `seuusuario_oper_radar`, `seuusuario_oper`).
+2. Rodar `schema_mysql.sql` nesse banco (via phpMyAdmin, que já vem no cPanel).
+3. **Setup Python App** (se disponível no seu cPanel) → criar uma aplicação Python, instalar
+   `requirements-hostgator.txt` nesse ambiente virtual.
+4. **Cron Jobs** → configurar os 2 horários usando `crontab-hostgator.example` como referência
+   (ajustando usuário, senha do banco e caminho do Python).
+
+Duas coisas que só dá pra confirmar direto no seu painel ou com o suporte HostGator:
+- Se **SSH** está disponível pra essa conta (facilita instalar/testar antes de depender só do cron)
+- Qual **versão de Python** está disponível (o código foi escrito pensando em Python 3.10+)
+
 ## O que ainda não pode ser executado a partir daqui
 
 Este ambiente de chat não tem acesso de rede ao portal (só a ferramentas de busca/leitura pontuais) nem um banco Postgres persistente rodando em segundo plano. Por isso, o que falta para o scraper rodar de verdade, 2x por dia, é:

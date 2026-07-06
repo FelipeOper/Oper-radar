@@ -1,0 +1,16 @@
+# OPER RADAR — agendamento no cPanel (HostGator Plano M)
+# No cPanel: Avançado -> Cron Jobs -> Adicionar novo Cron Job
+# (ou cole isso via "Editor de Cron Jobs Bruto", se o cPanel oferecer essa opção)
+#
+# Ajuste:
+#   - o caminho do Python (confirme com o suporte HostGator; costuma ser algo como
+#     /home/SEUUSUARIO/virtualenv/oper-radar/3.x/bin/python se usar Setup Python App do cPanel)
+#   - SEUUSUARIO_oper, SENHA_AQUI, SEUUSUARIO_oper_radar -> dados do banco MySQL criado no cPanel
+#   - fuso horário: o cPanel geralmente já roda no horário do servidor; confirme com o suporte
+#     se precisa de ajuste para America/Sao_Paulo
+
+0 7  * * * cd /home/SEUUSUARIO/oper-radar && /home/SEUUSUARIO/virtualenv/oper-radar/3.x/bin/python scraper_hostgator.py --janela 07h --uf PR --db-user SEUUSUARIO_oper --db-pass 'SENHA_AQUI' --db-name SEUUSUARIO_oper_radar >> /home/SEUUSUARIO/oper-radar/coleta.log 2>&1
+0 19 * * * cd /home/SEUUSUARIO/oper-radar && /home/SEUUSUARIO/virtualenv/oper-radar/3.x/bin/python scraper_hostgator.py --janela 19h --uf PR --db-user SEUUSUARIO_oper --db-pass 'SENHA_AQUI' --db-name SEUUSUARIO_oper_radar >> /home/SEUUSUARIO/oper-radar/coleta.log 2>&1
+
+# repetir por UF (PR, SC, SP...) com um cron job por estado, OU adaptar o script para
+# aceitar uma lista de UFs numa unica chamada (mais simples de manter no cPanel).
