@@ -70,3 +70,27 @@ PRATA |
 
 R$ 210.000,00
 
+## [PRANCHA 2026/2026](https://www.caminhoesecarretas.com.br/veiculo/patos-de-minas/mg/carreta/semi-reboque/prancha/2026/reta/rodomoura/2-eixos/patos-caminhoes/1387727)
+
+Patos Caminhões/MG
+
+BRANCO |
+
+### Semi-reboque
+
+### Rodomoura | 2 Eixos
+
+R$ 199.900,00
+
+## [BASCULANTE 2012/2012](https://www.caminhoesecarretas.com.br/veiculo/almirante-tamandare/pr/carreta/semi-reboque/basculante/2012/pastre/2-1-canguru/mega-carretas---guerra/1387725)
+
+Mega Carretas - Guerra/PR
+
+AMARELO |
+
+### Semi-reboque
+
+### Pastre | 2-1 Canguru
+
+R$ 99.900,00
+

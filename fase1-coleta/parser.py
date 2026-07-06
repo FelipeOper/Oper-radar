@@ -28,7 +28,18 @@ ANO_RE = re.compile(r"(\d{4})/(\d{4})")
 # lista mantida à mão.
 MARCAS_CAMINHAO_FALLBACK = {
     "daf", "volvo", "scania", "mercedes-benz", "iveco", "man", "ford", "vw",
-    "volkswagen", "agrale",
+    "volkswagen", "agrale", "gm", "hyundai", "mack",
+}
+
+# Marcas vistas em anúncios reais durante esta sessão mas que o primeiro discovery
+# (taxonomia.json) ainda não capturou nas categorias de carreta e trator — cobertura
+# extra até rodar o discovery de novo (ele deve ser refeito periodicamente mesmo,
+# já que o portal adiciona marcas com o tempo).
+MARCAS_EXTRA_FALLBACK = {
+    "pastre", "rodomoura", "bertolini", "rossetti", "fibraforte", "rodotec",
+    "recrusul", "sanchezi", "kaili",
+    "massey-ferguson", "valtra", "landini", "mahindra", "ls-tractor", "foton",
+    "stara", "yanmar",
 }
 
 
@@ -37,9 +48,9 @@ def _carrega_marcas_conhecidas() -> set[str]:
         from taxonomia import carrega_marcas_conhecidas
         marcas = carrega_marcas_conhecidas()
         # normaliza pro mesmo formato usado nas comparações (minúsculo, hífen)
-        return {m.lower().replace(" ", "-") for m in marcas} | MARCAS_CAMINHAO_FALLBACK
+        return {m.lower().replace(" ", "-") for m in marcas} | MARCAS_CAMINHAO_FALLBACK | MARCAS_EXTRA_FALLBACK
     except (FileNotFoundError, ImportError):
-        return set(MARCAS_CAMINHAO_FALLBACK)
+        return set(MARCAS_CAMINHAO_FALLBACK) | MARCAS_EXTRA_FALLBACK
 
 
 MARCAS_CONHECIDAS = _carrega_marcas_conhecidas()

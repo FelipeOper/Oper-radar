@@ -11,12 +11,24 @@ Pacote técnico da Fase 1 do roteiro de implementação (ver `OPER_RADAR_Roteiro
 - `crontab.example` — agendamento das janelas 07h/19h
 - `sample_page.md` — trecho real de uma página de revenda (SVD Seminovos, Curitiba/PR), usado para validar o parser
 
-## O que já foi testado de verdade nesta sessão
+## Estrutura atualizada (catálogo de marcas/modelos do próprio portal)
 
-1. **`parser.py`** rodou contra o texto real de uma página do portal e extraiu corretamente ID, título, tipo, marca, ano e preço de 5 anúncios reais (caminhões, carreta, trator e van).
-2. **`diff_logic.py`** rodou 5 ciclos simulados e confirmou o comportamento esperado: um anúncio que some 1x e volta não é contabilizado (evita falso positivo); um anúncio que some 2x seguidas é confirmado como removido.
+Como o Caminhões e Carretas é o maior portal do nicho, ele funciona como o catálogo mais
+completo e atualizado de marcas e modelos de pesados/extrapesados do Brasil — melhor fonte
+do que manter uma lista fixa à mão. Por isso a extração de marca agora vem de dois lugares,
+combinados:
 
-Os dois testes rodam com `python3 parser.py` e `python3 diff_logic.py` — os resultados aparecem no terminal.
+1. **`taxonomia.py` / `taxonomia.json`** — discovery real rodado contra as páginas de filtro
+   do portal (`/venda/<categoria>/marca/<id>`), com marcas E modelos (com os IDs internos
+   do site). Rodar `python taxonomia.py` para atualizar sempre que o portal adicionar marcas novas
+   (recomendo mensalmente).
+2. **Fallback de segurança** (`MARCAS_CAMINHAO_FALLBACK` + `MARCAS_EXTRA_FALLBACK` em `parser.py`)
+   — marcas confirmadas em anúncios reais que a primeira rodada de discovery ainda não
+   capturou (ex: o discovery de carreta pegou 11 marcas mas anúncios reais mostraram também
+   Pastre e Rodomoura, que foram adicionadas aqui manualmente até o próximo discovery completo).
+
+- [x] **`parser.py`** testado com 8 anúncios reais (2 caminhões, 4 carretas de marcas diferentes, 1 trator) — todos com marca correta.
+- [x] **`diff_logic.py`** testado com 5 ciclos simulados — confirma a regra de 2 confirmações.
 
 ## O que ainda não pode ser executado a partir daqui
 
