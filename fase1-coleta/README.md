@@ -28,6 +28,26 @@ Este ambiente de chat não tem acesso de rede ao portal (só a ferramentas de bu
 4. **Configurar o cron** com `crontab.example` (ajustando os caminhos).
 5. **Rodar o primeiro ciclo manualmente** para validar contra o banco real: `python scraper.py --janela 07h --uf PR`
 
+## Taxonomia (marcas e modelos) — direto do portal
+
+Em vez de manter uma lista de marcas escrita à mão, `taxonomia.py` descobre a lista oficial
+de marcas e modelos direto dos filtros do próprio portal (ex: a página de carreta/semi-reboque
+lista as 70+ marcas de implemento que o portal reconhece, e os 28 tipos de carroceria).
+Como é o maior marketplace do nicho no Brasil, essa lista tende a cobrir praticamente tudo
+que se vende de pesados e extrapesados no país — e se atualiza sozinha rodando o discovery
+de novo (recomendado: 1x por mês, junto com a atualização da FIPE).
+
+Fluxo:
+1. `python taxonomia.py` roda o discovery contra as categorias em `CATEGORIAS_RELEVANTES`
+   e gera `taxonomia.json`.
+2. `parser.py` carrega esse arquivo automaticamente (`_carrega_marcas_conhecidas()`) — se
+   ainda não existir, cai num fallback pequeno só com as marcas de caminhão mais comuns.
+
+**Testado nesta sessão**: a extração de marcas e modelos rodou contra uma página real
+(carreta/semi-reboque) e encontrou corretamente 11 marcas e 10 modelos de exemplo.
+Não rodei o discovery completo contra as 6 categorias de `CATEGORIAS_RELEVANTES` (isso
+precisa do ambiente com rede livre — ver seção abaixo).
+
 ## Limitações conhecidas (documentadas, não escondidas)
 
 - **Paginação**: não confirmei ainda se páginas de revendas com muitos anúncios paginam (a SVD Seminovos, com ~40 anúncios, veio inteira numa página só). Se houver revenda maior que pagine, o `scraper.py` precisa de um loop de páginas.

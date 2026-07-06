@@ -20,25 +20,29 @@ PRECO_CONSULTAR_RE = re.compile(r"\(A consultar\)")
 ANO_RE = re.compile(r"(\d{4})/(\d{4})")
 
 # Marcas de caminhão (posição fixa no path: /veiculo/.../<tipo>/<marca>/<modelo>/...)
-MARCAS_CAMINHAO = {
+# Esta lista pequena é só um FALLBACK para quando taxonomia.json ainda não foi gerado
+# (rodando `python taxonomia.py` a partir do discovery real no portal — ver taxonomia.py).
+# Assim que o discovery roda pela primeira vez, MARCAS_CONHECIDAS passa a vir do portal,
+# que é o maior marketplace do nicho e tende a cobrir praticamente tudo que se vende de
+# pesados e extrapesados no Brasil — muito mais completo e sempre atualizado do que uma
+# lista mantida à mão.
+MARCAS_CAMINHAO_FALLBACK = {
     "daf", "volvo", "scania", "mercedes-benz", "iveco", "man", "ford", "vw",
     "volkswagen", "agrale",
 }
 
-# Marcas de implemento/carreta (posição VARIÁVEL no path — não dá pra usar índice fixo,
-# porque o número de segmentos descritivos entre o ano e a marca muda de anúncio pra
-# anúncio, ex: .../graneleiro/2006/randon/... vs .../bau-sider/2025/reta/librelato/...).
-# Por isso escaneamos todos os segmentos da URL procurando um nome conhecido.
-MARCAS_IMPLEMENTO = {
-    "randon", "librelato", "facchini", "guerra", "noma", "tanesfil", "truckvan",
-    "rodofort", "bertolini", "rossetti", "fibraforte", "rodotec", "recrusul",
-    "pastre", "sanchezi", "kaili",
-}
-MARCAS_TRATOR = {
-    "case", "john-deere", "new-holland", "massey-ferguson", "valtra", "landini",
-    "mahindra", "ls-tractor", "foton", "stara", "yanmar",
-}
-MARCAS_CONHECIDAS = MARCAS_CAMINHAO | MARCAS_IMPLEMENTO | MARCAS_TRATOR
+
+def _carrega_marcas_conhecidas() -> set[str]:
+    try:
+        from taxonomia import carrega_marcas_conhecidas
+        marcas = carrega_marcas_conhecidas()
+        # normaliza pro mesmo formato usado nas comparações (minúsculo, hífen)
+        return {m.lower().replace(" ", "-") for m in marcas} | MARCAS_CAMINHAO_FALLBACK
+    except (FileNotFoundError, ImportError):
+        return set(MARCAS_CAMINHAO_FALLBACK)
+
+
+MARCAS_CONHECIDAS = _carrega_marcas_conhecidas()
 
 
 @dataclass
@@ -64,17 +68,14 @@ def _extrai_tipo_e_marca_da_url(url: str) -> tuple[Optional[str], Optional[str]]
     partes = url.split("/veiculo/")[-1].split("/")
     tipo = partes[2].capitalize() if len(partes) > 2 else None
 
-    # Marca de caminhão fica em posição fixa (logo após o tipo) — checa isso primeiro.
-    if len(partes) > 3 and partes[3].lower() in MARCAS_CAMINHAO:
-        return tipo, partes[3].replace("-", " ").upper()
-
-    # Para os demais tipos (carreta, implemento, trator...) a marca não tem posição fixa:
-    # escaneia todos os segmentos do path procurando um nome de marca conhecido.
+    # A marca não tem posição fixa em todos os tipos (caminhão sim, carreta/trator não —
+    # ver taxonomia.py para o porquê). Por isso escaneia todos os segmentos do path
+    # procurando um nome presente na taxonomia descoberta no próprio portal.
     for segmento in partes:
         if segmento.lower() in MARCAS_CONHECIDAS:
             return tipo, segmento.replace("-", " ").upper()
 
-    return tipo, None  # marca não reconhecida — fica None em vez de um valor errado
+    return tipo, None  # marca não reconhecida (fora da taxonomia atual) — fica None em vez de errada
 
 
 def parse_listings(page_text: str) -> List[Anuncio]:
