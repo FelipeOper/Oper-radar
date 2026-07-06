@@ -29,7 +29,7 @@ combinados:
 
 - [x] **`parser.py`** testado com 9 anúncios reais (2 caminhões, 4 carretas de marcas diferentes, 1 trator, 1 ônibus) — todos com marca correta, incluindo a distinção entre encarroçadora e chassi em ônibus.
 - [x] **`diff_logic.py`** testado com 5 ciclos simulados — confirma a regra de 2 confirmações.
-- [x] **Categorias mapeadas**: caminhão, carreta/semi-reboque, trator, ônibus (17 tipos de veículo identificados no total no portal, ver `taxonomia.json`).
+- [x] **Categorias mapeadas**: caminhão, carreta/semi-reboque, trator, ônibus, vans, utilitários (17 tipos de veículo identificados no total no portal, ver `taxonomia.json`). Todas as 6 categorias relevantes de transporte pesado/extrapesado têm marca já catalogada.
 
 ## Descoberta importante: ônibus tem duas dimensões de marca
 

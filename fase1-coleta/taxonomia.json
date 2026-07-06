@@ -59,6 +59,30 @@
       "VOLARE",
       "VOLKSWAGEN",
       "VOLVO"
+    ],
+    "vans": [
+      "CITROEN",
+      "FIAT",
+      "FORD",
+      "IVECO",
+      "MERCEDES-BENZ",
+      "PEUGEOT",
+      "RENAULT",
+      "VW - VOLKSWAGEN"
+    ],
+    "utilitarios": [
+      "CITROEN",
+      "DODGE",
+      "FIAT",
+      "FORD",
+      "GM - CHEVROLET",
+      "KIA MOTORS",
+      "MERCEDES-BENZ",
+      "PEUGEOT",
+      "RENAULT",
+      "TAYLON",
+      "TOYOTA",
+      "VW - VOLKSWAGEN"
     ]
   },
   "modelos_por_categoria": {

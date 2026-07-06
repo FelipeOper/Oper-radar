@@ -25,7 +25,7 @@ MODELO_ITEM_RE = re.compile(r"\* \[([^\]]+)\]\([^)]*/modelo/(\d+)\)")
 TIPO_LIST_RE = re.compile(r"\* \(Todos os Tipos\)\n((?:[A-ZÀ-Ú ]+\n?)+)")
 # Ônibus/micro-ônibus usam um link de categoria diferente do "?fabricante=" das carretas:
 # "### [NOME](/venda/onibus/slug/marca/123)" — encarroçadora — e um filtro à parte pro chassi.
-ENCARROCADORA_ITEM_RE = re.compile(r"### \[([^\]]+)\]\(/venda/[a-z-]+/[a-z0-9-]+/marca/\d+\)")
+ENCARROCADORA_ITEM_RE = re.compile(r"### \[([^\]]+)\]\(/venda/[a-z-]+/[a-z0-9%\-]+/marca/\d+\)")
 CHASSI_ITEM_RE = re.compile(r"\* \[([^\]]+)\]\([^)]*\?chassi=[^)]+\)")
 
 # Categorias relevantes para o nicho de caminhões pesados/extrapesados (Fase 1 do OPER RADAR).
@@ -36,8 +36,8 @@ CATEGORIAS_RELEVANTES = {
     "carreta_semi_reboque": "https://www.caminhoesecarretas.com.br/venda/carreta/semi-reboque/marca/25",
     "trator": "https://www.caminhoesecarretas.com.br/venda/trator",
     "onibus": "https://www.caminhoesecarretas.com.br/venda/onibus/3",
-    "vans": "https://www.caminhoesecarretas.com.br/venda/vans",
-    "utilitarios": "https://www.caminhoesecarretas.com.br/venda/utilitarios",
+    "vans": "https://www.caminhoesecarretas.com.br/venda/vans/12",
+    "utilitarios": "https://www.caminhoesecarretas.com.br/venda/utilitarios/37",
 }
 
 # Ônibus/micro-ônibus tem DUAS dimensões de marca no portal, não uma:
@@ -97,7 +97,10 @@ def descobre_taxonomia_completa(categorias: dict = CATEGORIAS_RELEVANTES, pausa_
 
     for i, (nome_categoria, url) in enumerate(categorias.items()):
         texto = fetch_categoria(url)
-        marcas_por_categoria[nome_categoria] = extrai_marcas(texto)
+        # Categorias diferentes usam padrões de link diferentes no portal (ver notas em
+        # ENCARROCADORA_ITEM_RE vs FABRICANTE_ITEM_RE) — mesclar os dois extratores é
+        # seguro, já que cada um só retorna algo quando o padrão dele realmente aparece.
+        marcas_por_categoria[nome_categoria] = sorted(set(extrai_marcas(texto)) | set(extrai_encarrocadoras(texto)))
         modelos_por_categoria[nome_categoria] = extrai_modelos(texto)
         if not tipos_disponiveis:
             tipos_disponiveis = extrai_tipos_disponiveis(texto)
