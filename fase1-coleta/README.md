@@ -30,9 +30,10 @@ Este ambiente de chat não tem acesso de rede ao portal (só a ferramentas de bu
 
 ## Limitações conhecidas (documentadas, não escondidas)
 
-- **Carretas e implementos** têm uma estrutura de URL diferente da de caminhões (não têm marca na mesma posição), então hoje o parser extrai a marca errada para esses tipos — ajuste pontual necessário antes de rodar em produção para todos os segmentos.
 - **Paginação**: não confirmei ainda se páginas de revendas com muitos anúncios paginam (a SVD Seminovos, com ~40 anúncios, veio inteira numa página só). Se houver revenda maior que pagine, o `scraper.py` precisa de um loop de páginas.
 - **Descoberta de URL real** (`discover_revenda_urls`) substitui as URLs "adivinhadas" que estavam na planilha de mapeamento nacional — recomendo rodar essa descoberta para os 3 estados detalhados (PR/SC/SP) antes de confiar nos links da planilha para scraping.
+- **Marcas não catalogadas**: a extração de marca em carretas/implementos/tratores depende de uma lista de marcas conhecidas (`MARCAS_CONHECIDAS` em `parser.py`). Uma marca fora dessa lista fica com `marca = None` em vez de errada — mais seguro, mas precisa de manutenção periódica da lista conforme aparecem marcas novas na base.
+
 
 ## Próximo passo sugerido
 

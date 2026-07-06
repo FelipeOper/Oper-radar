@@ -46,11 +46,27 @@ Cabinado | 8366 horas
 
 R$ 254.800,00
 
-## [Sprinter VAN 415 2019/2020](https://www.caminhoesecarretas.com.br/veiculo/curitiba/pr/vans/mercedes-benz/sprinter-van-415/2020/16-lugares/svd-seminovos/1302754)
+## [CARRETA GRANELEIRO 2005/2006](https://www.caminhoesecarretas.com.br/veiculo/itapetininga/sp/carreta/semi-reboque/graneleiro/2006/randon/3-eixos/rodozan-implementos-rodoviarios---librelato/1229528)
 
-SVD Seminovos/PR
+Rodozan Implementos Rodoviários - Librelato/SP
 
-BRANCO | DIESEL
-16 lugares
+BRANCO |
 
-R$ 135.990,00
+### Semi-reboque
+
+### Randon | 3 Eixos
+
+R$ 165.000,00
+
+## [CARRETA BAU SIDER 2024/2025](https://www.caminhoesecarretas.com.br/veiculo/itapetininga/sp/carreta/semi-reboque/bau-sider/2025/reta/librelato/1-1-1-vanderleia/rodozan-implementos-rodoviarios---librelato/1237660)
+
+Rodozan Implementos Rodoviários - Librelato/SP
+
+PRATA |
+
+### Semi-reboque
+
+### Librelato | Vanderleia
+
+R$ 210.000,00
+
