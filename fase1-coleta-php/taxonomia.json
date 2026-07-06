@@ -1,0 +1,132 @@
+{
+  "tipos_disponiveis": [
+    "CAMINHAO",
+    "CARRETA",
+    "CARROCERIA SOBRE CHASSI",
+    "MICRO ONIBUS",
+    "ONIBUS",
+    "UTILITARIOS",
+    "VANS",
+    "TRATOR",
+    "COLHEITADEIRA",
+    "MICRO TRATOR",
+    "IMPLEMENTOS AGRICOLAS",
+    "FORRAGEM E FENO",
+    "DISTRIBUIDOR AUTOPROPELIDO",
+    "PLATAFORMA COLHEITADEIRA",
+    "PLANTADEIRA",
+    "SEMEADEIRA",
+    "PULVERIZADOR"
+  ],
+  "marcas_por_categoria": {
+    "carreta_semi_reboque": [
+      "AIZI",
+      "ANTONINI",
+      "BERCAMP",
+      "FACCHINI",
+      "GUERRA",
+      "LIBRELATO",
+      "NOMA",
+      "RANDON",
+      "RODOFORT",
+      "TANESFIL",
+      "TRUCKVAN"
+    ],
+    "caminhao": [
+      "DAF",
+      "VOLVO",
+      "SCANIA",
+      "MERCEDES-BENZ",
+      "IVECO"
+    ],
+    "trator": [
+      "CASE",
+      "JOHN DEERE",
+      "NEW HOLLAND"
+    ],
+    "onibus_encarrocadora": [
+      "BUSSCAR",
+      "CAIO",
+      "COMIL",
+      "MARCOPOLO",
+      "MASCARELLO",
+      "NEOBUS",
+      "NIELSON"
+    ],
+    "onibus_chassi": [
+      "MERCEDES-BENZ",
+      "SCANIA",
+      "VOLARE",
+      "VOLKSWAGEN",
+      "VOLVO"
+    ],
+    "vans": [
+      "CITROEN",
+      "FIAT",
+      "FORD",
+      "IVECO",
+      "MERCEDES-BENZ",
+      "PEUGEOT",
+      "RENAULT",
+      "VW - VOLKSWAGEN"
+    ],
+    "utilitarios": [
+      "CITROEN",
+      "DODGE",
+      "FIAT",
+      "FORD",
+      "GM - CHEVROLET",
+      "KIA MOTORS",
+      "MERCEDES-BENZ",
+      "PEUGEOT",
+      "RENAULT",
+      "TAYLON",
+      "TOYOTA",
+      "VW - VOLKSWAGEN"
+    ]
+  },
+  "modelos_por_categoria": {
+    "carreta_semi_reboque": [
+      [
+        "AUTO ESCOLA",
+        "12830"
+      ],
+      [
+        "BASCULANTE",
+        "203"
+      ],
+      [
+        "BAU BEBIDAS",
+        "7339"
+      ],
+      [
+        "BAU FURGÃO",
+        "206"
+      ],
+      [
+        "BAU SIDER",
+        "209"
+      ],
+      [
+        "GRANELEIRO",
+        "207"
+      ],
+      [
+        "PRANCHA",
+        "616"
+      ],
+      [
+        "ROLL ON OFF",
+        "24746"
+      ],
+      [
+        "SILO",
+        "624"
+      ],
+      [
+        "TANQUE AÇO",
+        "210"
+      ]
+    ]
+  }
+}
