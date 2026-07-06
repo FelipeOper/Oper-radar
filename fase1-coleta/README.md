@@ -27,8 +27,17 @@ combinados:
    capturou (ex: o discovery de carreta pegou 11 marcas mas anúncios reais mostraram também
    Pastre e Rodomoura, que foram adicionadas aqui manualmente até o próximo discovery completo).
 
-- [x] **`parser.py`** testado com 8 anúncios reais (2 caminhões, 4 carretas de marcas diferentes, 1 trator) — todos com marca correta.
+- [x] **`parser.py`** testado com 9 anúncios reais (2 caminhões, 4 carretas de marcas diferentes, 1 trator, 1 ônibus) — todos com marca correta, incluindo a distinção entre encarroçadora e chassi em ônibus.
 - [x] **`diff_logic.py`** testado com 5 ciclos simulados — confirma a regra de 2 confirmações.
+- [x] **Categorias mapeadas**: caminhão, carreta/semi-reboque, trator, ônibus (17 tipos de veículo identificados no total no portal, ver `taxonomia.json`).
+
+## Descoberta importante: ônibus tem duas dimensões de marca
+
+O portal separa **encarroçadora** (Busscar, Marcopolo, Comil, Caio, Mascarello, Nielson, Neobus —
+quem monta a carroceria) de **chassi** (Mercedes-Benz, Scania, Volvo, Volkswagen, Volare — o fabricante
+do chassi por baixo). O campo "marca" do nosso schema captura a encarroçadora (é o que o próprio
+portal chama de "Marca" na navegação); o chassi fica disponível como informação adicional, mas ainda
+não tem uma coluna própria no schema — avaliar se vale adicionar em `anuncio` numa próxima iteração.
 
 ## O que ainda não pode ser executado a partir daqui
 

@@ -94,3 +94,21 @@ AMARELO |
 
 R$ 99.900,00
 
+## [Vissta Buss 2007/2007](https://www.caminhoesecarretas.com.br/veiculo/uberlandia/mg/onibus/busscar/vissta-buss/2007/tracao-4x2/50-lugares/mercedes-benz/rodoviario/afp-caminhoes/1374128)
+
+AFP Caminhões/MG
+
+CINZA |
+
+### Tração 4x2
+
+### 50 lugares
+
+|
+
+### MERCEDES-BENZ
+
+### RODOVIÁRIO
+
+R$ 110.000,00
+

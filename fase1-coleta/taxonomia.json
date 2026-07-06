@@ -43,6 +43,22 @@
       "CASE",
       "JOHN DEERE",
       "NEW HOLLAND"
+    ],
+    "onibus_encarrocadora": [
+      "BUSSCAR",
+      "CAIO",
+      "COMIL",
+      "MARCOPOLO",
+      "MASCARELLO",
+      "NEOBUS",
+      "NIELSON"
+    ],
+    "onibus_chassi": [
+      "MERCEDES-BENZ",
+      "SCANIA",
+      "VOLARE",
+      "VOLKSWAGEN",
+      "VOLVO"
     ]
   },
   "modelos_por_categoria": {

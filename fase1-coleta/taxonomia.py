@@ -23,6 +23,10 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (OPER RADAR monitoring bot; contato@agenci
 FABRICANTE_ITEM_RE = re.compile(r"\* \[([^\]]+)\]\([^)]*\?fabricante=[^)]+\)")
 MODELO_ITEM_RE = re.compile(r"\* \[([^\]]+)\]\([^)]*/modelo/(\d+)\)")
 TIPO_LIST_RE = re.compile(r"\* \(Todos os Tipos\)\n((?:[A-ZÀ-Ú ]+\n?)+)")
+# Ônibus/micro-ônibus usam um link de categoria diferente do "?fabricante=" das carretas:
+# "### [NOME](/venda/onibus/slug/marca/123)" — encarroçadora — e um filtro à parte pro chassi.
+ENCARROCADORA_ITEM_RE = re.compile(r"### \[([^\]]+)\]\(/venda/[a-z-]+/[a-z0-9-]+/marca/\d+\)")
+CHASSI_ITEM_RE = re.compile(r"\* \[([^\]]+)\]\([^)]*\?chassi=[^)]+\)")
 
 # Categorias relevantes para o nicho de caminhões pesados/extrapesados (Fase 1 do OPER RADAR).
 # Cada entrada é a URL de uma página de categoria/subcategoria que tem os filtros de
@@ -31,10 +35,21 @@ CATEGORIAS_RELEVANTES = {
     "caminhao": "https://www.caminhoesecarretas.com.br/venda/caminhao",
     "carreta_semi_reboque": "https://www.caminhoesecarretas.com.br/venda/carreta/semi-reboque/marca/25",
     "trator": "https://www.caminhoesecarretas.com.br/venda/trator",
-    "onibus": "https://www.caminhoesecarretas.com.br/venda/onibus",
+    "onibus": "https://www.caminhoesecarretas.com.br/venda/onibus/3",
     "vans": "https://www.caminhoesecarretas.com.br/venda/vans",
     "utilitarios": "https://www.caminhoesecarretas.com.br/venda/utilitarios",
 }
+
+# Ônibus/micro-ônibus tem DUAS dimensões de marca no portal, não uma:
+#   - "marca" = a encarroçadora (Busscar, Marcopolo, Comil, Caio, Mascarello, Nielson, Neobus)
+#     -> fica em posição fixa no path, igual caminhão (/veiculo/.../onibus/<encarrocadora>/...)
+#   - "chassi" = o fabricante do chassi (Mercedes-Benz, Scania, Volvo, Volkswagen, Volare)
+#     -> aparece mais adiante no path, como um segmento a mais
+# Confirmado via fetch real de https://www.caminhoesecarretas.com.br/venda/onibus/3
+ENCARROCADORAS_ONIBUS = {
+    "busscar", "marcopolo", "caio", "comil", "mascarello", "nielson", "neobus", "chassi",
+}
+CHASSIS_ONIBUS = {"mercedes-benz", "scania", "volare", "volkswagen", "volvo"}
 
 
 @dataclass
@@ -46,6 +61,14 @@ class Taxonomia:
 
 def extrai_marcas(texto: str) -> list[str]:
     return sorted(set(m.upper() for m in FABRICANTE_ITEM_RE.findall(texto)))
+
+
+def extrai_encarrocadoras(texto: str) -> list[str]:
+    return sorted(set(m.upper() for m in ENCARROCADORA_ITEM_RE.findall(texto) if m.upper() != "CHASSI"))
+
+
+def extrai_chassis(texto: str) -> list[str]:
+    return sorted(set(m.upper() for m in CHASSI_ITEM_RE.findall(texto)))
 
 
 def extrai_modelos(texto: str) -> list[tuple[str, str]]:
