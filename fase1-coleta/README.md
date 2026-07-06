@@ -1,0 +1,39 @@
+# OPER RADAR — Fase 1: Coleta e banco de dados
+
+Pacote técnico da Fase 1 do roteiro de implementação (ver `OPER_RADAR_Roteiro_de_Implementacao.docx`).
+
+## O que está aqui
+
+- `schema.sql` — schema Postgres completo (revenda, anuncio, execucao_coleta, venda_estimada)
+- `parser.py` — extração dos campos de cada anúncio (ID, título, tipo, marca, ano, preço)
+- `diff_logic.py` — máquina de estados com a regra de 2 confirmações antes de marcar um anúncio como removido
+- `scraper.py` — orquestrador: descobre as URLs reais das revendas, busca cada página, roda o parser e o diff, grava no banco
+- `crontab.example` — agendamento das janelas 07h/19h
+- `sample_page.md` — trecho real de uma página de revenda (SVD Seminovos, Curitiba/PR), usado para validar o parser
+
+## O que já foi testado de verdade nesta sessão
+
+1. **`parser.py`** rodou contra o texto real de uma página do portal e extraiu corretamente ID, título, tipo, marca, ano e preço de 5 anúncios reais (caminhões, carreta, trator e van).
+2. **`diff_logic.py`** rodou 5 ciclos simulados e confirmou o comportamento esperado: um anúncio que some 1x e volta não é contabilizado (evita falso positivo); um anúncio que some 2x seguidas é confirmado como removido.
+
+Os dois testes rodam com `python3 parser.py` e `python3 diff_logic.py` — os resultados aparecem no terminal.
+
+## O que ainda não pode ser executado a partir daqui
+
+Este ambiente de chat não tem acesso de rede ao portal (só a ferramentas de busca/leitura pontuais) nem um banco Postgres persistente rodando em segundo plano. Por isso, o que falta para o scraper rodar de verdade, 2x por dia, é:
+
+1. **Hospedar** este código em um ambiente com acesso à internet e execução agendada — uma VPS simples, um serviço tipo Railway/Render, ou o Claude Code rodando localmente na sua máquina/servidor.
+2. **Subir um Postgres** (gerenciado ou não) e rodar `schema.sql` nele.
+3. **Instalar as dependências**: `pip install -r requirements.txt`
+4. **Configurar o cron** com `crontab.example` (ajustando os caminhos).
+5. **Rodar o primeiro ciclo manualmente** para validar contra o banco real: `python scraper.py --janela 07h --uf PR`
+
+## Limitações conhecidas (documentadas, não escondidas)
+
+- **Carretas e implementos** têm uma estrutura de URL diferente da de caminhões (não têm marca na mesma posição), então hoje o parser extrai a marca errada para esses tipos — ajuste pontual necessário antes de rodar em produção para todos os segmentos.
+- **Paginação**: não confirmei ainda se páginas de revendas com muitos anúncios paginam (a SVD Seminovos, com ~40 anúncios, veio inteira numa página só). Se houver revenda maior que pagine, o `scraper.py` precisa de um loop de páginas.
+- **Descoberta de URL real** (`discover_revenda_urls`) substitui as URLs "adivinhadas" que estavam na planilha de mapeamento nacional — recomendo rodar essa descoberta para os 3 estados detalhados (PR/SC/SP) antes de confiar nos links da planilha para scraping.
+
+## Próximo passo sugerido
+
+Rodar `discover_revenda_urls("PR")` contra o portal de verdade (fora deste chat) e comparar a contagem com as 363 revendas já mapeadas, para validar que a descoberta automática bate com o levantamento manual.

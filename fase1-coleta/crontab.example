@@ -1,0 +1,8 @@
+# OPER RADAR — agendamento das coletas (fuso America/Sao_Paulo)
+# instalar com: crontab crontab.example  (ajustar caminhos antes)
+
+0 7  * * * cd /opt/oper-radar && /opt/oper-radar/venv/bin/python scraper.py --janela 07h --uf PR >> /var/log/oper-radar/coleta.log 2>&1
+0 19 * * * cd /opt/oper-radar && /opt/oper-radar/venv/bin/python scraper.py --janela 19h --uf PR >> /var/log/oper-radar/coleta.log 2>&1
+
+# repetir as duas linhas acima por UF (PR, SC, SP, ...) ou adaptar o script
+# para aceitar uma lista de UFs numa unica chamada.
