@@ -18,6 +18,11 @@ const RUST = '#D9714F';
 const GREEN = '#4FAE7D';
 const STEEL = '#5B8AA6';
 
+// Endereço da API PHP publicada no HostGator (ver pasta oper-radar-api/ no repositório).
+// Troque pelo domínio real assim que publicar os arquivos — enquanto estiver com o valor
+// de exemplo, o app usa os dados de demonstração como fallback automático.
+const API_BASE_URL = 'https://SEUDOMINIO.com.br/oper-radar-api';
+
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'anuncios', label: 'Anúncios', icon: LayoutGrid },
@@ -155,14 +160,29 @@ function SectionCard({ title, subtitle, children }) {
 
 // ---------- Página: Dashboard ----------
 function PageDashboard() {
+  const [kpis, setKpis] = useState(null);
+  const [kpisErro, setKpisErro] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/kpis.php`)
+      .then(r => { if (!r.ok) throw new Error('erro'); return r.json(); })
+      .then(setKpis)
+      .catch(() => setKpisErro(true));
+  }, []);
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <Kpi label="Revendas monitoradas" value="1.567" sub="20 estados" />
-        <Kpi label="Vendas estimadas (mês)" value="—" sub="aguardando 1º ciclo" />
-        <Kpi label="Giro médio" value="—" sub="dias no anúncio" />
-        <Kpi label="Desvio médio vs FIPE" value="—" sub="ver aba Preços" />
+        <Kpi label="Revendas monitoradas" value={kpis ? kpis.revendas_monitoradas.toLocaleString('pt-BR') : '1.567'} sub={kpis ? 'dados reais' : '20 estados (exemplo)'} />
+        <Kpi label="Anúncios ativos" value={kpis ? kpis.anuncios_ativos.toLocaleString('pt-BR') : '—'} sub={kpis ? 'dados reais' : 'aguardando 1º ciclo'} />
+        <Kpi label="Vendas estimadas (mês)" value={kpis ? kpis.vendas_estimadas_mes : '—'} sub="anúncios removidos" />
+        <Kpi label="Desvio médio vs FIPE" value="—" sub="ver aba Preços (Fase 2)" />
       </div>
+      {kpisErro && (
+        <div style={{ fontSize: 12, color: INK_MUTED, marginBottom: 16, background: SURFACE, border: `0.5px solid ${BORDER}`, borderRadius: 8, padding: '8px 12px' }}>
+          Não foi possível buscar dados reais da API ({API_BASE_URL}) — mostrando valores de exemplo. Confirme se a API já foi publicada e se o endereço acima está correto.
+        </div>
+      )}
       <SectionCard title="Ranking nacional por estado" subtitle="Nº de revendas cadastradas no radar">
         <div style={{ height: 380 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -194,11 +214,53 @@ function PageDashboard() {
   );
 }
 
+// Mapeia o status salvo no banco (Fase 1) para o rótulo que o card já sabe exibir.
+const STATUS_DB_PARA_UI = {
+  ativo: 'ativo',
+  removido_candidato: 'venda_provavel',
+  removido_confirmado: 'removido',
+};
+
+function mapeiaAnuncioReal(a) {
+  const dias = Math.max(0, Math.round((new Date(a.ultima_vez_ativo) - new Date(a.primeira_vez_visto)) / 86400000));
+  return {
+    id: a.anuncio_portal_id,
+    tipo: a.tipo || '—',
+    marca: a.marca || '',
+    modelo: a.titulo,
+    ano: a.ano_inicial ? `${a.ano_inicial}/${a.ano_final}` : '',
+    km: '—',
+    preco: a.preco,
+    fipe: null, // preço FIPE chega na Fase 2 (mapeamento de marca/modelo)
+    revenda: a.revenda,
+    cidade: a.cidade,
+    uf: a.uf,
+    ultimaVez: new Date(a.ultima_vez_ativo).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+    status: STATUS_DB_PARA_UI[a.status] || 'ativo',
+    dias,
+  };
+}
+
 // ---------- Página: Anúncios ----------
 function PageAnuncios() {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
-  const filtered = SAMPLE_ANUNCIOS.filter(a => {
+  const [anuncios, setAnuncios] = useState(SAMPLE_ANUNCIOS);
+  const [usandoDadosReais, setUsandoDadosReais] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/anuncios.php?limit=100`)
+      .then(r => { if (!r.ok) throw new Error('erro'); return r.json(); })
+      .then(data => {
+        if (data.anuncios && data.anuncios.length > 0) {
+          setAnuncios(data.anuncios.map(mapeiaAnuncioReal));
+          setUsandoDadosReais(true);
+        }
+      })
+      .catch(() => { /* mantém os dados de exemplo */ });
+  }, []);
+
+  const filtered = anuncios.filter(a => {
     if (statusFilter !== 'todos' && a.status !== statusFilter) return false;
     if (q && !(`${a.marca} ${a.modelo} ${a.cidade}`.toLowerCase().includes(q.toLowerCase()))) return false;
     return true;
@@ -214,7 +276,9 @@ function PageAnuncios() {
           <option value="removido">Removido</option>
         </select>
       </div>
-      <div style={{ fontSize: 12, color: INK_MUTED, marginBottom: 12 }}>{filtered.length} anúncio(s) de exemplo — layout final, dados reais assim que o scraper estiver ativo</div>
+      <div style={{ fontSize: 12, color: INK_MUTED, marginBottom: 12 }}>
+        {filtered.length} anúncio(s) {usandoDadosReais ? '— dados reais da coleta' : 'de exemplo — layout final, dados reais assim que a API estiver publicada'}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
         {filtered.map(a => <AnuncioCard key={a.id} a={a} />)}
       </div>
