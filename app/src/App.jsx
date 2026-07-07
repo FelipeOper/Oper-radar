@@ -21,7 +21,7 @@ const STEEL = '#5B8AA6';
 // Endereço da API PHP publicada no HostGator (ver pasta oper-radar-api/ no repositório).
 // Troque pelo domínio real assim que publicar os arquivos — enquanto estiver com o valor
 // de exemplo, o app usa os dados de demonstração como fallback automático.
-const API_BASE_URL = 'https://SEUDOMINIO.com.br/oper-radar-api';
+const API_BASE_URL = 'https://agenciaoper.com.br/oper-radar-api';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
