@@ -10,7 +10,7 @@
 require_once __DIR__ . '/parser.php';
 require_once __DIR__ . '/diff_logic.php';
 
-const USER_AGENT = 'Mozilla/5.0 (OPER RADAR monitoring bot; contato@agenciaoper.com.br)';
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const LOJA_URL_RE = '/https:\/\/www\.caminhoesecarretas\.com\.br\/[^\/]+\/[a-z]{2}\/loja\/[^\/\s"]+\/veiculo\/\d+/';
 
 // Pausa entre cada revenda visitada. Plano compartilhado tem limite de 25% de CPU por

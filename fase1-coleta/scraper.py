@@ -17,7 +17,7 @@ from psycopg2.extras import RealDictCursor
 from parser import parse_listings, hash_pagina
 from diff_logic import processa_diff, EstadoAnuncio
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (OPER RADAR monitoring bot; contato@agenciaoper.com.br)"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 LOJA_URL_RE = re.compile(r"https://www\.caminhoesecarretas\.com\.br/[^/]+/[a-z]{2}/loja/[^/\s\"]+/veiculo/\d+")
 
 
