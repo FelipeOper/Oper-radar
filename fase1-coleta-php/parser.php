@@ -1,19 +1,17 @@
 <?php
 /**
- * OPER RADAR — Fase 1 (versão PHP, para hospedagem compartilhada sem Python/terminal)
- * Extração de anúncios a partir da página de uma revenda no portal Caminhões e Carretas.
- *
- * Porta 1:1 a lógica já validada em parser.py (Python) — mesmas regex, mesmo
- * comportamento, só a sintaxe muda. Testado contra a mesma amostra real (sample_page.md).
+ * OPER RADAR — Fase 1 (versão PHP)
+ * Extração de anúncios a partir da página de uma revenda — v2, HTML bruto real.
+ * Porta 1:1 da versão Python (parser.py v2), estrutura confirmada direto no servidor
+ * de produção via curl+grep.
  */
 
-const VEICULO_URL_RE = '/\[(?<titulo>[^\]]+)\]\((?<url>https:\/\/www\.caminhoesecarretas\.com\.br\/veiculo\/[^)]+)\)/';
-const PRECO_RE = '/R\$\s*([\d.]+),\d{2}/';
-const PRECO_CONSULTAR_RE = '/\(A consultar\)/';
-const ANO_RE = '/(\d{4})\/(\d{4})/';
+const BASE_URL_PARSER = 'https://www.caminhoesecarretas.com.br';
+const HREF_RE = '/href="(\/veiculo\/[a-z0-9\/\-]+\/(\d+))"/';
+const TITULO_RE = '/<h2 class="h16">\s*(.*?)\s*<\/h2>/s';
+const PRECO_RE = '/<span class="money">\s*(R\$[^<]+)<\/span>/';
+const ANO_RE_PARSER = '/(\d{4})\/(\d{4})/';
 
-/** Marcas de caminhão conhecidas — fallback de segurança quando taxonomia.json não tem
- * a categoria ainda. Mesma lista do parser.py. */
 const MARCAS_CAMINHAO_FALLBACK = [
     "daf", "volvo", "scania", "mercedes-benz", "iveco", "man", "ford", "vw",
     "volkswagen", "agrale", "gm", "hyundai", "mack",
@@ -25,10 +23,6 @@ const MARCAS_EXTRA_FALLBACK = [
     "stara", "yanmar",
 ];
 
-/**
- * Carrega o conjunto de marcas conhecidas: taxonomia.json (descoberta real no portal,
- * ver taxonomia.php) + os dois fallbacks acima.
- */
 function carrega_marcas_conhecidas(string $caminho_taxonomia = __DIR__ . '/taxonomia.json'): array {
     $marcas = [];
     if (file_exists($caminho_taxonomia)) {
@@ -45,70 +39,78 @@ function carrega_marcas_conhecidas(string $caminho_taxonomia = __DIR__ . '/taxon
     return array_unique($marcas);
 }
 
-function extrai_id_da_url(string $url): int {
-    $partes = explode('/', rtrim($url, '/'));
-    return (int) end($partes);
+function limpa_texto_html(string $texto): string {
+    $texto = html_entity_decode($texto, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    return trim(preg_replace('/\s+/', ' ', $texto));
 }
 
-function extrai_tipo_e_marca_da_url(string $url, array $marcas_conhecidas): array {
-    $partes = explode('/veiculo/', $url);
-    $segmentos = explode('/', end($partes));
-    $tipo = isset($segmentos[2]) ? ucfirst($segmentos[2]) : null;
+function extrai_tipo_e_marca_da_url(string $url_relativa, array $marcas_conhecidas): array {
+    $partes = explode('/', trim($url_relativa, '/'));
+    // partes[0] == "veiculo"
+    $tipo = isset($partes[3]) ? ucfirst($partes[3]) : null;
 
-    // A marca não tem posição fixa em todos os tipos — escaneia todos os segmentos
-    // do path procurando um nome presente na taxonomia descoberta no próprio portal
-    // (mesma lógica de parser.py: o primeiro segmento que bater já resolve, e como a
-    // encarroçadora/marca aparece antes do chassi na URL, o scan naturalmente acerta).
-    foreach ($segmentos as $segmento) {
+    foreach ($partes as $segmento) {
         if (in_array(strtolower($segmento), $marcas_conhecidas, true)) {
             return [$tipo, strtoupper(str_replace('-', ' ', $segmento))];
         }
     }
-    return [$tipo, null]; // marca não reconhecida — fica null em vez de errada
+    return [$tipo, null];
 }
 
 /**
- * @return array Lista de anúncios extraídos, cada um como array associativo.
+ * @return array Lista de anúncios extraídos (arrays associativos).
  */
-function parse_listings(string $page_text, array $marcas_conhecidas): array {
+function parse_listings(string $html, array $marcas_conhecidas): array {
     $anuncios = [];
-    // Cada bloco de anúncio começa no link do título ("## [") e vai até o próximo bloco.
-    $blocos = preg_split('/(?=## \[)/', $page_text);
+    $ids_processados = [];
+
+    $blocos = preg_split('/(?=<div class="list-product list-view-item">)/', $html);
 
     foreach ($blocos as $bloco) {
-        if (!preg_match(VEICULO_URL_RE, $bloco, $m)) {
+        if (!preg_match(HREF_RE, $bloco, $hrefM)) {
             continue;
         }
-        $titulo = $m['titulo'];
-        $url = $m['url'];
-        $anuncio_id = extrai_id_da_url($url);
-        [$tipo, $marca] = extrai_tipo_e_marca_da_url($url, $marcas_conhecidas);
+        $urlRelativa = $hrefM[1];
+        $anuncioId = (int) $hrefM[2];
+        if (in_array($anuncioId, $ids_processados, true)) {
+            continue;
+        }
+        $ids_processados[] = $anuncioId;
 
-        $ano_inicial = $ano_final = null;
-        if (preg_match(ANO_RE, $titulo, $anoM)) {
-            $ano_inicial = (int) $anoM[1];
-            $ano_final = (int) $anoM[2];
+        [$tipo, $marca] = extrai_tipo_e_marca_da_url($urlRelativa, $marcas_conhecidas);
+
+        $titulo = (string) $anuncioId;
+        if (preg_match(TITULO_RE, $bloco, $tituloM)) {
+            $titulo = limpa_texto_html($tituloM[1]);
+        }
+
+        $anoInicial = $anoFinal = null;
+        if (preg_match(ANO_RE_PARSER, $titulo, $anoM)) {
+            $anoInicial = (int) $anoM[1];
+            $anoFinal = (int) $anoM[2];
         }
 
         $preco = null;
-        $preco_texto_bruto = '';
+        $precoTextoBruto = '';
         if (preg_match(PRECO_RE, $bloco, $precoM)) {
-            $preco = (float) str_replace('.', '', $precoM[1]);
-            $preco_texto_bruto = $precoM[0];
-        } elseif (preg_match(PRECO_CONSULTAR_RE, $bloco)) {
-            $preco_texto_bruto = '(A consultar)';
+            $precoTextoBruto = limpa_texto_html($precoM[1]);
+            if (preg_match('/[\d.]+,\d{2}/', $precoTextoBruto, $valorM)) {
+                $preco = (float) str_replace(',', '.', str_replace('.', '', $valorM[0]));
+            }
+        } elseif (stripos($bloco, 'consultar') !== false) {
+            $precoTextoBruto = '(A consultar)';
         }
 
         $anuncios[] = [
-            'anuncio_portal_id' => $anuncio_id,
-            'url' => $url,
+            'anuncio_portal_id' => $anuncioId,
+            'url' => BASE_URL_PARSER . $urlRelativa,
             'titulo' => $titulo,
             'tipo' => $tipo,
             'marca' => $marca,
-            'ano_inicial' => $ano_inicial,
-            'ano_final' => $ano_final,
+            'ano_inicial' => $anoInicial,
+            'ano_final' => $anoFinal,
             'preco' => $preco,
-            'preco_texto_bruto' => $preco_texto_bruto,
+            'preco_texto_bruto' => $precoTextoBruto,
         ];
     }
     return $anuncios;
@@ -120,7 +122,7 @@ function hash_pagina(string $page_text): string {
 
 // ---- teste local, roda com: php parser.php ----
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
-    $texto = file_get_contents(__DIR__ . '/sample_page.md');
+    $texto = file_get_contents(__DIR__ . '/sample_page_real.html');
     $marcas = carrega_marcas_conhecidas();
     $anuncios = parse_listings($texto, $marcas);
 
