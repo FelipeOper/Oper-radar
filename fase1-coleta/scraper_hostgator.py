@@ -34,7 +34,14 @@ PAUSA_ENTRE_REQUISICOES = 2.0
 def discover_revenda_urls(uf: str) -> list[str]:
     resp = requests.get(f"https://www.caminhoesecarretas.com.br/revendas.aspx?uf={uf}", headers=HEADERS, timeout=20)
     resp.raise_for_status()
-    return sorted(set(LOJA_URL_RE.findall(resp.text)))
+    urls = sorted(set(LOJA_URL_RE.findall(resp.text)))
+    if not urls:
+        # Diagnóstico: por que nada bateu? Mostra o que realmente veio na resposta.
+        print(f"[debug] status={resp.status_code} tamanho={len(resp.text)} chars")
+        print(f"[debug] primeiros 500 caracteres da resposta:\n{resp.text[:500]}")
+        print(f"[debug] contém 'loja'? {'loja' in resp.text.lower()}")
+        print(f"[debug] contém 'cloudflare' ou 'challenge'? {'cloudflare' in resp.text.lower() or 'challenge' in resp.text.lower()}")
+    return urls
 
 
 def fetch_revenda_page(url: str) -> str:
