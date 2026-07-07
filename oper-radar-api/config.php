@@ -8,6 +8,11 @@
  * NÃO deixe este arquivo dentro de public_html acessível diretamente — coloque-o
  * junto dos outros arquivos da API numa pasta própria (ex: /oper-radar-api/).
  */
+
+// Chave da API da Anthropic para o Analista IA (analista.php).
+// Crie em console.anthropic.com > API Keys. Deixe '' para desativar o Analista.
+define('ANTHROPIC_API_KEY', '');
+
 function conecta(): mysqli {
     $host = 'localhost';
     $user = 'pro93061_pro93061';       // mesmo usuário do scraper

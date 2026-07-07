@@ -4,7 +4,7 @@ import {
   Radar, LayoutGrid, Crosshair, Building2, Settings, ListChecks,
   MapPin, Truck, Clock, ExternalLink, Search, ChevronRight, Menu, X,
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
-  Timer, Flame, PackageOpen, Zap
+  Timer, Flame, PackageOpen, Zap, Gauge
 } from 'lucide-react';
 
 /* ============================================================
@@ -53,6 +53,7 @@ function mapeiaAnuncioReal(a) {
     titulo: a.titulo,
     ano: a.ano_inicial ? `${a.ano_inicial}/${a.ano_final}` : '',
     preco: a.preco,
+    precoFipe: a.preco_fipe ?? null,
     revenda: a.revenda,
     cidade: a.cidade,
     uf: a.uf,
@@ -244,39 +245,89 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
 }
 
 /* ============================================================
-   MERCADO — estoque regional completo
+   MERCADO — estoque regional completo (filtros avançados)
    ============================================================ */
 function PageMercado({ anuncios, usandoReais }) {
   const [q, setQ] = useState('');
   const [tipo, setTipo] = useState('todos');
   const [status, setStatus] = useState('todos');
+  const [cidade, setCidade] = useState('todas');
+  const [revenda, setRevenda] = useState('todas');
+  const [precoMin, setPrecoMin] = useState('');
+  const [precoMax, setPrecoMax] = useState('');
+  const [ordem, setOrdem] = useState('recente');
+  const [maisFiltros, setMaisFiltros] = useState(false);
 
   const tipos = useMemo(() => ['todos', ...new Set(anuncios.map(a => a.tipo).filter(t => t && t !== '—'))], [anuncios]);
-  const filtrados = anuncios.filter(a => {
-    if (tipo !== 'todos' && a.tipo !== tipo) return false;
-    if (status !== 'todos' && a.status !== status) return false;
-    if (q && !(`${a.marca} ${a.titulo} ${a.cidade} ${a.revenda}`.toLowerCase().includes(q.toLowerCase()))) return false;
-    return true;
-  });
+  const cidades = useMemo(() => ['todas', ...[...new Set(anuncios.map(a => a.cidade).filter(Boolean))].sort()], [anuncios]);
+  const revendas = useMemo(() => ['todas', ...[...new Set(anuncios.map(a => a.revenda).filter(Boolean))].sort()], [anuncios]);
+
+  const filtrados = useMemo(() => {
+    let lista = anuncios.filter(a => {
+      if (tipo !== 'todos' && a.tipo !== tipo) return false;
+      if (status !== 'todos' && a.status !== status) return false;
+      if (cidade !== 'todas' && a.cidade !== cidade) return false;
+      if (revenda !== 'todas' && a.revenda !== revenda) return false;
+      if (precoMin && (a.preco == null || a.preco < Number(precoMin))) return false;
+      if (precoMax && (a.preco == null || a.preco > Number(precoMax))) return false;
+      if (q && !(`${a.marca} ${a.titulo} ${a.cidade} ${a.revenda}`.toLowerCase().includes(q.toLowerCase()))) return false;
+      return true;
+    });
+    const ordens = {
+      recente: (x, y) => new Date(y.ultimaVez) - new Date(x.ultimaVez),
+      preco_asc: (x, y) => (x.preco ?? Infinity) - (y.preco ?? Infinity),
+      preco_desc: (x, y) => (y.preco ?? -1) - (x.preco ?? -1),
+      mais_tempo: (x, y) => y.dias - x.dias,
+    };
+    return [...lista].sort(ordens[ordem] || ordens.recente);
+  }, [anuncios, tipo, status, cidade, revenda, precoMin, precoMax, q, ordem]);
+
+  const filtrosAtivos = [tipo !== 'todos', status !== 'todos', cidade !== 'todas', revenda !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar modelo, marca, cidade ou revenda…"
             style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
         </div>
-        <select value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle}>
-          {tipos.map(t => <option key={t} value={t}>{t === 'todos' ? 'Todos os tipos' : t}</option>)}
+        <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
+          <option value="recente">Mais recentes</option>
+          <option value="preco_asc">Menor preço</option>
+          <option value="preco_desc">Maior preço</option>
+          <option value="mais_tempo">Há mais tempo no ar</option>
         </select>
-        <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
-          <option value="todos">Todos os status</option>
-          <option value="ativo">No mercado</option>
-          <option value="venda_provavel">Venda provável</option>
-          <option value="removido">Vendido</option>
-        </select>
+        <button onClick={() => setMaisFiltros(!maisFiltros)} style={{
+          ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center',
+          borderColor: filtrosAtivos ? T.signal : T.line, color: filtrosAtivos ? T.signal : T.ink,
+        }}>
+          Filtros{filtrosAtivos ? ` · ${filtrosAtivos}` : ''} {maisFiltros ? '▴' : '▾'}
+        </button>
       </div>
+
+      {maisFiltros && (
+        <Card style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+          <select value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle}>
+            {tipos.map(t => <option key={t} value={t}>{t === 'todos' ? 'Todos os tipos' : t}</option>)}
+          </select>
+          <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
+            <option value="todos">Todos os status</option>
+            <option value="ativo">No mercado</option>
+            <option value="venda_provavel">Venda provável</option>
+            <option value="removido">Vendido</option>
+          </select>
+          <select value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle}>
+            {cidades.map(c => <option key={c} value={c}>{c === 'todas' ? 'Todas as cidades' : c}</option>)}
+          </select>
+          <select value={revenda} onChange={e => setRevenda(e.target.value)} style={inputStyle}>
+            {revendas.map(r => <option key={r} value={r}>{r === 'todas' ? 'Todas as revendas' : r}</option>)}
+          </select>
+          <input type="number" value={precoMin} onChange={e => setPrecoMin(e.target.value)} placeholder="Preço mín. (R$)" style={inputStyle} />
+          <input type="number" value={precoMax} onChange={e => setPrecoMax(e.target.value)} placeholder="Preço máx. (R$)" style={inputStyle} />
+        </Card>
+      )}
+
       <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, margin: '10px 2px 14px' }}>
         {fmtN(filtrados.length)} ANÚNCIOS {usandoReais ? '· DADOS REAIS DA COLETA' : '· CONECTANDO À API…'}
       </div>
@@ -301,7 +352,11 @@ function PageMercado({ anuncios, usandoReais }) {
                 <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>
                   {fmtBRL(a.preco)}
                 </div>
-                <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 2 }}>vs FIPE: aguardando Fase 2</div>
+                <div style={{ fontSize: 11, marginTop: 2, color: a.precoFipe ? (a.preco < a.precoFipe ? T.positive : T.inkMuted) : T.inkMuted }}>
+                  {a.precoFipe
+                    ? `FIPE ${fmtBRL(a.precoFipe)} · ${a.preco < a.precoFipe ? '▼' : '▲'} ${Math.abs(Math.round((a.preco - a.precoFipe) / a.precoFipe * 100))}%`
+                    : 'vs FIPE: aguardando Fase 2'}
+                </div>
               </div>
               {a.url && (
                 <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal">
@@ -545,6 +600,144 @@ function PageAjustes() {
 }
 
 /* ============================================================
+   ANÁLISE — insights agregados + Analista IA
+   ============================================================ */
+function BarraH({ rotulo, valor, max, cor }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+      <span style={{ width: 130, color: T.inkMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rotulo}</span>
+      <div style={{ flex: 1, height: 8, background: T.surface2, borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ width: `${Math.max(3, valor / max * 100)}%`, height: '100%', background: cor || T.signal, borderRadius: 4 }} />
+      </div>
+      <span style={{ fontFamily: T.fontMono, fontSize: 11.5, width: 46, textAlign: 'right' }}>{fmtN(valor)}</span>
+    </div>
+  );
+}
+
+function PageAnalise() {
+  const { data: ins, erro } = useApi('insights.php');
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState('');
+  const [pensando, setPensando] = useState(false);
+  const [chatErro, setChatErro] = useState(null);
+
+  const enviar = async () => {
+    const texto = input.trim();
+    if (!texto || pensando) return;
+    const novas = [...msgs, { role: 'user', content: texto }];
+    setMsgs(novas); setInput(''); setPensando(true); setChatErro(null);
+    try {
+      const r = await fetch(`${API_BASE_URL}/analista.php`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: novas }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.mensagem || d.erro || 'falha');
+      setMsgs([...novas, { role: 'assistant', content: d.resposta }]);
+    } catch (e) {
+      setChatErro(String(e.message || e));
+    } finally {
+      setPensando(false);
+    }
+  };
+
+  const sugestoes = [
+    'Monte um plano de ação de vendas para esta semana com base no giro dos concorrentes',
+    'Quais anúncios parados valem uma proposta agressiva de compra?',
+    'Onde está a maior oferta e o que isso diz sobre preço na região?',
+  ];
+
+  return (
+    <div>
+      {!ins && !erro && <EmptyState icon={Gauge} titulo="Calculando insights…" texto="Agregando os dados reais da coleta." />}
+      {erro && <EmptyState icon={Gauge} titulo="API indisponível" texto={`Não foi possível buscar ${API_BASE_URL}/insights.php — confirme se o arquivo foi publicado.`} />}
+
+      {ins && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
+          <Card>
+            <SectionTitle sub="Onde a oferta se concentra">Marcas com mais anúncios</SectionTitle>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {ins.por_marca.slice(0, 8).map(m => (
+                <BarraH key={m.marca} rotulo={m.marca} valor={m.anuncios} max={ins.por_marca[0]?.anuncios || 1} />
+              ))}
+            </div>
+          </Card>
+          <Card>
+            <SectionTitle sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</SectionTitle>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {ins.por_cidade.slice(0, 8).map(c => (
+                <BarraH key={c.cidade} rotulo={c.cidade} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} cor={T.positive} />
+              ))}
+            </div>
+          </Card>
+          <Card>
+            <SectionTitle sub="Vendas confirmadas · estoque · idade média — o que ninguém mais enxerga">Giro dos concorrentes</SectionTitle>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {ins.giro_por_revenda.slice(0, 8).map(g => (
+                <div key={g.revenda} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda}</span>
+                  <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>
+                    <span style={{ color: T.positive }}>{g.vendas_confirmadas}v</span> · {g.estoque_ativo}a · {g.idade_media_dias ?? '—'}d
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card>
+            <SectionTitle sub="Distribuição do estoque ativo por preço">Faixas de preço</SectionTitle>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {ins.faixas_preco.map(f => (
+                <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(...ins.faixas_preco.map(x => x.anuncios))} cor={T.alert} />
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <SectionTitle sub="Converse com os dados: peça planos de ação, priorização e leitura de concorrência">Analista IA</SectionTitle>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ maxHeight: 380, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {msgs.length === 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 13, color: T.inkMuted }}>Sugestões para começar:</div>
+              {sugestoes.map((s, i) => (
+                <button key={i} onClick={() => setInput(s)} style={{
+                  ...inputStyle, cursor: 'pointer', textAlign: 'left', fontSize: 12.5, color: T.inkMuted,
+                }}>{s}</button>
+              ))}
+            </div>
+          )}
+          {msgs.map((m, i) => (
+            <div key={i} style={{
+              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%',
+              background: m.role === 'user' ? 'rgba(245,166,35,0.12)' : T.surface2,
+              border: `1px solid ${m.role === 'user' ? 'rgba(245,166,35,0.25)' : T.line}`,
+              borderRadius: 12, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+            }}>{m.content}</div>
+          ))}
+          {pensando && <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted }}>ANALISANDO OS DADOS…</div>}
+          {chatErro && (
+            <div style={{ fontSize: 12.5, color: T.alert }}>
+              {chatErro.includes('chave') || chatErro.includes('configurada')
+                ? 'O Analista precisa de uma chave da API Anthropic configurada no config.php do servidor (console.anthropic.com > API Keys).'
+                : `Erro: ${chatErro}`}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, padding: 14, borderTop: `1px solid ${T.line}` }}>
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviar()}
+            placeholder="Pergunte ao analista — ex: onde devo focar as vendas esta semana?" style={{ ...inputStyle, flex: 1 }} />
+          <button onClick={enviar} disabled={pensando} style={{
+            ...inputStyle, cursor: 'pointer', background: T.signal, color: '#14171C',
+            fontWeight: 600, border: 'none', opacity: pensando ? 0.6 : 1,
+          }}>Enviar</button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
    shell — navegação
    ============================================================ */
 const NAV = [
@@ -552,6 +745,7 @@ const NAV = [
   { id: 'mercado', rotulo: 'Mercado', icone: LayoutGrid },
   { id: 'oportunidades', rotulo: 'Oportunidades', icone: Crosshair },
   { id: 'concorrentes', rotulo: 'Concorrentes', icone: Building2 },
+  { id: 'analise', rotulo: 'Análise', icone: Gauge },
   { id: 'acoes', rotulo: 'Ações', icone: ListChecks },
   { id: 'ajustes', rotulo: 'Ajustes', icone: Settings },
 ];
@@ -583,6 +777,7 @@ export default function App() {
     mercado: <PageMercado anuncios={anuncios} usandoReais={usandoReais} />,
     oportunidades: <PageOportunidades anuncios={anuncios} onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrentes />,
+    analise: <PageAnalise />,
     acoes: <PageAcoes acoes={acoes} setAcoes={setAcoes} />,
     ajustes: <PageAjustes />,
   };
