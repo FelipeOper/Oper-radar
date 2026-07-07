@@ -72,26 +72,36 @@ def salva_estado(conn, revenda_id: int, novo_estado: dict, anuncios_por_id: dict
     with conn.cursor() as cur:
         for anuncio_id, estado in novo_estado.items():
             anuncio = anuncios_por_id.get(anuncio_id)
-            cur.execute("""
-                INSERT INTO anuncio (anuncio_portal_id, revenda_id, url, titulo, tipo, marca,
-                    ano_inicial, ano_final, preco, preco_texto_bruto,
-                    primeira_vez_visto, ultima_vez_ativo, status, misses_consecutivos, data_remocao)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (revenda_id, anuncio_portal_id) DO UPDATE SET
-                    ultima_vez_ativo = EXCLUDED.ultima_vez_ativo,
-                    status = EXCLUDED.status,
-                    misses_consecutivos = EXCLUDED.misses_consecutivos,
-                    data_remocao = EXCLUDED.data_remocao,
-                    preco = COALESCE(EXCLUDED.preco, anuncio.preco)
-            """, (
-                anuncio_id, revenda_id,
-                anuncio.url if anuncio else None, anuncio.titulo if anuncio else str(anuncio_id),
-                anuncio.tipo if anuncio else None, anuncio.marca if anuncio else None,
-                anuncio.ano_inicial if anuncio else None, anuncio.ano_final if anuncio else None,
-                anuncio.preco if anuncio else None, anuncio.preco_texto_bruto if anuncio else None,
-                estado.primeira_vez_visto, estado.ultima_vez_ativo, estado.status,
-                estado.misses_consecutivos, estado.data_remocao,
-            ))
+            if anuncio is not None:
+                # Anúncio visto nesta coleta (novo ou continuando ativo) — grava tudo.
+                cur.execute("""
+                    INSERT INTO anuncio (anuncio_portal_id, revenda_id, url, titulo, tipo, marca,
+                        ano_inicial, ano_final, preco, preco_texto_bruto,
+                        primeira_vez_visto, ultima_vez_ativo, status, misses_consecutivos, data_remocao)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (revenda_id, anuncio_portal_id) DO UPDATE SET
+                        ultima_vez_ativo = EXCLUDED.ultima_vez_ativo,
+                        status = EXCLUDED.status,
+                        misses_consecutivos = EXCLUDED.misses_consecutivos,
+                        data_remocao = EXCLUDED.data_remocao,
+                        preco = COALESCE(EXCLUDED.preco, anuncio.preco)
+                """, (
+                    anuncio_id, revenda_id,
+                    anuncio.url, anuncio.titulo, anuncio.tipo, anuncio.marca,
+                    anuncio.ano_inicial, anuncio.ano_final, anuncio.preco, anuncio.preco_texto_bruto,
+                    estado.primeira_vez_visto, estado.ultima_vez_ativo, estado.status,
+                    estado.misses_consecutivos, estado.data_remocao,
+                ))
+            else:
+                # Anúncio que já existia e sumiu desta coleta — só atualiza o status.
+                cur.execute("""
+                    UPDATE anuncio SET
+                        ultima_vez_ativo = %s, status = %s, misses_consecutivos = %s, data_remocao = %s
+                    WHERE revenda_id = %s AND anuncio_portal_id = %s
+                """, (
+                    estado.ultima_vez_ativo, estado.status, estado.misses_consecutivos,
+                    estado.data_remocao, revenda_id, anuncio_id,
+                ))
     conn.commit()
 
 

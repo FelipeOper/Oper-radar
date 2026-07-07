@@ -83,7 +83,7 @@ function carrega_estado_atual(mysqli $conn, int $revenda_id): array {
 }
 
 function salva_estado(mysqli $conn, int $revenda_id, array $novo_estado, array $anuncios_por_id): void {
-    $sql = "INSERT INTO anuncio (anuncio_portal_id, revenda_id, url, titulo, tipo, marca,
+    $sqlInsert = "INSERT INTO anuncio (anuncio_portal_id, revenda_id, url, titulo, tipo, marca,
                 ano_inicial, ano_final, preco, preco_texto_bruto,
                 primeira_vez_visto, ultima_vez_ativo, status, misses_consecutivos, data_remocao)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -93,29 +93,48 @@ function salva_estado(mysqli $conn, int $revenda_id, array $novo_estado, array $
                 misses_consecutivos = VALUES(misses_consecutivos),
                 data_remocao = VALUES(data_remocao),
                 preco = COALESCE(VALUES(preco), preco)";
-    $stmt = $conn->prepare($sql);
+    $stmtInsert = $conn->prepare($sqlInsert);
+
+    $sqlUpdateOnly = "UPDATE anuncio SET
+                ultima_vez_ativo = ?, status = ?, misses_consecutivos = ?, data_remocao = ?
+            WHERE revenda_id = ? AND anuncio_portal_id = ?";
+    $stmtUpdate = $conn->prepare($sqlUpdateOnly);
 
     foreach ($novo_estado as $anuncio_id => $estado) {
         $a = $anuncios_por_id[$anuncio_id] ?? null;
-        $url = $a['url'] ?? null;
-        $titulo = $a['titulo'] ?? (string) $anuncio_id;
-        $tipo = $a['tipo'] ?? null;
-        $marca = $a['marca'] ?? null;
-        $anoInicial = $a['ano_inicial'] ?? null;
-        $anoFinal = $a['ano_final'] ?? null;
-        $preco = $a['preco'] ?? null;
-        $precoTexto = $a['preco_texto_bruto'] ?? null;
 
-        $stmt->bind_param(
-            'iisssssiidsssis',
-            $anuncio_id, $revenda_id, $url, $titulo, $tipo, $marca,
-            $anoInicial, $anoFinal, $preco, $precoTexto,
-            $estado['primeira_vez_visto'], $estado['ultima_vez_ativo'], $estado['status'],
-            $estado['misses_consecutivos'], $estado['data_remocao']
-        );
-        $stmt->execute();
+        if ($a !== null) {
+            // Anúncio visto nesta coleta — grava tudo.
+            $url = $a['url'];
+            $titulo = $a['titulo'];
+            $tipo = $a['tipo'];
+            $marca = $a['marca'];
+            $anoInicial = $a['ano_inicial'];
+            $anoFinal = $a['ano_final'];
+            $preco = $a['preco'];
+            $precoTexto = $a['preco_texto_bruto'];
+
+            $stmtInsert->bind_param(
+                'iisssssiidsssis',
+                $anuncio_id, $revenda_id, $url, $titulo, $tipo, $marca,
+                $anoInicial, $anoFinal, $preco, $precoTexto,
+                $estado['primeira_vez_visto'], $estado['ultima_vez_ativo'], $estado['status'],
+                $estado['misses_consecutivos'], $estado['data_remocao']
+            );
+            $stmtInsert->execute();
+        } else {
+            // Anúncio que já existia e sumiu desta coleta — só atualiza o status,
+            // não mexe em url/titulo/preço (evita violar NOT NULL).
+            $stmtUpdate->bind_param(
+                'ssisi',
+                $estado['ultima_vez_ativo'], $estado['status'], $estado['misses_consecutivos'],
+                $estado['data_remocao'], $revenda_id, $anuncio_id
+            );
+            $stmtUpdate->execute();
+        }
     }
-    $stmt->close();
+    $stmtInsert->close();
+    $stmtUpdate->close();
 }
 
 function registra_execucao(mysqli $conn, ?int $revenda_id, string $janela, int $qtd_ativos, string $hash, bool $sucesso, ?string $erro = null): void {
