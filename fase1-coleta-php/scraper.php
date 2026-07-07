@@ -11,7 +11,10 @@ require_once __DIR__ . '/parser.php';
 require_once __DIR__ . '/diff_logic.php';
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-const LOJA_URL_RE = '/https:\/\/www\.caminhoesecarretas\.com\.br\/[^\/]+\/[a-z]{2}\/loja\/[^\/\s"]+\/veiculo\/\d+/';
+const BASE_URL = 'https://www.caminhoesecarretas.com.br';
+// Os links no HTML real sao RELATIVOS (sem dominio, sem barra inicial) — confirmado
+// via curl+grep direto no servidor de producao.
+const LOJA_URL_RE = '/href="([a-z0-9-]+\/[a-z]{2}\/loja\/[a-z0-9-]+\/veiculo\/\d+)"/';
 
 // Pausa entre cada revenda visitada. Plano compartilhado tem limite de 25% de CPU por
 // períodos >=90s — rodar devagar evita estourar isso (e é mais gentil com o portal).
@@ -36,7 +39,8 @@ function http_get(string $url): string {
 function discover_revenda_urls(string $uf): array {
     $html = http_get("https://www.caminhoesecarretas.com.br/revendas.aspx?uf={$uf}");
     preg_match_all(LOJA_URL_RE, $html, $matches);
-    return array_values(array_unique($matches[0]));
+    $caminhos = array_values(array_unique($matches[1]));
+    return array_map(fn($c) => BASE_URL . '/' . $c, $caminhos);
 }
 
 function get_or_create_revenda(mysqli $conn, string $nome, string $cidade, string $uf, string $url_perfil): int {

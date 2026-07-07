@@ -23,7 +23,10 @@ from parser import parse_listings, hash_pagina
 from diff_logic import processa_diff, EstadoAnuncio
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-LOJA_URL_RE = re.compile(r"https://www\.caminhoesecarretas\.com\.br/[^/]+/[a-z]{2}/loja/[^/\s\"]+/veiculo/\d+")
+BASE_URL = "https://www.caminhoesecarretas.com.br"
+# Os links no HTML real são RELATIVOS (ex: href="curitiba/pr/loja/svd-seminovos/veiculo/20345"),
+# sem o domínio na frente e sem barra inicial — confirmado direto no servidor via curl+grep.
+LOJA_URL_RE = re.compile(r'href="([a-z0-9-]+/[a-z]{2}/loja/[a-z0-9-]+/veiculo/\d+)"')
 
 # Pausa entre cada fetch de revenda. Em hospedagem compartilhada, mais importante do que
 # velocidade é não estourar o limite de CPU (25% por >=90s) nem sobrecarregar o portal.
@@ -34,7 +37,8 @@ PAUSA_ENTRE_REQUISICOES = 2.0
 def discover_revenda_urls(uf: str) -> list[str]:
     resp = requests.get(f"https://www.caminhoesecarretas.com.br/revendas.aspx?uf={uf}", headers=HEADERS, timeout=20)
     resp.raise_for_status()
-    urls = sorted(set(LOJA_URL_RE.findall(resp.text)))
+    caminhos = sorted(set(LOJA_URL_RE.findall(resp.text)))
+    urls = [f"{BASE_URL}/{caminho}" for caminho in caminhos]
     if not urls:
         # Diagnóstico: por que nada bateu? Mostra o que realmente veio na resposta.
         print(f"[debug] status={resp.status_code} tamanho={len(resp.text)} chars")

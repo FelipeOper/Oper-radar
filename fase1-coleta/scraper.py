@@ -18,7 +18,10 @@ from parser import parse_listings, hash_pagina
 from diff_logic import processa_diff, EstadoAnuncio
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-LOJA_URL_RE = re.compile(r"https://www\.caminhoesecarretas\.com\.br/[^/]+/[a-z]{2}/loja/[^/\s\"]+/veiculo/\d+")
+BASE_URL = "https://www.caminhoesecarretas.com.br"
+# Os links no HTML real são RELATIVOS (sem domínio, sem barra inicial) — confirmado via
+# curl+grep direto no servidor de produção.
+LOJA_URL_RE = re.compile(r'href="([a-z0-9-]+/[a-z]{2}/loja/[a-z0-9-]+/veiculo/\d+)"')
 
 
 def discover_revenda_urls(uf: str) -> list[str]:
@@ -26,8 +29,8 @@ def discover_revenda_urls(uf: str) -> list[str]:
     Isso substitui qualquer URL "adivinhada" por slug — usa só o que o portal realmente linka."""
     resp = requests.get(f"https://www.caminhoesecarretas.com.br/revendas.aspx?uf={uf}", headers=HEADERS, timeout=20)
     resp.raise_for_status()
-    urls = sorted(set(LOJA_URL_RE.findall(resp.text)))
-    return urls
+    caminhos = sorted(set(LOJA_URL_RE.findall(resp.text)))
+    return [f"{BASE_URL}/{caminho}" for caminho in caminhos]
 
 
 def fetch_revenda_page(url: str) -> str:
