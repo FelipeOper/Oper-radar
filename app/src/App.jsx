@@ -177,9 +177,26 @@ const inputStyle = {
 };
 
 /* ============================================================
-   HOJE — feed de sinais + estado do radar
+   HOJE — feed compacto + KPIs de mercado
    ============================================================ */
+function PainelKpi({ titulo, subtitulo, dados, renderItem }) {
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ fontFamily: T.fontDisplay, fontSize: 13, fontWeight: 600, color: T.ink, marginBottom: 2 }}>{titulo}</div>
+      {subtitulo && <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 12 }}>{subtitulo}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {dados && dados.length > 0
+          ? dados.map(renderItem)
+          : <div style={{ fontSize: 12, color: T.inkMuted, fontStyle: 'italic' }}>ainda sem dados suficientes</div>}
+      </div>
+    </Card>
+  );
+}
+
 function PageHoje({ kpis, anuncios, usandoReais }) {
+  const { data: stats } = useApi('hoje_stats.php');
+  const [sinalAberto, setSinalAberto] = useState(null);
+
   const sinais = useMemo(() => {
     const lista = [];
     const agora = Date.now();
@@ -193,53 +210,113 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
         lista.push({ tipo: 'novo', a, quando: a.primeiraVez });
       }
     });
-    return lista.sort((x, y) => new Date(y.quando) - new Date(x.quando)).slice(0, 30);
+    return lista.sort((x, y) => new Date(y.quando) - new Date(x.quando)).slice(0, 40);
   }, [anuncios]);
 
   const config = {
-    novo:  { icone: Zap,          cor: T.signal,   rotulo: 'ENTROU NO MERCADO' },
-    sumiu: { icone: Timer,        cor: T.alert,    rotulo: 'SUMIU — VENDA PROVÁVEL' },
-    venda: { icone: CheckCircle2, cor: T.positive, rotulo: 'VENDA CONFIRMADA' },
+    novo:  { icone: Zap,          cor: T.signal,   rotulo: 'NOVO' },
+    sumiu: { icone: Timer,        cor: T.alert,    rotulo: 'SUMIU' },
+    venda: { icone: CheckCircle2, cor: T.positive, rotulo: 'VENDIDO' },
   };
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-        <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={usandoReais ? 'Paraná · coleta 2x/dia' : 'conectando…'} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 22 }}>
+        <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={usandoReais ? 'PR · 2×/dia' : 'conectando…'} />
         <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />
-        <Kpi label="Vendas estimadas" value={kpis ? fmtN(kpis.vendas_estimadas_mes) : '—'} sub="este mês · confirmadas 2×" tone={T.positive} />
-        <Kpi label="Sinais nas últimas 48h" value={fmtN(sinais.length)} sub="novos + removidos" tone={T.signal} />
+        <Kpi label="Vendas estimadas" value={kpis ? fmtN(kpis.vendas_estimadas_mes) : '—'} sub="este mês · confirmadas" tone={T.positive} />
+        <Kpi label="Sinais 48h" value={fmtN(sinais.length)} sub="novos + removidos" tone={T.signal} />
       </div>
 
-      <SectionTitle sub="Tudo que mudou no mercado desde a última varredura — mais recente primeiro">O que o radar captou</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1.1fr) 1.4fr', gap: 16, alignItems: 'start' }}>
 
-      {sinais.length === 0 ? (
-        <EmptyState icon={Radar} titulo="Coletando os primeiros sinais"
-          texto="O radar precisa de pelo menos dois ciclos de coleta (manhã e noite) para começar a detectar movimento — anúncios novos, removidos e vendas prováveis aparecem aqui." />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {sinais.map((s, i) => {
-            const C = config[s.tipo];
-            return (
-              <Card key={i} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                <C.icone size={17} style={{ color: C.cor, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 3 }}>
-                    <Tag tone={s.tipo === 'venda' ? 'positivo' : s.tipo === 'sumiu' ? 'alerta' : 'sinal'}>{C.rotulo}</Tag>
-                    <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted }}>
-                      {new Date(s.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </span>
+        {/* COLUNA ESQUERDA: feed compacto */}
+        <div>
+          <div style={{ fontFamily: T.fontDisplay, fontSize: 14, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Feed do mercado</div>
+          <div style={{ fontSize: 11.5, color: T.inkMuted, marginBottom: 12 }}>O que mudou desde ontem — clique para expandir</div>
+
+          {sinais.length === 0 ? (
+            <EmptyState icon={Radar} titulo="Sem sinais ainda"
+              texto="Aguardando o próximo ciclo do radar detectar movimento." />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 640, overflowY: 'auto', paddingRight: 4 }}>
+              {sinais.map((s, i) => {
+                const C = config[s.tipo];
+                const aberto = sinalAberto === i;
+                return (
+                  <div key={i} onClick={() => setSinalAberto(aberto ? null : i)} style={{
+                    background: aberto ? T.surface2 : T.surface,
+                    border: `1px solid ${aberto ? 'rgba(245,166,35,0.3)' : T.line}`,
+                    borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
+                    transition: 'border-color 140ms',
+                  }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <C.icone size={13} style={{ color: C.cor, flexShrink: 0 }} />
+                      <span style={{ fontFamily: T.fontMono, fontSize: 9.5, color: C.cor, letterSpacing: '0.05em', minWidth: 46 }}>{C.rotulo}</span>
+                      <span style={{ fontSize: 12.5, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.a.titulo}</span>
+                      <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted, whiteSpace: 'nowrap' }}>
+                        {new Date(s.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {aberto && (
+                      <div style={{ marginTop: 10, paddingLeft: 24, fontSize: 12, color: T.inkMuted, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div><span style={{ color: T.ink }}>{s.a.revenda}</span> · {s.a.cidade}/{s.a.uf}</div>
+                        <div><span style={{ fontFamily: T.fontMono, color: T.ink }}>{fmtBRL(s.a.preco)}</span> · {s.a.dias} dias no ar</div>
+                        {s.a.url && <a href={s.a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, textDecoration: 'none', display: 'inline-flex', gap: 5, alignItems: 'center', marginTop: 4 }}>Ver no portal <ExternalLink size={11} /></a>}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {s.a.titulo}
-                  </div>
-                  <div style={{ fontSize: 12, color: T.inkMuted }}>{s.a.revenda} · {s.a.cidade}/{s.a.uf} · {fmtBRL(s.a.preco)}</div>
-                </div>
-              </Card>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* COLUNA DIREITA: KPIs de mercado */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <PainelKpi titulo="Modelos mais anunciados" subtitulo="Volume ativo · preço médio de mercado"
+            dados={stats?.top_modelos}
+            renderItem={(m, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{m.modelo}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>
+                  {m.n}× · <span style={{ color: T.ink }}>{fmtBRL(m.preco_medio)}</span>
+                </span>
+              </div>
+            )}
+          />
+
+          <PainelKpi titulo="Regiões com mais vendas" subtitulo="Vendas confirmadas nos últimos 30 dias"
+            dados={stats?.regioes_vendas}
+            renderItem={(c, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><MapPin size={11} style={{ color: T.inkMuted }} />{c.cidade}/{c.uf}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{c.n} vendas</span>
+              </div>
+            )}
+          />
+
+          <PainelKpi titulo="Lojas mais ativas" subtitulo="Anúncios novos nos últimos 7 dias"
+            dados={stats?.top_lojas_novos}
+            renderItem={(l, i) => (
+              <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.signal }}>+{l.n}</span>
+              </div>
+            )}
+          />
+
+          <PainelKpi titulo="Lojas que mais venderam" subtitulo="Vendas confirmadas nos últimos 30 dias"
+            dados={stats?.top_lojas_vendas}
+            renderItem={(l, i) => (
+              <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{l.n}v</span>
+              </div>
+            )}
+          />
+        </div>
+      </div>
     </div>
   );
 }
