@@ -82,6 +82,19 @@ def linha_comercial(s: str):
     return None
 
 
+def eixos(s: str):
+    """Configuracao de eixos: '4X2', '6X4', '8X2'... Diferencia caminhoes de preco distinto."""
+    m = re.search(r"\b(\d)\s?X\s?(\d)\b", normaliza(s))
+    return f"{m.group(1)}X{m.group(2)}" if m else None
+
+
+def assinatura(modelo_fipe: str):
+    """O que realmente distingue dois modelos FIPE de precos diferentes:
+    a linha comercial (Atego/Atron, Worker/Constellation) e a config de eixos (4x2/6x4).
+    Variantes de norma de emissao (E5/E6) NAO entram — o ano do anuncio resolve isso."""
+    return (linha_comercial(modelo_fipe), eixos(modelo_fipe))
+
+
 def avalia(titulo: str, modelo_fipe: str):
     """Devolve (score, motivo). Regra: o numero do modelo TEM que bater; se ambos
     tem letra de serie, elas TEM que ser iguais (senao 'R440' casaria com 'G-440',
@@ -188,17 +201,31 @@ def melhores_candidatos(conn, anuncio, quantos=3):
 
 
 def escolhe(conn, anuncio):
-    """Devolve (modelo, confianca) ou (None, motivo_da_recusa)."""
-    validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=50) if s >= 0.5]
+    """Devolve (candidatos_ordenados, confianca) ou (None, motivo_da_recusa).
+    Devolve LISTA porque variantes da mesma assinatura (E5/E6) sao desempatadas
+    pelo ano: tenta-se a primeira que tenha o ano do anuncio na FIPE."""
+    validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=100) if s >= 0.5]
     if not validos:
         return None, "sem match"
-    linhas = {linha_comercial(c["modelo_fipe"]) for _, _, c in validos}
-    if len(linhas) > 1:
-        # Ex: 'MB 1719' casa com Atego 1719 E Atron 1719 — modelos e precos diferentes.
+
+    # Se o titulo informa os eixos (ex: 'DAF XF FTT 530 6X4'), usa isso pra desempatar
+    eixo_titulo = eixos(anuncio["titulo"])
+    if eixo_titulo:
+        filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_titulo, None)]
+        if filtrados:
+            validos = filtrados
+
+    assinaturas = {assinatura(c["modelo_fipe"]) for _, _, c in validos}
+    if len(assinaturas) > 1:
+        # Ex: 'MB 1719' -> Atego 1719 E Atron 1719 (linhas diferentes)
+        #     'SCANIA R440' -> R-440 4x2 E R-440 6x4 (eixos diferentes, precos diferentes)
         # Preco errado e pior que preco nenhum: nao vincula.
-        return None, "ambiguo (" + "/".join(sorted(x or "?" for x in linhas)) + ")"
-    score, _, melhor = validos[0]
-    return melhor, ("alto" if score >= 0.95 else "medio")
+        desc = "/".join(sorted(f"{l or '?'}{'-' + e if e else ''}" for l, e in assinaturas))[:34]
+        return None, f"ambiguo ({desc})"
+
+    melhor_score = validos[0][0]
+    confianca = "alto" if melhor_score >= 0.95 else "medio"
+    return [c for _, _, c in validos], confianca
 
 
 def roda_debug(conn):
@@ -212,20 +239,20 @@ def roda_debug(conn):
 
     pendentes = anuncios_pendentes(conn, 20)
     print(f"\nMatching nos {len(pendentes)} primeiros anuncios pendentes:\n")
-    contagem = {"vincula": 0, "sem match": 0, "ambiguo": 0}
+    cont = {"vincula": 0, "sem match": 0, "ambiguo": 0}
     for a in pendentes:
-        modelo, info = escolhe(conn, a)
-        if modelo:
-            contagem["vincula"] += 1
-            print(f"  OK  [{info:5}] {a['titulo'][:34]:34} -> {modelo['modelo_fipe'][:42]}")
+        cands, info = escolhe(conn, a)
+        if cands:
+            cont["vincula"] += 1
+            extra = f" (+{len(cands)-1} variantes, o ano decide)" if len(cands) > 1 else ""
+            print(f"  OK  [{info:5}] {a['titulo'][:32]:32} -> {cands[0]['modelo_fipe'][:38]}{extra}")
         else:
-            chave = "ambiguo" if info.startswith("ambiguo") else "sem match"
-            contagem[chave] += 1
-            print(f"  --  [{info[:28]:28}] {a['titulo'][:34]}")
+            cont["ambiguo" if info.startswith("ambiguo") else "sem match"] += 1
+            print(f"  --  [{info[:34]:34}] {a['titulo'][:30]}")
             for s, motivo, c in melhores_candidatos(conn, a, quantos=2):
-                print(f"          {s:.2f} {motivo:16} {c['modelo_fipe'][:40]}")
-    print(f"\nResumo da amostra: {contagem['vincula']} vinculariam · "
-          f"{contagem['sem match']} sem match · {contagem['ambiguo']} ambiguos (nao vinculam de proposito)")
+                print(f"          {s:.2f} {motivo:14} {c['modelo_fipe'][:38]}")
+    print(f"\nResumo: {cont['vincula']} vinculariam · {cont['sem match']} sem match · "
+          f"{cont['ambiguo']} ambiguos (nao vinculam de proposito)")
 
 
 def roda(conn):
@@ -236,36 +263,42 @@ def roda(conn):
 
     for a in pendentes:
         try:
-            modelo, info = escolhe(conn, a)
-            if not modelo:
+            cands, info = escolhe(conn, a)
+            if not cands:
                 if info.startswith("ambiguo"):
                     ambiguos += 1
                 else:
                     sem_match += 1
                 continue
-            preco_id = busca_ou_cria_preco(conn, modelo, a["ano_inicial"])
+
+            # Variantes com a mesma assinatura (E5/E6): a primeira que tiver o ano do anuncio vence
+            preco_id = escolhido = None
+            for c in cands[:3]:
+                preco_id = busca_ou_cria_preco(conn, c, a["ano_inicial"])
+                if preco_id:
+                    escolhido = c
+                    break
             if not preco_id:
                 sem_ano += 1
                 continue
+
             cur = conn.cursor()
             cur.execute("UPDATE anuncio SET fipe_preco_id=%s, fipe_match_confianca=%s WHERE id=%s",
                         (preco_id, info, a["id"]))
             conn.commit()
             cur.close()
             vinculados += 1
-            print(f"  [{info}] {a['titulo'][:40]:40} -> {modelo['modelo_fipe'][:38]}")
+            print(f"  [{info}] {a['titulo'][:38]:38} -> {escolhido['modelo_fipe'][:36]}")
         except RuntimeError as e:
             print(f"\n{e}")
             break
         except requests.RequestException as e:
-            print(f"  ! erro de rede em '{a['titulo'][:34]}': {e}")
+            print(f"  ! erro de rede em '{a['titulo'][:32]}': {e}")
             continue
 
     print(f"\n{vinculados} vinculados · {sem_match} sem match · {ambiguos} ambiguos (pulados de proposito) "
           f"· {sem_ano} sem o ano na FIPE")
     print(f"{contador_req} requisicoes usadas nesta rodada.")
-    if vinculados == 0:
-        print("\nRode com --debug pra ver os scores sem gastar cota.")
 
 
 if __name__ == "__main__":

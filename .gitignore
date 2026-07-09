@@ -2,3 +2,5 @@ Oper-radar.bundle
 *.bundle
 node_modules/
 dist/
+__pycache__/
+*.pyc
