@@ -43,12 +43,50 @@ const STATUS_DB_PARA_UI = {
   removido_confirmado: 'removido',
 };
 
+
+// Agrupa os 33 "tipos" do portal em 8 categorias de negocio (definidas com base
+// nos dados reais do banco em 08/jul). Cada anuncio tem 1 categoria a partir do tipo.
+const CATEGORIAS = {
+  'caminhoes':      { label: 'Caminhoes',                    icone: '🚛', cor: '#F5A623' },
+  'implementos':    { label: 'Implementos rodoviarios',     icone: '🚚', cor: '#D9714F' },
+  'onibus_vans':    { label: 'Onibus e vans',                icone: '🚌', cor: '#5B8AA6' },
+  'leves':          { label: 'Leves',                        icone: '🚗', cor: '#8A94A6' },
+  'agricolas':      { label: 'Maquinas agricolas',           icone: '🌾', cor: '#3DD68C' },
+  'construcao':     { label: 'Maquinas construcao',          icone: '🏗️', cor: '#FFB347' },
+  'pecas':          { label: 'Pecas e acessorios',           icone: '🔧', cor: '#B98CE0' },
+  'outros':         { label: 'Outros',                       icone: '🌀', cor: '#6B7280' },
+};
+
+// De qual categoria e cada tipo. Fonte: consulta ao banco pro93061_radar_oper em 08/jul.
+const TIPO_PARA_CATEGORIA = {
+  'Caminhao': 'caminhoes', 'Motorhome': 'caminhoes',
+  'Implemento': 'implementos', 'Carroceria-sobre-chassi': 'implementos', 'Trailer': 'implementos',
+  'Onibus': 'onibus_vans', 'Micro-onibus': 'onibus_vans', 'Vans': 'onibus_vans', 'Utilitarios': 'onibus_vans',
+  'Carro': 'leves',
+  'Trator': 'agricolas', 'Trator-esteira': 'agricolas', 'Micro-trator': 'agricolas',
+  'Plantadeira': 'agricolas', 'Colheitadeira': 'agricolas', 'Plataforma-colheitadeira': 'agricolas',
+  'Pulverizador': 'agricolas', 'Semeadeira': 'agricolas', 'Distribuidor-autopropelido': 'agricolas',
+  'Forragem-e-feno': 'agricolas', 'Florestal': 'agricolas',
+  'Pa-carregadeira': 'construcao', 'Escavadeira': 'construcao', 'Retro-escavadeira': 'construcao',
+  'Motoniveladora': 'construcao', 'Rolo-compactador': 'construcao', 'Guindaste': 'construcao',
+  'Mini-carregadeira': 'construcao', 'Auto-carregavel': 'construcao', 'Mini-escavadeira': 'construcao',
+  'Empilhadeira': 'construcao', 'Plataforma-elevatoria': 'construcao', 'Maquinas': 'construcao',
+  'Equipamentos': 'construcao',
+  'Pecas-a-venda': 'pecas',
+  'Moto': 'outros', 'Imoveis': 'outros', 'Quadriciclo': 'outros', 'Nautico': 'outros',
+};
+
+function categoriaDe(tipo) {
+  return TIPO_PARA_CATEGORIA[tipo] || 'outros';
+}
+
 function mapeiaAnuncioReal(a) {
   const dias = Math.max(0, Math.round((Date.now() - new Date(a.primeira_vez_visto)) / 86400000));
   return {
     id: a.anuncio_portal_id,
     url: a.url,
     tipo: a.tipo || '—',
+    categoria: categoriaDe(a.tipo),
     marca: a.marca || '',
     titulo: a.titulo,
     ano: a.ano_inicial ? `${a.ano_inicial}/${a.ano_final}` : '',
@@ -322,10 +360,11 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
 }
 
 /* ============================================================
-   MERCADO — estoque regional completo (filtros avançados)
+   MERCADO — estoque regional completo (filtros avancados + categorias)
    ============================================================ */
 function PageMercado({ anuncios, usandoReais }) {
   const [q, setQ] = useState('');
+  const [categoria, setCategoria] = useState('todas');
   const [tipo, setTipo] = useState('todos');
   const [status, setStatus] = useState('todos');
   const [cidade, setCidade] = useState('todas');
@@ -335,12 +374,23 @@ function PageMercado({ anuncios, usandoReais }) {
   const [ordem, setOrdem] = useState('recente');
   const [maisFiltros, setMaisFiltros] = useState(false);
 
-  const tipos = useMemo(() => ['todos', ...new Set(anuncios.map(a => a.tipo).filter(t => t && t !== '—'))], [anuncios]);
+  // Categorias com contagem — permite mostrar quantos anúncios cada uma tem
+  const contagemPorCategoria = useMemo(() => {
+    const cont = {};
+    anuncios.forEach(a => { cont[a.categoria] = (cont[a.categoria] || 0) + 1; });
+    return cont;
+  }, [anuncios]);
+
   const cidades = useMemo(() => ['todas', ...[...new Set(anuncios.map(a => a.cidade).filter(Boolean))].sort()], [anuncios]);
   const revendas = useMemo(() => ['todas', ...[...new Set(anuncios.map(a => a.revenda).filter(Boolean))].sort()], [anuncios]);
+  const tipos = useMemo(() => {
+    const filtroCat = categoria === 'todas' ? anuncios : anuncios.filter(a => a.categoria === categoria);
+    return ['todos', ...[...new Set(filtroCat.map(a => a.tipo).filter(t => t && t !== '—'))].sort()];
+  }, [anuncios, categoria]);
 
   const filtrados = useMemo(() => {
     let lista = anuncios.filter(a => {
+      if (categoria !== 'todas' && a.categoria !== categoria) return false;
       if (tipo !== 'todos' && a.tipo !== tipo) return false;
       if (status !== 'todos' && a.status !== status) return false;
       if (cidade !== 'todas' && a.cidade !== cidade) return false;
@@ -357,16 +407,42 @@ function PageMercado({ anuncios, usandoReais }) {
       mais_tempo: (x, y) => y.dias - x.dias,
     };
     return [...lista].sort(ordens[ordem] || ordens.recente);
-  }, [anuncios, tipo, status, cidade, revenda, precoMin, precoMax, q, ordem]);
+  }, [anuncios, categoria, tipo, status, cidade, revenda, precoMin, precoMax, q, ordem]);
 
-  const filtrosAtivos = [tipo !== 'todos', status !== 'todos', cidade !== 'todas', revenda !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
+  const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'todos', cidade !== 'todas', revenda !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
+
+  // Barra de chips com as categorias — visao rapida do que tem no mercado
+  const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
 
   return (
     <div>
+      {/* Chips de categorias */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, marginBottom: 4 }}>
+        {chipsCategorias.map(cat => {
+          const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
+          const ativa = categoria === cat;
+          const n = cat === 'todas' ? anuncios.length : (contagemPorCategoria[cat] || 0);
+          return (
+            <button key={cat} onClick={() => { setCategoria(cat); setTipo('todos'); }} style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+              background: ativa ? `${info.cor}22` : T.surface,
+              border: `1px solid ${ativa ? info.cor : T.line}`,
+              borderRadius: 999, cursor: 'pointer', fontSize: 12.5, fontFamily: T.fontBody,
+              color: ativa ? info.cor : T.ink, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
+              transition: 'all 140ms',
+            }}>
+              <span>{info.icone}</span>
+              <span>{info.label}</span>
+              <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>{fmtN(n)}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar modelo, marca, cidade ou revenda…"
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar modelo, marca, cidade ou revenda..."
             style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
         </div>
         <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
@@ -386,7 +462,7 @@ function PageMercado({ anuncios, usandoReais }) {
       {maisFiltros && (
         <Card style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
           <select value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle}>
-            {tipos.map(t => <option key={t} value={t}>{t === 'todos' ? 'Todos os tipos' : t}</option>)}
+            {tipos.map(t => <option key={t} value={t}>{t === 'todos' ? 'Todos os subtipos' : t}</option>)}
           </select>
           <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
             <option value="todos">Todos os status</option>
@@ -406,43 +482,52 @@ function PageMercado({ anuncios, usandoReais }) {
       )}
 
       <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, margin: '10px 2px 14px' }}>
-        {fmtN(filtrados.length)} ANÚNCIOS {usandoReais ? '· DADOS REAIS DA COLETA' : '· CONECTANDO À API…'}
+        {fmtN(filtrados.length)} ANÚNCIOS {usandoReais ? '· DADOS REAIS DA COLETA' : '· CONECTANDO À API...'}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
-        {filtrados.slice(0, 60).map(a => (
-          <Card key={a.id} style={{ padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-              <Tag tone={a.status === 'removido' ? 'positivo' : a.status === 'venda_provavel' ? 'alerta' : 'neutro'}>
-                {a.status === 'removido' ? 'VENDIDO' : a.status === 'venda_provavel' ? 'VENDA PROVÁVEL' : `NO AR HÁ ${a.dias}D`}
-              </Tag>
-              <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>#{a.id}</span>
-            </div>
-            <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>
-              {a.titulo}
-            </div>
-            <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
-              <MapPin size={11} /> {a.revenda} · {a.cidade}/{a.uf}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-              <div>
-                <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>
-                  {fmtBRL(a.preco)}
+        {filtrados.slice(0, 60).map(a => {
+          const cat = CATEGORIAS[a.categoria] || CATEGORIAS.outros;
+          return (
+            <Card key={a.id} style={{ padding: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <Tag tone={a.status === 'removido' ? 'positivo' : a.status === 'venda_provavel' ? 'alerta' : 'neutro'}>
+                    {a.status === 'removido' ? 'VENDIDO' : a.status === 'venda_provavel' ? 'VENDA PROVÁVEL' : `${a.dias}D NO AR`}
+                  </Tag>
                 </div>
-                <div style={{ fontSize: 11, marginTop: 2, color: a.precoFipe ? (a.preco < a.precoFipe ? T.positive : T.inkMuted) : T.inkMuted }}>
-                  {a.precoFipe
-                    ? `FIPE ${fmtBRL(a.precoFipe)} · ${a.preco < a.precoFipe ? '▼' : '▲'} ${Math.abs(Math.round((a.preco - a.precoFipe) / a.precoFipe * 100))}%`
-                    : 'vs FIPE: aguardando Fase 2'}
-                </div>
+                <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>#{a.id}</span>
               </div>
-              {a.url && (
-                <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal">
-                  <ExternalLink size={15} />
-                </a>
-              )}
-            </div>
-          </Card>
-        ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 12 }}>{cat.icone}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 10, color: cat.cor, letterSpacing: '0.04em' }}>{cat.label.toUpperCase()}</span>
+              </div>
+              <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>
+                {a.titulo}
+              </div>
+              <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
+                <MapPin size={11} /> {a.revenda} · {a.cidade}/{a.uf}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div>
+                  <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>
+                    {fmtBRL(a.preco)}
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 2, color: a.precoFipe ? (a.preco < a.precoFipe ? T.positive : T.inkMuted) : T.inkMuted }}>
+                    {a.precoFipe
+                      ? `FIPE ${fmtBRL(a.precoFipe)} · ${a.preco < a.precoFipe ? '▼' : '▲'} ${Math.abs(Math.round((a.preco - a.precoFipe) / a.precoFipe * 100))}%`
+                      : 'vs FIPE: aguardando Fase 2'}
+                  </div>
+                </div>
+                {a.url && (
+                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal">
+                    <ExternalLink size={15} />
+                  </a>
+                )}
+              </div>
+            </Card>
+          );
+        })}
       </div>
       {filtrados.length > 60 && (
         <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
