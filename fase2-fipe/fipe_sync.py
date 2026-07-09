@@ -48,8 +48,10 @@ def api_get(path):
 # Tokens de marca e ruido que nao servem pra identificar modelo
 MARCAS_RUIDO = {"MB", "VW", "GM", "MERCEDES", "BENZ", "SCANIA", "VOLVO", "DAF", "IVECO",
                 "FORD", "AGRALE", "VOLKSWAGEN", "CHEVROLET", "MARCOPOLO", "SAAB"}
-PALAVRAS_RUIDO = {"DIESEL", "DIES", "EIXOS", "EIXO", "TURBO", "ELETRICO", "ELET",
-                  "HIGH", "HIGHLINE", "STREAMLINE", "TOPLINE", "NORMAL", "LEITO", "CABINE"}
+# Palavras da FIPE que descrevem acabamento/combustivel, nao a linha do caminhao.
+# Comparadas por PREFIXO porque a FIPE abrevia: "Dies.", "Stre.", "High.", "Constel."
+RUIDO_RAIZES = ("DIESEL", "STREAMLINE", "HIGHLINE", "TOPLINE", "ELETRICO",
+                "EIXOS", "CABINE", "LEITO", "TURBO", "NORMAL", "AUTOMATICO")
 
 
 def normaliza(s: str) -> str:
@@ -75,13 +77,27 @@ def serie(s: str):
     return None
 
 
+def eh_ruido(token: str) -> bool:
+    """True se o token e marca ou descreve acabamento/combustivel. Compara por prefixo:
+    'DIES' e 'DIESE' sao inicio de 'DIESEL'; 'STRE'/'STREAM' de 'STREAMLINE'."""
+    if token in MARCAS_RUIDO:
+        return True
+    return any(raiz.startswith(token) for raiz in RUIDO_RAIZES)
+
+
 def palavras_chave(s: str) -> set:
     """Palavras que identificam a LINHA comercial ('Atego', 'Worker', 'Delivery').
-    Ignora marca e ruido da FIPE ('Dies.', 'High.', '3-Eixos'). Pode vir vazio —
-    varios nomes FIPE sao so numero + eixo ('R-440 A 4x2 2p (diesel)')."""
+    Pode vir vazio — varios nomes FIPE sao so numero + eixo ('R-440 A 4x2 2p (diesel)')."""
     return {t for t in normaliza(s).split()
-            if t.isalpha() and len(t) >= 4
-            and t not in MARCAS_RUIDO and t not in PALAVRAS_RUIDO}
+            if t.isalpha() and len(t) >= 4 and not eh_ruido(t)}
+
+
+def mesma_linha(a: set, b: set) -> bool:
+    """Conjuntos vazios nunca conflitam. 'WORK' e 'WORKER' sao a mesma linha
+    (a FIPE abrevia); 'ATEGO' e 'ATRON' nao."""
+    if not a or not b:
+        return True
+    return any(x.startswith(y) or y.startswith(x) for x in a for y in b)
 
 
 def eixos(s: str):
@@ -221,7 +237,7 @@ def escolhe(conn, anuncio):
     nao_vazias = [k for k in chaves if k]
     for i_ in range(len(nao_vazias)):
         for j_ in range(i_ + 1, len(nao_vazias)):
-            if not (nao_vazias[i_] & nao_vazias[j_]):
+            if not mesma_linha(nao_vazias[i_], nao_vazias[j_]):
                 conflito = "/".join(sorted(nao_vazias[i_] | nao_vazias[j_]))[:26]
                 return None, f"ambiguo linha ({conflito})"
 
