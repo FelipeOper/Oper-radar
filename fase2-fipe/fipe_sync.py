@@ -88,13 +88,6 @@ def eixos(s: str):
     return f"{m.group(1)}X{m.group(2)}" if m else None
 
 
-def assinatura(modelo_fipe: str):
-    """O que realmente distingue dois modelos FIPE de precos diferentes:
-    a linha comercial (Atego/Atron, Worker/Constellation) e a config de eixos (4x2/6x4).
-    Variantes de norma de emissao (E5/E6) NAO entram — o ano do anuncio resolve isso."""
-    return (linha_comercial(modelo_fipe), eixos(modelo_fipe))
-
-
 def avalia(titulo: str, modelo_fipe: str):
     """Devolve (score, motivo). Regra: o numero do modelo TEM que bater; se ambos
     tem letra de serie, elas TEM que ser iguais (senao 'R440' casaria com 'G-440',
@@ -201,30 +194,34 @@ def melhores_candidatos(conn, anuncio, quantos=3):
 
 
 def escolhe(conn, anuncio):
-    """Devolve (candidatos_ordenados, confianca) ou (None, motivo_da_recusa).
-    Devolve LISTA porque variantes da mesma assinatura (E5/E6) sao desempatadas
-    pelo ano: tenta-se a primeira que tenha o ano do anuncio na FIPE."""
+    """Devolve (candidatos_ordenados, confianca) ou (None, motivo).
+
+    Ambiguidade so existe quando ha DOIS valores EXPLICITOS e diferentes:
+      - linhas: 'Atego 1719' vs 'Atron 1719'  -> caminhoes diferentes
+      - eixos:  'Constel. 6x2' vs 'Constel. 8x2' -> precos diferentes
+    Quando a FIPE simplesmente omite o dado ('11-180 Delivery 2p' nao declara eixo,
+    e implicitamente 4x2), isso NAO e ambiguidade — o None funciona como coringa.
+    """
     validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=100) if s >= 0.5]
     if not validos:
         return None, "sem match"
 
-    # Se o titulo informa os eixos (ex: 'DAF XF FTT 530 6X4'), usa isso pra desempatar
+    # Se o titulo informa o eixo ('DAF XF FTT 530 6X4'), usa pra desempatar
     eixo_titulo = eixos(anuncio["titulo"])
     if eixo_titulo:
         filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_titulo, None)]
         if filtrados:
             validos = filtrados
 
-    assinaturas = {assinatura(c["modelo_fipe"]) for _, _, c in validos}
-    if len(assinaturas) > 1:
-        # Ex: 'MB 1719' -> Atego 1719 E Atron 1719 (linhas diferentes)
-        #     'SCANIA R440' -> R-440 4x2 E R-440 6x4 (eixos diferentes, precos diferentes)
-        # Preco errado e pior que preco nenhum: nao vincula.
-        desc = "/".join(sorted(f"{l or '?'}{'-' + e if e else ''}" for l, e in assinaturas))[:34]
-        return None, f"ambiguo ({desc})"
+    linhas = {l for l in (linha_comercial(c["modelo_fipe"]) for _, _, c in validos) if l}
+    if len(linhas) > 1:
+        return None, "ambiguo linha (" + "/".join(sorted(linhas))[:26] + ")"
 
-    melhor_score = validos[0][0]
-    confianca = "alto" if melhor_score >= 0.95 else "medio"
+    eixos_expl = {e for e in (eixos(c["modelo_fipe"]) for _, _, c in validos) if e}
+    if len(eixos_expl) > 1:
+        return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:24] + ")"
+
+    confianca = "alto" if validos[0][0] >= 0.95 else "medio"
     return [c for _, _, c in validos], confianca
 
 
