@@ -231,6 +231,32 @@ function PainelKpi({ titulo, subtitulo, dados, renderItem }) {
   );
 }
 
+
+function KpiEntradaSaida({ entrou, saiu }) {
+  return (
+    <Card style={{ padding: '18px 20px' }}>
+      <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.inkMuted, fontFamily: T.fontBody, marginBottom: 10 }}>
+        Movimento 48h
+      </div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: T.fontDisplay, fontSize: 24, fontWeight: 600, color: T.signal, lineHeight: 1, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <ArrowUpRight size={18} strokeWidth={2.5} />{fmtN(entrou)}
+          </div>
+          <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 6 }}>entrou</div>
+        </div>
+        <div style={{ width: 1, alignSelf: 'stretch', background: T.line, margin: '4px 0' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: T.fontDisplay, fontSize: 24, fontWeight: 600, color: T.positive, lineHeight: 1, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <ArrowDownRight size={18} strokeWidth={2.5} />{fmtN(saiu)}
+          </div>
+          <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 6 }}>saiu</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function PageHoje({ kpis, anuncios, usandoReais }) {
   const { data: stats } = useApi('hoje_stats.php');
   const [sinalAberto, setSinalAberto] = useState(null);
@@ -263,7 +289,10 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
         <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={usandoReais ? 'PR · 2×/dia' : 'conectando…'} />
         <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />
         <Kpi label="Vendas estimadas" value={kpis ? fmtN(kpis.vendas_estimadas_mes) : '—'} sub="este mês · confirmadas" tone={T.positive} />
-        <Kpi label="Sinais 48h" value={fmtN(sinais.length)} sub="novos + removidos" tone={T.signal} />
+        <KpiEntradaSaida
+          entrou={sinais.filter(s => s.tipo === 'novo').length}
+          saiu={sinais.filter(s => s.tipo === 'sumiu' || s.tipo === 'venda').length}
+        />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1.1fr) 1.4fr', gap: 16, alignItems: 'start' }}>
