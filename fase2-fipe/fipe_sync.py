@@ -45,51 +45,56 @@ def api_get(path):
     return r.json()
 
 
+# Tokens de marca e ruido que nao servem pra identificar modelo
+MARCAS_RUIDO = {"MB", "VW", "GM", "MERCEDES", "BENZ", "SCANIA", "VOLVO", "DAF", "IVECO",
+                "FORD", "AGRALE", "VOLKSWAGEN", "CHEVROLET", "MARCOPOLO", "SAAB"}
+PALAVRAS_RUIDO = {"DIESEL", "EIXOS", "PLUS", "TURBO"}
+
+
 def normaliza(s: str) -> str:
     s = unicodedata.normalize("NFD", s or "").encode("ascii", "ignore").decode().upper()
-    s = re.sub(r"(?<=\d)[.,](?=\d)", "", s)      # "11.180" -> "11180"
+    s = re.sub(r"(?<=\d)[.,-](?=\d)", "", s)      # "11.180" e "11-180" viram "11180"
     return re.sub(r"[^A-Z0-9]+", " ", s)
 
 
-def tokens(s: str) -> set:
-    """Tokens do texto, quebrando tambem transicoes letra<->digito.
-    'R540' vira {'R540','540'}; 'A6X4' vira {'A6X4','6','4'}... isso e o que
-    permite casar 'SCANIA R540' com o modelo FIPE 'R 540 A6X4'."""
-    out = set()
-    for bruto in normaliza(s).split():
-        if len(bruto) >= 2:
-            out.add(bruto)
-        for parte in re.findall(r"\d+|[A-Z]+", bruto):
-            if len(parte) >= 2:
-                out.add(parte)
-    return out
+def numero_modelo(s: str):
+    """O numero que identifica o modelo (440, 2430, 11180), ignorando anos."""
+    for n in re.findall(r"\d{3,5}", normaliza(s)):
+        if not 1900 <= int(n) <= 2100:
+            return n
+    return None
 
 
-def numeros(s: str) -> set:
-    """Numeros de 2+ digitos, ignorando o que parece ano (1900-2100)."""
-    return {n for n in re.findall(r"\d{2,}", normaliza(s)) if not 1900 <= int(n) <= 2100}
+def serie(s: str):
+    """Letra(s) de serie coladas ao numero: 'R440' -> 'R'; 'G-440' -> 'G'.
+    Marca nao conta como serie: 'MB 2430' -> None."""
+    for pref, num in re.findall(r"\b([A-Z]{1,2})[ ]?(\d{3,5})\b", normaliza(s)):
+        if pref not in MARCAS_RUIDO and not 1900 <= int(num) <= 2100:
+            return pref
+    return None
 
 
-def score_match(titulo: str, modelo_fipe: str):
-    """Devolve (score_final, score_base). O score_base ignora o reforco numerico
-    e e o que decide a confianca — reforco numerico sozinho nao vira 'alto'."""
-    t_anuncio, t_modelo = tokens(titulo), tokens(modelo_fipe)
-    if not t_modelo:
-        return 0.0, 0.0
-    pontos = peso_total = 0.0
-    for tok in t_modelo:
-        peso = 2.0 if any(c.isdigit() for c in tok) else 1.0
-        peso_total += peso
-        if tok in t_anuncio:
-            pontos += peso
-    base = pontos / peso_total
+def linha_comercial(s: str):
+    """Nome da linha: 'Atego 2430' -> 'ATEGO'. Usado pra detectar ambiguidade."""
+    for t in normaliza(s).split():
+        if t.isalpha() and len(t) >= 4 and t not in MARCAS_RUIDO and t not in PALAVRAS_RUIDO:
+            return t
+    return None
 
-    # Reforco: o numero do modelo (2651, 530, 11180) e o identificador mais forte.
-    n_anuncio, n_modelo = numeros(titulo), numeros(modelo_fipe)
-    final = base
-    if n_modelo and (n_modelo & n_anuncio):
-        final = max(base, 0.55 + 0.45 * (len(n_modelo & n_anuncio) / len(n_modelo)))
-    return final, base
+
+def avalia(titulo: str, modelo_fipe: str):
+    """Devolve (score, motivo). Regra: o numero do modelo TEM que bater; se ambos
+    tem letra de serie, elas TEM que ser iguais (senao 'R440' casaria com 'G-440',
+    que e outro caminhao e outro preco)."""
+    n_t, n_f = numero_modelo(titulo), numero_modelo(modelo_fipe)
+    if not n_t or not n_f or n_t != n_f:
+        return 0.0, "numero difere"
+    s_t, s_f = serie(titulo), serie(modelo_fipe)
+    if s_t and s_f and s_t != s_f:
+        return 0.0, f"serie {s_t}!={s_f}"
+    if s_t and s_f:
+        return 0.95, "numero+serie"
+    return 0.60, "so numero"
 
 
 def garante_marcas(conn):
@@ -174,14 +179,26 @@ def busca_ou_cria_preco(conn, modelo, ano):
 
 def melhores_candidatos(conn, anuncio, quantos=3):
     cands = modelos_da_marca(conn, anuncio["marca"])
-    if not cands:
-        return []
     pontuados = []
     for c in cands:
-        final, base = score_match(anuncio["titulo"], c["modelo_fipe"])
-        pontuados.append((final, base, c))
-    pontuados.sort(key=lambda x: x[0], reverse=True)
+        score, motivo = avalia(anuncio["titulo"], c["modelo_fipe"])
+        pontuados.append((score, motivo, c))
+    pontuados.sort(key=lambda x: (-x[0], len(x[2]["modelo_fipe"])))
     return pontuados[:quantos]
+
+
+def escolhe(conn, anuncio):
+    """Devolve (modelo, confianca) ou (None, motivo_da_recusa)."""
+    validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=50) if s >= 0.5]
+    if not validos:
+        return None, "sem match"
+    linhas = {linha_comercial(c["modelo_fipe"]) for _, _, c in validos}
+    if len(linhas) > 1:
+        # Ex: 'MB 1719' casa com Atego 1719 E Atron 1719 — modelos e precos diferentes.
+        # Preco errado e pior que preco nenhum: nao vincula.
+        return None, "ambiguo (" + "/".join(sorted(x or "?" for x in linhas)) + ")"
+    score, _, melhor = validos[0]
+    return melhor, ("alto" if score >= 0.95 else "medio")
 
 
 def roda_debug(conn):
@@ -193,61 +210,62 @@ def roda_debug(conn):
     print("Marcas no cache:", ", ".join(f"{r['marca_fipe']}({r['n']})" for r in cur.fetchall()) or "NENHUMA")
     cur.close()
 
-    pendentes = anuncios_pendentes(conn, 15)
-    print(f"\nTestando o matching nos {len(pendentes)} primeiros anuncios pendentes:\n")
+    pendentes = anuncios_pendentes(conn, 20)
+    print(f"\nMatching nos {len(pendentes)} primeiros anuncios pendentes:\n")
+    contagem = {"vincula": 0, "sem match": 0, "ambiguo": 0}
     for a in pendentes:
-        top = melhores_candidatos(conn, a)
-        print(f"  {a['titulo'][:44]:44} (marca no portal: {a['marca']})")
-        if not top:
-            print("    ! nenhum modelo FIPE encontrado para essa marca\n")
-            continue
-        for final, base, c in top:
-            marcador = "OK " if final >= 0.5 else "   "
-            conf = "alto" if base >= 0.75 else "medio"
-            print(f"    {marcador}score {final:.2f} (base {base:.2f}, {conf})  {c['modelo_fipe'][:46]}")
-        print()
+        modelo, info = escolhe(conn, a)
+        if modelo:
+            contagem["vincula"] += 1
+            print(f"  OK  [{info:5}] {a['titulo'][:34]:34} -> {modelo['modelo_fipe'][:42]}")
+        else:
+            chave = "ambiguo" if info.startswith("ambiguo") else "sem match"
+            contagem[chave] += 1
+            print(f"  --  [{info[:28]:28}] {a['titulo'][:34]}")
+            for s, motivo, c in melhores_candidatos(conn, a, quantos=2):
+                print(f"          {s:.2f} {motivo:16} {c['modelo_fipe'][:40]}")
+    print(f"\nResumo da amostra: {contagem['vincula']} vinculariam · "
+          f"{contagem['sem match']} sem match · {contagem['ambiguo']} ambiguos (nao vinculam de proposito)")
 
 
 def roda(conn):
     garante_marcas(conn)
     pendentes = anuncios_pendentes(conn, 200)
     print(f"{len(pendentes)} anuncios de caminhao sem vinculo FIPE — processando (limite {max_req} req)...")
-    vinculados = sem_candidato = score_baixo = 0
+    vinculados = sem_match = ambiguos = sem_ano = 0
 
     for a in pendentes:
         try:
-            top = melhores_candidatos(conn, a, quantos=2)
-            if not top:
-                sem_candidato += 1
+            modelo, info = escolhe(conn, a)
+            if not modelo:
+                if info.startswith("ambiguo"):
+                    ambiguos += 1
+                else:
+                    sem_match += 1
                 continue
-            final, base, melhor = top[0]
-            if final < 0.5:
-                score_baixo += 1
-                continue
-            # Ambiguidade: se o 2o candidato empata, a confianca cai
-            ambiguo = len(top) > 1 and abs(top[1][0] - final) < 0.05
-            preco_id = busca_ou_cria_preco(conn, melhor, a["ano_inicial"])
+            preco_id = busca_ou_cria_preco(conn, modelo, a["ano_inicial"])
             if not preco_id:
+                sem_ano += 1
                 continue
-            confianca = "alto" if (base >= 0.75 and not ambiguo) else "medio"
             cur = conn.cursor()
             cur.execute("UPDATE anuncio SET fipe_preco_id=%s, fipe_match_confianca=%s WHERE id=%s",
-                        (preco_id, confianca, a["id"]))
+                        (preco_id, info, a["id"]))
             conn.commit()
             cur.close()
             vinculados += 1
-            print(f"  [{confianca}] {a['titulo'][:44]:44} -> {melhor['modelo_fipe'][:40]}")
+            print(f"  [{info}] {a['titulo'][:40]:40} -> {modelo['modelo_fipe'][:38]}")
         except RuntimeError as e:
             print(f"\n{e}")
             break
         except requests.RequestException as e:
-            print(f"  ! erro de rede em '{a['titulo'][:38]}': {e}")
+            print(f"  ! erro de rede em '{a['titulo'][:34]}': {e}")
             continue
 
-    print(f"\n{vinculados} vinculados · {sem_candidato} sem modelo da marca · {score_baixo} com match fraco (<0.50)")
+    print(f"\n{vinculados} vinculados · {sem_match} sem match · {ambiguos} ambiguos (pulados de proposito) "
+          f"· {sem_ano} sem o ano na FIPE")
     print(f"{contador_req} requisicoes usadas nesta rodada.")
-    if vinculados == 0 and score_baixo > 0:
-        print("\nDica: rode com --debug para ver os scores e entender por que nao casou.")
+    if vinculados == 0:
+        print("\nRode com --debug pra ver os scores sem gastar cota.")
 
 
 if __name__ == "__main__":
