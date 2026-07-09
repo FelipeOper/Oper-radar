@@ -1,9 +1,9 @@
 <?php
 /**
- * OPER RADAR — API: lista de lojistas (revendas) com metricas completas
- * GET lojistas.php?uf=PR
- * Retorna, alem dos campos basicos: total historico, ativos, vendidos, giro medio,
- * mix de categorias (quantos anuncios cada revenda tem por categoria).
+ * OPER RADAR — API: lista de lojistas com metricas honestas
+ * A idade media do estoque só é confiavel quando ha pelo menos 14 dias
+ * desde a primeira coleta (senao, todos os anuncios teriam "idade" recente
+ * artificialmente — bug real detectado em 09/jul quando toda revenda mostrava "1d").
  */
 require_once __DIR__ . '/config.php';
 $conn = conecta();
@@ -15,6 +15,7 @@ $sql = "SELECT r.id, r.nome, r.cidade, r.uf, r.url_perfil, r.telefone, r.ativa_d
                SUM(CASE WHEN a.status = 'removido_confirmado' THEN 1 ELSE 0 END) AS vendidos,
                SUM(CASE WHEN a.status = 'removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS vendidos_30d,
                ROUND(AVG(CASE WHEN a.status='ativo' THEN DATEDIFF(NOW(), a.primeira_vez_visto) END), 1) AS idade_media_estoque,
+               DATEDIFF(NOW(), (SELECT MIN(primeira_vez_visto) FROM anuncio WHERE revenda_id = r.id)) AS dias_de_coleta,
                MIN(a.primeira_vez_visto) AS primeiro_anuncio_visto,
                MAX(a.ultima_vez_ativo) AS ultima_atividade
         FROM revenda r
@@ -28,28 +29,28 @@ if ($params) $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $res = $stmt->get_result();
 
-$lojistas = [];
-$mapaId = [];
+$lojistas = []; $mapaId = [];
 while ($row = $res->fetch_assoc()) {
     $row['total_historico'] = (int)$row['total_historico'];
     $row['ativos'] = (int)$row['ativos'];
     $row['vendidos'] = (int)$row['vendidos'];
     $row['vendidos_30d'] = (int)$row['vendidos_30d'];
     $row['idade_media_estoque'] = $row['idade_media_estoque'] !== null ? (float)$row['idade_media_estoque'] : null;
-    $row['mix_categorias'] = []; // preenchido abaixo
+    $row['dias_de_coleta'] = $row['dias_de_coleta'] !== null ? (int)$row['dias_de_coleta'] : 0;
+    // Giro só é confiavel apos 14 dias de coleta acumulada — antes disso,
+    // "primeira_vez_visto" e recente demais pra todos os anuncios.
+    $row['giro_confiavel'] = $row['dias_de_coleta'] >= 14;
+    $row['mix_categorias'] = [];
     $mapaId[$row['id']] = count($lojistas);
     $lojistas[] = $row;
 }
 
-// Mix de categorias: para cada revenda, quantos anuncios ativos por "tipo".
-// Frontend agrupa em 8 categorias — aqui devolvemos os tipos crus, sem mapeamento.
 if ($lojistas) {
     $ids = array_column($lojistas, 'id');
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $tSql = "SELECT revenda_id, tipo, COUNT(*) n FROM anuncio
-             WHERE revenda_id IN ($placeholders) AND status = 'ativo' AND tipo IS NOT NULL
-             GROUP BY revenda_id, tipo";
-    $ts = $conn->prepare($tSql);
+    $ts = $conn->prepare("SELECT revenda_id, tipo, COUNT(*) n FROM anuncio
+                          WHERE revenda_id IN ($placeholders) AND status='ativo' AND tipo IS NOT NULL
+                          GROUP BY revenda_id, tipo");
     $ts->bind_param(str_repeat('i', count($ids)), ...$ids);
     $ts->execute();
     $tr = $ts->get_result();

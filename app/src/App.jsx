@@ -11,6 +11,7 @@ import {
    OPER RADAR — design system "instrumento de precisão"
    (ver docs/OPER_RADAR_Estrategia_e_Design.md)
    ============================================================ */
+const STEEL = '#5B8AA6';
 const T = {
   bg: '#0B0E13',
   surface: '#141922',
@@ -400,7 +401,7 @@ function PageMercado({ anuncios, usandoReais }) {
   const [revenda, setRevenda] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
-  const [ordem, setOrdem] = useState('recente');
+  const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
   const [mostrados, setMostrados] = useState(60);
 
@@ -446,6 +447,7 @@ function PageMercado({ anuncios, usandoReais }) {
       return true;
     });
     const ordens = {
+      aleatorio: () => Math.random() - 0.5,
       recente: (x, y) => new Date(y.ultimaVez) - new Date(x.ultimaVez),
       preco_asc: (x, y) => (x.preco ?? Infinity) - (y.preco ?? Infinity),
       preco_desc: (x, y) => (y.preco ?? -1) - (x.preco ?? -1),
@@ -491,6 +493,7 @@ function PageMercado({ anuncios, usandoReais }) {
             style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
         </div>
         <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
+          <option value="aleatorio">Aleatório (mercado)</option>
           <option value="recente">Mais recentes</option>
           <option value="preco_asc">Menor preço</option>
           <option value="preco_desc">Maior preço</option>
@@ -537,9 +540,19 @@ function PageMercado({ anuncios, usandoReais }) {
             <Card key={a.id} style={{ padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <Tag tone={a.status === 'removido' ? 'positivo' : a.status === 'venda_provavel' ? 'alerta' : 'neutro'}>
-                    {a.status === 'removido' ? 'VENDIDO' : a.status === 'venda_provavel' ? 'VENDA PROVÁVEL' : `${a.dias}D NO AR`}
-                  </Tag>
+                  {a.status === 'removido' ? (
+                    <Tag tone="positivo">VENDIDO</Tag>
+                  ) : a.status === 'venda_provavel' ? (
+                    <Tag tone="alerta">VENDA PROVÁVEL</Tag>
+                  ) : a.dias >= 30 ? (
+                    <Tag tone="alerta">{a.dias}D NO AR</Tag>
+                  ) : a.dias >= 7 ? (
+                    <Tag tone="sinal">{a.dias}D NO AR</Tag>
+                  ) : a.dias < 2 ? (
+                    <Tag tone="sinal">NOVO</Tag>
+                  ) : (
+                    <Tag tone="neutro">ATIVO</Tag>
+                  )}
                 </div>
                 <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>#{a.id}</span>
               </div>
@@ -827,8 +840,8 @@ function PageConcorrentes() {
                 <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.positive }}>{fmtN(l.vendidos)}</div>
               </div>
               <div>
-                <div style={{ color: T.inkMuted, fontSize: 10 }}>GIRO MEDIO</div>
-                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.ink }}>{l.idade_media_estoque != null ? `${Math.round(l.idade_media_estoque)}d` : '—'}</div>
+                <div style={{ color: T.inkMuted, fontSize: 10 }} title={l.giro_confiavel ? '' : 'Aguardando 14+ dias de coleta pra ser confiavel'}>GIRO MEDIO</div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: l.giro_confiavel ? T.ink : T.inkMuted }}>{l.giro_confiavel && l.idade_media_estoque != null ? `${Math.round(l.idade_media_estoque)}d` : '—'}</div>
               </div>
             </div>
 
@@ -973,15 +986,22 @@ function PageAjustes() {
       </div>
       <Card><div style={{ fontSize: 13.5, color: T.inkMuted }}>{permissoes[papel]}</div></Card>
 
-      <SectionTitle sub="Presença por estado no portal monitorado">Cobertura nacional</SectionTitle>
+      <SectionTitle sub="Estados em coleta (verde) vs. na fila (cinza) — hoje só PR é coletado">Cobertura nacional</SectionTitle>
       <Card style={{ height: 300 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={STATE_DATA.map(([uf, , qtd]) => ({ name: uf, qtd }))} margin={{ left: -22, top: 4 }}>
+          <BarChart data={STATE_DATA.map(([uf, , qtd]) => ({ name: uf, qtd, coletando: uf === 'PR' }))} margin={{ left: -22, top: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis dataKey="name" tick={{ fill: T.inkMuted, fontSize: 10, fontFamily: T.fontMono }} axisLine={{ stroke: T.line }} tickLine={false} />
             <YAxis tick={{ fill: T.inkMuted, fontSize: 10, fontFamily: T.fontMono }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 10, color: T.ink, fontSize: 12 }} />
-            <Bar dataKey="qtd" fill={T.signal} radius={[3, 3, 0, 0]} />
+            <Tooltip contentStyle={{ background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 10, color: T.ink, fontSize: 12 }}
+              formatter={(v, name, props) => [`${v} revendas${props.payload.coletando ? ' · em coleta' : ' · na fila'}`, 'Total']}
+            />
+            <Bar dataKey="qtd" radius={[3, 3, 0, 0]}
+              shape={(props) => {
+                const { x, y, width, height, payload } = props;
+                return <rect x={x} y={y} width={width} height={height} rx={3} fill={payload.coletando ? T.positive : 'rgba(138,148,166,0.3)'} />;
+              }}
+            />
           </BarChart>
         </ResponsiveContainer>
       </Card>
@@ -1041,6 +1061,24 @@ function PageAnalise() {
     <div>
       {!ins && !erro && <EmptyState icon={Gauge} titulo="Calculando insights…" texto="Agregando os dados reais da coleta." />}
       {erro && <EmptyState icon={Gauge} titulo="API indisponível" texto={`Não foi possível buscar ${API_BASE_URL}/insights.php — confirme se o arquivo foi publicado.`} />}
+
+      {ins && ins.descobertas && ins.descobertas.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <SectionTitle sub="Insights cruzados calculados a partir dos dados reais desta semana">Descobertas do dia</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+            {ins.descobertas.map((d, i) => {
+              const cores = { conversao: T.positive, concentracao: T.signal, movimento: T.alert, faixa: STEEL };
+              const c = cores[d.tipo] || T.signal;
+              return (
+                <Card key={i} style={{ padding: 16, borderLeft: `2px solid ${c}` }}>
+                  <div style={{ fontFamily: T.fontMono, fontSize: 10, color: c, letterSpacing: '0.06em', marginBottom: 5 }}>{d.titulo.toUpperCase()}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.55, color: T.ink }}>{d.texto}</div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {ins && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
