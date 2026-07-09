@@ -373,6 +373,22 @@ function PageMercado({ anuncios, usandoReais }) {
   const [precoMax, setPrecoMax] = useState('');
   const [ordem, setOrdem] = useState('recente');
   const [maisFiltros, setMaisFiltros] = useState(false);
+  const [mostrados, setMostrados] = useState(60);
+
+  // Reset da paginacao quando os filtros mudam
+  useEffect(() => { setMostrados(60); }, [categoria, tipo, status, cidade, revenda, precoMin, precoMax, q, ordem]);
+
+  // Scroll infinito — carrega +100 quando estiver perto do fim
+  useEffect(() => {
+    const onScroll = () => {
+      const el = document.scrollingElement || document.documentElement;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 800) {
+        setMostrados(m => Math.min(m + 100, 800));
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Categorias com contagem — permite mostrar quantos anúncios cada uma tem
   const contagemPorCategoria = useMemo(() => {
@@ -486,7 +502,7 @@ function PageMercado({ anuncios, usandoReais }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
-        {filtrados.slice(0, 60).map(a => {
+        {filtrados.slice(0, mostrados).map(a => {
           const cat = CATEGORIAS[a.categoria] || CATEGORIAS.outros;
           return (
             <Card key={a.id} style={{ padding: 18 }}>
@@ -506,7 +522,14 @@ function PageMercado({ anuncios, usandoReais }) {
                 {a.titulo}
               </div>
               <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
-                <MapPin size={11} /> {a.revenda} · {a.cidade}/{a.uf}
+                <MapPin size={11} />
+                <button onClick={(e) => { e.stopPropagation(); setRevenda(a.revenda); setMostrados(60); window.scrollTo({top: 0, behavior: 'smooth'}); }}
+                  style={{ background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', padding: 0, fontSize: 12, textDecoration: 'underline', textDecorationColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.textDecorationColor = T.signal}
+                  onMouseLeave={(e) => e.currentTarget.style.textDecorationColor = 'transparent'}
+                  title="Filtrar por essa revenda"
+                >{a.revenda}</button>
+                <span>· {a.cidade}/{a.uf}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
@@ -529,9 +552,14 @@ function PageMercado({ anuncios, usandoReais }) {
           );
         })}
       </div>
-      {filtrados.length > 60 && (
+      {mostrados < filtrados.length && (
         <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
-          Mostrando 60 de {fmtN(filtrados.length)} — refine a busca para ver mais específicos
+          {fmtN(Math.min(mostrados, filtrados.length))} de {fmtN(filtrados.length)} — role para carregar mais
+        </div>
+      )}
+      {mostrados >= filtrados.length && filtrados.length > 60 && (
+        <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
+          Fim da lista — {fmtN(filtrados.length)} anuncios encontrados
         </div>
       )}
     </div>
@@ -590,48 +618,219 @@ function PageOportunidades({ anuncios, onCriarAcao }) {
 }
 
 /* ============================================================
-   CONCORRENTES — quem são os players e quem gira
+   CONCORRENTES — quem sao os players + metricas de giro
    ============================================================ */
 function PageConcorrentes() {
   const { data, erro } = useApi('lojistas.php?uf=PR');
   const [q, setQ] = useState('');
-  const lojistas = (data?.lojistas || []).filter(l => !q || l.nome.toLowerCase().includes(q.toLowerCase()));
-  const ordenados = [...lojistas].sort((a, b) => b.anuncios_ativos - a.anuncios_ativos);
+  const [categoria, setCategoria] = useState('todas');
+  const [cidade, setCidade] = useState('todas');
+  const [ordem, setOrdem] = useState('ativos');
+  const [mostrados, setMostrados] = useState(48);
+
+  const lojistas = data?.lojistas || [];
+
+  // Classifica cada tipo dentro de uma categoria e monta o mix de categorias por revenda
+  const lojistasComCat = useMemo(() => lojistas.map(l => {
+    const catMix = {};
+    Object.entries(l.mix_categorias || {}).forEach(([tipo, n]) => {
+      const cat = categoriaDe(tipo);
+      catMix[cat] = (catMix[cat] || 0) + n;
+    });
+    return { ...l, catMix, cidades: [l.cidade] };
+  }), [lojistas]);
+
+  // Chips: contagem por categoria (revendas que TEM ao menos 1 anuncio da categoria)
+  const contCat = useMemo(() => {
+    const c = {};
+    lojistasComCat.forEach(l => {
+      Object.keys(l.catMix).forEach(cat => { c[cat] = (c[cat] || 0) + 1; });
+    });
+    return c;
+  }, [lojistasComCat]);
+
+  const cidades = useMemo(() => ['todas', ...[...new Set(lojistasComCat.map(l => l.cidade).filter(Boolean))].sort()], [lojistasComCat]);
+  const contCidade = useMemo(() => {
+    const c = {};
+    lojistasComCat.forEach(l => { c[l.cidade] = (c[l.cidade] || 0) + 1; });
+    return c;
+  }, [lojistasComCat]);
+
+  const filtrados = useMemo(() => {
+    let lista = lojistasComCat.filter(l => {
+      if (categoria !== 'todas' && !l.catMix[categoria]) return false;
+      if (cidade !== 'todas' && l.cidade !== cidade) return false;
+      if (q && !l.nome.toLowerCase().includes(q.toLowerCase())) return false;
+      return true;
+    });
+    const ordens = {
+      ativos: (a, b) => b.ativos - a.ativos,
+      vendidos: (a, b) => b.vendidos - a.vendidos,
+      vendidos_30d: (a, b) => b.vendidos_30d - a.vendidos_30d,
+      giro: (a, b) => (a.idade_media_estoque ?? 999) - (b.idade_media_estoque ?? 999),
+      historico: (a, b) => b.total_historico - a.total_historico,
+    };
+    return [...lista].sort(ordens[ordem]);
+  }, [lojistasComCat, categoria, cidade, q, ordem]);
+
+  useEffect(() => { setMostrados(48); }, [categoria, cidade, q, ordem]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const el = document.scrollingElement || document.documentElement;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 800) {
+        setMostrados(m => Math.min(m + 60, 500));
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
+  const cidadesTop = cidades.filter(c => c !== 'todas').sort((a, b) => (contCidade[b] || 0) - (contCidade[a] || 0)).slice(0, 8);
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar revenda…" style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
+      {/* Chips de categorias — quais lojistas atuam em cada segmento */}
+      <div style={{ marginBottom: 4 }}>
+        <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.05em' }}>SEGMENTO DE ATUACAO</div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8 }}>
+          {chipsCategorias.map(cat => {
+            const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
+            const ativa = categoria === cat;
+            const n = cat === 'todas' ? lojistasComCat.length : (contCat[cat] || 0);
+            return (
+              <button key={cat} onClick={() => setCategoria(cat)} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px',
+                background: ativa ? `${info.cor}22` : T.surface,
+                border: `1px solid ${ativa ? info.cor : T.line}`,
+                borderRadius: 999, cursor: 'pointer', fontSize: 12, fontFamily: T.fontBody,
+                color: ativa ? info.cor : T.ink, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
+                transition: 'all 140ms',
+              }}>
+                <span>{info.icone}</span>
+                <span>{info.label}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{fmtN(n)}</span>
+              </button>
+            );
+          })}
         </div>
-        <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted }}>
-          {data ? `${fmtN(ordenados.length)} REVENDAS · PR` : erro ? 'API INDISPONÍVEL' : 'CARREGANDO…'}
-        </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-        {ordenados.slice(0, 48).map((l, i) => (
+      {/* Chips de cidade — top 8 regioes com mais lojistas */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.05em' }}>REGIAO</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button onClick={() => setCidade('todas')} style={{
+            padding: '5px 10px', background: cidade === 'todas' ? `${T.signal}22` : T.surface,
+            border: `1px solid ${cidade === 'todas' ? T.signal : T.line}`, borderRadius: 999,
+            cursor: 'pointer', fontSize: 11.5, color: cidade === 'todas' ? T.signal : T.ink,
+            fontWeight: cidade === 'todas' ? 600 : 400,
+          }}>Todas ({fmtN(lojistasComCat.length)})</button>
+          {cidadesTop.map(c => (
+            <button key={c} onClick={() => setCidade(c)} style={{
+              padding: '5px 10px', background: cidade === c ? `${T.signal}22` : T.surface,
+              border: `1px solid ${cidade === c ? T.signal : T.line}`, borderRadius: 999,
+              cursor: 'pointer', fontSize: 11.5, color: cidade === c ? T.signal : T.ink,
+              fontWeight: cidade === c ? 600 : 400,
+            }}>{c} <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{contCidade[c]}</span></button>
+          ))}
+        </div>
+      </div>
+
+      {/* Busca + ordenacao */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar revenda..." style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
+        </div>
+        <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
+          <option value="ativos">Mais anuncios ativos</option>
+          <option value="vendidos_30d">Mais vendas (30d)</option>
+          <option value="vendidos">Mais vendas (total)</option>
+          <option value="giro">Melhor giro (menor idade)</option>
+          <option value="historico">Maior historico</option>
+        </select>
+      </div>
+
+      <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, margin: '2px 2px 14px' }}>
+        {data ? `${fmtN(filtrados.length)} REVENDAS · PR` : erro ? 'API INDISPONIVEL' : 'CARREGANDO...'}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+        {filtrados.slice(0, mostrados).map((l, i) => (
           <Card key={l.id} style={{ padding: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontFamily: T.fontMono, fontSize: 11, color: i < 3 ? T.signal : T.inkMuted }}>#{String(i + 1).padStart(2, '0')}</span>
-              <Tag tone={l.anuncios_ativos > 30 ? 'sinal' : 'neutro'}>{fmtN(l.anuncios_ativos)} ATIVOS</Tag>
+              <Tag tone={l.vendidos_30d > 3 ? 'positivo' : l.ativos > 30 ? 'sinal' : 'neutro'}>
+                {l.vendidos_30d > 0 ? `${l.vendidos_30d} VENDAS/30D` : `${fmtN(l.ativos)} ATIVOS`}
+              </Tag>
             </div>
             <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, marginBottom: 3 }}>{l.nome}</div>
-            <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
               <MapPin size={11} /> {l.cidade}/{l.uf}
             </div>
-            {l.url_perfil && (
-              <a href={l.url_perfil} target="_blank" rel="noreferrer"
-                style={{ fontSize: 12, color: T.signal, display: 'inline-flex', gap: 5, alignItems: 'center', marginTop: 10, textDecoration: 'none' }}>
-                Ver estoque no portal <ExternalLink size={11} />
-              </a>
+
+            {/* Mix de categorias — pequenas tags coloridas */}
+            {Object.keys(l.catMix).length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
+                {Object.entries(l.catMix).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([cat, n]) => {
+                  const info = CATEGORIAS[cat] || CATEGORIAS.outros;
+                  return (
+                    <span key={cat} title={info.label} style={{
+                      fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                      background: `${info.cor}18`, color: info.cor,
+                      fontFamily: T.fontMono, whiteSpace: 'nowrap',
+                    }}>{info.icone} {n}</span>
+                  );
+                })}
+              </div>
             )}
+
+            {/* Grade de metricas */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 11, marginBottom: 12 }}>
+              <div>
+                <div style={{ color: T.inkMuted, fontSize: 10 }}>ATIVOS</div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.ink }}>{fmtN(l.ativos)}</div>
+              </div>
+              <div>
+                <div style={{ color: T.inkMuted, fontSize: 10 }}>VENDIDOS</div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.positive }}>{fmtN(l.vendidos)}</div>
+              </div>
+              <div>
+                <div style={{ color: T.inkMuted, fontSize: 10 }}>GIRO MEDIO</div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.ink }}>{l.idade_media_estoque != null ? `${Math.round(l.idade_media_estoque)}d` : '—'}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11.5 }}>
+              {l.url_perfil && (
+                <a href={l.url_perfil} target="_blank" rel="noreferrer"
+                  style={{ color: T.signal, display: 'inline-flex', gap: 4, alignItems: 'center', textDecoration: 'none' }}>
+                  Ver estoque <ExternalLink size={11} />
+                </a>
+              )}
+              {l.telefone && (
+                <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 11 }}>· {l.telefone}</span>
+              )}
+            </div>
           </Card>
         ))}
       </div>
-      {!data && !erro && <EmptyState icon={Building2} titulo="Carregando concorrentes…" texto="Buscando a lista de revendas monitoradas na API." />}
-      {erro && <EmptyState icon={Building2} titulo="API indisponível" texto={`Não foi possível buscar os lojistas em ${API_BASE_URL}. Confirme se a API está publicada.`} />}
+
+      {mostrados < filtrados.length && (
+        <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
+          {fmtN(Math.min(mostrados, filtrados.length))} de {fmtN(filtrados.length)} — role para carregar mais
+        </div>
+      )}
+      {mostrados >= filtrados.length && filtrados.length > 48 && (
+        <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
+          Fim da lista — {fmtN(filtrados.length)} revendas
+        </div>
+      )}
+
+      {!data && !erro && <EmptyState icon={Building2} titulo="Carregando concorrentes..." texto="Buscando a lista de revendas monitoradas na API." />}
+      {erro && <EmptyState icon={Building2} titulo="API indisponivel" texto={`Nao foi possivel buscar os lojistas em ${API_BASE_URL}. Confirme se a API esta publicada.`} />}
     </div>
   );
 }
