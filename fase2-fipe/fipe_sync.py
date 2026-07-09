@@ -48,7 +48,8 @@ def api_get(path):
 # Tokens de marca e ruido que nao servem pra identificar modelo
 MARCAS_RUIDO = {"MB", "VW", "GM", "MERCEDES", "BENZ", "SCANIA", "VOLVO", "DAF", "IVECO",
                 "FORD", "AGRALE", "VOLKSWAGEN", "CHEVROLET", "MARCOPOLO", "SAAB"}
-PALAVRAS_RUIDO = {"DIESEL", "EIXOS", "PLUS", "TURBO"}
+PALAVRAS_RUIDO = {"DIESEL", "DIES", "EIXOS", "EIXO", "TURBO", "ELETRICO", "ELET",
+                  "HIGH", "HIGHLINE", "STREAMLINE", "TOPLINE", "NORMAL", "LEITO", "CABINE"}
 
 
 def normaliza(s: str) -> str:
@@ -74,12 +75,13 @@ def serie(s: str):
     return None
 
 
-def linha_comercial(s: str):
-    """Nome da linha: 'Atego 2430' -> 'ATEGO'. Usado pra detectar ambiguidade."""
-    for t in normaliza(s).split():
-        if t.isalpha() and len(t) >= 4 and t not in MARCAS_RUIDO and t not in PALAVRAS_RUIDO:
-            return t
-    return None
+def palavras_chave(s: str) -> set:
+    """Palavras que identificam a LINHA comercial ('Atego', 'Worker', 'Delivery').
+    Ignora marca e ruido da FIPE ('Dies.', 'High.', '3-Eixos'). Pode vir vazio —
+    varios nomes FIPE sao so numero + eixo ('R-440 A 4x2 2p (diesel)')."""
+    return {t for t in normaliza(s).split()
+            if t.isalpha() and len(t) >= 4
+            and t not in MARCAS_RUIDO and t not in PALAVRAS_RUIDO}
 
 
 def eixos(s: str):
@@ -194,32 +196,42 @@ def melhores_candidatos(conn, anuncio, quantos=3):
 
 
 def escolhe(conn, anuncio):
-    """Devolve (candidatos_ordenados, confianca) ou (None, motivo).
+    """Devolve (candidatos, confianca) ou (None, motivo).
 
-    Ambiguidade so existe quando ha DOIS valores EXPLICITOS e diferentes:
-      - linhas: 'Atego 1719' vs 'Atron 1719'  -> caminhoes diferentes
-      - eixos:  'Constel. 6x2' vs 'Constel. 8x2' -> precos diferentes
-    Quando a FIPE simplesmente omite o dado ('11-180 Delivery 2p' nao declara eixo,
-    e implicitamente 4x2), isso NAO e ambiguidade — o None funciona como coringa.
+    Regras, nesta ordem:
+      1. Se o titulo informa o eixo ('R440 6X4'), filtra por ele.
+      2. Linhas comerciais em conflito (Atego x Atron) -> nao vincula.
+         Conjunto vazio nunca conflita: 'R-440 A 4x2 (diesel)' nao declara linha.
+      3. Eixos explicitos em conflito (6x2 x 8x2) -> tenta o nome base da FIPE,
+         aquele que nao declara eixo ('11-180 Delivery 2p'), que e o modelo padrao.
+         Se nao houver base, ai sim nao vincula.
     """
     validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=100) if s >= 0.5]
     if not validos:
         return None, "sem match"
 
-    # Se o titulo informa o eixo ('DAF XF FTT 530 6X4'), usa pra desempatar
     eixo_titulo = eixos(anuncio["titulo"])
     if eixo_titulo:
         filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_titulo, None)]
         if filtrados:
             validos = filtrados
 
-    linhas = {l for l in (linha_comercial(c["modelo_fipe"]) for _, _, c in validos) if l}
-    if len(linhas) > 1:
-        return None, "ambiguo linha (" + "/".join(sorted(linhas))[:26] + ")"
+    # 2) linhas conflitantes: dois conjuntos nao-vazios e sem interseccao
+    chaves = [palavras_chave(c["modelo_fipe"]) for _, _, c in validos]
+    nao_vazias = [k for k in chaves if k]
+    for i_ in range(len(nao_vazias)):
+        for j_ in range(i_ + 1, len(nao_vazias)):
+            if not (nao_vazias[i_] & nao_vazias[j_]):
+                conflito = "/".join(sorted(nao_vazias[i_] | nao_vazias[j_]))[:26]
+                return None, f"ambiguo linha ({conflito})"
 
+    # 3) eixos conflitantes: prefere o nome base (sem eixo declarado)
     eixos_expl = {e for e in (eixos(c["modelo_fipe"]) for _, _, c in validos) if e}
     if len(eixos_expl) > 1:
-        return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:24] + ")"
+        base = [v for v in validos if eixos(v[2]["modelo_fipe"]) is None]
+        if not base:
+            return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
+        validos = base
 
     confianca = "alto" if validos[0][0] >= 0.95 else "medio"
     return [c for _, _, c in validos], confianca
