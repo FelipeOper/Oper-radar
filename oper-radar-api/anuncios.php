@@ -1,62 +1,108 @@
 <?php
 /**
- * OPER RADAR — API: lista de anúncios (com filtros avançados e preço FIPE quando houver)
- * GET anuncios.php?status=ativo&limit=50&cidade=Curitiba&revenda=SVD&preco_min=100000&preco_max=500000&q=daf
+ * OPER RADAR — API: lista de anuncios com filtros, paginacao real e total do banco
+ * GET anuncios.php?categoria=caminhoes&limit=60&offset=0&ordem=aleatorio&q=daf
+ *
+ * Diferenca importante vs versao anterior: agora devolve `total` = quantos anuncios
+ * batem os filtros NO BANCO INTEIRO (nao so na pagina). O app usa isso pro scroll
+ * infinito e pras contagens honestas.
  */
 require_once __DIR__ . '/config.php';
 $conn = conecta();
 
-$limit = min((int) ($_GET['limit'] ?? 50), 500);
-$where = [];
-$params = [];
-$types = '';
+// Mapa categoria -> tipos do portal (espelha o TIPO_PARA_CATEGORIA do frontend)
+$CATEGORIA_TIPOS = [
+  'caminhoes'   => ['Caminhao','Motorhome'],
+  'implementos' => ['Implemento','Carroceria-sobre-chassi','Trailer'],
+  'onibus_vans' => ['Onibus','Micro-onibus','Vans','Utilitarios'],
+  'leves'       => ['Carro'],
+  'agricolas'   => ['Trator','Trator-esteira','Micro-trator','Plantadeira','Colheitadeira',
+                    'Plataforma-colheitadeira','Pulverizador','Semeadeira',
+                    'Distribuidor-autopropelido','Forragem-e-feno','Florestal'],
+  'construcao'  => ['Pa-carregadeira','Escavadeira','Retro-escavadeira','Motoniveladora',
+                    'Rolo-compactador','Guindaste','Mini-carregadeira','Auto-carregavel',
+                    'Mini-escavadeira','Empilhadeira','Plataforma-elevatoria','Maquinas','Equipamentos'],
+  'pecas'       => ['Pecas-a-venda'],
+  'outros'      => ['Moto','Imoveis','Quadriciclo','Nautico'],
+];
 
-if (!empty($_GET['status'])) { $where[] = 'a.status = ?'; $params[] = $_GET['status']; $types .= 's'; }
-if (!empty($_GET['cidade'])) { $where[] = 'r.cidade LIKE ?'; $params[] = '%' . $_GET['cidade'] . '%'; $types .= 's'; }
-if (!empty($_GET['uf']))     { $where[] = 'r.uf = ?'; $params[] = strtoupper($_GET['uf']); $types .= 's'; }
-if (!empty($_GET['revenda'])){ $where[] = 'r.nome LIKE ?'; $params[] = '%' . $_GET['revenda'] . '%'; $types .= 's'; }
-if (!empty($_GET['tipo']))   { $where[] = 'a.tipo = ?'; $params[] = $_GET['tipo']; $types .= 's'; }
-if (!empty($_GET['marca']))  { $where[] = 'a.marca = ?'; $params[] = strtoupper($_GET['marca']); $types .= 's'; }
-if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?'; $params[] = (float) $_GET['preco_min']; $types .= 'd'; }
-if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?'; $params[] = (float) $_GET['preco_max']; $types .= 'd'; }
+$limit  = min(max((int)($_GET['limit'] ?? 60), 1), 200);
+$offset = max((int)($_GET['offset'] ?? 0), 0);
+
+$where = []; $params = []; $types = '';
+
+if (!empty($_GET['categoria']) && isset($CATEGORIA_TIPOS[$_GET['categoria']])) {
+    $tipos = $CATEGORIA_TIPOS[$_GET['categoria']];
+    $ph = implode(',', array_fill(0, count($tipos), '?'));
+    $where[] = "a.tipo IN ($ph)";
+    foreach ($tipos as $t) { $params[] = $t; $types .= 's'; }
+}
+if (!empty($_GET['status']))    { $where[] = 'a.status = ?';    $params[] = $_GET['status']; $types .= 's'; }
+if (!empty($_GET['cidade']))    { $where[] = 'r.cidade = ?';    $params[] = $_GET['cidade']; $types .= 's'; }
+if (!empty($_GET['uf']))        { $where[] = 'r.uf = ?';        $params[] = strtoupper($_GET['uf']); $types .= 's'; }
+if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GET['revenda']; $types .= 's'; }
+if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
+if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
+if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
+if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
 if (!empty($_GET['q'])) {
     $where[] = '(a.titulo LIKE ? OR a.marca LIKE ? OR r.nome LIKE ? OR r.cidade LIKE ?)';
     $termo = '%' . $_GET['q'] . '%';
     array_push($params, $termo, $termo, $termo, $termo);
     $types .= 'ssss';
 }
+$clausula = $where ? ' WHERE ' . implode(' AND ', $where) : '';
 
+// 1) Total real no banco (respeitando filtros) — pro scroll infinito saber quando parar
+$sqlCount = "SELECT COUNT(*) AS n FROM anuncio a JOIN revenda r ON r.id = a.revenda_id" . $clausula;
+$stc = $conn->prepare($sqlCount);
+if ($params) $stc->bind_param($types, ...$params);
+$stc->execute();
+$total = (int)$stc->get_result()->fetch_assoc()['n'];
+$stc->close();
+
+// 2) Pagina de resultados
+// 'aleatorio' usa RAND() com semente estavel por dia, pra paginacao nao repetir/pular itens
+$semente = (int)date('Ymd');
 $ordens = [
-    'recente' => 'a.ultima_vez_ativo DESC',
-    'preco_asc' => 'a.preco IS NULL, a.preco ASC',
+    'aleatorio'  => "RAND($semente)",
+    'recente'    => 'a.ultima_vez_ativo DESC',
+    'preco_asc'  => 'a.preco IS NULL, a.preco ASC',
     'preco_desc' => 'a.preco IS NULL, a.preco DESC',
     'mais_tempo' => 'a.primeira_vez_visto ASC',
 ];
-$ordem = $ordens[$_GET['ordem'] ?? 'recente'] ?? $ordens['recente'];
+$ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
 
 $sql = "SELECT a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.ano_inicial, a.ano_final,
                a.preco, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
-               a.fipe_match_confianca,
-               f.preco AS preco_fipe, f.codigo_fipe,
+               a.fipe_match_confianca, f.preco AS preco_fipe, f.codigo_fipe,
                r.nome AS revenda, r.cidade, r.uf
         FROM anuncio a
         JOIN revenda r ON r.id = a.revenda_id
-        LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id";
-if ($where) { $sql .= ' WHERE ' . implode(' AND ', $where); }
-$sql .= " ORDER BY $ordem LIMIT ?";
-$params[] = $limit;
-$types .= 'i';
+        LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id
+        $clausula
+        ORDER BY $ordem
+        LIMIT ? OFFSET ?";
+$paramsPag = $params; $typesPag = $types;
+$paramsPag[] = $limit;  $typesPag .= 'i';
+$paramsPag[] = $offset; $typesPag .= 'i';
 
 $stmt = $conn->prepare($sql);
-$stmt->bind_param($types, ...$params);
+$stmt->bind_param($typesPag, ...$paramsPag);
 $stmt->execute();
 $res = $stmt->get_result();
 
 $anuncios = [];
 while ($row = $res->fetch_assoc()) {
-    $row['preco'] = $row['preco'] !== null ? (float) $row['preco'] : null;
-    $row['preco_fipe'] = $row['preco_fipe'] !== null ? (float) $row['preco_fipe'] : null;
+    $row['preco'] = $row['preco'] !== null ? (float)$row['preco'] : null;
+    $row['preco_fipe'] = $row['preco_fipe'] !== null ? (float)$row['preco_fipe'] : null;
     $anuncios[] = $row;
 }
 
-envia_json(['total' => count($anuncios), 'anuncios' => $anuncios]);
+envia_json([
+    'total' => $total,               // total no banco com os filtros aplicados
+    'retornados' => count($anuncios),
+    'offset' => $offset,
+    'limit' => $limit,
+    'anuncios' => $anuncios,
+]);

@@ -390,10 +390,15 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
 }
 
 /* ============================================================
-   MERCADO — estoque regional completo (filtros avancados + categorias)
+   MERCADO — busca paginada no servidor (todos os 7k+ anuncios)
    ============================================================ */
-function PageMercado({ anuncios, usandoReais }) {
+const PAGINA = 60;
+
+function PageMercado() {
+  const { data: facetas } = useApi('facetas.php');
+
   const [q, setQ] = useState('');
+  const [qDebounced, setQDebounced] = useState('');
   const [categoria, setCategoria] = useState('todas');
   const [tipo, setTipo] = useState('todos');
   const [status, setStatus] = useState('todos');
@@ -403,72 +408,98 @@ function PageMercado({ anuncios, usandoReais }) {
   const [precoMax, setPrecoMax] = useState('');
   const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
-  const [mostrados, setMostrados] = useState(60);
 
-  // Reset da paginacao quando os filtros mudam
-  useEffect(() => { setMostrados(60); }, [categoria, tipo, status, cidade, revenda, precoMin, precoMax, q, ordem]);
+  const [anuncios, setAnuncios] = useState([]);
+  const [total, setTotal] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+  const [fim, setFim] = useState(false);
 
-  // Scroll infinito — carrega +100 quando estiver perto do fim
+  // Debounce da busca — evita disparar uma requisicao por tecla digitada
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q), 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const queryBase = useMemo(() => {
+    const p = new URLSearchParams();
+    if (categoria !== 'todas') p.set('categoria', categoria);
+    if (tipo !== 'todos') p.set('tipo', tipo);
+    if (status !== 'todos') {
+      const mapa = { ativo: 'ativo', venda_provavel: 'removido_candidato', removido: 'removido_confirmado' };
+      p.set('status', mapa[status] || status);
+    }
+    if (cidade !== 'todas') p.set('cidade', cidade);
+    if (revenda !== 'todas') p.set('revenda', revenda);
+    if (precoMin) p.set('preco_min', precoMin);
+    if (precoMax) p.set('preco_max', precoMax);
+    if (qDebounced) p.set('q', qDebounced);
+    p.set('ordem', ordem);
+    return p.toString();
+  }, [categoria, tipo, status, cidade, revenda, precoMin, precoMax, qDebounced, ordem]);
+
+  // Busca a primeira pagina sempre que qualquer filtro muda
+  useEffect(() => {
+    let cancelado = false;
+    setCarregando(true); setFim(false);
+    fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=0`)
+      .then(r => r.json())
+      .then(d => {
+        if (cancelado) return;
+        setAnuncios((d.anuncios || []).map(mapeiaAnuncioReal));
+        setTotal(d.total ?? 0);
+        setFim((d.anuncios || []).length >= (d.total ?? 0));
+      })
+      .catch(() => { if (!cancelado) { setAnuncios([]); setTotal(0); } })
+      .finally(() => { if (!cancelado) setCarregando(false); });
+    return () => { cancelado = true; };
+  }, [queryBase]);
+
+  const carregaMais = () => {
+    if (carregando || fim) return;
+    setCarregando(true);
+    fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=${anuncios.length}`)
+      .then(r => r.json())
+      .then(d => {
+        const novos = (d.anuncios || []).map(mapeiaAnuncioReal);
+        setAnuncios(prev => {
+          const juntos = [...prev, ...novos];
+          if (novos.length === 0 || juntos.length >= (d.total ?? 0)) setFim(true);
+          return juntos;
+        });
+      })
+      .catch(() => setFim(true))
+      .finally(() => setCarregando(false));
+  };
+
+  // Scroll infinito de verdade — dispara nova requisicao ao chegar perto do fim
   useEffect(() => {
     const onScroll = () => {
       const el = document.scrollingElement || document.documentElement;
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 800) {
-        setMostrados(m => Math.min(m + 100, 800));
-      }
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) carregaMais();
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  });
 
-  // Categorias com contagem — permite mostrar quantos anúncios cada uma tem
-  const contagemPorCategoria = useMemo(() => {
-    const cont = {};
-    anuncios.forEach(a => { cont[a.categoria] = (cont[a.categoria] || 0) + 1; });
-    return cont;
-  }, [anuncios]);
+  const catCounts = facetas?.categorias || {};
+  const totalGeral = facetas?.total_geral ?? 0;
+  const cidades = ['todas', ...(facetas?.cidades || []).map(c => c.cidade)];
+  const revendas = ['todas', ...(facetas?.revendas || []).map(r => r.nome)];
+  const subtipos = categoria === 'todas'
+    ? []
+    : (facetas?.subtipos?.[categoria] || []);
 
-  const cidades = useMemo(() => ['todas', ...[...new Set(anuncios.map(a => a.cidade).filter(Boolean))].sort()], [anuncios]);
-  const revendas = useMemo(() => ['todas', ...[...new Set(anuncios.map(a => a.revenda).filter(Boolean))].sort()], [anuncios]);
-  const tipos = useMemo(() => {
-    const filtroCat = categoria === 'todas' ? anuncios : anuncios.filter(a => a.categoria === categoria);
-    return ['todos', ...[...new Set(filtroCat.map(a => a.tipo).filter(t => t && t !== '—'))].sort()];
-  }, [anuncios, categoria]);
-
-  const filtrados = useMemo(() => {
-    let lista = anuncios.filter(a => {
-      if (categoria !== 'todas' && a.categoria !== categoria) return false;
-      if (tipo !== 'todos' && a.tipo !== tipo) return false;
-      if (status !== 'todos' && a.status !== status) return false;
-      if (cidade !== 'todas' && a.cidade !== cidade) return false;
-      if (revenda !== 'todas' && a.revenda !== revenda) return false;
-      if (precoMin && (a.preco == null || a.preco < Number(precoMin))) return false;
-      if (precoMax && (a.preco == null || a.preco > Number(precoMax))) return false;
-      if (q && !(`${a.marca} ${a.titulo} ${a.cidade} ${a.revenda}`.toLowerCase().includes(q.toLowerCase()))) return false;
-      return true;
-    });
-    const ordens = {
-      aleatorio: () => Math.random() - 0.5,
-      recente: (x, y) => new Date(y.ultimaVez) - new Date(x.ultimaVez),
-      preco_asc: (x, y) => (x.preco ?? Infinity) - (y.preco ?? Infinity),
-      preco_desc: (x, y) => (y.preco ?? -1) - (x.preco ?? -1),
-      mais_tempo: (x, y) => y.dias - x.dias,
-    };
-    return [...lista].sort(ordens[ordem] || ordens.recente);
-  }, [anuncios, categoria, tipo, status, cidade, revenda, precoMin, precoMax, q, ordem]);
-
-  const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'todos', cidade !== 'todas', revenda !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
-
-  // Barra de chips com as categorias — visao rapida do que tem no mercado
+  const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'todos',
+    cidade !== 'todas', revenda !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
   const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
 
   return (
     <div>
-      {/* Chips de categorias */}
       <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, marginBottom: 4 }}>
         {chipsCategorias.map(cat => {
           const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
           const ativa = categoria === cat;
-          const n = cat === 'todas' ? anuncios.length : (contagemPorCategoria[cat] || 0);
+          const n = cat === 'todas' ? totalGeral : (catCounts[cat] || 0);
           return (
             <button key={cat} onClick={() => { setCategoria(cat); setTipo('todos'); }} style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
@@ -478,8 +509,7 @@ function PageMercado({ anuncios, usandoReais }) {
               color: ativa ? info.cor : T.ink, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
               transition: 'all 140ms',
             }}>
-              <span>{info.icone}</span>
-              <span>{info.label}</span>
+              <span>{info.icone}</span><span>{info.label}</span>
               <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>{fmtN(n)}</span>
             </button>
           );
@@ -493,7 +523,7 @@ function PageMercado({ anuncios, usandoReais }) {
             style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
         </div>
         <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
-          <option value="aleatorio">Aleatório (mercado)</option>
+          <option value="aleatorio">Amostra do mercado</option>
           <option value="recente">Mais recentes</option>
           <option value="preco_asc">Menor preço</option>
           <option value="preco_desc">Maior preço</option>
@@ -509,8 +539,9 @@ function PageMercado({ anuncios, usandoReais }) {
 
       {maisFiltros && (
         <Card style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
-          <select value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle}>
-            {tipos.map(t => <option key={t} value={t}>{t === 'todos' ? 'Todos os subtipos' : t}</option>)}
+          <select value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle} disabled={categoria === 'todas'}>
+            <option value="todos">{categoria === 'todas' ? 'Escolha uma categoria' : 'Todos os subtipos'}</option>
+            {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{s.tipo} ({s.n})</option>)}
           </select>
           <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
             <option value="todos">Todos os status</option>
@@ -530,79 +561,63 @@ function PageMercado({ anuncios, usandoReais }) {
       )}
 
       <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, margin: '10px 2px 14px' }}>
-        {fmtN(filtrados.length)} ANÚNCIOS {usandoReais ? '· DADOS REAIS DA COLETA' : '· CONECTANDO À API...'}
+        {total === null ? 'CONSULTANDO O BANCO...' : `${fmtN(total)} ANÚNCIOS ENCONTRADOS · MOSTRANDO ${fmtN(anuncios.length)}`}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
-        {filtrados.slice(0, mostrados).map(a => {
+        {anuncios.map(a => {
           const cat = CATEGORIAS[a.categoria] || CATEGORIAS.outros;
           return (
             <Card key={a.id} style={{ padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {a.status === 'removido' ? (
-                    <Tag tone="positivo">VENDIDO</Tag>
-                  ) : a.status === 'venda_provavel' ? (
-                    <Tag tone="alerta">VENDA PROVÁVEL</Tag>
-                  ) : a.dias >= 30 ? (
-                    <Tag tone="alerta">{a.dias}D NO AR</Tag>
-                  ) : a.dias >= 7 ? (
-                    <Tag tone="sinal">{a.dias}D NO AR</Tag>
-                  ) : a.dias < 2 ? (
-                    <Tag tone="sinal">NOVO</Tag>
-                  ) : (
-                    <Tag tone="neutro">ATIVO</Tag>
-                  )}
-                </div>
+                <Tag tone={a.status === 'removido' ? 'positivo' : a.status === 'venda_provavel' ? 'alerta' : a.dias >= 30 ? 'sinal' : 'neutro'}>
+                  {a.status === 'removido' ? 'VENDIDO'
+                    : a.status === 'venda_provavel' ? 'VENDA PROVÁVEL'
+                    : a.dias >= 30 ? `${a.dias}D NO AR`
+                    : a.dias < 2 ? 'NOVO' : 'ATIVO'}
+                </Tag>
                 <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>#{a.id}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 12 }}>{cat.icone}</span>
                 <span style={{ fontFamily: T.fontMono, fontSize: 10, color: cat.cor, letterSpacing: '0.04em' }}>{cat.label.toUpperCase()}</span>
               </div>
-              <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>
-                {a.titulo}
-              </div>
+              <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
               <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
                 <MapPin size={11} />
-                <button onClick={(e) => { e.stopPropagation(); setRevenda(a.revenda); setMostrados(60); window.scrollTo({top: 0, behavior: 'smooth'}); }}
-                  style={{ background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', padding: 0, fontSize: 12, textDecoration: 'underline', textDecorationColor: 'transparent' }}
-                  onMouseEnter={(e) => e.currentTarget.style.textDecorationColor = T.signal}
-                  onMouseLeave={(e) => e.currentTarget.style.textDecorationColor = 'transparent'}
-                  title="Filtrar por essa revenda"
-                >{a.revenda}</button>
+                <button onClick={() => { setRevenda(a.revenda); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  style={{ background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', padding: 0, fontSize: 12,
+                           textDecoration: 'underline', textDecorationColor: 'transparent' }}
+                  onMouseEnter={e => e.currentTarget.style.textDecorationColor = T.signal}
+                  onMouseLeave={e => e.currentTarget.style.textDecorationColor = 'transparent'}
+                  title="Filtrar por essa revenda">{a.revenda}</button>
                 <span>· {a.cidade}/{a.uf}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                  <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>
-                    {fmtBRL(a.preco)}
-                  </div>
+                  <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>{fmtBRL(a.preco)}</div>
                   <div style={{ fontSize: 11, marginTop: 2, color: a.precoFipe ? (a.preco < a.precoFipe ? T.positive : T.inkMuted) : T.inkMuted }}>
                     {a.precoFipe
                       ? `FIPE ${fmtBRL(a.precoFipe)} · ${a.preco < a.precoFipe ? '▼' : '▲'} ${Math.abs(Math.round((a.preco - a.precoFipe) / a.precoFipe * 100))}%`
                       : 'vs FIPE: aguardando Fase 2'}
                   </div>
                 </div>
-                {a.url && (
-                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal">
-                    <ExternalLink size={15} />
-                  </a>
-                )}
+                {a.url && <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal"><ExternalLink size={15} /></a>}
               </div>
             </Card>
           );
         })}
       </div>
-      {mostrados < filtrados.length && (
-        <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
-          {fmtN(Math.min(mostrados, filtrados.length))} de {fmtN(filtrados.length)} — role para carregar mais
+
+      {carregando && <div style={{ textAlign: 'center', fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, marginTop: 18 }}>CARREGANDO...</div>}
+      {!carregando && fim && anuncios.length > 0 && (
+        <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 18 }}>
+          Fim da lista — {fmtN(anuncios.length)} de {fmtN(total)} anúncios
         </div>
       )}
-      {mostrados >= filtrados.length && filtrados.length > 60 && (
-        <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
-          Fim da lista — {fmtN(filtrados.length)} anuncios encontrados
-        </div>
+      {!carregando && anuncios.length === 0 && total === 0 && (
+        <EmptyState icon={PackageOpen} titulo="Nenhum anúncio com esses filtros"
+          texto="Tente ampliar a busca — remova filtros de preço, cidade ou revenda." />
       )}
     </div>
   );
@@ -611,21 +626,23 @@ function PageMercado({ anuncios, usandoReais }) {
 /* ============================================================
    OPORTUNIDADES — onde há dinheiro na mesa
    ============================================================ */
-function PageOportunidades({ anuncios, onCriarAcao }) {
-  const maduros = anuncios
-    .filter(a => a.status === 'ativo' && a.dias >= 30)
-    .sort((x, y) => y.dias - x.dias)
-    .slice(0, 12);
+function PageOportunidades({ onCriarAcao }) {
+  // Busca no servidor os anuncios ativos ha mais tempo — nao depende do que o Mercado carregou
+  const { data, erro } = useApi('anuncios.php?status=ativo&ordem=mais_tempo&limit=40');
+  const lista = useMemo(() => (data?.anuncios || []).map(mapeiaAnuncioReal), [data]);
+  const maduros = lista.filter(a => a.dias >= 30).slice(0, 15);
 
   return (
     <div>
       <SectionTitle sub="Anúncio parado há 30+ dias: o vendedor tende a aceitar negociação — oportunidade de compra abaixo do anunciado">
         Anúncios maduros no mercado
       </SectionTitle>
-      {maduros.length === 0 ? (
-        <EmptyState icon={Timer} titulo="Construindo o histórico de idade dos anúncios"
-          texto="O radar registra quando cada anúncio apareceu pela primeira vez. Conforme as coletas diárias se acumulam, os anúncios parados há 30+ dias aparecem aqui como oportunidades de negociação." />
-      ) : (
+      {!data && !erro && <EmptyState icon={Timer} titulo="Consultando o mercado..." texto="Buscando os anúncios que estão no ar há mais tempo." />}
+      {data && maduros.length === 0 && (
+        <EmptyState icon={Timer} titulo="Ainda sem anúncios com 30+ dias registrados"
+          texto={`O mais antigo do radar hoje está há ${lista[0]?.dias ?? 0} dias. A idade só conta a partir da primeira coleta (07/jul) — conforme os dias passam, os anúncios realmente parados aparecem aqui.`} />
+      )}
+      {maduros.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {maduros.map(a => (
             <Card key={a.id} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
@@ -644,20 +661,17 @@ function PageOportunidades({ anuncios, onCriarAcao }) {
         </div>
       )}
 
-      <SectionTitle sub="Anúncios abaixo da tabela FIPE — exige o mapeamento marca/modelo da Fase 2">
-        Preço abaixo da FIPE
-      </SectionTitle>
+      <SectionTitle sub="Anúncios abaixo da tabela FIPE — exige o mapeamento marca/modelo da Fase 2">Preço abaixo da FIPE</SectionTitle>
       <EmptyState icon={TrendingDown} titulo="Aguardando Fase 2 — mapeamento FIPE"
         texto="Quando o catálogo de marcas e modelos estiver cruzado com a tabela FIPE, esta seção mostra automaticamente cada anúncio abaixo da referência — os candidatos mais óbvios a arbitragem." />
 
-      <SectionTitle sub="Reduções de preço detectadas entre uma varredura e outra">
-        Quedas de preço
-      </SectionTitle>
+      <SectionTitle sub="Reduções de preço detectadas entre uma varredura e outra">Quedas de preço</SectionTitle>
       <EmptyState icon={ArrowDownRight} titulo="Coletando histórico de preços"
         texto="A cada varredura o radar registra o preço de cada anúncio. Assim que houver histórico suficiente (alguns dias de coleta), toda queda de preço aparece aqui em ordem de relevância." />
     </div>
   );
 }
+
 
 /* ============================================================
    CONCORRENTES — quem sao os players + metricas de giro
@@ -1202,8 +1216,8 @@ export default function App() {
 
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} />,
-    mercado: <PageMercado anuncios={anuncios} usandoReais={usandoReais} />,
-    oportunidades: <PageOportunidades anuncios={anuncios} onCriarAcao={criarAcao} />,
+    mercado: <PageMercado />,
+    oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrentes />,
     analise: <PageAnalise />,
     acoes: <PageAcoes acoes={acoes} setAcoes={setAcoes} />,
