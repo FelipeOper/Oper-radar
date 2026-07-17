@@ -10,6 +10,13 @@
 require_once __DIR__ . '/config.php';
 $conn = conecta();
 
+$REGIOES = [
+    'Sul' => ['PR','SC','RS'], 'Sudeste' => ['SP','RJ','MG','ES'],
+    'Centro-Oeste' => ['MT','MS','GO','DF'],
+    'Nordeste' => ['BA','PE','CE','MA','PB','RN','AL','PI','SE'],
+    'Norte' => ['AM','PA','RO','RR','AC','AP','TO'],
+];
+
 // Mapa categoria -> tipos do portal (espelha o TIPO_PARA_CATEGORIA do frontend)
 $CATEGORIA_TIPOS = [
   'caminhoes'   => ['Caminhao','Motorhome'],
@@ -39,7 +46,12 @@ if (!empty($_GET['categoria']) && isset($CATEGORIA_TIPOS[$_GET['categoria']])) {
 }
 if (!empty($_GET['status']))    { $where[] = 'a.status = ?';    $params[] = $_GET['status']; $types .= 's'; }
 if (!empty($_GET['cidade']))    { $where[] = 'r.cidade = ?';    $params[] = $_GET['cidade']; $types .= 's'; }
-if (!empty($_GET['uf']))        { $where[] = 'r.uf = ?';        $params[] = strtoupper($_GET['uf']); $types .= 's'; }
+if (!empty($_GET['regiao']) && isset($REGIOES[$_GET['regiao']])) {
+    $ufsR = $REGIOES[$_GET['regiao']];
+    $ph = implode(',', array_fill(0, count($ufsR), '?'));
+    $where[] = "r.uf IN ($ph)";
+    foreach ($ufsR as $u) { $params[] = $u; $types .= 's'; }
+} elseif (!empty($_GET['uf'])) { $where[] = 'r.uf = ?'; $params[] = strtoupper($_GET['uf']); $types .= 's'; }
 if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GET['revenda']; $types .= 's'; }
 if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
 if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }

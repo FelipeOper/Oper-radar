@@ -402,6 +402,7 @@ function PageMercado() {
   const [categoria, setCategoria] = useState('todas');
   const [tipo, setTipo] = useState('todos');
   const [status, setStatus] = useState('todos');
+  const [regiao, setRegiao] = useState('todas');
   const [cidade, setCidade] = useState('todas');
   const [revenda, setRevenda] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
@@ -423,6 +424,7 @@ function PageMercado() {
   const queryBase = useMemo(() => {
     const p = new URLSearchParams();
     if (categoria !== 'todas') p.set('categoria', categoria);
+    if (regiao !== 'todas') p.set('regiao', regiao);
     if (tipo !== 'todos') p.set('tipo', tipo);
     if (status !== 'todos') {
       const mapa = { ativo: 'ativo', venda_provavel: 'removido_candidato', removido: 'removido_confirmado' };
@@ -435,7 +437,7 @@ function PageMercado() {
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [categoria, tipo, status, cidade, revenda, precoMin, precoMax, qDebounced, ordem]);
+  }, [categoria, regiao, tipo, status, cidade, revenda, precoMin, precoMax, qDebounced, ordem]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
@@ -515,6 +517,33 @@ function PageMercado() {
           );
         })}
       </div>
+
+      {/* Chips de regiao — so aparecem regioes que ja tem dados coletados */}
+      {facetas?.regioes && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, marginBottom: 4 }}>
+          {['todas', ...Object.keys(facetas.regioes)].map(rg => {
+            const dados = rg === 'todas' ? null : facetas.regioes[rg];
+            const temDados = rg === 'todas' || (dados && dados.anuncios > 0);
+            const ativa = regiao === rg;
+            const n = rg === 'todas' ? totalGeral : (dados?.anuncios || 0);
+            return (
+              <button key={rg} onClick={() => temDados && setRegiao(rg)} disabled={!temDados} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px',
+                background: ativa ? `${STEEL}22` : T.surface,
+                border: `1px solid ${ativa ? STEEL : T.line}`,
+                borderRadius: 999, cursor: temDados ? 'pointer' : 'not-allowed',
+                fontSize: 12, fontFamily: T.fontBody,
+                color: ativa ? STEEL : (temDados ? T.ink : T.inkMuted),
+                opacity: temDados ? 1 : 0.4, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
+              }} title={temDados ? '' : 'Regiao ainda nao coletada'}>
+                <MapPin size={11} />
+                <span>{rg === 'todas' ? 'Brasil' : rg}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{fmtN(n)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
@@ -676,8 +705,13 @@ function PageOportunidades({ onCriarAcao }) {
 /* ============================================================
    CONCORRENTES — quem sao os players + metricas de giro
    ============================================================ */
+const REGIOES_UI = ['Sul', 'Sudeste', 'Centro-Oeste', 'Nordeste', 'Norte'];
+
 function PageConcorrentes() {
-  const { data, erro } = useApi('lojistas.php?uf=PR');
+  const [regiao, setRegiao] = useState('todas');
+  const { data: facetas } = useApi('facetas.php');
+  const urlLojistas = regiao === 'todas' ? 'lojistas.php' : `lojistas.php?regiao=${encodeURIComponent(regiao)}`;
+  const { data, erro } = useApi(urlLojistas);
   const [q, setQ] = useState('');
   const [categoria, setCategoria] = useState('todas');
   const [cidade, setCidade] = useState('todas');
@@ -747,6 +781,33 @@ function PageConcorrentes() {
 
   return (
     <div>
+      {/* Chips de regiao — refiltram os lojistas por regiao do Brasil */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.05em' }}>REGIAO DO BRASIL</div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8 }}>
+          {['todas', ...REGIOES_UI].map(rg => {
+            const dados = rg === 'todas' ? null : facetas?.regioes?.[rg];
+            const temDados = rg === 'todas' || (dados && dados.revendas > 0);
+            const ativa = regiao === rg;
+            const n = rg === 'todas' ? '' : (dados?.revendas || 0);
+            return (
+              <button key={rg} onClick={() => temDados && setRegiao(rg)} disabled={!temDados} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                background: ativa ? `${STEEL}22` : T.surface,
+                border: `1px solid ${ativa ? STEEL : T.line}`, borderRadius: 999,
+                cursor: temDados ? 'pointer' : 'not-allowed', fontSize: 12, fontFamily: T.fontBody,
+                color: ativa ? STEEL : (temDados ? T.ink : T.inkMuted),
+                opacity: temDados ? 1 : 0.4, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
+              }} title={temDados ? '' : 'Regiao ainda nao coletada'}>
+                <MapPin size={11} />
+                <span>{rg === 'todas' ? 'Brasil inteiro' : rg}</span>
+                {n !== '' && <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{fmtN(n)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Chips de categorias — quais lojistas atuam em cada segmento */}
       <div style={{ marginBottom: 4 }}>
         <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.05em' }}>SEGMENTO DE ATUACAO</div>

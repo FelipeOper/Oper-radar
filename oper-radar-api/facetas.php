@@ -60,8 +60,45 @@ $r = $conn->query("SELECT r.nome, COUNT(*) n FROM anuncio a JOIN revenda r ON r.
                    GROUP BY r.id ORDER BY r.nome");
 while ($row = $r->fetch_assoc()) $revendas[] = ['nome' => $row['nome'], 'n' => (int)$row['n']];
 
+
+// Regioes do Brasil -> UFs. Usado pros chips de regiao no app.
+$REGIOES = [
+    'Sul'          => ['PR','SC','RS'],
+    'Sudeste'      => ['SP','RJ','MG','ES'],
+    'Centro-Oeste' => ['MT','MS','GO','DF'],
+    'Nordeste'     => ['BA','PE','CE','MA','PB','RN','AL','PI','SE'],
+    'Norte'        => ['AM','PA','RO','RR','AC','AP','TO'],
+];
+
+// Contagem de anuncios ativos por UF
+$porUf = [];
+$r = $conn->query("SELECT r.uf, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+                   WHERE a.status='ativo' GROUP BY r.uf");
+while ($row = $r->fetch_assoc()) $porUf[$row['uf']] = (int)$row['n'];
+
+// Contagem de revendas por UF
+$revendasUf = [];
+$r = $conn->query("SELECT uf, COUNT(*) n FROM revenda GROUP BY uf");
+while ($row = $r->fetch_assoc()) $revendasUf[$row['uf']] = (int)$row['n'];
+
+// Agrega por regiao
+$regioes = [];
+foreach ($REGIOES as $nome => $ufs) {
+    $anuncios = 0; $revs = 0; $ufsAtivas = [];
+    foreach ($ufs as $uf) {
+        $a = $porUf[$uf] ?? 0;
+        $anuncios += $a;
+        $revs += $revendasUf[$uf] ?? 0;
+        if ($a > 0) $ufsAtivas[] = $uf;
+    }
+    $regioes[$nome] = ['anuncios' => $anuncios, 'revendas' => $revs, 'ufs_ativas' => $ufsAtivas, 'ufs' => $ufs];
+}
+
 envia_json([
     'total_geral' => $totalGeral,
+    'por_uf' => $porUf,
+    'revendas_por_uf' => $revendasUf,
+    'regioes' => $regioes,
     'categorias' => $categorias,
     'subtipos' => $subtipos,
     'cidades' => $cidades,

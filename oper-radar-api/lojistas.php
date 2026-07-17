@@ -7,7 +7,16 @@
  */
 require_once __DIR__ . '/config.php';
 $conn = conecta();
+
+$REGIOES = [
+    'Sul' => ['PR','SC','RS'], 'Sudeste' => ['SP','RJ','MG','ES'],
+    'Centro-Oeste' => ['MT','MS','GO','DF'],
+    'Nordeste' => ['BA','PE','CE','MA','PB','RN','AL','PI','SE'],
+    'Norte' => ['AM','PA','RO','RR','AC','AP','TO'],
+];
 $uf = $_GET['uf'] ?? null;
+$regiao = $_GET['regiao'] ?? null;
+$ufsRegiao = ($regiao && isset($REGIOES[$regiao])) ? $REGIOES[$regiao] : null;
 
 $sql = "SELECT r.id, r.nome, r.cidade, r.uf, r.url_perfil, r.telefone, r.ativa_desde,
                COUNT(a.id) AS total_historico,
@@ -21,7 +30,13 @@ $sql = "SELECT r.id, r.nome, r.cidade, r.uf, r.url_perfil, r.telefone, r.ativa_d
         FROM revenda r
         LEFT JOIN anuncio a ON a.revenda_id = r.id";
 $params = []; $types = '';
-if ($uf) { $sql .= ' WHERE r.uf = ?'; $params[] = strtoupper($uf); $types .= 's'; }
+if ($ufsRegiao) {
+    $ph = implode(',', array_fill(0, count($ufsRegiao), '?'));
+    $sql .= " WHERE r.uf IN ($ph)";
+    foreach ($ufsRegiao as $u) { $params[] = $u; $types .= 's'; }
+} elseif ($uf) {
+    $sql .= ' WHERE r.uf = ?'; $params[] = strtoupper($uf); $types .= 's';
+}
 $sql .= ' GROUP BY r.id ORDER BY ativos DESC, vendidos DESC';
 
 $stmt = $conn->prepare($sql);
