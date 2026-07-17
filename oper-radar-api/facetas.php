@@ -9,6 +9,13 @@
 require_once __DIR__ . '/config.php';
 $conn = conecta();
 
+$statusFiltro = $_GET['status'] ?? 'ativo';
+$statusPermitidos = ['ativo', 'removido_candidato', 'removido_confirmado', 'todos'];
+if (!in_array($statusFiltro, $statusPermitidos, true)) $statusFiltro = 'ativo';
+// O valor foi validado pela lista fechada acima.
+$whereStatus = $statusFiltro === 'todos' ? '' : " WHERE status='$statusFiltro'";
+$whereStatusA = $statusFiltro === 'todos' ? '' : " WHERE a.status='$statusFiltro'";
+
 $CATEGORIA_TIPOS = [
   'caminhoes'   => ['Caminhao','Motorhome'],
   'implementos' => ['Implemento','Carroceria-sobre-chassi','Trailer'],
@@ -26,7 +33,8 @@ $CATEGORIA_TIPOS = [
 
 // Contagem por tipo (uma consulta), depois soma nas categorias
 $porTipo = [];
-$r = $conn->query("SELECT tipo, COUNT(*) n FROM anuncio WHERE tipo IS NOT NULL GROUP BY tipo");
+$conector = $whereStatus ? ' AND' : ' WHERE';
+$r = $conn->query("SELECT tipo, COUNT(*) n FROM anuncio$whereStatus$conector tipo IS NOT NULL GROUP BY tipo");
 while ($row = $r->fetch_assoc()) $porTipo[$row['tipo']] = (int)$row['n'];
 
 $categorias = [];
@@ -51,12 +59,12 @@ foreach ($CATEGORIA_TIPOS as $cat => $tipos) {
 }
 
 $cidades = [];
-$r = $conn->query("SELECT r.cidade, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+$r = $conn->query("SELECT r.cidade, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id$whereStatusA
                    GROUP BY r.cidade ORDER BY r.cidade");
 while ($row = $r->fetch_assoc()) $cidades[] = ['cidade' => $row['cidade'], 'n' => (int)$row['n']];
 
 $revendas = [];
-$r = $conn->query("SELECT r.nome, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+$r = $conn->query("SELECT r.nome, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id$whereStatusA
                    GROUP BY r.id ORDER BY r.nome");
 while ($row = $r->fetch_assoc()) $revendas[] = ['nome' => $row['nome'], 'n' => (int)$row['n']];
 
@@ -70,10 +78,10 @@ $REGIOES = [
     'Norte'        => ['AM','PA','RO','RR','AC','AP','TO'],
 ];
 
-// Contagem de anuncios ativos por UF
+// Contagem de anuncios do status selecionado por UF
 $porUf = [];
 $r = $conn->query("SELECT r.uf, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
-                   WHERE a.status='ativo' GROUP BY r.uf");
+                   $whereStatusA GROUP BY r.uf");
 while ($row = $r->fetch_assoc()) $porUf[$row['uf']] = (int)$row['n'];
 
 // Contagem de revendas por UF
@@ -95,6 +103,7 @@ foreach ($REGIOES as $nome => $ufs) {
 }
 
 envia_json([
+    'status_aplicado' => $statusFiltro,
     'total_geral' => $totalGeral,
     'por_uf' => $porUf,
     'revendas_por_uf' => $revendasUf,

@@ -3,9 +3,9 @@
  * OPER RADAR — API: KPIs adicionais para o painel "Hoje"
  * GET hoje_stats.php
  * - top_modelos: modelos com mais anúncios ativos + preço médio
- * - regioes_vendas: cidades com mais vendas confirmadas (últimos 30 dias)
+ * - regioes_saidas: cidades com mais saídas detectadas (últimos 30 dias)
  * - top_lojas_novos: lojas que mais subiram anúncios (últimos 7 dias)
- * - top_lojas_vendas: lojas com mais vendas confirmadas (últimos 30 dias)
+ * - top_lojas_saidas: lojas com mais saídas detectadas (últimos 30 dias)
  */
 require_once __DIR__ . '/config.php';
 $conn = conecta();
@@ -33,15 +33,15 @@ $topModelos = rows($conn, "
 ");
 foreach ($topModelos as &$m) { $m['n'] = (int)$m['n']; $m['preco_medio'] = (int)$m['preco_medio']; }
 
-// Cidades com mais vendas confirmadas (últimos 30 dias)
-$regioesVendas = rows($conn, "
+// Cidades com mais anuncios que deixaram o portal (ultimos 30 dias)
+$regioesSaidas = rows($conn, "
     SELECT r.cidade, r.uf, COUNT(*) n
     FROM anuncio a JOIN revenda r ON r.id = a.revenda_id
     WHERE a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)
     GROUP BY r.cidade, r.uf
     ORDER BY n DESC LIMIT 6
 ");
-foreach ($regioesVendas as &$c) { $c['n'] = (int)$c['n']; }
+foreach ($regioesSaidas as &$c) { $c['n'] = (int)$c['n']; }
 
 // Lojas que mais SUBIRAM anúncios (últimos 7 dias) — quem está mais ativo comercialmente
 $topLojasNovos = rows($conn, "
@@ -53,19 +53,22 @@ $topLojasNovos = rows($conn, "
 ");
 foreach ($topLojasNovos as &$l) { $l['n'] = (int)$l['n']; }
 
-// Lojas que mais VENDERAM (últimos 30 dias) — quem gira mais rápido
-$topLojasVendas = rows($conn, "
+// Lojas com mais saidas detectadas (ultimos 30 dias); isso nao comprova venda.
+$topLojasSaidas = rows($conn, "
     SELECT r.nome, r.cidade, r.uf, COUNT(*) n
     FROM anuncio a JOIN revenda r ON r.id = a.revenda_id
     WHERE a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)
     GROUP BY r.id
     ORDER BY n DESC LIMIT 6
 ");
-foreach ($topLojasVendas as &$l) { $l['n'] = (int)$l['n']; }
+foreach ($topLojasSaidas as &$l) { $l['n'] = (int)$l['n']; }
 
 envia_json([
     'top_modelos' => $topModelos,
-    'regioes_vendas' => $regioesVendas,
+    'regioes_saidas' => $regioesSaidas,
     'top_lojas_novos' => $topLojasNovos,
-    'top_lojas_vendas' => $topLojasVendas,
+    'top_lojas_saidas' => $topLojasSaidas,
+    // Compatibilidade temporaria com bundles anteriores.
+    'regioes_vendas' => $regioesSaidas,
+    'top_lojas_vendas' => $topLojasSaidas,
 ]);

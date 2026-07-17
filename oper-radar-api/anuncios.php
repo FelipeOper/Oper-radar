@@ -58,10 +58,15 @@ if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strt
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
 if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
 if (!empty($_GET['q'])) {
-    $where[] = '(a.titulo LIKE ? OR a.marca LIKE ? OR r.nome LIKE ? OR r.cidade LIKE ?)';
-    $termo = '%' . $_GET['q'] . '%';
-    array_push($params, $termo, $termo, $termo, $termo);
-    $types .= 'ssss';
+    // Cada palavra precisa existir em algum campo do veiculo. Assim, "DAF XF 530"
+    // encontra titulos com palavras intermediarias sem misturar a revenda/cidade.
+    $tokens = preg_split('/\s+/u', trim($_GET['q']), -1, PREG_SPLIT_NO_EMPTY);
+    foreach (array_slice($tokens ?: [], 0, 8) as $token) {
+        $where[] = "(a.titulo LIKE ? OR COALESCE(a.marca, '') LIKE ? OR COALESCE(a.modelo, '') LIKE ?)";
+        $termo = '%' . $token . '%';
+        array_push($params, $termo, $termo, $termo);
+        $types .= 'sss';
+    }
 }
 $clausula = $where ? ' WHERE ' . implode(' AND ', $where) : '';
 

@@ -1,7 +1,10 @@
 """
 OPER RADAR — Fase 1
 Lógica de diff entre coletas: decide se um anúncio é novo, continua ativo,
-vira candidato a remoção, ou é confirmado como removido (saída de estoque).
+vira candidato a remoção, ou tem sua ausência no portal confirmada.
+
+"removido_confirmado" confirma a ausência em duas coletas consecutivas; não
+comprova que o veículo foi vendido.
 
 Regra (ver blueprint, Fase 1 / seção 4 do documento de arquitetura):
   - ausente 1x  -> status = removido_candidato (nao conta ainda)
