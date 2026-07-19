@@ -57,6 +57,13 @@ if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GE
 if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
 if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
+if (($_GET['abaixo_fipe'] ?? '') === '1') {
+    $where[] = 'a.preco IS NOT NULL AND f.preco IS NOT NULL AND a.preco < f.preco';
+}
+if (!empty($_GET['fipe_confianca']) && in_array($_GET['fipe_confianca'], ['alto', 'medio'], true)) {
+    $where[] = 'a.fipe_match_confianca = ?';
+    $params[] = $_GET['fipe_confianca']; $types .= 's';
+}
 if (!empty($_GET['q'])) {
     // Cada palavra precisa existir em algum campo do veiculo. Assim, "DAF XF 530"
     // encontra titulos com palavras intermediarias sem misturar a revenda/cidade.
@@ -71,7 +78,9 @@ if (!empty($_GET['q'])) {
 $clausula = $where ? ' WHERE ' . implode(' AND ', $where) : '';
 
 // 1) Total real no banco (respeitando filtros) — pro scroll infinito saber quando parar
-$sqlCount = "SELECT COUNT(*) AS n FROM anuncio a JOIN revenda r ON r.id = a.revenda_id" . $clausula;
+$sqlCount = "SELECT COUNT(*) AS n FROM anuncio a
+             JOIN revenda r ON r.id = a.revenda_id
+             LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id" . $clausula;
 $stc = $conn->prepare($sqlCount);
 if ($params) $stc->bind_param($types, ...$params);
 $stc->execute();
@@ -87,12 +96,14 @@ $ordens = [
     'preco_asc'  => 'a.preco IS NULL, a.preco ASC',
     'preco_desc' => 'a.preco IS NULL, a.preco DESC',
     'mais_tempo' => 'a.primeira_vez_visto ASC',
+    'desvio_fipe' => 'a.preco / NULLIF(f.preco, 0) ASC, a.preco ASC',
 ];
 $ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
 
 $sql = "SELECT a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.ano_inicial, a.ano_final,
                a.preco, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
                a.fipe_match_confianca, f.preco AS preco_fipe, f.codigo_fipe,
+               ROUND((a.preco - f.preco) / NULLIF(f.preco, 0) * 100, 1) AS desvio_fipe_pct,
                r.nome AS revenda, r.cidade, r.uf
         FROM anuncio a
         JOIN revenda r ON r.id = a.revenda_id
@@ -113,6 +124,7 @@ $anuncios = [];
 while ($row = $res->fetch_assoc()) {
     $row['preco'] = $row['preco'] !== null ? (float)$row['preco'] : null;
     $row['preco_fipe'] = $row['preco_fipe'] !== null ? (float)$row['preco_fipe'] : null;
+    $row['desvio_fipe_pct'] = $row['desvio_fipe_pct'] !== null ? (float)$row['desvio_fipe_pct'] : null;
     $anuncios[] = $row;
 }
 

@@ -6,12 +6,14 @@ Estrategia incremental: nao baixa a FIPE inteira. Olha os anuncios reais do banc
 e busca preco so dos modelos/anos que existem na coleta, cacheando tudo.
 
 Uso normal:
-  python3 fipe_sync.py --db-user=... --db-pass='...' --db-name=... --max-req=400
+  set -a; . /root/.oper-radar.env; set +a
+  python3 fipe_sync.py --max-req=400
 
 Diagnostico (NAO gasta requisicao, so mostra os scores do matching):
-  python3 fipe_sync.py --db-user=... --db-pass='...' --db-name=... --debug
+  python3 fipe_sync.py --debug
 """
 import argparse
+import os
 import re
 import time
 import unicodedata
@@ -40,6 +42,10 @@ def api_get(path):
         raise RuntimeError(f"Limite de {max_req} requisicoes atingido — rode de novo depois, continua de onde parou.")
     contador_req += 1
     r = requests.get(f"{BASE}{path}", headers=headers_api, timeout=20)
+    if r.status_code == 429:
+        raise RuntimeError("A API FIPE atingiu o limite de requisicoes. A fila continua na proxima rodada.")
+    if r.status_code in (401, 403):
+        raise RuntimeError(f"A API FIPE recusou a autenticacao (HTTP {r.status_code}).")
     r.raise_for_status()
     time.sleep(PAUSA)
     return r.json()
@@ -149,7 +155,15 @@ def anuncios_pendentes(conn, limite):
         SELECT id, titulo, marca, ano_inicial FROM anuncio
         WHERE fipe_preco_id IS NULL AND tipo = 'Caminhao' AND marca IS NOT NULL
           AND ano_inicial IS NOT NULL AND status = 'ativo'
-        ORDER BY id LIMIT %s
+          AND (
+              fipe_ultima_tentativa IS NULL
+              OR (fipe_match_status = 'erro_api'
+                  AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 1 DAY))
+              OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano')
+                  AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 30 DAY))
+          )
+        ORDER BY fipe_ultima_tentativa IS NULL DESC, fipe_ultima_tentativa ASC, id
+        LIMIT %s
     """, (limite,))
     rows = cur.fetchall()
     cur.close()
@@ -186,8 +200,7 @@ def busca_ou_cria_preco(conn, modelo, ano):
         return None
 
     dados = api_get(f"/trucks/brands/{modelo['marca_fipe_id']}/models/{modelo['modelo_fipe_id']}/years/{ano_alvo['code']}")
-    preco_txt = dados.get("price", "")
-    preco = float(re.sub(r"[^\d,]", "", preco_txt).replace(".", "").replace(",", ".")) if preco_txt else None
+    preco = parse_preco(dados.get("price", ""))
 
     cur = conn.cursor()
     cur.execute(
@@ -199,6 +212,69 @@ def busca_ou_cria_preco(conn, modelo, ano):
     novo = cur.lastrowid
     cur.close()
     return novo
+
+
+def parse_preco(preco_txt):
+    """Converte 'R$ 123.456,78' para decimal aceito pelo MySQL."""
+    return (float(re.sub(r"[^\d,]", "", preco_txt).replace(".", "").replace(",", "."))
+            if preco_txt else None)
+
+
+def atualiza_precos_vencidos(conn, limite):
+    """Atualiza aos poucos precos cujo mes de referencia ja ficou para tras."""
+    if limite <= 0:
+        return 0
+    cur = conn.cursor(dictionary=True)
+    cur.execute("""
+        SELECT fp.id, fp.ano_codigo, fm.marca_fipe_id, fm.modelo_fipe_id
+        FROM fipe_preco fp
+        JOIN fipe_modelo fm ON fm.id = fp.fipe_modelo_id
+        WHERE fp.atualizado_em < DATE_FORMAT(NOW(), '%Y-%m-01')
+        ORDER BY fp.atualizado_em, fp.id
+        LIMIT %s
+    """, (limite,))
+    vencidos = cur.fetchall()
+    cur.close()
+    atualizados = 0
+    for item in vencidos:
+        try:
+            dados = api_get(
+                f"/trucks/brands/{item['marca_fipe_id']}/models/"
+                f"{item['modelo_fipe_id']}/years/{item['ano_codigo']}"
+            )
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE fipe_preco
+                SET codigo_fipe=%s, preco=%s, mes_referencia=%s, atualizado_em=NOW()
+                WHERE id=%s
+            """, (dados.get("codeFipe"), parse_preco(dados.get("price", "")),
+                  dados.get("referenceMonth"), item["id"]))
+            conn.commit()
+            cur.close()
+            atualizados += 1
+        except RuntimeError:
+            raise
+        except requests.RequestException as e:
+            print(f"  ! erro ao atualizar preco FIPE {item['id']}: {e}")
+    if vencidos:
+        print(f"Precos FIPE vencidos: {len(vencidos)} encontrados, {atualizados} atualizados.")
+    return atualizados
+
+
+def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianca=None):
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE anuncio
+        SET fipe_preco_id=%s,
+            fipe_match_confianca=%s,
+            fipe_match_status=%s,
+            fipe_match_motivo=%s,
+            fipe_ultima_tentativa=NOW(),
+            fipe_tentativas=fipe_tentativas+1
+        WHERE id=%s
+    """, (preco_id, confianca, status, motivo[:160], anuncio_id))
+    conn.commit()
+    cur.close()
 
 
 def melhores_candidatos(conn, anuncio, quantos=3):
@@ -280,9 +356,16 @@ def roda_debug(conn):
           f"{cont['ambiguo']} ambiguos (nao vinculam de proposito)")
 
 
-def roda(conn):
+def roda(conn, lote=200, max_refresh=100):
     garante_marcas(conn)
-    pendentes = anuncios_pendentes(conn, 200)
+    try:
+        atualiza_precos_vencidos(conn, max_refresh)
+    except RuntimeError as e:
+        print(f"\n{e}")
+        print(f"{contador_req} requisicoes usadas nesta rodada.")
+        return
+
+    pendentes = anuncios_pendentes(conn, lote)
     print(f"{len(pendentes)} anuncios de caminhao sem vinculo FIPE — processando (limite {max_req} req)...")
     vinculados = sem_match = ambiguos = sem_ano = 0
 
@@ -292,8 +375,10 @@ def roda(conn):
             if not cands:
                 if info.startswith("ambiguo"):
                     ambiguos += 1
+                    registra_resultado(conn, a["id"], "ambiguo", info)
                 else:
                     sem_match += 1
+                    registra_resultado(conn, a["id"], "sem_match", info)
                 continue
 
             # Variantes com a mesma assinatura (E5/E6): a primeira que tiver o ano do anuncio vence
@@ -305,13 +390,14 @@ def roda(conn):
                     break
             if not preco_id:
                 sem_ano += 1
+                registra_resultado(conn, a["id"], "sem_ano", f"ano {a['ano_inicial']} ausente nos candidatos FIPE")
                 continue
 
-            cur = conn.cursor()
-            cur.execute("UPDATE anuncio SET fipe_preco_id=%s, fipe_match_confianca=%s WHERE id=%s",
-                        (preco_id, info, a["id"]))
-            conn.commit()
-            cur.close()
+            registra_resultado(
+                conn, a["id"], "vinculado",
+                f"{escolhido['marca_fipe']} | {escolhido['modelo_fipe']}",
+                preco_id=preco_id, confianca=info,
+            )
             vinculados += 1
             print(f"  [{info}] {a['titulo'][:38]:38} -> {escolhido['modelo_fipe'][:36]}")
         except RuntimeError as e:
@@ -319,6 +405,7 @@ def roda(conn):
             break
         except requests.RequestException as e:
             print(f"  ! erro de rede em '{a['titulo'][:32]}': {e}")
+            registra_resultado(conn, a["id"], "erro_api", str(e))
             continue
 
     print(f"\n{vinculados} vinculados · {sem_match} sem match · {ambiguos} ambiguos (pulados de proposito) "
@@ -328,14 +415,24 @@ def roda(conn):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db-host", default="localhost")
-    ap.add_argument("--db-user", required=True)
-    ap.add_argument("--db-pass", required=True)
-    ap.add_argument("--db-name", required=True)
+    ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
+    ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"))
+    ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"))
+    ap.add_argument("--db-name", default=os.getenv("OPER_RADAR_DB_NAME"))
     ap.add_argument("--max-req", type=int, default=400)
-    ap.add_argument("--token", default=None, help="token gratuito do fipe.online (sobe o limite diario)")
+    ap.add_argument("--lote", type=int, default=200, help="quantos anuncios examinar por rodada")
+    ap.add_argument("--max-refresh", type=int, default=100, help="quantos precos mensais atualizar por rodada")
+    ap.add_argument("--token", default=os.getenv("FIPE_API_TOKEN"), help="token opcional da API FIPE")
     ap.add_argument("--debug", action="store_true", help="so mostra os scores do matching, sem chamar a API")
     args = ap.parse_args()
+
+    faltando = [nome for nome, valor in {
+        "OPER_RADAR_DB_USER/--db-user": args.db_user,
+        "OPER_RADAR_DB_PASS/--db-pass": args.db_pass,
+        "OPER_RADAR_DB_NAME/--db-name": args.db_name,
+    }.items() if not valor]
+    if faltando:
+        ap.error("credenciais ausentes: " + ", ".join(faltando))
 
     max_req = args.max_req
     if args.token:
@@ -344,6 +441,6 @@ if __name__ == "__main__":
     conn = mysql.connector.connect(host=args.db_host, user=args.db_user, password=args.db_pass,
                                    database=args.db_name, charset="utf8mb4")
     try:
-        roda_debug(conn) if args.debug else roda(conn)
+        roda_debug(conn) if args.debug else roda(conn, lote=args.lote, max_refresh=args.max_refresh)
     finally:
         conn.close()

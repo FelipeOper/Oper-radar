@@ -28,6 +28,11 @@ CREATE TABLE fipe_preco (
 ALTER TABLE anuncio
     ADD COLUMN fipe_preco_id INT NULL,
     ADD COLUMN fipe_match_confianca VARCHAR(12) NULL,  -- 'alto' | 'medio' (validado na aplicação; MySQL 5.7 ignora CHECK)
+    ADD COLUMN fipe_match_status VARCHAR(24) NULL,
+    ADD COLUMN fipe_match_motivo VARCHAR(160) NULL,
+    ADD COLUMN fipe_ultima_tentativa DATETIME NULL,
+    ADD COLUMN fipe_tentativas INT NOT NULL DEFAULT 0,
     ADD CONSTRAINT fk_anuncio_fipe FOREIGN KEY (fipe_preco_id) REFERENCES fipe_preco(id);
 
 CREATE INDEX idx_anuncio_fipe ON anuncio(fipe_preco_id);
+CREATE INDEX idx_anuncio_fipe_fila ON anuncio(fipe_preco_id, fipe_ultima_tentativa, status, tipo);

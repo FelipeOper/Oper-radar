@@ -14,17 +14,38 @@ em números (530, 6x4...) e guarda o nível de confiança (`alto`/`medio`); matc
 fica sem FIPE — melhor sem referência do que com referência errada.
 
 ## Passos no servidor
-1. Rodar `schema_fipe_mysql.sql` no banco (phpMyAdmin > Importar).
-2. No terminal:
+
+1. Banco novo: importar `schema_fipe_mysql.sql`. Banco que ja tem FIPE: importar uma unica
+   vez `migracao_fipe_fila_mysql.sql`.
+2. Guardar as credenciais fora do repositorio, por exemplo em
+   `/home1/USUARIO/.oper-radar.env`, com permissao `600`:
+   ```bash
+   export OPER_RADAR_DB_HOST='localhost'
+   export OPER_RADAR_DB_USER='USUARIO_MYSQL'
+   export OPER_RADAR_DB_PASS='SENHA_MYSQL'
+   export OPER_RADAR_DB_NAME='BANCO_MYSQL'
    ```
-   cd ~/Oper-radar/fase2-fipe
-   python3 fipe_sync.py --db-user=... --db-pass='...' --db-name=... --max-req=400
+3. Fazer primeiro um diagnostico sem consumir a API:
+   ```bash
+   set -a; source /home1/USUARIO/.oper-radar.env; set +a
+   cd /home1/USUARIO/agenciaoper.com.br/oper-radar/fase2-fipe
+   python3 fipe_sync.py --debug
    ```
-3. Agendar 1x/dia no cron (fora dos horários do scraper), ex às 13h:
-   `0 13 * * * cd /home1/SEUUSUARIO/Oper-radar/fase2-fipe && python3 fipe_sync.py --db-user=... --db-pass='...' --db-name=... --max-req=400 >> fipe.log 2>&1`
+4. Rodar um piloto pequeno:
+   ```bash
+   python3 fipe_sync.py --lote=20 --max-req=50 --max-refresh=10
+   ```
+5. Depois da auditoria do piloto, agendar 1x/dia fora dos horarios do scraper:
+   ```cron
+   0 13 * * * bash -lc 'set -a; source /home1/USUARIO/.oper-radar.env; set +a; cd /home1/USUARIO/agenciaoper.com.br/oper-radar/fase2-fipe && python3 fipe_sync.py --lote=200 --max-req=400 --max-refresh=100 >> fipe.log 2>&1'
+   ```
 
 Cada rodada vincula até ~100-150 anúncios (dentro do limite diário); em poucos dias a base
 inteira de caminhões fica coberta e o app passa a mostrar o desvio vs FIPE automaticamente.
+
+Anuncios sem match, ambiguos ou sem ano recebem motivo auditavel e saem da frente da fila.
+Eles podem ser tentados novamente depois de 30 dias; erros de rede voltam em 1 dia. Precos de
+meses anteriores sao atualizados gradualmente a cada rodada.
 
 ## Limitações honestas
 - A FIPE cobre caminhões; **carretas/implementos não têm FIPE** — esses anúncios seguem sem

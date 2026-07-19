@@ -93,6 +93,8 @@ function mapeiaAnuncioReal(a) {
     ano: a.ano_inicial ? `${a.ano_inicial}/${a.ano_final}` : '',
     preco: a.preco,
     precoFipe: a.preco_fipe ?? null,
+    desvioFipePct: a.desvio_fipe_pct ?? null,
+    fipeConfianca: a.fipe_match_confianca ?? null,
     revenda: a.revenda,
     cidade: a.cidade,
     uf: a.uf,
@@ -679,6 +681,8 @@ function PageOportunidades({ onCriarAcao }) {
   const { data, erro } = useApi('anuncios.php?status=ativo&ordem=mais_tempo&limit=40');
   const lista = useMemo(() => (data?.anuncios || []).map(mapeiaAnuncioReal), [data]);
   const maduros = lista.filter(a => a.dias >= 30).slice(0, 15);
+  const { data: fipeData, erro: fipeErro } = useApi('anuncios.php?status=ativo&abaixo_fipe=1&ordem=desvio_fipe&limit=20');
+  const abaixoFipe = useMemo(() => (fipeData?.anuncios || []).map(mapeiaAnuncioReal), [fipeData]);
 
   return (
     <div>
@@ -709,9 +713,38 @@ function PageOportunidades({ onCriarAcao }) {
         </div>
       )}
 
-      <SectionTitle sub="Anúncios abaixo da tabela FIPE — exige o mapeamento marca/modelo da Fase 2">Preço abaixo da FIPE</SectionTitle>
-      <EmptyState icon={TrendingDown} titulo="Aguardando Fase 2 — mapeamento FIPE"
-        texto="Quando o catálogo de marcas e modelos estiver cruzado com a tabela FIPE, esta seção mostra automaticamente cada anúncio abaixo da referência — os candidatos mais óbvios a arbitragem." />
+      <SectionTitle sub="Diferença entre preço anunciado e referência FIPE — valide modelo, estado e configuração antes de negociar">
+        Preço abaixo da FIPE
+      </SectionTitle>
+      {!fipeData && !fipeErro && <EmptyState icon={TrendingDown} titulo="Consultando referências FIPE..." texto="Buscando anúncios ativos já vinculados ao catálogo FIPE." />}
+      {fipeErro && <EmptyState icon={TrendingDown} titulo="FIPE temporariamente indisponível" texto="Não foi possível consultar os vínculos FIPE agora." />}
+      {fipeData && abaixoFipe.length === 0 && (
+        <EmptyState icon={TrendingDown} titulo="Nenhum anúncio abaixo da FIPE ainda"
+          texto="A sincronização FIPE está sendo ampliada gradualmente. Esta seção preencherá automaticamente conforme os vínculos forem auditados." />
+      )}
+      {abaixoFipe.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {abaixoFipe.map(a => (
+            <Card key={a.id} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <TrendingDown size={17} style={{ color: T.positive, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 230 }}>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{a.titulo}</div>
+                <div style={{ fontSize: 12, color: T.inkMuted }}>
+                  {a.revenda} · {a.cidade}/{a.uf} · anunciado {fmtBRL(a.preco)} · FIPE {fmtBRL(a.precoFipe)}
+                </div>
+              </div>
+              <Tag tone="positivo">{Math.abs(a.desvioFipePct ?? 0).toLocaleString('pt-BR')}% ABAIXO</Tag>
+              <Tag tone={a.fipeConfianca === 'alto' ? 'positivo' : 'alerta'}>
+                MATCH {a.fipeConfianca?.toUpperCase() || '—'}
+              </Tag>
+              <button onClick={() => onCriarAcao(`Validar oportunidade FIPE: ${a.titulo} (${a.revenda})`)}
+                style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
+                <Plus size={13} /> Criar ação
+              </button>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <SectionTitle sub="Reduções de preço detectadas entre uma varredura e outra">Quedas de preço</SectionTitle>
       <EmptyState icon={ArrowDownRight} titulo="Coletando histórico de preços"
@@ -1053,6 +1086,7 @@ function PageAcoes({ acoes, setAcoes }) {
    ============================================================ */
 function PageAjustes() {
   const [papel, setPapel] = useState('Admin');
+  const { data: fipeStatus, erro: fipeErro } = useApi('fipe_status.php');
   const papeis = ['Admin', 'Gestor', 'Analista', 'Visualizador'];
   const permissoes = {
     Admin: ['Tudo: coleta, usuários, exportação, configuração'],
@@ -1074,10 +1108,38 @@ function PageAjustes() {
             <span style={{ fontFamily: T.fontMono }}>07h · 19h (2×/dia)</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: T.inkMuted }}>Regra de venda</span>
+            <span style={{ color: T.inkMuted }}>Regra de saída</span>
             <span style={{ fontFamily: T.fontMono }}>2 varreduras sem o anúncio</span>
           </div>
         </div>
+      </Card>
+
+      <SectionTitle sub="Cobertura e saúde do vínculo com a referência de caminhões">FIPE</SectionTitle>
+      <Card>
+        {fipeErro ? (
+          <div style={{ color: T.alert, fontSize: 13 }}>Status FIPE indisponível — confirme a migração e o endpoint no servidor.</div>
+        ) : !fipeStatus ? (
+          <div style={{ color: T.inkMuted, fontSize: 13 }}>Consultando sincronização FIPE...</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13.5 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: T.inkMuted }}>Caminhões elegíveis</span>
+              <span style={{ fontFamily: T.fontMono }}>{fmtN(fipeStatus.elegiveis)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: T.inkMuted }}>Vinculados ativos</span>
+              <span style={{ fontFamily: T.fontMono, color: T.positive }}>{fmtN(fipeStatus.vinculados_ativos)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: T.inkMuted }}>Ainda não tentados</span>
+              <span style={{ fontFamily: T.fontMono }}>{fmtN(fipeStatus.nunca_tentados)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: T.inkMuted }}>Preços em cache</span>
+              <span style={{ fontFamily: T.fontMono }}>{fmtN(fipeStatus.precos_cache)}</span>
+            </div>
+          </div>
+        )}
       </Card>
 
       <SectionTitle sub="O que cada papel pode ver e fazer">Papéis de acesso</SectionTitle>
