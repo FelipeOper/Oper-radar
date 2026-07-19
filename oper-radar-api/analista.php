@@ -43,28 +43,28 @@ $kpi = linhaUnica($conn, "SELECT
     (SELECT COUNT(*) FROM revenda) revendas,
     (SELECT COUNT(*) FROM anuncio WHERE status='ativo') ativos,
     (SELECT COUNT(*) FROM anuncio WHERE status='removido_confirmado'
-        AND data_remocao >= DATE_FORMAT(NOW(), '%Y-%m-01')) vendas_mes,
+        AND data_remocao >= DATE_FORMAT(NOW(), '%Y-%m-01')) saidas_mes,
     (SELECT MAX(timestamp) FROM execucao_coleta) ultima_coleta");
 
 $topMarcas = linhas($conn, "SELECT marca, COUNT(*) n, ROUND(AVG(preco)) preco_medio FROM anuncio
     WHERE status='ativo' AND marca IS NOT NULL GROUP BY marca ORDER BY n DESC LIMIT 8");
 $topCidades = linhas($conn, "SELECT r.cidade, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
     WHERE a.status='ativo' GROUP BY r.cidade ORDER BY n DESC LIMIT 8");
-$giro = linhas($conn, "SELECT r.nome, SUM(a.status='removido_confirmado') vendas, SUM(a.status='ativo') ativos,
+$giro = linhas($conn, "SELECT r.nome, SUM(a.status='removido_confirmado') saidas, SUM(a.status='ativo') ativos,
     ROUND(AVG(CASE WHEN a.status='ativo' THEN DATEDIFF(NOW(), a.primeira_vez_visto) END)) idade_media
     FROM revenda r JOIN anuncio a ON a.revenda_id=r.id GROUP BY r.id HAVING ativos>5
-    ORDER BY vendas DESC, ativos DESC LIMIT 10");
+    ORDER BY saidas DESC, ativos DESC LIMIT 10");
 $maduros = linhas($conn, "SELECT a.titulo, a.preco, r.nome revenda, r.cidade,
     DATEDIFF(NOW(), a.primeira_vez_visto) dias FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
     WHERE a.status='ativo' ORDER BY a.primeira_vez_visto ASC LIMIT 10");
 
 $contexto = "DADOS ATUAIS DO OPER RADAR (coletados do portal Caminhões e Carretas, estado PR):\n"
     . "KPIs: {$kpi['revendas']} revendas monitoradas, {$kpi['ativos']} anúncios ativos, "
-    . "{$kpi['vendas_mes']} vendas estimadas este mês (anúncios confirmados removidos). Última coleta: {$kpi['ultima_coleta']}.\n\n"
+    . "{$kpi['saidas_mes']} saídas detectadas este mês (ausências confirmadas após duas coletas; não comprovam venda). Última coleta: {$kpi['ultima_coleta']}.\n\n"
     . "TOP MARCAS (ativos | preço médio): " . implode('; ', array_map(fn($m) => "{$m['marca']}: {$m['n']} anúncios, R$ " . number_format((float)$m['preco_medio'], 0, ',', '.'), $topMarcas)) . "\n\n"
     . "TOP CIDADES POR OFERTA: " . implode('; ', array_map(fn($c2) => "{$c2['cidade']}: {$c2['n']}", $topCidades)) . "\n\n"
-    . "GIRO POR REVENDA (vendas confirmadas | estoque ativo | idade média do estoque em dias): "
-    . implode('; ', array_map(fn($g) => "{$g['nome']}: {$g['vendas']}v/{$g['ativos']}a/" . ($g['idade_media'] ?? '?') . "d", $giro)) . "\n\n"
+    . "MOVIMENTO POR REVENDA (saídas detectadas | estoque ativo | idade média do estoque em dias): "
+    . implode('; ', array_map(fn($g) => "{$g['nome']}: {$g['saidas']}s/{$g['ativos']}a/" . ($g['idade_media'] ?? '?') . "d", $giro)) . "\n\n"
     . "ANÚNCIOS HÁ MAIS TEMPO NO AR (candidatos a negociação): "
     . implode('; ', array_map(fn($m2) => "{$m2['titulo']} ({$m2['revenda']}, {$m2['cidade']}, {$m2['dias']}d, R$ " . number_format((float)$m2['preco'], 0, ',', '.') . ")", $maduros));
 

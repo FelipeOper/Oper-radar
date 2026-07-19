@@ -2,7 +2,7 @@
 /**
  * OPER RADAR — API: insights agregados + DESCOBERTAS (insights cruzados)
  * As "descobertas" são frases prontas que juntam 2 dados — o que um analista faria.
- * Exemplo: "Curitiba concentra 30% da oferta mas gerou 45% das vendas do mes".
+ * Uma saida significa ausencia confirmada no portal, nao necessariamente uma venda.
  */
 require_once __DIR__ . '/config.php';
 $conn = conecta();
@@ -19,11 +19,11 @@ $porCidade = rows($conn, "SELECT r.cidade, COUNT(*) n FROM anuncio a JOIN revend
 
 $giroRevenda = rows($conn, "
     SELECT r.nome, r.cidade,
-           SUM(CASE WHEN a.status='removido_confirmado' THEN 1 ELSE 0 END) vendas,
+           SUM(CASE WHEN a.status='removido_confirmado' THEN 1 ELSE 0 END) saidas,
            SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END) ativos,
            AVG(CASE WHEN a.status='ativo' THEN DATEDIFF(NOW(), a.primeira_vez_visto) END) idade_media_dias
     FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
-    GROUP BY r.id HAVING ativos>5 ORDER BY vendas DESC, ativos DESC LIMIT 15");
+    GROUP BY r.id HAVING ativos>5 ORDER BY saidas DESC, ativos DESC LIMIT 15");
 
 $faixas = rows($conn, "
     SELECT CASE WHEN preco < 100000 THEN 'até 100 mil'
@@ -44,18 +44,18 @@ $fipe = ['vinculados' => (int)($fipeRow['n'] ?? 0),
 // ---- DESCOBERTAS: insights cruzados calculados aqui ----
 $descobertas = [];
 
-// 1) Cidade com melhor conversão (vendas/estoque acima da media)
+// 1) Cidade com maior taxa observada de saida/estoque
 $conv = rows($conn, "
     SELECT r.cidade,
            SUM(a.status='ativo') estoque,
-           SUM(a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)) vendas
+           SUM(a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)) saidas
     FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
-    GROUP BY r.cidade HAVING estoque > 20 ORDER BY (vendas/estoque) DESC LIMIT 1");
-if ($conv && $conv[0]['vendas'] > 0) {
+    GROUP BY r.cidade HAVING estoque > 20 ORDER BY (saidas/estoque) DESC LIMIT 1");
+if ($conv && $conv[0]['saidas'] > 0) {
     $c = $conv[0];
-    $taxa = round(($c['vendas'] / $c['estoque']) * 100, 1);
-    $descobertas[] = ['tipo' => 'conversao', 'titulo' => 'Maior conversão do mercado',
-        'texto' => "{$c['cidade']}: {$c['vendas']} vendas / {$c['estoque']} anúncios = {$taxa}% de giro no mês. É a região onde os anúncios saem mais rápido."];
+    $taxa = round(($c['saidas'] / $c['estoque']) * 100, 1);
+    $descobertas[] = ['tipo' => 'conversao', 'titulo' => 'Maior taxa de saída do mercado',
+        'texto' => "{$c['cidade']}: {$c['saidas']} saídas detectadas / {$c['estoque']} anúncios = {$taxa}% no mês. A ausência no portal não comprova venda."];
 }
 
 // 2) Marca dominante em uma região
@@ -95,12 +95,12 @@ $hot = rows($conn, "
                 WHEN a.preco < 600000 THEN '400–600 mil'
                 ELSE '600 mil+' END faixa,
            SUM(a.status='ativo') ativos,
-           SUM(a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)) vendas
+           SUM(a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)) saidas
     FROM anuncio a WHERE a.preco IS NOT NULL
-    GROUP BY faixa HAVING ativos > 100 ORDER BY (vendas/ativos) DESC LIMIT 1");
-if ($hot && $hot[0]['vendas'] > 0) {
+    GROUP BY faixa HAVING ativos > 100 ORDER BY (saidas/ativos) DESC LIMIT 1");
+if ($hot && $hot[0]['saidas'] > 0) {
     $h = $hot[0];
-    $taxa = round(($h['vendas'] / $h['ativos']) * 100, 1);
+    $taxa = round(($h['saidas'] / $h['ativos']) * 100, 1);
     $descobertas[] = ['tipo' => 'faixa', 'titulo' => "Faixa mais quente",
         'texto' => "Anúncios de {$h['faixa']} têm {$taxa}% de giro no mês — a mais alta entre todas as faixas de preço. Segmento onde o cliente aparece."];
 }
@@ -110,10 +110,12 @@ foreach ($porMarca as &$m)  { $m['n']=(int)$m['n']; $m['preco_medio']=$m['preco_
 foreach ($porCidade as &$c) { $c['n']=(int)$c['n']; }
 foreach ($faixas as &$f)    { $f['n']=(int)$f['n']; }
 foreach ($giroRevenda as &$g) {
-    $g['vendas']=(int)$g['vendas']; $g['ativos']=(int)$g['ativos'];
+    $g['saidas']=(int)$g['saidas']; $g['ativos']=(int)$g['ativos'];
     $g['idade_media_dias']=$g['idade_media_dias']!==null?round((float)$g['idade_media_dias']):null;
     $g['revenda']=$g['nome']; unset($g['nome']);
-    $g['vendas_confirmadas']=$g['vendas']; unset($g['vendas']);
+    $g['saidas_detectadas']=$g['saidas']; unset($g['saidas']);
+    // Compatibilidade temporaria com bundles anteriores.
+    $g['vendas_confirmadas']=$g['saidas_detectadas'];
     $g['estoque_ativo']=$g['ativos']; unset($g['ativos']);
 }
 

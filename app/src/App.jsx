@@ -40,8 +40,8 @@ const STATE_DATA = [
 
 const STATUS_DB_PARA_UI = {
   ativo: 'ativo',
-  removido_candidato: 'venda_provavel',
-  removido_confirmado: 'removido',
+  removido_candidato: 'em_verificacao',
+  removido_confirmado: 'saida_detectada',
 };
 
 
@@ -267,10 +267,10 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
     const agora = Date.now();
     anuncios.forEach(a => {
       const horasDesdePrimeira = (agora - new Date(a.primeiraVez)) / 3600000;
-      if (a.status === 'removido') {
-        lista.push({ tipo: 'venda', a, quando: a.dataRemocao || a.ultimaVez });
-      } else if (a.status === 'venda_provavel') {
-        lista.push({ tipo: 'sumiu', a, quando: a.ultimaVez });
+      if (a.status === 'saida_detectada') {
+        lista.push({ tipo: 'saida', a, quando: a.dataRemocao || a.ultimaVez });
+      } else if (a.status === 'em_verificacao') {
+        lista.push({ tipo: 'verificacao', a, quando: a.ultimaVez });
       } else if (horasDesdePrimeira < 48) {
         lista.push({ tipo: 'novo', a, quando: a.primeiraVez });
       }
@@ -280,8 +280,8 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
 
   const config = {
     novo:  { icone: Zap,          cor: T.signal,   rotulo: 'NOVO' },
-    sumiu: { icone: Timer,        cor: T.alert,    rotulo: 'SUMIU' },
-    venda: { icone: CheckCircle2, cor: T.positive, rotulo: 'VENDIDO' },
+    verificacao: { icone: Timer,        cor: T.alert,    rotulo: 'VERIFICAR' },
+    saida:       { icone: CheckCircle2, cor: T.positive, rotulo: 'SAIU' },
   };
 
   return (
@@ -289,10 +289,10 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 22 }}>
         <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={usandoReais ? 'PR · 2×/dia' : 'conectando…'} />
         <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />
-        <Kpi label="Vendas estimadas" value={kpis ? fmtN(kpis.vendas_estimadas_mes) : '—'} sub="este mês · confirmadas" tone={T.positive} />
+        <Kpi label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · ausência confirmada" tone={T.positive} />
         <KpiEntradaSaida
           entrou={sinais.filter(s => s.tipo === 'novo').length}
-          saiu={sinais.filter(s => s.tipo === 'sumiu' || s.tipo === 'venda').length}
+          saiu={sinais.filter(s => s.tipo === 'verificacao' || s.tipo === 'saida').length}
         />
       </div>
 
@@ -354,12 +354,12 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
             )}
           />
 
-          <PainelKpi titulo="Regiões com mais vendas" subtitulo="Vendas confirmadas nos últimos 30 dias"
-            dados={stats?.regioes_vendas}
+          <PainelKpi titulo="Regiões com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias"
+            dados={stats?.regioes_saidas ?? stats?.regioes_vendas}
             renderItem={(c, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><MapPin size={11} style={{ color: T.inkMuted }} />{c.cidade}/{c.uf}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{c.n} vendas</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{c.n} saídas</span>
               </div>
             )}
           />
@@ -374,8 +374,8 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
             )}
           />
 
-          <PainelKpi titulo="Lojas que mais venderam" subtitulo="Vendas confirmadas nos últimos 30 dias"
-            dados={stats?.top_lojas_vendas}
+          <PainelKpi titulo="Lojas com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias"
+            dados={stats?.top_lojas_saidas ?? stats?.top_lojas_vendas}
             renderItem={(l, i) => (
               <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span>
@@ -395,13 +395,11 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
 const PAGINA = 60;
 
 function PageMercado() {
-  const { data: facetas } = useApi('facetas.php');
-
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   const [categoria, setCategoria] = useState('todas');
   const [tipo, setTipo] = useState('todos');
-  const [status, setStatus] = useState('todos');
+  const [status, setStatus] = useState('ativo');
   const [regiao, setRegiao] = useState('todas');
   const [cidade, setCidade] = useState('todas');
   const [revenda, setRevenda] = useState('todas');
@@ -409,6 +407,12 @@ function PageMercado() {
   const [precoMax, setPrecoMax] = useState('');
   const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
+
+  const statusDb = {
+    ativo: 'ativo', em_verificacao: 'removido_candidato',
+    saida_detectada: 'removido_confirmado', todos: 'todos',
+  }[status] || 'ativo';
+  const { data: facetas } = useApi(`facetas.php?status=${statusDb}`);
 
   const [anuncios, setAnuncios] = useState([]);
   const [total, setTotal] = useState(null);
@@ -426,10 +430,7 @@ function PageMercado() {
     if (categoria !== 'todas') p.set('categoria', categoria);
     if (regiao !== 'todas') p.set('regiao', regiao);
     if (tipo !== 'todos') p.set('tipo', tipo);
-    if (status !== 'todos') {
-      const mapa = { ativo: 'ativo', venda_provavel: 'removido_candidato', removido: 'removido_confirmado' };
-      p.set('status', mapa[status] || status);
-    }
+    if (statusDb !== 'todos') p.set('status', statusDb);
     if (cidade !== 'todas') p.set('cidade', cidade);
     if (revenda !== 'todas') p.set('revenda', revenda);
     if (precoMin) p.set('preco_min', precoMin);
@@ -437,7 +438,7 @@ function PageMercado() {
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [categoria, regiao, tipo, status, cidade, revenda, precoMin, precoMax, qDebounced, ordem]);
+  }, [categoria, regiao, tipo, statusDb, cidade, revenda, precoMin, precoMax, qDebounced, ordem]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
@@ -491,7 +492,7 @@ function PageMercado() {
     ? []
     : (facetas?.subtipos?.[categoria] || []);
 
-  const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'todos',
+  const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'ativo',
     cidade !== 'todas', revenda !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
   const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
 
@@ -548,7 +549,7 @@ function PageMercado() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar modelo, marca, cidade ou revenda..."
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar veículo, marca ou modelo..."
             style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
         </div>
         <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
@@ -573,10 +574,10 @@ function PageMercado() {
             {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{s.tipo} ({s.n})</option>)}
           </select>
           <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
-            <option value="todos">Todos os status</option>
             <option value="ativo">No mercado</option>
-            <option value="venda_provavel">Venda provável</option>
-            <option value="removido">Vendido</option>
+            <option value="em_verificacao">Em verificação</option>
+            <option value="saida_detectada">Saídas detectadas</option>
+            <option value="todos">Todos (histórico)</option>
           </select>
           <select value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle}>
             {cidades.map(c => <option key={c} value={c}>{c === 'todas' ? 'Todas as cidades' : c}</option>)}
@@ -599,9 +600,9 @@ function PageMercado() {
           return (
             <Card key={a.id} style={{ padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                <Tag tone={a.status === 'removido' ? 'positivo' : a.status === 'venda_provavel' ? 'alerta' : a.dias >= 30 ? 'sinal' : 'neutro'}>
-                  {a.status === 'removido' ? 'VENDIDO'
-                    : a.status === 'venda_provavel' ? 'VENDA PROVÁVEL'
+                <Tag tone={a.status === 'saida_detectada' ? 'positivo' : a.status === 'em_verificacao' ? 'alerta' : a.dias >= 30 ? 'sinal' : 'neutro'}>
+                  {a.status === 'saida_detectada' ? 'SAIU DO PORTAL'
+                    : a.status === 'em_verificacao' ? 'EM VERIFICAÇÃO'
                     : a.dias >= 30 ? `${a.dias}D NO AR`
                     : a.dias < 2 ? 'NOVO' : 'ATIVO'}
                 </Tag>
@@ -727,7 +728,13 @@ function PageConcorrentes() {
       const cat = categoriaDe(tipo);
       catMix[cat] = (catMix[cat] || 0) + n;
     });
-    return { ...l, catMix, cidades: [l.cidade] };
+    return {
+      ...l,
+      saidas_detectadas: l.saidas_detectadas ?? l.vendidos ?? 0,
+      saidas_30d: l.saidas_30d ?? l.vendidos_30d ?? 0,
+      catMix,
+      cidades: [l.cidade],
+    };
   }), [lojistas]);
 
   // Chips: contagem por categoria (revendas que TEM ao menos 1 anuncio da categoria)
@@ -755,8 +762,8 @@ function PageConcorrentes() {
     });
     const ordens = {
       ativos: (a, b) => b.ativos - a.ativos,
-      vendidos: (a, b) => b.vendidos - a.vendidos,
-      vendidos_30d: (a, b) => b.vendidos_30d - a.vendidos_30d,
+      saidas: (a, b) => b.saidas_detectadas - a.saidas_detectadas,
+      saidas_30d: (a, b) => b.saidas_30d - a.saidas_30d,
       giro: (a, b) => (a.idade_media_estoque ?? 999) - (b.idade_media_estoque ?? 999),
       historico: (a, b) => b.total_historico - a.total_historico,
     };
@@ -863,8 +870,8 @@ function PageConcorrentes() {
         </div>
         <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
           <option value="ativos">Mais anuncios ativos</option>
-          <option value="vendidos_30d">Mais vendas (30d)</option>
-          <option value="vendidos">Mais vendas (total)</option>
+          <option value="saidas_30d">Mais saídas (30d)</option>
+          <option value="saidas">Mais saídas (total)</option>
           <option value="giro">Melhor giro (menor idade)</option>
           <option value="historico">Maior historico</option>
         </select>
@@ -879,8 +886,8 @@ function PageConcorrentes() {
           <Card key={l.id} style={{ padding: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontFamily: T.fontMono, fontSize: 11, color: i < 3 ? T.signal : T.inkMuted }}>#{String(i + 1).padStart(2, '0')}</span>
-              <Tag tone={l.vendidos_30d > 3 ? 'positivo' : l.ativos > 30 ? 'sinal' : 'neutro'}>
-                {l.vendidos_30d > 0 ? `${l.vendidos_30d} VENDAS/30D` : `${fmtN(l.ativos)} ATIVOS`}
+              <Tag tone={l.saidas_30d > 3 ? 'positivo' : l.ativos > 30 ? 'sinal' : 'neutro'}>
+                {l.saidas_30d > 0 ? `${l.saidas_30d} SAÍDAS/30D` : `${fmtN(l.ativos)} ATIVOS`}
               </Tag>
             </div>
             <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, marginBottom: 3 }}>{l.nome}</div>
@@ -911,8 +918,8 @@ function PageConcorrentes() {
                 <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.ink }}>{fmtN(l.ativos)}</div>
               </div>
               <div>
-                <div style={{ color: T.inkMuted, fontSize: 10 }}>VENDIDOS</div>
-                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.positive }}>{fmtN(l.vendidos)}</div>
+                <div style={{ color: T.inkMuted, fontSize: 10 }}>SAÍDAS</div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.positive }}>{fmtN(l.saidas_detectadas)}</div>
               </div>
               <div>
                 <div style={{ color: T.inkMuted, fontSize: 10 }} title={l.giro_confiavel ? '' : 'Aguardando 14+ dias de coleta pra ser confiavel'}>GIRO MEDIO</div>
@@ -1174,13 +1181,13 @@ function PageAnalise() {
             </div>
           </Card>
           <Card>
-            <SectionTitle sub="Vendas confirmadas · estoque · idade média — o que ninguém mais enxerga">Giro dos concorrentes</SectionTitle>
+            <SectionTitle sub="Saídas detectadas · estoque · idade média — sinais do movimento do mercado">Giro dos concorrentes</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {ins.giro_por_revenda.slice(0, 8).map(g => (
                 <div key={g.revenda} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda}</span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>
-                    <span style={{ color: T.positive }}>{g.vendas_confirmadas}v</span> · {g.estoque_ativo}a · {g.idade_media_dias ?? '—'}d
+                    <span style={{ color: T.positive }}>{g.saidas_detectadas ?? g.vendas_confirmadas}s</span> · {g.estoque_ativo}a · {g.idade_media_dias ?? '—'}d
                   </span>
                 </div>
               ))}

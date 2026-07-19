@@ -21,8 +21,8 @@ $ufsRegiao = ($regiao && isset($REGIOES[$regiao])) ? $REGIOES[$regiao] : null;
 $sql = "SELECT r.id, r.nome, r.cidade, r.uf, r.url_perfil, r.telefone, r.ativa_desde,
                COUNT(a.id) AS total_historico,
                SUM(CASE WHEN a.status = 'ativo' THEN 1 ELSE 0 END) AS ativos,
-               SUM(CASE WHEN a.status = 'removido_confirmado' THEN 1 ELSE 0 END) AS vendidos,
-               SUM(CASE WHEN a.status = 'removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS vendidos_30d,
+               SUM(CASE WHEN a.status = 'removido_confirmado' THEN 1 ELSE 0 END) AS saidas_detectadas,
+               SUM(CASE WHEN a.status = 'removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS saidas_30d,
                ROUND(AVG(CASE WHEN a.status='ativo' THEN DATEDIFF(NOW(), a.primeira_vez_visto) END), 1) AS idade_media_estoque,
                DATEDIFF(NOW(), (SELECT MIN(primeira_vez_visto) FROM anuncio WHERE revenda_id = r.id)) AS dias_de_coleta,
                MIN(a.primeira_vez_visto) AS primeiro_anuncio_visto,
@@ -37,7 +37,7 @@ if ($ufsRegiao) {
 } elseif ($uf) {
     $sql .= ' WHERE r.uf = ?'; $params[] = strtoupper($uf); $types .= 's';
 }
-$sql .= ' GROUP BY r.id ORDER BY ativos DESC, vendidos DESC';
+$sql .= ' GROUP BY r.id ORDER BY ativos DESC, saidas_detectadas DESC';
 
 $stmt = $conn->prepare($sql);
 if ($params) $stmt->bind_param($types, ...$params);
@@ -48,8 +48,11 @@ $lojistas = []; $mapaId = [];
 while ($row = $res->fetch_assoc()) {
     $row['total_historico'] = (int)$row['total_historico'];
     $row['ativos'] = (int)$row['ativos'];
-    $row['vendidos'] = (int)$row['vendidos'];
-    $row['vendidos_30d'] = (int)$row['vendidos_30d'];
+    $row['saidas_detectadas'] = (int)$row['saidas_detectadas'];
+    $row['saidas_30d'] = (int)$row['saidas_30d'];
+    // Compatibilidade temporaria com bundles anteriores.
+    $row['vendidos'] = $row['saidas_detectadas'];
+    $row['vendidos_30d'] = $row['saidas_30d'];
     $row['idade_media_estoque'] = $row['idade_media_estoque'] !== null ? (float)$row['idade_media_estoque'] : null;
     $row['dias_de_coleta'] = $row['dias_de_coleta'] !== null ? (int)$row['dias_de_coleta'] : 0;
     // Giro só é confiavel apos 14 dias de coleta acumulada — antes disso,
