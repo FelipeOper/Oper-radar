@@ -4,10 +4,10 @@ Materializa o estado da tabela `anuncio` em `anuncio_snapshot` (uma linha por an
 e detecta mudanças de preço vs. dia anterior.
 
 Rodar 1×/dia após o último ciclo do scraper. Sugestão de cron (23h):
-  0 23 * * * cd /home1/pro93061/agenciaoper.com.br/oper-radar/fase3-series && \
-    python3 snapshot_diario.py --db-user=... --db-pass='...' --db-name=... >> snapshot.log 2>&1
+  0 23 * * * set -a; . /home1/pro93061/.oper-radar.env; set +a; cd /home1/pro93061/agenciaoper.com.br/oper-radar/fase3-series && python3 snapshot_diario.py >> snapshot.log 2>&1
 """
 import argparse
+import os
 from datetime import date, timedelta
 import mysql.connector
 
@@ -54,11 +54,19 @@ def roda(conn):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db-host", default="localhost")
-    ap.add_argument("--db-user", required=True)
-    ap.add_argument("--db-pass", required=True)
-    ap.add_argument("--db-name", required=True)
+    ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
+    ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"))
+    ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"))
+    ap.add_argument("--db-name", default=os.getenv("OPER_RADAR_DB_NAME"))
     args = ap.parse_args()
+
+    faltando = [nome for nome, valor in {
+        "OPER_RADAR_DB_USER/--db-user": args.db_user,
+        "OPER_RADAR_DB_PASS/--db-pass": args.db_pass,
+        "OPER_RADAR_DB_NAME/--db-name": args.db_name,
+    }.items() if not valor]
+    if faltando:
+        ap.error("credenciais ausentes: " + ", ".join(faltando))
 
     conn = mysql.connector.connect(host=args.db_host, user=args.db_user,
                                    password=args.db_pass, database=args.db_name, charset="utf8mb4")

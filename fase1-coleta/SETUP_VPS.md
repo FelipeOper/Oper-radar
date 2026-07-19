@@ -1,83 +1,74 @@
-# Setup do VPS para coleta multi-região — OPER RADAR
+# OPER RADAR — coleta multi-região no VPS
 
-O objetivo: tirar a coleta pesada do HostGator (que satura a 25% CPU) e passar
-para um VPS barato, que grava no MESMO banco MySQL do HostGator via conexão remota.
+Este guia configura o VPS para gravar no mesmo MySQL usado pelo OPER RADAR sem colocar
+senha no Git, no histórico do shell, no `crontab` ou na lista de processos.
 
-## 1. Contratar o VPS
-
-Qualquer um destes serve (Ubuntu 22.04, 1-2 vCPU, 2GB RAM):
-- **Contabo** VPS S — ~€5/mês (mais barato, alemão)
-- **Hetzner** CX22 — ~€4/mês (excelente custo-benefício)
-- **DigitalOcean** / **Vultr** — ~US$6/mês (interface mais simples)
-
-Anota o **IP do VPS** — vamos precisar dele no passo 3.
-
-## 2. Preparar o VPS (uma vez só)
-
-Conecta via SSH (`ssh root@IP_DO_VPS`) e roda:
+## 1. Preparar o servidor
 
 ```bash
-apt update && apt install -y python3 python3-pip git
-pip3 install requests mysql-connector-python==8.0.33 beautifulsoup4 lxml
-git clone https://github.com/FelipeOper/Oper-radar.git
-cd Oper-radar/fase1-coleta
+git clone https://github.com/FelipeOper/Oper-radar.git /root/Oper-radar
+cd /root/Oper-radar/fase1-coleta
+python3 -m pip install -r requirements.txt
 ```
 
-## 3. Liberar conexão remota do MySQL (no cPanel do HostGator)
+No cPanel do HostGator, autorize somente o IP fixo do VPS em **MySQL remoto**. Não use `%`
+como host permitido.
 
-O VPS precisa escrever no banco que está no HostGator. Por padrão o MySQL
-do HostGator só aceita conexão local (`localhost`). Para liberar o VPS:
+## 2. Guardar as credenciais fora do repositório
 
-1. cPanel → **Bancos de Dados MySQL Remotos** (ou "Remote MySQL")
-2. Em "Host de acesso", adiciona o **IP do VPS**
-3. Salva
-
-Agora o `--db-host` deixa de ser `localhost` e passa a ser o **hostname do
-HostGator** (ex: `br348.hostgator.com.br` — está no email de boas-vindas do
-HostGator, ou no cPanel em "Informações Gerais" → "Nome do servidor").
-
-## 4. Teste inicial (um estado só, pra validar)
+Crie `/root/.oper-radar.env` no VPS:
 
 ```bash
-cd ~/Oper-radar/fase1-coleta
-python3 scraper_hostgator.py --janela=07h --uf=MT \
-  --db-host=br348.hostgator.com.br \
-  --db-user=pro93061_pro93061 --db-pass='Emgrupo221@' \
-  --db-name=pro93061_radar_oper
+touch /root/.oper-radar.env
+chmod 600 /root/.oper-radar.env
+nano /root/.oper-radar.env
 ```
 
-Se aparecer `[MT] N revendas encontradas` e começar a listar, funcionou.
-Se der erro de conexão, o passo 3 (MySQL remoto) não foi liberado corretamente.
-
-## 5. Coleta da região inteira
+Conteúdo, preenchido diretamente no servidor:
 
 ```bash
-python3 coleta_multi_uf.py --regiao=centro-oeste --janela=07h \
-  --db-host=br348.hostgator.com.br \
-  --db-user=pro93061_pro93061 --db-pass='Emgrupo221@' \
-  --db-name=pro93061_radar_oper
+export OPER_RADAR_DB_HOST='HOST_MYSQL'
+export OPER_RADAR_DB_USER='USUARIO_MYSQL'
+export OPER_RADAR_DB_PASS='SENHA_MYSQL'
+export OPER_RADAR_DB_NAME='BANCO_MYSQL'
 ```
 
-Ele roda MT, depois MS, GO, DF — um de cada vez, com 30s de descanso entre eles.
+Nunca copie esse arquivo para o repositório e nunca envie seu conteúdo por mensagem.
 
-## 6. Agendar no VPS (cron próprio, 2x/dia)
+## 3. Testar uma região
 
 ```bash
-crontab -e
+set -a
+source /root/.oper-radar.env
+set +a
+cd /root/Oper-radar/fase1-coleta
+python3 coleta_multi_uf.py --regiao=centro-oeste --janela=07h
 ```
 
-Adiciona (ajusta o caminho do db-host):
+O coletor filho recebe as credenciais pelo ambiente; a senha não aparece nos argumentos do
+processo.
 
+## 4. Agendar
+
+Edite com `crontab -e`:
+
+```cron
+0 7  * * * bash -lc 'set -a; source /root/.oper-radar.env; set +a; cd /root/Oper-radar/fase1-coleta && python3 coleta_multi_uf.py --regiao=centro-oeste --janela=07h >> /root/coleta.log 2>&1'
+0 19 * * * bash -lc 'set -a; source /root/.oper-radar.env; set +a; cd /root/Oper-radar/fase1-coleta && python3 coleta_multi_uf.py --regiao=centro-oeste --janela=19h >> /root/coleta.log 2>&1'
 ```
-0 7  * * * cd /root/Oper-radar/fase1-coleta && python3 coleta_multi_uf.py --regiao=centro-oeste --janela=07h --db-host=br348.hostgator.com.br --db-user=pro93061_pro93061 --db-pass='Emgrupo221@' --db-name=pro93061_radar_oper >> /root/coleta.log 2>&1
-0 19 * * * cd /root/Oper-radar/fase1-coleta && python3 coleta_multi_uf.py --regiao=centro-oeste --janela=19h --db-host=br348.hostgator.com.br --db-user=pro93061_pro93061 --db-pass='Emgrupo221@' --db-name=pro93061_radar_oper >> /root/coleta.log 2>&1
+
+## 5. Verificar
+
+```bash
+tail -50 /root/coleta.log
 ```
 
-## Divisão de trabalho recomendada
+No app, as regiões só devem ser habilitadas quando houver anúncios ativos coletados nelas.
 
-- **PR** continua sendo coletado pelo **HostGator** (já funciona, não mexe)
-- **Centro-Oeste** (e futuras regiões) pelo **VPS**
+## Segurança
 
-Assim o HostGator nunca fica sobrecarregado, e o VPS cuida da expansão.
-Quando quiser adicionar Nordeste, é só trocar `--regiao=centro-oeste` por
-`--regiao=nordeste` numa nova linha do cron do VPS.
+- Rotacione imediatamente qualquer senha que tenha sido commitada, mesmo depois de removê-la.
+- O histórico Git continua contendo versões antigas até uma limpeza específica; a rotação é
+  o que invalida a credencial exposta.
+- Use um usuário MySQL exclusivo, com acesso apenas ao banco do radar.
+- Não coloque chaves ou senhas em documentação, exemplos, logs ou comandos do cron.
