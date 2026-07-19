@@ -3,9 +3,9 @@
  * OPER RADAR — Fase 1 (versão PHP para HostGator Plano M, sem Python/terminal disponível)
  *
  * Usa cURL (já vem pronto no HostGator) e MySQLi (idem) — não precisa instalar nada.
- * Roda via Tarefas Cron do cPanel, chamando "php scraper.php" com os parâmetros.
+ * Roda via Tarefas Cron do cPanel, lendo as credenciais de variaveis de ambiente.
  *
- * Uso: php scraper.php --janela=07h --uf=PR --db-user=SEUUSUARIO_oper --db-pass=SENHA --db-name=SEUUSUARIO_oper_radar
+ * Uso: set -a; . /home/SEUUSUARIO/.oper-radar.env; set +a; php scraper.php --janela=07h --uf=PR
  */
 require_once __DIR__ . '/parser.php';
 require_once __DIR__ . '/diff_logic.php';
@@ -189,21 +189,21 @@ function roda_ciclo(mysqli $conn, string $uf, string $janela, array $marcas_conh
 
 // ---- CLI entry point ----
 if (php_sapi_name() === 'cli' && basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
-    $opts = getopt('', ['janela:', 'uf::', 'db-host::', 'db-user:', 'db-pass:', 'db-name:']);
+    $opts = getopt('', ['janela:', 'uf::', 'db-host::', 'db-user::', 'db-pass::', 'db-name::']);
 
     $janela = $opts['janela'] ?? null;
     if (!in_array($janela, ['07h', '19h'], true)) {
-        fwrite(STDERR, "Uso: php scraper.php --janela=07h|19h --uf=PR --db-user=... --db-pass=... --db-name=...\n");
+        fwrite(STDERR, "Uso: php scraper.php --janela=07h|19h --uf=PR (credenciais via OPER_RADAR_DB_*)\n");
         exit(1);
     }
     $uf = $opts['uf'] ?? 'PR';
-    $dbHost = $opts['db-host'] ?? 'localhost';
-    $dbUser = $opts['db-user'] ?? null;
-    $dbPass = $opts['db-pass'] ?? null;
-    $dbName = $opts['db-name'] ?? null;
+    $dbHost = $opts['db-host'] ?? (getenv('OPER_RADAR_DB_HOST') ?: 'localhost');
+    $dbUser = $opts['db-user'] ?? (getenv('OPER_RADAR_DB_USER') ?: null);
+    $dbPass = $opts['db-pass'] ?? (getenv('OPER_RADAR_DB_PASS') ?: null);
+    $dbName = $opts['db-name'] ?? (getenv('OPER_RADAR_DB_NAME') ?: null);
 
     if (!$dbUser || !$dbPass || !$dbName) {
-        fwrite(STDERR, "Faltam --db-user, --db-pass ou --db-name\n");
+        fwrite(STDERR, "Faltam OPER_RADAR_DB_USER, OPER_RADAR_DB_PASS ou OPER_RADAR_DB_NAME\n");
         exit(1);
     }
 

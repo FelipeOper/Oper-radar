@@ -33,10 +33,12 @@ removido) é a mesma nas duas versões — só a linguagem de implementação mu
 2. **Enviar os arquivos**: usar o **Gerenciador de Arquivos** do cPanel (ou FTP) para subir
    `parser.php`, `diff_logic.php`, `scraper.php` e `taxonomia.json` numa pasta, ex:
    `/home/SEUUSUARIO/oper-radar/`.
-3. **Tarefas Cron** (Avançado → Tarefas Cron no cPanel):
+3. **Credenciais protegidas**: crie `/home/SEUUSUARIO/.oper-radar.env` a partir do
+   `.env.example`, fora da pasta pública, e aplique permissão `600`.
+4. **Tarefas Cron** (Avançado → Tarefas Cron no cPanel):
    ```
-   0 7  * * * php /home/SEUUSUARIO/oper-radar/scraper.php --janela=07h --uf=PR --db-user=SEUUSUARIO_oper --db-pass='SENHA' --db-name=SEUUSUARIO_oper_radar >> /home/SEUUSUARIO/oper-radar/coleta.log 2>&1
-   0 19 * * * php /home/SEUUSUARIO/oper-radar/scraper.php --janela=19h --uf=PR --db-user=SEUUSUARIO_oper --db-pass='SENHA' --db-name=SEUUSUARIO_oper_radar >> /home/SEUUSUARIO/oper-radar/coleta.log 2>&1
+   0 7  * * * set -a; . /home/SEUUSUARIO/.oper-radar.env; set +a; php /home/SEUUSUARIO/oper-radar/scraper.php --janela=07h --uf=PR >> /home/SEUUSUARIO/oper-radar/coleta.log 2>&1
+   0 19 * * * set -a; . /home/SEUUSUARIO/.oper-radar.env; set +a; php /home/SEUUSUARIO/oper-radar/scraper.php --janela=19h --uf=PR >> /home/SEUUSUARIO/oper-radar/coleta.log 2>&1
    ```
    Sem precisar de terminal nem de instalar bibliotecas — o cPanel só precisa saber o
    caminho do `php` (geralmente já funciona com `php` direto; se não, o suporte HostGator

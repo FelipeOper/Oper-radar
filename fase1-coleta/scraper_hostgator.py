@@ -12,6 +12,7 @@ Duas adaptações em relação ao scraper.py genérico (pensado para VPS/Postgre
 Uso: python scraper_hostgator.py --janela 07h --uf PR
 """
 import argparse
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -182,11 +183,19 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--janela", choices=["07h", "19h"], required=True)
     ap.add_argument("--uf", default="PR")
-    ap.add_argument("--db-host", default="localhost")
-    ap.add_argument("--db-user", required=True, help="usuário MySQL criado no cPanel, ex: seuusuario_oper")
-    ap.add_argument("--db-pass", required=True)
-    ap.add_argument("--db-name", required=True, help="banco criado no cPanel, ex: seuusuario_oper_radar")
+    ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
+    ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"), help="usuário MySQL (ou OPER_RADAR_DB_USER)")
+    ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"), help="senha MySQL (ou OPER_RADAR_DB_PASS)")
+    ap.add_argument("--db-name", default=os.getenv("OPER_RADAR_DB_NAME"), help="banco MySQL (ou OPER_RADAR_DB_NAME)")
     args = ap.parse_args()
+
+    faltando = [nome for nome, valor in {
+        "OPER_RADAR_DB_USER/--db-user": args.db_user,
+        "OPER_RADAR_DB_PASS/--db-pass": args.db_pass,
+        "OPER_RADAR_DB_NAME/--db-name": args.db_name,
+    }.items() if not valor]
+    if faltando:
+        ap.error("credenciais ausentes: " + ", ".join(faltando))
 
     conn = conecta_mysql(args.db_host, args.db_user, args.db_pass, args.db_name)
     try:

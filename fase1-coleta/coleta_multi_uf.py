@@ -4,17 +4,18 @@ Roda o scraper_hostgator para varios UFs em sequencia, com pausa entre eles
 pra nao saturar CPU nem tomar rate-limit do portal.
 
 Uso:
-  python3 coleta_multi_uf.py --regiao=centro-oeste --janela=07h \\
-      --db-host=IP_DO_HOSTGATOR --db-user=... --db-pass='...' --db-name=...
+  set -a; . /root/.oper-radar.env; set +a
+  python3 coleta_multi_uf.py --regiao=centro-oeste --janela=07h
 
   # ou UFs avulsas:
-  python3 coleta_multi_uf.py --ufs=MT,MS,GO --janela=07h --db-...
+  python3 coleta_multi_uf.py --ufs=MT,MS,GO --janela=07h
 
 Importante: o VPS grava no MESMO banco MySQL do HostGator (conexao remota).
 Pra isso, o MySQL do HostGator precisa aceitar conexao remota do IP do VPS
 (cPanel -> Bancos de Dados MySQL -> Hosts de acesso remoto -> adicionar IP do VPS).
 """
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -37,11 +38,19 @@ def main():
     grupo.add_argument("--regiao", choices=list(REGIOES.keys()))
     grupo.add_argument("--ufs", help="lista separada por virgula, ex: MT,MS,GO")
     ap.add_argument("--janela", choices=["07h", "19h"], required=True)
-    ap.add_argument("--db-host", required=True)
-    ap.add_argument("--db-user", required=True)
-    ap.add_argument("--db-pass", required=True)
-    ap.add_argument("--db-name", required=True)
+    ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
+    ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"))
+    ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"))
+    ap.add_argument("--db-name", default=os.getenv("OPER_RADAR_DB_NAME"))
     args = ap.parse_args()
+
+    faltando = [nome for nome, valor in {
+        "OPER_RADAR_DB_USER/--db-user": args.db_user,
+        "OPER_RADAR_DB_PASS/--db-pass": args.db_pass,
+        "OPER_RADAR_DB_NAME/--db-name": args.db_name,
+    }.items() if not valor]
+    if faltando:
+        ap.error("credenciais ausentes: " + ", ".join(faltando))
 
     ufs = REGIOES[args.regiao] if args.regiao else [u.strip().upper() for u in args.ufs.split(",")]
     scraper = Path(__file__).parent / "scraper_hostgator.py"
@@ -54,12 +63,17 @@ def main():
         print(f"\n--- [{i}/{len(ufs)}] Coletando {uf} ---")
         t0 = time.time()
         try:
+            ambiente = os.environ.copy()
+            ambiente.update({
+                "OPER_RADAR_DB_HOST": args.db_host,
+                "OPER_RADAR_DB_USER": args.db_user,
+                "OPER_RADAR_DB_PASS": args.db_pass,
+                "OPER_RADAR_DB_NAME": args.db_name,
+            })
             r = subprocess.run([
                 sys.executable, str(scraper),
                 f"--janela={args.janela}", f"--uf={uf}",
-                f"--db-host={args.db_host}", f"--db-user={args.db_user}",
-                f"--db-pass={args.db_pass}", f"--db-name={args.db_name}",
-            ], timeout=3600)  # teto de 1h por estado
+            ], env=ambiente, timeout=3600)  # teto de 1h por estado
             dur = int(time.time() - t0)
             resumo[uf] = "ok" if r.returncode == 0 else f"erro (rc={r.returncode})"
             print(f"--- {uf} concluido em {dur//60}min{dur%60}s: {resumo[uf]} ---")

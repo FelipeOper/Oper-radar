@@ -16,11 +16,14 @@ $saidasDetectadasMes = $conn->query("
 ")->fetch_assoc()['n'];
 
 $desvioRow = $conn->query("
-    SELECT AVG((preco - preco) / preco) AS media FROM anuncio WHERE preco IS NOT NULL
+    SELECT AVG((a.preco - f.preco) / NULLIF(f.preco, 0)) * 100 AS media,
+           COUNT(*) AS vinculados
+    FROM anuncio a
+    JOIN fipe_preco f ON f.id = a.fipe_preco_id
+    WHERE a.status='ativo' AND a.preco IS NOT NULL AND f.preco IS NOT NULL
+      AND a.fipe_match_confianca='alto'
 ")->fetch_assoc();
-// Nota: ainda não temos preco_fipe na tabela anuncio (isso é Fase 2 — mapeamento FIPE).
-// Por enquanto o desvio fica null até esse campo existir de verdade.
-$desvioMedioFipe = null;
+$desvioMedioFipe = $desvioRow['media'] !== null ? round((float)$desvioRow['media'], 1) : null;
 
 $ultimaColeta = $conn->query('SELECT MAX(timestamp) AS t FROM execucao_coleta')->fetch_assoc()['t'];
 
@@ -31,5 +34,6 @@ envia_json([
     // Compatibilidade temporaria com bundles anteriores.
     'vendas_estimadas_mes' => (int) $saidasDetectadasMes,
     'desvio_medio_fipe' => $desvioMedioFipe,
+    'fipe_vinculados_ativos_alta_confianca' => (int)$desvioRow['vinculados'],
     'ultima_coleta' => $ultimaColeta,
 ]);
