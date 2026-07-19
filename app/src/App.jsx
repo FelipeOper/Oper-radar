@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Radar, LayoutGrid, Crosshair, Building2, Settings, ListChecks,
@@ -418,6 +418,8 @@ function PageMercado() {
   const [total, setTotal] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [fim, setFim] = useState(false);
+  const carregandoRef = useRef(false);
+  const sentinelaRef = useRef(null);
 
   // Debounce da busca — evita disparar uma requisicao por tecla digitada
   useEffect(() => {
@@ -443,7 +445,9 @@ function PageMercado() {
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
     let cancelado = false;
+    carregandoRef.current = true;
     setCarregando(true); setFim(false);
+    document.getElementById('app-scroll-container')?.scrollTo({ top: 0 });
     fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=0`)
       .then(r => r.json())
       .then(d => {
@@ -453,12 +457,16 @@ function PageMercado() {
         setFim((d.anuncios || []).length >= (d.total ?? 0));
       })
       .catch(() => { if (!cancelado) { setAnuncios([]); setTotal(0); } })
-      .finally(() => { if (!cancelado) setCarregando(false); });
+      .finally(() => {
+        carregandoRef.current = false;
+        if (!cancelado) setCarregando(false);
+      });
     return () => { cancelado = true; };
   }, [queryBase]);
 
   const carregaMais = () => {
-    if (carregando || fim) return;
+    if (carregandoRef.current || fim) return;
+    carregandoRef.current = true;
     setCarregando(true);
     fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=${anuncios.length}`)
       .then(r => r.json())
@@ -471,18 +479,26 @@ function PageMercado() {
         });
       })
       .catch(() => setFim(true))
-      .finally(() => setCarregando(false));
+      .finally(() => {
+        carregandoRef.current = false;
+        setCarregando(false);
+      });
   };
 
-  // Scroll infinito de verdade — dispara nova requisicao ao chegar perto do fim
+  // O app rola dentro de <main>, nao na janela. A sentinela observa esse container
+  // e pede a proxima pagina quando chega perto do fim da grade.
   useEffect(() => {
-    const onScroll = () => {
-      const el = document.scrollingElement || document.documentElement;
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) carregaMais();
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  });
+    const root = document.getElementById('app-scroll-container');
+    const alvo = sentinelaRef.current;
+    if (!root || !alvo) return undefined;
+
+    const observer = new IntersectionObserver(([entrada]) => {
+      if (entrada.isIntersecting) carregaMais();
+    }, { root, rootMargin: '600px 0px' });
+
+    observer.observe(alvo);
+    return () => observer.disconnect();
+  }, [queryBase, anuncios.length, carregando, fim]);
 
   const catCounts = facetas?.categorias || {};
   const totalGeral = facetas?.total_geral ?? 0;
@@ -615,7 +631,7 @@ function PageMercado() {
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
               <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
                 <MapPin size={11} />
-                <button onClick={() => { setRevenda(a.revenda); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                <button onClick={() => { setRevenda(a.revenda); document.getElementById('app-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   style={{ background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', padding: 0, fontSize: 12,
                            textDecoration: 'underline', textDecorationColor: 'transparent' }}
                   onMouseEnter={e => e.currentTarget.style.textDecorationColor = T.signal}
@@ -638,6 +654,8 @@ function PageMercado() {
           );
         })}
       </div>
+
+      <div ref={sentinelaRef} aria-hidden="true" style={{ height: 1 }} />
 
       {carregando && <div style={{ textAlign: 'center', fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, marginTop: 18 }}>CARREGANDO...</div>}
       {!carregando && fim && anuncios.length > 0 && (
@@ -718,6 +736,7 @@ function PageConcorrentes() {
   const [cidade, setCidade] = useState('todas');
   const [ordem, setOrdem] = useState('ativos');
   const [mostrados, setMostrados] = useState(48);
+  const sentinelaRef = useRef(null);
 
   const lojistas = data?.lojistas || [];
 
@@ -773,15 +792,19 @@ function PageConcorrentes() {
   useEffect(() => { setMostrados(48); }, [categoria, cidade, q, ordem]);
 
   useEffect(() => {
-    const onScroll = () => {
-      const el = document.scrollingElement || document.documentElement;
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 800) {
+    const root = document.getElementById('app-scroll-container');
+    const alvo = sentinelaRef.current;
+    if (!root || !alvo) return undefined;
+
+    const observer = new IntersectionObserver(([entrada]) => {
+      if (entrada.isIntersecting) {
         setMostrados(m => Math.min(m + 60, 500));
       }
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+    }, { root, rootMargin: '800px 0px' });
+
+    observer.observe(alvo);
+    return () => observer.disconnect();
+  }, [mostrados, filtrados.length]);
 
   const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
   const cidadesTop = cidades.filter(c => c !== 'todas').sort((a, b) => (contCidade[b] || 0) - (contCidade[a] || 0)).slice(0, 8);
@@ -941,6 +964,8 @@ function PageConcorrentes() {
           </Card>
         ))}
       </div>
+
+      <div ref={sentinelaRef} aria-hidden="true" style={{ height: 1 }} />
 
       {mostrados < filtrados.length && (
         <div style={{ textAlign: 'center', fontSize: 12, color: T.inkMuted, marginTop: 16 }}>
@@ -1328,7 +1353,7 @@ export default function App() {
       )}
 
       {/* área principal */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: mobile ? '18px 16px 90px' : '26px 32px 40px' }}>
+      <main id="app-scroll-container" style={{ flex: 1, overflowY: 'auto', padding: mobile ? '18px 16px 90px' : '26px 32px 40px' }}>
         {mobile && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 16 }}>
