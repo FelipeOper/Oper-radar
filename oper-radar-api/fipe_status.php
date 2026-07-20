@@ -6,12 +6,14 @@ $conn = conecta();
 $resumo = $conn->query("
     SELECT
         SUM(tipo='Caminhao' AND status='ativo' AND marca IS NOT NULL AND ano_inicial IS NOT NULL) AS elegiveis,
-        SUM(tipo='Caminhao' AND status='ativo' AND fipe_preco_id IS NOT NULL) AS vinculados_ativos,
-        SUM(tipo='Caminhao' AND status='ativo' AND fipe_preco_id IS NULL AND fipe_ultima_tentativa IS NULL) AS nunca_tentados,
-        SUM(fipe_match_status='sem_match') AS sem_match,
-        SUM(fipe_match_status='ambiguo') AS ambiguos,
-        SUM(fipe_match_status='sem_ano') AS sem_ano,
-        SUM(fipe_match_status='erro_api') AS erros_api,
+        SUM(tipo='Caminhao' AND status='ativo' AND marca IS NOT NULL AND ano_inicial IS NOT NULL
+            AND fipe_preco_id IS NOT NULL) AS vinculados_ativos,
+        SUM(tipo='Caminhao' AND status='ativo' AND marca IS NOT NULL AND ano_inicial IS NOT NULL
+            AND fipe_preco_id IS NULL AND fipe_ultima_tentativa IS NULL) AS nunca_tentados,
+        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='sem_match') AS sem_match,
+        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='ambiguo') AS ambiguos,
+        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='sem_ano') AS sem_ano,
+        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='erro_api') AS erros_api,
         MAX(fipe_ultima_tentativa) AS ultima_tentativa
     FROM anuncio
 ")->fetch_assoc();
