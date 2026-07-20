@@ -1,29 +1,64 @@
 <?php
 /**
- * OPER RADAR — Fase 7 (ponte entre o banco e o app)
- * Configuração de conexão compartilhada pelos endpoints da API.
+ * OPER RADAR — configuração compartilhada da API.
  *
- * IMPORTANTE: preencha os 3 valores abaixo com os dados reais do seu banco
- * (os mesmos que você já usa no scraper_hostgator.py). Depois de preencher,
- * NÃO deixe este arquivo dentro de public_html acessível diretamente — coloque-o
- * junto dos outros arquivos da API numa pasta própria (ex: /oper-radar-api/).
+ * As credenciais ficam fora do repositorio em .oper-radar.env, com permissao 600.
+ * Este arquivo pode permanecer versionado porque nao contem segredos.
  */
 
 // Chave da API da Anthropic para o Analista IA (analista.php).
-// Crie em console.anthropic.com > API Keys. Deixe '' para desativar o Analista.
+// Deixe vazia para desativar o Analista.
 define('ANTHROPIC_API_KEY', '');
 
-function conecta(): mysqli {
-    $host = 'localhost';
-    $user = 'pro93061_pro93061';       // mesmo usuário do scraper
-    $pass = 'SUA_SENHA_AQUI';          // mesma senha do scraper
-    $name = 'pro93061_radar_oper';     // mesmo banco do scraper
+function carrega_config_db(): array {
+    $direto = [
+        'host' => getenv('OPER_RADAR_DB_HOST') ?: 'localhost',
+        'user' => getenv('OPER_RADAR_DB_USER') ?: null,
+        'pass' => getenv('OPER_RADAR_DB_PASS') ?: null,
+        'name' => getenv('OPER_RADAR_DB_NAME') ?: null,
+    ];
+    if ($direto['user'] && $direto['pass'] && $direto['name']) {
+        return $direto;
+    }
 
-    $conn = new mysqli($host, $user, $pass, $name);
+    $candidatos = array_filter(array_unique([
+        getenv('OPER_RADAR_ENV_FILE') ?: null,
+        (getenv('HOME') ?: '') . '/.oper-radar.env',
+        dirname(__DIR__, 2) . '/.oper-radar.env',
+        dirname(__DIR__, 3) . '/.oper-radar.env',
+    ]));
+    foreach ($candidatos as $arquivo) {
+        if (!is_readable($arquivo)) continue;
+        $env = parse_ini_file($arquivo, false, INI_SCANNER_RAW);
+        if (!is_array($env)) continue;
+        $config = [
+            'host' => $env['OPER_RADAR_DB_HOST'] ?? 'localhost',
+            'user' => $env['OPER_RADAR_DB_USER'] ?? null,
+            'pass' => $env['OPER_RADAR_DB_PASS'] ?? null,
+            'name' => $env['OPER_RADAR_DB_NAME'] ?? null,
+        ];
+        if ($config['user'] && $config['pass'] && $config['name']) {
+            return $config;
+        }
+    }
+    throw new RuntimeException('Configuracao do banco indisponivel');
+}
+
+function conecta(): mysqli {
+    try {
+        $config = carrega_config_db();
+    } catch (RuntimeException $e) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode(['erro' => 'Configuracao do banco indisponivel']);
+        exit;
+    }
+
+    $conn = new mysqli($config['host'], $config['user'], $config['pass'], $config['name']);
     if ($conn->connect_error) {
         http_response_code(500);
         header('Content-Type: application/json');
-        echo json_encode(['erro' => 'Falha de conexão com o banco']);
+        echo json_encode(['erro' => 'Falha de conexao com o banco']);
         exit;
     }
     $conn->set_charset('utf8mb4');
