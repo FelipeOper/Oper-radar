@@ -71,7 +71,7 @@ $conversao = consulta_um($conn, 'descoberta_saida', "
            SUM(CASE WHEN a.status='removido_confirmado' AND a.data_remocao>=DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) saidas
     FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
     GROUP BY r.cidade,r.uf HAVING estoque>20 AND saidas>0
-    ORDER BY saidas/estoque DESC LIMIT 1");
+    ORDER BY SUM(CASE WHEN a.status='removido_confirmado' AND a.data_remocao>=DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END),0) DESC LIMIT 1");
 if ($conversao) {
     $taxa = round(((int)$conversao['saidas']/(int)$conversao['estoque'])*100,1);
     $descobertas[] = ['tipo'=>'conversao','titulo'=>'Maior movimento relativo',
@@ -84,7 +84,7 @@ $novos = consulta_um($conn, 'descoberta_estoque', "
            SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END) ativos
     FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
     GROUP BY r.id HAVING ativos>20 AND novos_7d>5
-    ORDER BY novos_7d/ativos DESC LIMIT 1");
+    ORDER BY SUM(CASE WHEN a.primeira_vez_visto>=DATE_SUB(NOW(),INTERVAL 7 DAY) THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END),0) DESC LIMIT 1");
 if ($novos) {
     $pct = round(((int)$novos['novos_7d']/(int)$novos['ativos'])*100);
     $descobertas[] = ['tipo'=>'movimento','titulo'=>'Reposição forte de estoque',
@@ -100,7 +100,7 @@ $quente = consulta_um($conn, 'descoberta_faixa', "
            SUM(CASE WHEN status='ativo' THEN 1 ELSE 0 END) ativos,
            SUM(CASE WHEN status='removido_confirmado' AND data_remocao>=DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) saidas
     FROM anuncio WHERE preco IS NOT NULL AND preco>0
-    GROUP BY faixa HAVING ativos>100 AND saidas>0 ORDER BY saidas/ativos DESC LIMIT 1");
+    GROUP BY faixa HAVING ativos>100 AND saidas>0 ORDER BY SUM(CASE WHEN status='removido_confirmado' AND data_remocao>=DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN status='ativo' THEN 1 ELSE 0 END),0) DESC LIMIT 1");
 if ($quente) {
     $taxa = round(((int)$quente['saidas']/(int)$quente['ativos'])*100,1);
     $descobertas[] = ['tipo'=>'faixa','titulo'=>'Faixa com maior movimento',
