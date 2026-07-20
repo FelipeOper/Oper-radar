@@ -1157,6 +1157,167 @@ function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
 }
 
 /* ============================================================
+   CONSULTA FIPE — catálogo local + leitura do mercado monitorado
+   ============================================================ */
+function PageFipe() {
+  const [busca, setBusca] = useState('');
+  const [buscaAplicada, setBuscaAplicada] = useState('');
+  const [marca, setMarca] = useState('todas');
+  const [modeloId, setModeloId] = useState('todos');
+  const [ano, setAno] = useState('todos');
+  const [ordem, setOrdem] = useState('mercado');
+  const [pagina, setPagina] = useState(0);
+  const porPagina = 40;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBuscaAplicada(busca.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [busca]);
+
+  useEffect(() => setPagina(0), [buscaAplicada, marca, modeloId, ano, ordem]);
+
+  const facetasPath = useMemo(() => {
+    const p = new URLSearchParams({ modo: 'facetas' });
+    if (marca !== 'todas') p.set('marca', marca);
+    if (modeloId !== 'todos') p.set('modelo_id', modeloId);
+    return `fipe_consulta.php?${p.toString()}`;
+  }, [marca, modeloId]);
+  const { data: facetas, erro: erroFacetas } = useApi(facetasPath);
+
+  const buscaPath = useMemo(() => {
+    const p = new URLSearchParams({ modo: 'buscar', ordem, limit: String(porPagina), offset: String(pagina * porPagina) });
+    if (buscaAplicada) p.set('q', buscaAplicada);
+    if (marca !== 'todas') p.set('marca', marca);
+    if (modeloId !== 'todos') p.set('modelo_id', modeloId);
+    if (ano !== 'todos') p.set('ano', ano);
+    return `fipe_consulta.php?${p.toString()}`;
+  }, [buscaAplicada, marca, modeloId, ano, ordem, pagina]);
+  const { data: resultado, erro: erroBusca } = useApi(buscaPath);
+
+  const limpar = () => {
+    setBusca(''); setMarca('todas'); setModeloId('todos'); setAno('todos'); setOrdem('mercado'); setPagina(0);
+  };
+  const total = Number(resultado?.total || 0);
+  const inicio = total ? pagina * porPagina + 1 : 0;
+  const fim = Math.min((pagina + 1) * porPagina, total);
+  const temFiltros = busca || marca !== 'todas' || modeloId !== 'todos' || ano !== 'todos';
+
+  return (
+    <div style={{ maxWidth: 1400 }}>
+      <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-8px 0 18px', maxWidth: 760 }}>
+        Consulte a referência nacional e compare cada versão com os anúncios ativos já vinculados no radar.
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: 12 }}>
+        <Kpi label="Modelos de caminhão" value={facetas ? fmtN(facetas.resumo?.modelos) : '—'} sub={`${fmtN(facetas?.resumo?.marcas)} marcas no catálogo`} />
+        <Kpi label="Preços disponíveis" value={facetas ? fmtN(facetas.resumo?.precos) : '—'} sub="anos e versões consultáveis" />
+        <Kpi label="Referência vigente" value={facetas?.resumo?.referencia || '—'} sub={facetas?.resumo?.referencia_codigo ? `código ${facetas.resumo.referencia_codigo}` : 'carregando referência'} tone={T.positive} />
+      </div>
+
+      <SectionTitle sub="Marca, versão e ano refinam a referência sem sair do OPER RADAR">Encontrar veículo</SectionTitle>
+      <Card style={{ padding: 16 }}>
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <Search size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: T.inkMuted }} />
+          <input value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Busque por modelo, marca ou código FIPE — ex: Actros 2651"
+            style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', paddingLeft: 40, minHeight: 44 }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10 }}>
+          <label>
+            <div style={rotuloFiltroStyle}>MARCA</div>
+            <select value={marca} onChange={e => { setMarca(e.target.value); setModeloId('todos'); setAno('todos'); }} style={{ ...inputStyle, width: '100%' }}>
+              <option value="todas">Todas as marcas</option>
+              {(facetas?.marcas || []).map(item => <option key={item.marca} value={item.marca}>{item.marca} · {fmtN(item.modelos)}</option>)}
+            </select>
+          </label>
+          <label>
+            <div style={rotuloFiltroStyle}>MODELO / VERSÃO</div>
+            <select value={modeloId} disabled={marca === 'todas'} onChange={e => { setModeloId(e.target.value); setAno('todos'); }} style={{ ...inputStyle, width: '100%', opacity: marca === 'todas' ? 0.5 : 1 }}>
+              <option value="todos">Todos os modelos</option>
+              {(facetas?.modelos || []).map(item => <option key={item.id} value={item.id}>{item.modelo}</option>)}
+            </select>
+          </label>
+          <label>
+            <div style={rotuloFiltroStyle}>ANO MODELO</div>
+            <select value={ano} disabled={modeloId === 'todos'} onChange={e => setAno(e.target.value)} style={{ ...inputStyle, width: '100%', opacity: modeloId === 'todos' ? 0.5 : 1 }}>
+              <option value="todos">Todos os anos</option>
+              {(facetas?.anos || []).map(item => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label>
+            <div style={rotuloFiltroStyle}>ORDENAR</div>
+            <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+              <option value="mercado">Mais presentes no radar</option>
+              <option value="modelo">Marca e modelo</option>
+              <option value="ano_desc">Ano mais recente</option>
+              <option value="preco_asc">Menor valor FIPE</option>
+              <option value="preco_desc">Maior valor FIPE</option>
+            </select>
+          </label>
+        </div>
+        {temFiltros && <button onClick={limpar} style={{ ...inputStyle, marginTop: 12, cursor: 'pointer', color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <RotateCcw size={13} /> Limpar consulta
+        </button>}
+      </Card>
+
+      <SectionTitle sub={resultado ? `${fmtN(total)} referências encontradas · mostrando ${fmtN(inicio)}–${fmtN(fim)}` : 'Consultando o catálogo local'}>Resultados</SectionTitle>
+      {(erroFacetas || erroBusca) ? (
+        <EmptyState icon={Gauge} titulo="Consulta FIPE indisponível" texto="O catálogo está preservado. Confirme a publicação do endpoint fipe_consulta.php no servidor." />
+      ) : !resultado ? (
+        <EmptyState icon={Search} titulo="Consultando catálogo" texto="Carregando modelos, anos e comparação com o mercado monitorado." />
+      ) : resultado.itens?.length === 0 ? (
+        <EmptyState icon={Search} titulo="Nenhuma referência encontrada" texto="Tente somente o número do modelo, outra marca ou remova alguns filtros." />
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: 12 }}>
+            {resultado.itens.map(item => {
+              const desvio = item.desvio_medio_pct;
+              const tomDesvio = desvio == null ? 'neutro' : desvio <= 0 ? 'positivo' : desvio >= 20 ? 'alerta' : 'sinal';
+              return <Card key={item.id} style={{ padding: 17, display: 'flex', flexDirection: 'column', minHeight: 252 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                  <Tag tone="sinal">{item.marca}</Tag>
+                  <span style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 11 }}>{item.ano}</span>
+                </div>
+                <div style={{ fontFamily: T.fontDisplay, fontWeight: 600, fontSize: 16, lineHeight: 1.35, margin: '13px 0 5px' }}>{item.modelo}</div>
+                <div style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 10.5 }}>FIPE {item.codigo_fipe} · {item.mes_referencia}</div>
+                <div style={{ fontFamily: T.fontDisplay, fontSize: 27, fontWeight: 650, marginTop: 16, color: T.ink }}>{fmtBRL(item.preco_fipe)}</div>
+                <div style={{ borderTop: `1px solid ${T.line}`, marginTop: 15, paddingTop: 13 }}>
+                  {item.anuncios_ativos > 0 ? <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 9, alignItems: 'center' }}>
+                      <span style={{ color: T.inkMuted, fontSize: 12 }}>{fmtN(item.anuncios_ativos)} no radar</span>
+                      <Tag tone={tomDesvio}>{desvio > 0 ? '+' : ''}{desvio ?? '—'}% vs FIPE</Tag>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11.5 }}>
+                      <div><span style={{ color: T.inkMuted }}>média</span><br /><strong>{fmtBRL(item.preco_medio_mercado)}</strong></div>
+                      <div><span style={{ color: T.inkMuted }}>menor oferta</span><br /><strong>{fmtBRL(item.menor_anuncio)}</strong></div>
+                    </div>
+                    <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 10 }}>{item.abaixo_fipe ? `${fmtN(item.abaixo_fipe)} abaixo da FIPE` : 'nenhum abaixo da FIPE'}{item.ufs?.length ? ` · ${item.ufs.join(', ')}` : ''}</div>
+                  </> : <div style={{ color: T.inkMuted, fontSize: 12, lineHeight: 1.5 }}>Sem anúncio vinculado no radar nesta versão.</div>}
+                </div>
+              </Card>;
+            })}
+          </div>
+          {total > porPagina && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18 }}>
+            <button disabled={pagina === 0} onClick={() => setPagina(v => Math.max(0, v - 1))} style={{ ...inputStyle, cursor: pagina === 0 ? 'default' : 'pointer', opacity: pagina === 0 ? 0.45 : 1 }}>Anterior</button>
+            <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted }}>Página {pagina + 1} de {Math.ceil(total / porPagina)}</span>
+            <button disabled={fim >= total} onClick={() => setPagina(v => v + 1)} style={{ ...inputStyle, cursor: fim >= total ? 'default' : 'pointer', opacity: fim >= total ? 0.45 : 1 }}>Próxima</button>
+          </div>}
+        </>
+      )}
+
+      <Card style={{ marginTop: 22, background: 'rgba(91,138,166,0.07)', padding: 16 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <ShieldCheck size={18} style={{ color: STEEL, flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 12, color: T.inkMuted, lineHeight: 1.65 }}>
+            <strong style={{ color: T.ink }}>Leitura correta:</strong> a FIPE é uma referência nacional. Configuração, implementos, estado de conservação, região e condição comercial podem explicar diferenças. A comparação do radar usa somente anúncios vinculados à mesma versão e ao mesmo ano FIPE.
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
    AJUSTES
    ============================================================ */
 function PageAjustes() {
@@ -1449,6 +1610,7 @@ function PageAnalise() {
 const NAV = [
   { id: 'hoje', rotulo: 'Hoje', icone: Radar },
   { id: 'mercado', rotulo: 'Mercado', icone: LayoutGrid },
+  { id: 'fipe', rotulo: 'FIPE', icone: Search },
   { id: 'oportunidades', rotulo: 'Oportunidades', icone: Crosshair },
   { id: 'concorrentes', rotulo: 'Concorrentes', icone: Building2 },
   { id: 'analise', rotulo: 'Análise', icone: Gauge },
@@ -1456,7 +1618,7 @@ const NAV = [
   { id: 'ajustes', rotulo: 'Ajustes', icone: Settings },
 ];
 const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'oportunidades', 'concorrentes'].includes(item.id));
-const NAV_MOBILE_MAIS = NAV.filter(item => ['analise', 'acoes', 'ajustes'].includes(item.id));
+const NAV_MOBILE_MAIS = NAV.filter(item => ['fipe', 'analise', 'acoes', 'ajustes'].includes(item.id));
 
 export default function App() {
   const [pagina, setPagina] = useState('hoje');
@@ -1504,6 +1666,7 @@ export default function App() {
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} />,
     mercado: <PageMercado />,
+    fipe: <PageFipe />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrentes />,
     analise: <PageAnalise />,
