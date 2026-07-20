@@ -129,7 +129,19 @@ def seleciona_precos(linhas, necessarias, mapa_ids, referencia_codigo,
 
 def importar(conn, linhas, mes, referencia_codigo, todos_os_precos=False):
     total_modelos = atualiza_catalogo(conn, linhas)
-    necessarias, total_anuncios, sem_match = combinacoes_necessarias(conn)
+    if todos_os_precos:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*) FROM anuncio
+            WHERE status='ativo' AND tipo='Caminhao'
+              AND marca IS NOT NULL AND ano_inicial IS NOT NULL
+        """)
+        total_anuncios = cur.fetchone()[0]
+        cur.close()
+        necessarias = set()
+        sem_match = None
+    else:
+        necessarias, total_anuncios, sem_match = combinacoes_necessarias(conn)
     precos, encontradas = seleciona_precos(
         linhas, necessarias, ids_modelos(conn), referencia_codigo, todos_os_precos
     )
@@ -158,13 +170,17 @@ def importar(conn, linhas, mes, referencia_codigo, todos_os_precos=False):
     print(f"Referencia: {mes} (codigo {referencia_codigo})")
     print(f"Catalogo de caminhoes: {total_modelos} modelos")
     print(f"Anuncios ativos analisados: {total_anuncios}")
-    print(f"Combinacoes requeridas: {len(necessarias)}")
+    if not todos_os_precos:
+        print(f"Combinacoes requeridas: {len(necessarias)}")
     print(f"Precos importados/atualizados: {len(precos)}")
     if todos_os_precos:
         print("Carga de precos: catalogo completo de caminhoes")
     else:
         print(f"Combinacoes sem preco no CSV: {len(necessarias - encontradas)}")
-    print(f"Anuncios sem match automatico seguro: {sem_match}")
+    if sem_match is not None:
+        print(f"Anuncios sem match automatico seguro: {sem_match}")
+    else:
+        print("Matching dos anuncios: adiado para a etapa local")
     print(f"Tentativas reabertas apos a carga: {reabertos}")
 
 
