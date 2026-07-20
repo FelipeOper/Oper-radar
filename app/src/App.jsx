@@ -262,6 +262,7 @@ function KpiEntradaSaida({ entrou, saiu }) {
 
 function PageHoje({ kpis, anuncios, usandoReais }) {
   const { data: stats } = useApi('hoje_stats.php');
+  const { data: facetas } = useApi('facetas.php?status=ativo');
   const [sinalAberto, setSinalAberto] = useState(null);
 
   const sinais = useMemo(() => {
@@ -289,7 +290,8 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 22 }}>
-        <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={usandoReais ? 'PR · 2×/dia' : 'conectando…'} />
+        <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'}
+          sub={usandoReais ? `${Object.keys(facetas?.por_uf || {}).length || 1} UFs · 2×/dia` : 'conectando…'} />
         <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />
         <Kpi label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · ausência confirmada" tone={T.positive} />
         <KpiEntradaSaida
@@ -934,7 +936,7 @@ function PageConcorrentes() {
       </div>
 
       <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, margin: '2px 2px 14px' }}>
-        {data ? `${fmtN(filtrados.length)} REVENDAS · PR` : erro ? 'API INDISPONIVEL' : 'CARREGANDO...'}
+        {data ? `${fmtN(filtrados.length)} REVENDAS · ${regiao === 'todas' ? 'BRASIL' : regiao.toUpperCase()}` : erro ? 'API INDISPONIVEL' : 'CARREGANDO...'}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
@@ -1087,6 +1089,13 @@ function PageAcoes({ acoes, setAcoes }) {
 function PageAjustes() {
   const [papel, setPapel] = useState('Admin');
   const { data: fipeStatus, erro: fipeErro } = useApi('fipe_status.php');
+  const { data: facetas } = useApi('facetas.php?status=ativo');
+  const ufsAtivas = Object.entries(facetas?.por_uf || {}).filter(([, n]) => n > 0).map(([uf]) => uf).sort();
+  const regioesAtivas = Object.values(facetas?.regioes || {}).filter(r => r.anuncios > 0).length;
+  const cobertura = STATE_DATA.map(([uf, nome, estimado]) => {
+    const coletado = facetas?.revendas_por_uf?.[uf] || 0;
+    return { name: uf, nome, qtd: coletado || estimado, coletado, coletando: coletado > 0 };
+  });
   const papeis = ['Admin', 'Gestor', 'Analista', 'Visualizador'];
   const permissoes = {
     Admin: ['Tudo: coleta, usuários, exportação, configuração'],
@@ -1101,7 +1110,9 @@ function PageAjustes() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13.5 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: T.inkMuted }}>Estados monitorados</span>
-            <span style={{ fontFamily: T.fontMono }}>PR <span style={{ color: T.inkMuted }}>(SC e SP na fila)</span></span>
+            <span style={{ fontFamily: T.fontMono, textAlign: 'right', marginLeft: 16 }}>
+              {ufsAtivas.length ? ufsAtivas.join(', ') : 'aguardando dados'}
+            </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: T.inkMuted }}>Frequência</span>
@@ -1155,15 +1166,15 @@ function PageAjustes() {
       </div>
       <Card><div style={{ fontSize: 13.5, color: T.inkMuted }}>{permissoes[papel]}</div></Card>
 
-      <SectionTitle sub="Estados em coleta (verde) vs. na fila (cinza) — hoje só PR é coletado">Cobertura nacional</SectionTitle>
+      <SectionTitle sub={`${ufsAtivas.length} UFs com dados · ${regioesAtivas} regiões ativas · verde indica coleta iniciada`}>Cobertura nacional</SectionTitle>
       <Card style={{ height: 300 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={STATE_DATA.map(([uf, , qtd]) => ({ name: uf, qtd, coletando: uf === 'PR' }))} margin={{ left: -22, top: 4 }}>
+          <BarChart data={cobertura} margin={{ left: -22, top: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis dataKey="name" tick={{ fill: T.inkMuted, fontSize: 10, fontFamily: T.fontMono }} axisLine={{ stroke: T.line }} tickLine={false} />
             <YAxis tick={{ fill: T.inkMuted, fontSize: 10, fontFamily: T.fontMono }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={{ background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 10, color: T.ink, fontSize: 12 }}
-              formatter={(v, name, props) => [`${v} revendas${props.payload.coletando ? ' · em coleta' : ' · na fila'}`, 'Total']}
+              formatter={(v, name, props) => [props.payload.coletando ? `${props.payload.coletado} revendas coletadas` : `${v} revendas estimadas · na fila`, props.payload.nome]}
             />
             <Bar dataKey="qtd" radius={[3, 3, 0, 0]}
               shape={(props) => {

@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 
 import requests
 import mysql.connector
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from parser import parse_listings, hash_pagina
 from diff_logic import processa_diff, EstadoAnuncio
@@ -35,8 +37,23 @@ LOJA_URL_RE = re.compile(r'href="([a-z0-9-]+/[a-z]{2}/loja/[a-z0-9-]+/veiculo/\d
 PAUSA_ENTRE_REQUISICOES = 2.0
 
 
+def cria_sessao() -> requests.Session:
+    sessao = requests.Session()
+    tentativas = Retry(
+        total=4, connect=4, read=4, backoff_factor=1.2,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(["GET"]), raise_on_status=False,
+    )
+    sessao.mount("https://", HTTPAdapter(max_retries=tentativas))
+    sessao.headers.update(HEADERS)
+    return sessao
+
+
+SESSAO = cria_sessao()
+
+
 def discover_revenda_urls(uf: str) -> list[str]:
-    resp = requests.get(f"https://www.caminhoesecarretas.com.br/revendas.aspx?uf={uf}", headers=HEADERS, timeout=20)
+    resp = SESSAO.get(f"{BASE_URL}/revendas.aspx?uf={uf}", timeout=30)
     resp.raise_for_status()
     caminhos = sorted(set(LOJA_URL_RE.findall(resp.text)))
     urls = [f"{BASE_URL}/{caminho}" for caminho in caminhos]
@@ -46,11 +63,13 @@ def discover_revenda_urls(uf: str) -> list[str]:
         print(f"[debug] primeiros 500 caracteres da resposta:\n{resp.text[:500]}")
         print(f"[debug] contém 'loja'? {'loja' in resp.text.lower()}")
         print(f"[debug] contém 'cloudflare' ou 'challenge'? {'cloudflare' in resp.text.lower() or 'challenge' in resp.text.lower()}")
+        if 'cloudflare' in resp.text.lower() or 'challenge' in resp.text.lower():
+            raise requests.RequestException("portal devolveu pagina de bloqueio/challenge")
     return urls
 
 
 def fetch_revenda_page(url: str) -> str:
-    resp = requests.get(url, headers=HEADERS, timeout=20)
+    resp = SESSAO.get(url, timeout=30)
     resp.raise_for_status()
     return resp.text
 
@@ -146,16 +165,24 @@ def registra_execucao(conn, revenda_id, janela, qtd_ativos, hash_pag, sucesso, e
     cur.close()
 
 
-def roda_ciclo(conn, uf: str, janela: str):
+def roda_ciclo(conn, uf: str, janela: str, pausa: float):
     urls = discover_revenda_urls(uf)
-    print(f"[{uf}] {len(urls)} revendas encontradas — pausa de {PAUSA_ENTRE_REQUISICOES}s entre cada uma")
+    if not urls:
+        print(f"[{uf}] nenhuma revenda publicada no portal")
+        return {"encontradas": 0, "sucessos": 0, "erros": 0}
+    print(f"[{uf}] {len(urls)} revendas encontradas — pausa de {pausa}s entre cada uma")
+
+    sucessos = 0
+    erros = 0
 
     for i, url in enumerate(urls):
         try:
             html = fetch_revenda_page(url)
         except requests.RequestException as e:
             registra_execucao(conn, None, janela, 0, "", sucesso=False, erro=str(e))
-            time.sleep(PAUSA_ENTRE_REQUISICOES)
+            erros += 1
+            print(f"  [{i+1}/{len(urls)}] erro ao buscar {url}: {e}")
+            time.sleep(pausa)
             continue
 
         h = hash_pagina(html)
@@ -173,16 +200,20 @@ def roda_ciclo(conn, uf: str, janela: str):
         salva_estado(conn, revenda_id, novo_estado, anuncios_por_id)
 
         registra_execucao(conn, revenda_id, janela, len(ids_ativos), h, sucesso=True)
+        sucessos += 1
         print(f"  [{i+1}/{len(urls)}] {nome_revenda}: {len(ids_ativos)} anúncios ativos")
 
         if i < len(urls) - 1:
-            time.sleep(PAUSA_ENTRE_REQUISICOES)
+            time.sleep(pausa)
+    print(f"[{uf}] resumo: {sucessos} revendas coletadas, {erros} erros")
+    return {"encontradas": len(urls), "sucessos": sucessos, "erros": erros}
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--janela", choices=["07h", "19h"], required=True)
     ap.add_argument("--uf", default="PR")
+    ap.add_argument("--pausa-requisicoes", type=float, default=float(os.getenv("OPER_RADAR_PAUSA_REQUISICOES", PAUSA_ENTRE_REQUISICOES)))
     ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
     ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"), help="usuário MySQL (ou OPER_RADAR_DB_USER)")
     ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"), help="senha MySQL (ou OPER_RADAR_DB_PASS)")
@@ -197,8 +228,18 @@ if __name__ == "__main__":
     if faltando:
         ap.error("credenciais ausentes: " + ", ".join(faltando))
 
+    args.uf = args.uf.strip().upper()
+    if not re.fullmatch(r"[A-Z]{2}", args.uf):
+        ap.error("UF invalida")
+    if args.pausa_requisicoes < 0:
+        ap.error("--pausa-requisicoes deve ser zero ou positivo")
+
     conn = conecta_mysql(args.db_host, args.db_user, args.db_pass, args.db_name)
     try:
-        roda_ciclo(conn, args.uf, args.janela)
+        resultado = roda_ciclo(conn, args.uf, args.janela, args.pausa_requisicoes)
     finally:
         conn.close()
+    if resultado["encontradas"] == 0:
+        raise SystemExit(3)
+    if resultado["sucessos"] == 0:
+        raise SystemExit(2)
