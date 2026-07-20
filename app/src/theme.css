@@ -1,0 +1,113 @@
+:root {
+  --or-bg: #0b0e13;
+  --or-surface: #141922;
+  --or-surface-2: #1b212c;
+  --or-surface-3: #242c39;
+  --or-ink: #edeff3;
+  --or-ink-muted: #8a94a6;
+  --or-signal: #f5a623;
+  --or-positive: #3dd68c;
+  --or-alert: #ff6b4a;
+  --or-line: rgba(255, 255, 255, 0.07);
+  --or-line-strong: rgba(255, 255, 255, 0.16);
+  --or-control-min-height: 42px;
+  --or-card-default-padding: 20px;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--or-bg);
+  color: var(--or-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select {
+  min-height: var(--or-control-min-height);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--or-signal);
+  outline-offset: 2px;
+}
+
+select {
+  max-width: 100%;
+}
+
+.or-card-density {
+  padding: var(--or-card-default-padding) !important;
+}
+
+:root[data-density='compact'] {
+  --or-control-min-height: 38px;
+  --or-card-default-padding: 15px;
+}
+
+:root[data-density='comfortable'] {
+  --or-control-min-height: 46px;
+  --or-card-default-padding: 24px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--or-line-strong);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
+:root[data-reduce-motion='true'] *,
+:root[data-reduce-motion='true'] *::before,
+:root[data-reduce-motion='true'] *::after {
+  animation: none !important;
+  scroll-behavior: auto !important;
+  transition: none !important;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --or-control-min-height: 44px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}

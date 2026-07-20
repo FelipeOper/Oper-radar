@@ -65,10 +65,73 @@ function conecta(): mysqli {
     return $conn;
 }
 
-/** Cabeçalhos padrão de toda resposta da API — JSON + CORS liberado pro app buscar dados. */
+/** Resposta JSON privada, sem cache no navegador ou em proxies. */
 function envia_json(array $dados): void {
     header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: *');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     echo json_encode($dados, JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+/** Sessão própria do Oper Radar, protegida por cookie HttpOnly. */
+function inicia_sessao_oper_radar(): void {
+    if (session_status() === PHP_SESSION_ACTIVE) return;
+
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    session_name('OPER_RADAR_SESSION');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    session_start();
+
+    $agora = time();
+    $ultima = (int)($_SESSION['ultima_atividade'] ?? 0);
+    if ($ultima && ($agora - $ultima) > 43200) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+    }
+    $_SESSION['ultima_atividade'] = $agora;
+    if (empty($_SESSION['csrf'])) {
+        $_SESSION['csrf'] = bin2hex(random_bytes(24));
+    }
+}
+
+function usuario_atual(): ?array {
+    inicia_sessao_oper_radar();
+    if (empty($_SESSION['usuario_id'])) return null;
+    return [
+        'id' => (int)$_SESSION['usuario_id'],
+        'nome' => (string)($_SESSION['usuario_nome'] ?? ''),
+        'email' => (string)($_SESSION['usuario_email'] ?? ''),
+        'papel' => (string)($_SESSION['usuario_papel'] ?? 'visualizador'),
+    ];
+}
+
+function exige_autenticacao(): array {
+    $usuario = usuario_atual();
+    if ($usuario) return $usuario;
+    http_response_code(401);
+    envia_json(['erro' => 'Autenticacao necessaria', 'codigo' => 'NAO_AUTENTICADO']);
+}
+
+function exige_csrf(): void {
+    inicia_sessao_oper_radar();
+    $recebido = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!$recebido || !hash_equals((string)($_SESSION['csrf'] ?? ''), (string)$recebido)) {
+        http_response_code(403);
+        envia_json(['erro' => 'Sessao expirada. Atualize a pagina e tente novamente.', 'codigo' => 'CSRF_INVALIDO']);
+    }
+}
+
+// Todas as APIs de dados são privadas. auth.php é a única porta pública.
+if (PHP_SAPI !== 'cli') {
+    $scriptAtual = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    if ($scriptAtual !== 'auth.php') {
+        exige_autenticacao();
+    }
 }

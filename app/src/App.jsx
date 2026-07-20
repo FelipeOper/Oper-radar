@@ -4,29 +4,19 @@ import {
   MapPin, ExternalLink, Search,
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
-  ShieldCheck
+  ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
+  Monitor, Moon, Sun, Palette, Save, X
 } from 'lucide-react';
+import {
+  T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
+  loadUiPreferences, saveUiPreferences, resolveTheme,
+  activateTheme, applyUiPreferences,
+} from './theme.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
    (ver docs/OPER_RADAR_Estrategia_e_Design.md)
    ============================================================ */
-const STEEL = '#5B8AA6';
-const T = {
-  bg: '#0B0E13',
-  surface: '#141922',
-  surface2: '#1B212C',
-  ink: '#EDEFF3',
-  inkMuted: '#8A94A6',
-  signal: '#F5A623',   // âmbar de radar — o único acento
-  positive: '#3DD68C', // giro / venda
-  alert: '#FF6B4A',    // oportunidade quente
-  line: 'rgba(255,255,255,0.07)',
-  fontDisplay: "'Space Grotesk', sans-serif",
-  fontBody: "'Inter', sans-serif",
-  fontMono: "'JetBrains Mono', monospace",
-};
-
 const API_BASE_URL = 'https://agenciaoper.com.br/oper-radar-api';
 
 /* ---------- dados de referência ---------- */
@@ -129,13 +119,32 @@ function useApi(path) {
   useEffect(() => {
     const controller = new AbortController();
     setErro(false);
-    fetch(`${API_BASE_URL}/${path}`, { signal: controller.signal })
+    fetch(`${API_BASE_URL}/${path}`, { signal: controller.signal, credentials: 'same-origin' })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(setData)
       .catch(e => { if (e.name !== 'AbortError') setErro(true); });
     return () => controller.abort();
   }, [path]);
   return { data, erro };
+}
+
+async function apiPost(path, dados, csrf) {
+  const resposta = await fetch(`${API_BASE_URL}/${path}`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+    },
+    body: JSON.stringify(dados),
+  });
+  const payload = await resposta.json().catch(() => ({}));
+  if (!resposta.ok) {
+    const erro = new Error(payload.erro || 'Não foi possível concluir a operação.');
+    erro.codigo = payload.codigo;
+    throw erro;
+  }
+  return payload;
 }
 
 /* ============================================================
@@ -173,14 +182,15 @@ function RadarPulse({ ultimaColeta }) {
 }
 
 function Card({ children, style, onClick }) {
+  const usaPaddingPadrao = style?.padding == null;
   return (
-    <div onClick={onClick} style={{
+    <div className={usaPaddingPadrao ? 'or-card or-card-density' : 'or-card'} onClick={onClick} style={{
       background: T.surface, border: `1px solid ${T.line}`, borderRadius: 14,
       padding: 20, transition: 'border-color 160ms ease',
       cursor: onClick ? 'pointer' : 'default',
       ...style,
     }}
-      onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = 'rgba(245,166,35,0.35)'; }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = `${T.signal}59`; }}
       onMouseLeave={e => { if (onClick) e.currentTarget.style.borderColor = T.line; }}
     >
       {children}
@@ -229,7 +239,9 @@ function EmptyState({ icon: Icon, titulo, texto }) {
 }
 
 const inputStyle = {
-  background: T.surface2, color: T.ink, border: `1px solid ${T.line}`,
+  get background() { return T.surface2; },
+  get color() { return T.ink; },
+  get border() { return `1px solid ${T.line}`; },
   borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontFamily: T.fontBody, outline: 'none',
   boxSizing: 'border-box', maxWidth: '100%',
 };
@@ -271,8 +283,8 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
           return (
             <button key={nome} disabled={!disponivel} onClick={() => disponivel && onRegiao(nome)} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px',
-              background: ativo ? `${STEEL}22` : T.surface2, border: `1px solid ${ativo ? STEEL : T.line}`,
-              borderRadius: 10, color: ativo ? '#8FC2DF' : T.ink,
+              background: ativo ? `${T.steel}22` : T.surface2, border: `1px solid ${ativo ? T.steel : T.line}`,
+              borderRadius: 10, color: ativo ? T.steel : T.ink,
               cursor: disponivel ? 'pointer' : 'not-allowed', opacity: disponivel ? 1 : 0.35,
               fontFamily: T.fontBody, fontSize: 12, fontWeight: ativo ? 600 : 450, minWidth: 0,
             }} title={disponivel ? '' : 'Coleta ainda não iniciada nesta região'}>
@@ -309,7 +321,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
                 opacity: disponivel ? 1 : 0.35, fontFamily: T.fontBody,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 0,
               }} title={`${NOMES_UF[sigla]}${disponivel ? '' : ' — ainda sem dados coletados'}`} aria-label={`${NOMES_UF[sigla]}, ${fmtN(quantidade)} ${metrica}`}>
-                <MapPin size={12} style={{ color: ativo ? T.signal : STEEL, flexShrink: 0 }} />
+                <MapPin size={12} style={{ color: ativo ? T.signal : T.steel, flexShrink: 0 }} />
                 <strong style={{ fontSize: 12 }}>{sigla}</strong>
                 <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtN(quantidade)}</span>
               </button>
@@ -425,7 +437,7 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
                 return (
                   <div key={i} onClick={() => setSinalAberto(aberto ? null : i)} style={{
                     background: aberto ? T.surface2 : T.surface,
-                    border: `1px solid ${aberto ? 'rgba(245,166,35,0.3)' : T.line}`,
+                    border: `1px solid ${aberto ? `${T.signal}4D` : T.line}`,
                     borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
                     transition: 'border-color 140ms',
                   }}>
@@ -1128,7 +1140,7 @@ function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <input value={novo} onChange={e => setNovo(e.target.value)} onKeyDown={e => e.key === 'Enter' && adicionar()}
           placeholder="Nova ação — ex: ligar pra revenda X sobre a carreta parada há 40 dias…" style={{ ...inputStyle, flex: 1 }} />
-        <button onClick={adicionar} disabled={salvando} style={{ ...inputStyle, cursor: salvando ? 'wait' : 'pointer', background: T.signal, color: '#14171C', fontWeight: 600, border: 'none', display: 'flex', gap: 6, alignItems: 'center', opacity: salvando ? 0.6 : 1 }}>
+        <button onClick={adicionar} disabled={salvando} style={{ ...inputStyle, cursor: salvando ? 'wait' : 'pointer', background: T.signal, color: T.signalInk, fontWeight: 600, border: 'none', display: 'flex', gap: 6, alignItems: 'center', opacity: salvando ? 0.6 : 1 }}>
           <Plus size={14} /> Adicionar
         </button>
       </div>
@@ -1318,9 +1330,9 @@ function PageFipe() {
         </>
       )}
 
-      <Card style={{ marginTop: 22, background: 'rgba(91,138,166,0.07)', padding: 16 }}>
+      <Card style={{ marginTop: 22, background: `${T.steel}12`, padding: 16 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <ShieldCheck size={18} style={{ color: STEEL, flexShrink: 0, marginTop: 1 }} />
+          <ShieldCheck size={18} style={{ color: T.steel, flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontSize: 12, color: T.inkMuted, lineHeight: 1.65 }}>
             <strong style={{ color: T.ink }}>Leitura correta:</strong> a FIPE é uma referência nacional. Configuração, implementos, estado de conservação, região e condição comercial podem explicar diferenças. A comparação do radar usa somente anúncios vinculados à mesma versão e ao mesmo ano FIPE.
           </div>
@@ -1331,9 +1343,243 @@ function PageFipe() {
 }
 
 /* ============================================================
-   AJUSTES
+   ACESSO, CONTA E ESTOQUE PRÓPRIO
    ============================================================ */
-function PageAjustes() {
+function LoginScreen({ onLogin }) {
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  const entrar = async e => {
+    e.preventDefault();
+    setErro(''); setEnviando(true);
+    try {
+      const sessao = await apiPost('auth.php', { acao: 'login', email, senha });
+      onLogin(sessao);
+    } catch (falha) {
+      setErro(falha.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 20, background: `radial-gradient(circle at 72% 18%, ${T.signal}18, transparent 34%), ${T.bg}`, color: T.ink, fontFamily: T.fontBody }}>
+    <div style={{ width: 'min(100%, 430px)' }}>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 20 }}>OPER<span style={{ color: T.signal }}> RADAR</span></div>
+        <div style={{ color: T.inkMuted, fontSize: 12.5, marginTop: 5 }}>Inteligência de mercado para transporte pesado</div>
+      </div>
+      <Card style={{ padding: 26, boxShadow: T.shadow }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', background: `${T.signal}18`, color: T.signal, marginBottom: 18 }}><LockKeyhole size={20} /></div>
+        <h1 style={{ fontFamily: T.fontDisplay, fontSize: 23, margin: '0 0 7px' }}>Acesse sua área</h1>
+        <p style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.55, margin: '0 0 20px' }}>Dados de mercado, FIPE e seu estoque em um ambiente privado.</p>
+        <form onSubmit={entrar} style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+          <label style={{ fontSize: 12, color: T.inkMuted }}>E-mail
+            <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 6 }} placeholder="seu@email.com" />
+          </label>
+          <label style={{ fontSize: 12, color: T.inkMuted }}>Senha
+            <input type="password" autoComplete="current-password" required value={senha} onChange={e => setSenha(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 6 }} placeholder="Sua senha" />
+          </label>
+          {erro && <div role="alert" style={{ color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}30`, borderRadius: 9, padding: 10, fontSize: 12.5 }}>{erro}</div>}
+          <button disabled={enviando} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: enviando ? 'wait' : 'pointer' }}>{enviando ? 'Entrando…' : 'Entrar no radar'}</button>
+        </form>
+      </Card>
+      <div style={{ display: 'flex', gap: 7, alignItems: 'center', justifyContent: 'center', color: T.inkMuted, fontSize: 11.5, marginTop: 16 }}><ShieldCheck size={14} /> Sessão protegida e senha criptografada</div>
+    </div>
+  </div>;
+}
+
+function PageConta({ sessao, onSessao, onLogout }) {
+  const [nome, setNome] = useState(sessao.usuario.nome);
+  const [senhas, setSenhas] = useState({ atual: '', nova: '' });
+  const [aviso, setAviso] = useState(null);
+  const [salvando, setSalvando] = useState(false);
+
+  const salvarPerfil = async () => {
+    setSalvando(true); setAviso(null);
+    try {
+      const d = await apiPost('auth.php', { acao: 'perfil', nome }, sessao.csrf);
+      onSessao({ ...sessao, usuario: d.usuario, csrf: d.csrf });
+      setAviso({ ok: true, texto: 'Perfil atualizado.' });
+    } catch (e) { setAviso({ ok: false, texto: e.message }); }
+    finally { setSalvando(false); }
+  };
+  const trocarSenha = async () => {
+    setSalvando(true); setAviso(null);
+    try {
+      const d = await apiPost('auth.php', { acao: 'senha', senha_atual: senhas.atual, nova_senha: senhas.nova }, sessao.csrf);
+      onSessao({ ...sessao, csrf: d.csrf });
+      setSenhas({ atual: '', nova: '' });
+      setAviso({ ok: true, texto: 'Senha alterada com segurança.' });
+    } catch (e) { setAviso({ ok: false, texto: e.message }); }
+    finally { setSalvando(false); }
+  };
+
+  return <div style={{ maxWidth: 820 }}>
+    <SectionTitle sub="Seus dados, nível de acesso e segurança da conta">Área de membros</SectionTitle>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
+      <Card>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, display: 'grid', placeItems: 'center', background: `${T.signal}18`, color: T.signal }}><UserRound size={21} /></div>
+          <div><strong>{sessao.usuario.nome}</strong><div style={{ color: T.inkMuted, fontSize: 12 }}>{sessao.usuario.email}</div></div>
+          <Tag tone="sinal">{String(sessao.usuario.papel || 'membro').toUpperCase()}</Tag>
+        </div>
+        <label style={{ fontSize: 12, color: T.inkMuted }}>Nome
+          <input value={nome} onChange={e => setNome(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 6 }} />
+        </label>
+        <button onClick={salvarPerfil} disabled={salvando || nome.trim() === sessao.usuario.nome} style={{ ...inputStyle, marginTop: 12, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer' }}><Save size={15} style={{ verticalAlign: -3, marginRight: 6 }} />Salvar perfil</button>
+      </Card>
+      <Card>
+        <div style={{ display: 'flex', gap: 9, alignItems: 'center', marginBottom: 16 }}><LockKeyhole size={18} color={T.steel} /><strong>Alterar senha</strong></div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          <input type="password" autoComplete="current-password" value={senhas.atual} onChange={e => setSenhas(s => ({ ...s, atual: e.target.value }))} style={inputStyle} placeholder="Senha atual" />
+          <input type="password" autoComplete="new-password" value={senhas.nova} onChange={e => setSenhas(s => ({ ...s, nova: e.target.value }))} style={inputStyle} placeholder="Nova senha · mínimo 10 caracteres" />
+          <button onClick={trocarSenha} disabled={salvando || !senhas.atual || senhas.nova.length < 10} style={{ ...inputStyle, cursor: 'pointer', fontWeight: 650 }}>Atualizar senha</button>
+        </div>
+      </Card>
+    </div>
+    {aviso && <div style={{ color: aviso.ok ? T.positive : T.alert, fontSize: 12.5, marginTop: 12 }}>{aviso.texto}</div>}
+    <Card style={{ marginTop: 16, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+      <div><strong>Sessão atual</strong><div style={{ color: T.inkMuted, fontSize: 12, marginTop: 3 }}>Ao sair, será necessário informar a senha novamente.</div></div>
+      <button onClick={onLogout} style={{ ...inputStyle, color: T.alert, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><LogOut size={15} />Sair da conta</button>
+    </Card>
+  </div>;
+}
+
+const NOVO_VEICULO = { referencia_interna: '', marca: '', modelo: '', ano: '', preco_anunciado: '', cidade: '', uf: '', data_entrada: new Date().toISOString().slice(0, 10), status: 'estoque', fipe_preco_id: null };
+
+function PageMinhaLoja({ sessao }) {
+  const [itens, setItens] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+  const [formAberto, setFormAberto] = useState(false);
+  const [form, setForm] = useState(NOVO_VEICULO);
+  const [comparacao, setComparacao] = useState(null);
+  const [salvando, setSalvando] = useState(false);
+
+  const carregar = async () => {
+    setCarregando(true); setErro('');
+    try {
+      const r = await fetch(`${API_BASE_URL}/minha_loja.php`, { credentials: 'same-origin' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || 'Estoque indisponível.');
+      setItens(d.itens || []);
+    } catch (e) { setErro(e.message); }
+    finally { setCarregando(false); }
+  };
+  useEffect(() => { carregar(); }, []);
+
+  const comparar = async () => {
+    if (form.modelo.trim().length < 2) return null;
+    setComparacao({ carregando: true });
+    try {
+      const q = [form.marca, form.modelo, form.ano].filter(Boolean).join(' ');
+      const r = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=1`, { credentials: 'same-origin' });
+      const d = await r.json();
+      const item = d.itens?.[0] || null;
+      setComparacao(item || { vazio: true });
+      return item;
+    } catch { setComparacao({ vazio: true }); return null; }
+  };
+  const salvar = async () => {
+    if (form.modelo.trim().length < 2) { setErro('Informe o modelo do veículo.'); return; }
+    setSalvando(true); setErro('');
+    try {
+      const sugestao = comparacao && !comparacao.carregando && !comparacao.vazio ? comparacao : null;
+      await apiPost('minha_loja.php', { acao: 'criar', ...form, fipe_preco_id: sugestao?.id || null }, sessao.csrf);
+      setForm(NOVO_VEICULO); setComparacao(null); setFormAberto(false);
+      await carregar();
+    } catch (e) { setErro(e.message); }
+    finally { setSalvando(false); }
+  };
+  const excluir = async id => {
+    if (!window.confirm('Remover este veículo do seu estoque?')) return;
+    try { await apiPost('minha_loja.php', { acao: 'excluir', id }, sessao.csrf); setItens(v => v.filter(i => i.id !== id)); }
+    catch (e) { setErro(e.message); }
+  };
+  const alterarStatus = async (item, status) => {
+    const anterior = item.status;
+    setItens(lista => lista.map(i => i.id === item.id ? { ...i, status } : i));
+    try {
+      await apiPost('minha_loja.php', {
+        acao: 'atualizar', id: item.id, referencia_interna: item.referencia_interna,
+        marca: item.marca, modelo: item.modelo, ano: item.ano,
+        preco_anunciado: item.preco_anunciado, cidade: item.cidade, uf: item.uf,
+        data_entrada: item.data_entrada, status, fipe_preco_id: item.fipe_preco_id,
+      }, sessao.csrf);
+    } catch (e) {
+      setItens(lista => lista.map(i => i.id === item.id ? { ...i, status: anterior } : i));
+      setErro(e.message);
+    }
+  };
+
+  const ativos = itens.filter(i => i.status !== 'vendido');
+  const valor = ativos.reduce((s, i) => s + Number(i.preco_anunciado || 0), 0);
+  const mediaDias = ativos.length ? Math.round(ativos.reduce((s, i) => s + Number(i.dias_estoque || 0), 0) / ativos.length) : 0;
+  const vinculados = ativos.filter(i => i.fipe_preco_id).length;
+
+  return <div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <SectionTitle sub="Seu estoque como base privada de comparação com FIPE e mercado">Meu estoque</SectionTitle>
+      <button onClick={() => setFormAberto(v => !v)} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}>{formAberto ? <X size={16} /> : <Plus size={16} />}{formAberto ? 'Fechar' : 'Adicionar veículo'}</button>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10 }}>
+      <Kpi label="No estoque" value={fmtN(ativos.length)} sub="veículos próprios" />
+      <Kpi label="Valor anunciado" value={fmtBRL(valor)} sub="soma do estoque ativo" />
+      <Kpi label="Idade média" value={`${mediaDias}d`} sub="tempo em estoque" />
+      <Kpi label="Comparados" value={`${vinculados}/${ativos.length}`} sub="vínculo FIPE automático" tone={T.positive} />
+    </div>
+
+    {formAberto && <Card style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16 }}><Store size={18} color={T.signal} /><strong>Novo veículo</strong></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10 }}>
+        <input value={form.referencia_interna} onChange={e => setForm(f => ({ ...f, referencia_interna: e.target.value }))} style={inputStyle} placeholder="Referência interna" />
+        <input value={form.marca} onChange={e => { setForm(f => ({ ...f, marca: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Marca · ex: Scania" />
+        <input value={form.modelo} onChange={e => { setForm(f => ({ ...f, modelo: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Modelo · ex: R450" />
+        <input type="number" min="1950" max="2030" value={form.ano} onChange={e => { setForm(f => ({ ...f, ano: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Ano" />
+        <input type="number" min="0" step="1000" value={form.preco_anunciado} onChange={e => setForm(f => ({ ...f, preco_anunciado: e.target.value }))} style={inputStyle} placeholder="Preço anunciado" />
+        <input value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} style={inputStyle} placeholder="Cidade" />
+        <select value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={inputStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
+        <input type="date" value={form.data_entrada} onChange={e => setForm(f => ({ ...f, data_entrada: e.target.value }))} style={inputStyle} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 13 }}>
+        <button onClick={comparar} disabled={form.modelo.trim().length < 2} style={{ ...inputStyle, cursor: 'pointer' }}><Search size={15} style={{ verticalAlign: -3, marginRight: 6 }} />Comparar com FIPE</button>
+        <button onClick={salvar} disabled={salvando} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer' }}>{salvando ? 'Salvando…' : 'Salvar no estoque'}</button>
+      </div>
+      {comparacao?.carregando && <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 12 }}>Procurando a melhor referência…</div>}
+      {comparacao?.vazio && <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 12 }}>Nenhuma referência segura encontrada. O veículo pode ser salvo sem vínculo.</div>}
+      {comparacao?.id && <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: `${T.positive}0F`, border: `1px solid ${T.positive}2A`, fontSize: 12.5 }}><strong style={{ color: T.positive }}>Referência encontrada:</strong> {comparacao.marca} {comparacao.modelo} · {comparacao.ano} · FIPE {fmtBRL(comparacao.preco_fipe)} · mercado {fmtBRL(comparacao.preco_medio_mercado)}</div>}
+    </Card>}
+
+    {erro && <div role="alert" style={{ color: T.alert, fontSize: 12.5, marginTop: 12 }}>{erro}</div>}
+    <SectionTitle sub="Preço próprio versus referência e anúncios ativos equivalentes">Comparativo da loja</SectionTitle>
+    {carregando ? <Card><span style={{ color: T.inkMuted }}>Carregando seu estoque…</span></Card> : itens.length === 0 ? <EmptyState icon={Store} titulo="Seu estoque começa aqui" texto="Adicione os veículos da sua loja para comparar preço, idade e posicionamento contra a FIPE e o mercado monitorado." /> :
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: 11 }}>
+        {itens.map(item => {
+          const mercado = Number(item.preco_medio_mercado || 0);
+          const preco = Number(item.preco_anunciado || 0);
+          const delta = mercado && preco ? Math.round((preco / mercado - 1) * 100) : null;
+          return <Card key={item.id} style={{ padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><select aria-label="Status do veículo" value={item.status} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select><button aria-label="Excluir veículo" onClick={() => excluir(item.id)} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
+            <div style={{ fontFamily: T.fontDisplay, fontSize: 16, fontWeight: 650, marginTop: 12 }}>{[item.marca, item.modelo].filter(Boolean).join(' ')}</div>
+            <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.ano || 'Ano não informado'} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias</div>
+            <div style={{ fontFamily: T.fontMono, fontSize: 19, fontWeight: 650, marginTop: 15 }}>{fmtBRL(item.preco_anunciado)}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>FIPE</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_fipe)}</div></div>
+              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>Mercado</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_medio_mercado)}</div></div>
+            </div>
+            <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{delta == null ? 'Aguardando comparação compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da média · ${fmtN(item.anuncios_ativos)} anúncios comparáveis`}</div>
+          </Card>;
+        })}
+      </div>}
+  </div>;
+}
+
+/* ============================================================
+   CONFIGURAÇÕES
+   ============================================================ */
+function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvido }) {
   const { data: fipeStatus, erro: fipeErro } = useApi('fipe_status.php');
   const { data: facetas } = useApi('facetas.php?status=ativo');
   const ufsAtivas = Object.entries(facetas?.por_uf || {}).filter(([, n]) => n > 0).map(([uf]) => uf).sort();
@@ -1345,6 +1591,32 @@ function PageAjustes() {
     ? Math.min(100, Math.round((Number(fipeStatus.vinculados_ativos || 0) / Number(fipeStatus.elegiveis)) * 100)) : 0;
   return (
     <div style={{ maxWidth: 980 }}>
+      <SectionTitle sub="Tema, densidade e conforto de uso — preferências salvas neste navegador">Aparência</SectionTitle>
+      <Card>
+        <div style={{ fontSize: 12, color: T.inkMuted, marginBottom: 12 }}>TEMA</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: 9 }}>
+          {[
+            { id: 'auto', label: 'Automático', description: 'Segue o aparelho', icon: Monitor, colors: ['#0B0E13', '#FFFFFF', '#5B8AA6'] },
+            { ...THEMES.radar, icon: Radar, colors: [THEMES.radar.tokens.bg, THEMES.radar.tokens.surface, THEMES.radar.tokens.signal] },
+            { ...THEMES.dark, icon: Moon, colors: [THEMES.dark.tokens.bg, THEMES.dark.tokens.surface, THEMES.dark.tokens.signal] },
+            { ...THEMES.white, icon: Sun, colors: [THEMES.white.tokens.bg, THEMES.white.tokens.surface, THEMES.white.tokens.signal] },
+          ].map(opcao => {
+            const ativo = preferencias.theme === opcao.id;
+            const Icon = opcao.icon;
+            return <button key={opcao.id} onClick={() => onPreferencias({ theme: opcao.id })} style={{ textAlign: 'left', padding: 13, borderRadius: 11, border: `1px solid ${ativo ? T.signal : T.line}`, background: ativo ? `${T.signal}10` : T.surface2, color: T.ink, cursor: 'pointer', fontFamily: T.fontBody }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}><Icon size={17} color={ativo ? T.signal : T.inkMuted} /><div style={{ display: 'flex' }}>{opcao.colors.map((c, i) => <span key={i} style={{ width: 15, height: 15, borderRadius: '50%', background: c, marginLeft: -3, border: `1px solid ${T.lineStrong}` }} />)}</div></div>
+              <div style={{ fontWeight: 650, fontSize: 13, marginTop: 10 }}>{opcao.label}</div><div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 3 }}>{opcao.description}</div>
+            </button>;
+          })}
+        </div>
+        <div style={{ fontSize: 12, color: T.inkMuted, margin: '18px 0 9px' }}>PRÓXIMOS TEMAS</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{COMING_THEMES.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${T.line}`, background: T.surface2, borderRadius: 9, padding: '8px 10px', color: T.inkMuted, fontSize: 11.5 }}><Palette size={14} />{t.label}<Tag tone="neutro">EM BREVE</Tag></div>)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: 14, marginTop: 20, paddingTop: 18, borderTop: `1px solid ${T.line}` }}>
+          <div><div style={{ fontSize: 12, color: T.inkMuted, marginBottom: 8 }}>DENSIDADE</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{[['compact','Compacta'],['standard','Padrão'],['comfortable','Confortável']].map(([id,label]) => <button key={id} onClick={() => onPreferencias({ density: id })} style={{ ...inputStyle, cursor: 'pointer', color: preferencias.density === id ? T.signal : T.ink, borderColor: preferencias.density === id ? T.signal : T.line }}>{label}</button>)}</div></div>
+          <div><div style={{ fontSize: 12, color: T.inkMuted, marginBottom: 8 }}>MOVIMENTO</div><button onClick={() => onPreferencias({ reduceMotion: !preferencias.reduceMotion })} style={{ ...inputStyle, cursor: 'pointer', width: '100%', textAlign: 'left', color: preferencias.reduceMotion ? T.positive : T.ink }}>{preferencias.reduceMotion ? '✓ Animações reduzidas' : 'Animações normais'}</button></div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 16 }}><span style={{ color: T.inkMuted, fontSize: 11.5 }}>Tema ativo: {THEMES[temaResolvido]?.label || temaResolvido}</span><button onClick={onReset} style={{ ...inputStyle, cursor: 'pointer' }}><RotateCcw size={14} style={{ verticalAlign: -3, marginRight: 6 }} />Restaurar padrão</button></div>
+      </Card>
       <SectionTitle sub="Saúde operacional, cobertura e frequência da varredura">Radar</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
       <Card>
@@ -1516,7 +1788,7 @@ function PageAnalise() {
           <SectionTitle sub="Insights cruzados calculados a partir dos dados reais desta semana">Descobertas do dia</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
             {ins.descobertas.map((d, i) => {
-              const cores = { conversao: T.positive, concentracao: T.signal, movimento: T.alert, faixa: STEEL };
+              const cores = { conversao: T.positive, concentracao: T.signal, movimento: T.alert, faixa: T.steel };
               const c = cores[d.tipo] || T.signal;
               return (
                 <Card key={i} style={{ padding: 16, borderLeft: `2px solid ${c}` }}>
@@ -1590,8 +1862,8 @@ function PageAnalise() {
           {msgs.map((m, i) => (
             <div key={i} style={{
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%',
-              background: m.role === 'user' ? 'rgba(245,166,35,0.12)' : T.surface2,
-              border: `1px solid ${m.role === 'user' ? 'rgba(245,166,35,0.25)' : T.line}`,
+              background: m.role === 'user' ? `${T.signal}1F` : T.surface2,
+              border: `1px solid ${m.role === 'user' ? `${T.signal}40` : T.line}`,
               borderRadius: 12, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap',
             }}>{m.content}</div>
           ))}
@@ -1608,7 +1880,7 @@ function PageAnalise() {
           <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviar()}
             placeholder="Pergunte ao analista — ex: onde devo focar as vendas esta semana?" style={{ ...inputStyle, flex: 1 }} />
           <button onClick={enviar} disabled={pensando} style={{
-            ...inputStyle, cursor: 'pointer', background: T.signal, color: '#14171C',
+            ...inputStyle, cursor: 'pointer', background: T.signal, color: T.signalInk,
             fontWeight: 600, border: 'none', opacity: pensando ? 0.6 : 1,
           }}>Enviar</button>
         </div>
@@ -1623,17 +1895,19 @@ function PageAnalise() {
 const NAV = [
   { id: 'hoje', rotulo: 'Hoje', icone: Radar },
   { id: 'mercado', rotulo: 'Mercado', icone: LayoutGrid },
+  { id: 'minha-loja', rotulo: 'Minha Loja', icone: Store },
   { id: 'fipe', rotulo: 'FIPE', icone: Search },
   { id: 'oportunidades', rotulo: 'Oportunidades', icone: Crosshair },
   { id: 'concorrentes', rotulo: 'Concorrentes', icone: Building2 },
   { id: 'analise', rotulo: 'Análise', icone: Gauge },
   { id: 'acoes', rotulo: 'Ações', icone: ListChecks },
-  { id: 'ajustes', rotulo: 'Ajustes', icone: Settings },
+  { id: 'ajustes', rotulo: 'Configurações', icone: Settings },
+  { id: 'conta', rotulo: 'Minha conta', icone: UserRound },
 ];
-const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'oportunidades', 'concorrentes'].includes(item.id));
-const NAV_MOBILE_MAIS = NAV.filter(item => ['fipe', 'analise', 'acoes', 'ajustes'].includes(item.id));
+const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'minha-loja', 'oportunidades'].includes(item.id));
+const NAV_MOBILE_MAIS = NAV.filter(item => ['fipe', 'concorrentes', 'analise', 'acoes', 'ajustes', 'conta'].includes(item.id));
 
-export default function App() {
+function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
   const [pagina, setPagina] = useState('hoje');
   const [menuAberto, setMenuAberto] = useState(false);
   const [acoes, setAcoes] = useState(() => {
@@ -1679,12 +1953,14 @@ export default function App() {
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} />,
     mercado: <PageMercado />,
+    'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrentes />,
     analise: <PageAnalise />,
     acoes: <PageAcoes acoes={acoes} onAdicionar={adicionarAcao} onAlternar={alternarAcao} salvando={false} />,
-    ajustes: <PageAjustes />,
+    ajustes: <PageConfiguracoes preferencias={preferencias} onPreferencias={onPreferencias} onReset={onReset} temaResolvido={temaResolvido} />,
+    conta: <PageConta sessao={sessao} onSessao={onSessao} onLogout={onLogout} />,
   };
 
   const tituloPagina = NAV.find(n => n.id === pagina)?.rotulo || '';
@@ -1707,7 +1983,7 @@ export default function App() {
               return (
                 <button key={item.id} onClick={() => setPagina(item.id)} style={{
                   display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px',
-                  background: ativo ? 'rgba(245,166,35,0.10)' : 'transparent',
+                  background: ativo ? `${T.signal}1A` : 'transparent',
                   border: 'none', borderRadius: 9, cursor: 'pointer',
                   color: ativo ? T.signal : T.inkMuted, fontSize: 13.5, fontWeight: ativo ? 600 : 450,
                   fontFamily: T.fontBody, transition: 'color 140ms, background 140ms', textAlign: 'left',
@@ -1718,8 +1994,12 @@ export default function App() {
               );
             })}
           </nav>
-          <div style={{ marginTop: 'auto', fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted, padding: '0 10px', lineHeight: 1.6 }}>
-            AGÊNCIA OPER<br />inteligência de mercado<br />transporte pesado
+          <div style={{ marginTop: 'auto' }}>
+            <button onClick={() => setPagina('conta')} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px', borderRadius: 9, background: pagina === 'conta' ? `${T.signal}12` : 'transparent', border: 'none', color: T.ink, textAlign: 'left', cursor: 'pointer', fontFamily: T.fontBody }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: T.surface2, color: T.signal }}><UserRound size={15} /></span>
+              <span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sessao.usuario.nome}</strong><small style={{ color: T.inkMuted, fontSize: 9.5 }}>{sessao.usuario.papel}</small></span>
+            </button>
+            <div style={{ fontFamily: T.fontMono, fontSize: 9, color: T.inkMuted, padding: '10px', lineHeight: 1.55 }}>AGÊNCIA OPER · inteligência de mercado</div>
           </div>
         </aside>
       )}
@@ -1743,18 +2023,18 @@ export default function App() {
       {mobile && (
         <>
         {menuAberto && <>
-          <div onClick={() => setMenuAberto(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.48)', zIndex: 48 }} />
-          <div style={{ position: 'fixed', left: 10, right: 10, bottom: 'calc(72px + env(safe-area-inset-bottom))', zIndex: 49, background: T.surface, border: `1px solid ${T.line}`, borderRadius: 16, padding: 10, boxShadow: '0 20px 60px rgba(0,0,0,.45)' }}>
+          <div onClick={() => setMenuAberto(false)} style={{ position: 'fixed', inset: 0, background: T.overlay, zIndex: 48 }} />
+          <div style={{ position: 'fixed', left: 10, right: 10, bottom: 'calc(72px + env(safe-area-inset-bottom))', zIndex: 49, background: T.surface, border: `1px solid ${T.line}`, borderRadius: 16, padding: 10, boxShadow: T.shadow }}>
             {NAV_MOBILE_MAIS.map(item => <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} style={{
               width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-              background: pagina === item.id ? 'rgba(245,166,35,0.10)' : 'transparent', border: 'none', borderRadius: 10,
+              background: pagina === item.id ? `${T.signal}1A` : 'transparent', border: 'none', borderRadius: 10,
               color: pagina === item.id ? T.signal : T.ink, fontFamily: T.fontBody, fontSize: 14, cursor: 'pointer', textAlign: 'left',
             }}><item.icone size={18} /> {item.rotulo}{item.id === 'acoes' && acoesPendentes > 0 && <Tag tone="sinal">{acoesPendentes} PENDENTES</Tag>}</button>)}
           </div>
         </>}
         <nav style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex',
-          background: 'rgba(11,14,19,0.94)', backdropFilter: 'blur(14px)',
+          background: T.nav, backdropFilter: 'blur(14px)',
           borderTop: `1px solid ${T.line}`, padding: '7px 4px calc(7px + env(safe-area-inset-bottom))', zIndex: 50,
         }}>
           {NAV_MOBILE_PRINCIPAL.map(item => {
@@ -1779,4 +2059,45 @@ export default function App() {
       )}
     </div>
   );
+}
+
+export default function App() {
+  const [preferencias, setPreferencias] = useState(loadUiPreferences);
+  const [sistemaEscuro, setSistemaEscuro] = useState(() => typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const [sessao, setSessao] = useState(null);
+  const [checandoSessao, setChecandoSessao] = useState(true);
+  const temaResolvido = resolveTheme(preferencias.theme, sistemaEscuro);
+  activateTheme(temaResolvido);
+
+  useEffect(() => {
+    applyUiPreferences(preferencias, temaResolvido);
+    saveUiPreferences(preferencias);
+  }, [preferencias, temaResolvido]);
+
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const atualiza = e => setSistemaEscuro(e.matches);
+    media.addEventListener?.('change', atualiza);
+    return () => media.removeEventListener?.('change', atualiza);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/auth.php`, { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(setSessao)
+      .catch(() => setSessao({ autenticado: false, erro: true }))
+      .finally(() => setChecandoSessao(false));
+  }, []);
+
+  const alterarPreferencias = patch => setPreferencias(atual => ({ ...atual, ...patch }));
+  const resetarPreferencias = () => setPreferencias({ ...DEFAULT_UI_PREFERENCES });
+  const sair = async () => {
+    try { await apiPost('auth.php', { acao: 'logout' }, sessao?.csrf); } catch {}
+    setSessao({ autenticado: false });
+  };
+
+  if (checandoSessao) return <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', background: T.bg, color: T.inkMuted, fontFamily: T.fontMono, fontSize: 12 }}>INICIANDO RADAR…</div>;
+  if (!sessao?.autenticado) return <LoginScreen onLogin={setSessao} />;
+  return <RadarApp sessao={sessao} onSessao={setSessao} onLogout={sair} preferencias={preferencias} onPreferencias={alterarPreferencias} onReset={resetarPreferencias} temaResolvido={temaResolvido} />;
 }
