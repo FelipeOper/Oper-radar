@@ -65,6 +65,10 @@ const CATEGORIAS = {
   'pecas':          { label: 'Pecas e acessorios',           icone: '🔧', cor: '#B98CE0' },
   'outros':         { label: 'Outros',                       icone: '🌀', cor: '#6B7280' },
 };
+const ROTULOS_CATEGORIA_FILTRO = {
+  caminhoes: 'Caminhões', implementos: 'Implementos', onibus_vans: 'Ônibus e vans',
+  leves: 'Leves', agricolas: 'Agrícolas', construcao: 'Construção', pecas: 'Peças', outros: 'Outros',
+};
 
 // De qual categoria e cada tipo. Fonte: consulta ao banco pro93061_radar_oper em 08/jul.
 const TIPO_PARA_CATEGORIA = {
@@ -227,9 +231,12 @@ function EmptyState({ icon: Icon, titulo, texto }) {
 const inputStyle = {
   background: T.surface2, color: T.ink, border: `1px solid ${T.line}`,
   borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontFamily: T.fontBody, outline: 'none',
+  boxSizing: 'border-box', maxWidth: '100%',
 };
 
-const chipLinhaStyle = { display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8 };
+const filtroGridRegiaoStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 122px), 1fr))', gap: 7 };
+const filtroGridUfStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 92px), 1fr))', gap: 7 };
+const filtroGridSegmentoStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 138px), 1fr))', gap: 7 };
 const rotuloFiltroStyle = { fontSize: 10.5, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.06em' };
 
 function ufsDoContexto(regiao, uf) {
@@ -253,7 +260,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
   return (
     <Card style={{ padding: 14, marginBottom: 12 }}>
       <div style={rotuloFiltroStyle}>1. REGIÃO</div>
-      <div style={chipLinhaStyle}>
+      <div style={filtroGridRegiaoStyle}>
         {['todas', ...Object.keys(REGIOES_UFS)].map(nome => {
           const dados = nome === 'todas' ? null : facetas?.regioes?.[nome];
           const quantidade = nome === 'todas'
@@ -263,11 +270,11 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
           const ativo = regiao === nome;
           return (
             <button key={nome} disabled={!disponivel} onClick={() => disponivel && onRegiao(nome)} style={{
-              display: 'flex', alignItems: 'center', gap: 6, minHeight: 38, padding: '7px 12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px',
               background: ativo ? `${STEEL}22` : T.surface2, border: `1px solid ${ativo ? STEEL : T.line}`,
-              borderRadius: 999, color: ativo ? '#8FC2DF' : T.ink, whiteSpace: 'nowrap',
+              borderRadius: 10, color: ativo ? '#8FC2DF' : T.ink,
               cursor: disponivel ? 'pointer' : 'not-allowed', opacity: disponivel ? 1 : 0.35,
-              fontFamily: T.fontBody, fontSize: 12, fontWeight: ativo ? 600 : 450,
+              fontFamily: T.fontBody, fontSize: 12, fontWeight: ativo ? 600 : 450, minWidth: 0,
             }} title={disponivel ? '' : 'Coleta ainda não iniciada nesta região'}>
               <MapPin size={12} /> {nome === 'todas' ? 'Brasil' : nome}
               <span style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 10 }}>{fmtN(quantidade || 0)}</span>
@@ -280,13 +287,14 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
       {regiao === 'todas' ? (
         <div style={{ color: T.inkMuted, fontSize: 12.5, padding: '8px 2px' }}>Escolha uma região para ver seus estados.</div>
       ) : (
-        <div style={chipLinhaStyle}>
+        <div style={filtroGridUfStyle}>
           <button onClick={() => onUf('todas')} style={{
-            minHeight: 38, padding: '7px 12px', borderRadius: 999, cursor: 'pointer',
+            minHeight: 40, padding: '7px 9px', borderRadius: 10, cursor: 'pointer',
             background: uf === 'todas' ? `${T.signal}20` : T.surface2,
             border: `1px solid ${uf === 'todas' ? T.signal : T.line}`,
-            color: uf === 'todas' ? T.signal : T.ink, whiteSpace: 'nowrap',
-          }}>Toda a região</button>
+            color: uf === 'todas' ? T.signal : T.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            fontFamily: T.fontBody, fontWeight: uf === 'todas' ? 600 : 450,
+          }}><LayoutGrid size={12} /> Todos</button>
           {(REGIOES_UFS[regiao] || []).map(sigla => {
             const dados = facetas?.ufs?.[sigla];
             const quantidade = Number(dados?.[metrica] || 0);
@@ -294,13 +302,16 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
             const ativo = uf === sigla;
             return (
               <button key={sigla} disabled={!disponivel} onClick={() => disponivel && onUf(sigla)} style={{
-                minHeight: 38, padding: '7px 12px', borderRadius: 999,
+                minHeight: 40, padding: '7px 9px', borderRadius: 10,
                 background: ativo ? `${T.signal}20` : T.surface2,
                 border: `1px solid ${ativo ? T.signal : T.line}`,
                 color: ativo ? T.signal : T.ink, cursor: disponivel ? 'pointer' : 'not-allowed',
-                opacity: disponivel ? 1 : 0.35, whiteSpace: 'nowrap', fontFamily: T.fontBody,
-              }} title={disponivel ? '' : 'Estado ainda sem dados coletados'}>
-                {dados?.nome || NOMES_UF[sigla]} <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 10 }}>{sigla} · {fmtN(quantidade)}</span>
+                opacity: disponivel ? 1 : 0.35, fontFamily: T.fontBody,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 0,
+              }} title={`${NOMES_UF[sigla]}${disponivel ? '' : ' — ainda sem dados coletados'}`} aria-label={`${NOMES_UF[sigla]}, ${fmtN(quantidade)} ${metrica}`}>
+                <MapPin size={12} style={{ color: ativo ? T.signal : STEEL, flexShrink: 0 }} />
+                <strong style={{ fontSize: 12 }}>{sigla}</strong>
+                <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtN(quantidade)}</span>
               </button>
             );
           })}
@@ -629,22 +640,23 @@ function PageMercado() {
         onUf={valor => { setUf(valor); setCidade('todas'); setRevendaId('todas'); }} />
 
       <div style={rotuloFiltroStyle}>3. SEGMENTO</div>
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, marginBottom: 4 }}>
+      <div style={{ ...filtroGridSegmentoStyle, marginBottom: 14 }}>
         {chipsCategorias.map(cat => {
-          const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
+          const info = cat === 'todas' ? { label: 'Todos', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
+          const rotulo = cat === 'todas' ? info.label : ROTULOS_CATEGORIA_FILTRO[cat];
           const ativa = categoria === cat;
           const n = cat === 'todas' ? totalGeral : (catCounts[cat] || 0);
           return (
             <button key={cat} onClick={() => { setCategoria(cat); setTipo('todos'); }} style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px', minWidth: 0,
               background: ativa ? `${info.cor}22` : T.surface,
               border: `1px solid ${ativa ? info.cor : T.line}`,
-              borderRadius: 999, cursor: 'pointer', fontSize: 12.5, fontFamily: T.fontBody,
-              color: ativa ? info.cor : T.ink, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
+              borderRadius: 10, cursor: 'pointer', fontSize: 12, fontFamily: T.fontBody,
+              color: ativa ? info.cor : T.ink, fontWeight: ativa ? 600 : 400,
               transition: 'all 140ms',
             }}>
-              <span>{info.icone}</span><span>{info.label}</span>
-              <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>{fmtN(n)}</span>
+              <span>{info.icone}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{rotulo}</span>
+              <span style={{ fontFamily: T.fontMono, fontSize: 9.5, color: T.inkMuted }}>{fmtN(n)}</span>
             </button>
           );
         })}
@@ -657,7 +669,7 @@ function PageMercado() {
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar veículo, marca ou modelo..."
             style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
         </div>
-        <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
+        <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, flex: '1 1 190px' }}>
           <option value="aleatorio">Amostra do mercado</option>
           <option value="recente">Mais recentes</option>
           <option value="preco_asc">Menor preço</option>
@@ -665,7 +677,7 @@ function PageMercado() {
           <option value="mais_tempo">Há mais tempo no ar</option>
         </select>
         <button onClick={() => setMaisFiltros(!maisFiltros)} style={{
-          ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center',
+          ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', flex: '0 1 auto',
           borderColor: filtrosAtivos ? T.signal : T.line, color: filtrosAtivos ? T.signal : T.ink,
         }}>
           Filtros{filtrosAtivos ? ` · ${filtrosAtivos}` : ''} {maisFiltros ? '▴' : '▾'}
@@ -947,25 +959,26 @@ function PageConcorrentes() {
         onUf={valor => { setUf(valor); setCidade('todas'); }} />
 
       {/* Chips de categorias — quais lojistas atuam em cada segmento */}
-      <div style={{ marginBottom: 4 }}>
+      <div style={{ marginBottom: 14 }}>
         <div style={rotuloFiltroStyle}>3. SEGMENTO DE ATUAÇÃO</div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8 }}>
+        <div style={filtroGridSegmentoStyle}>
           {chipsCategorias.map(cat => {
             const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
+            const rotulo = cat === 'todas' ? info.label : ROTULOS_CATEGORIA_FILTRO[cat];
             const ativa = categoria === cat;
             const n = cat === 'todas' ? lojistasComCat.length : (contCat[cat] || 0);
             return (
               <button key={cat} onClick={() => setCategoria(cat)} style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px', minWidth: 0,
                 background: ativa ? `${info.cor}22` : T.surface,
                 border: `1px solid ${ativa ? info.cor : T.line}`,
-                borderRadius: 999, cursor: 'pointer', fontSize: 12, fontFamily: T.fontBody,
-                color: ativa ? info.cor : T.ink, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
+                borderRadius: 10, cursor: 'pointer', fontSize: 12, fontFamily: T.fontBody,
+                color: ativa ? info.cor : T.ink, fontWeight: ativa ? 600 : 400,
                 transition: 'all 140ms',
               }}>
                 <span>{info.icone}</span>
-                <span>{info.label}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{fmtN(n)}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{rotulo}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 9.5, color: T.inkMuted }}>{fmtN(n)}</span>
               </button>
             );
           })}
@@ -975,20 +988,20 @@ function PageConcorrentes() {
       {/* Cidades aparecem apenas depois do estado: hierarquia previsivel no mobile. */}
       <div style={{ marginBottom: 14 }}>
         <div style={rotuloFiltroStyle}>4. CIDADE</div>
-        {uf === 'todas' ? <div style={{ color: T.inkMuted, fontSize: 12.5, padding: '7px 2px' }}>Escolha um estado para filtrar por cidade.</div> : <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {uf === 'todas' ? <div style={{ color: T.inkMuted, fontSize: 12.5, padding: '7px 2px' }}>Escolha um estado para filtrar por cidade.</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 128px), 1fr))', gap: 7 }}>
           <button onClick={() => setCidade('todas')} style={{
-            padding: '5px 10px', background: cidade === 'todas' ? `${T.signal}22` : T.surface,
-            border: `1px solid ${cidade === 'todas' ? T.signal : T.line}`, borderRadius: 999,
+            minHeight: 38, padding: '6px 9px', background: cidade === 'todas' ? `${T.signal}22` : T.surface,
+            border: `1px solid ${cidade === 'todas' ? T.signal : T.line}`, borderRadius: 10,
             cursor: 'pointer', fontSize: 11.5, color: cidade === 'todas' ? T.signal : T.ink,
             fontWeight: cidade === 'todas' ? 600 : 400,
           }}>Todas ({fmtN(lojistasComCat.length)})</button>
           {cidadesTop.map(c => (
             <button key={c} onClick={() => setCidade(c)} style={{
-              padding: '5px 10px', background: cidade === c ? `${T.signal}22` : T.surface,
-              border: `1px solid ${cidade === c ? T.signal : T.line}`, borderRadius: 999,
+              minHeight: 38, padding: '6px 9px', background: cidade === c ? `${T.signal}22` : T.surface,
+              border: `1px solid ${cidade === c ? T.signal : T.line}`, borderRadius: 10,
               cursor: 'pointer', fontSize: 11.5, color: cidade === c ? T.signal : T.ink,
-              fontWeight: cidade === c ? 600 : 400,
-            }}>{c} <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{contCidade[c]}</span></button>
+              fontWeight: cidade === c ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }} title={c}>{c} <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{contCidade[c]}</span></button>
           ))}
         </div>}
       </div>
@@ -1000,7 +1013,7 @@ function PageConcorrentes() {
           <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar revenda..." style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
         </div>
-        <select value={ordem} onChange={e => setOrdem(e.target.value)} style={inputStyle}>
+        <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, flex: '1 1 210px' }}>
           <option value="ativos">Mais anuncios ativos</option>
           <option value="saidas_30d">Mais saídas (30d)</option>
           <option value="saidas">Mais saídas (total)</option>
