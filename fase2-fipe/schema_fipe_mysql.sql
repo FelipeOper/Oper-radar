@@ -19,10 +19,14 @@ CREATE TABLE fipe_preco (
     codigo_fipe     VARCHAR(12),
     preco           DECIMAL(12,2),
     mes_referencia  VARCHAR(40),
+    referencia_codigo INT NULL,
     atualizado_em   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_fipe_preco (fipe_modelo_id, ano_codigo),
     CONSTRAINT fk_preco_modelo FOREIGN KEY (fipe_modelo_id) REFERENCES fipe_modelo(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_fipe_preco_referencia
+    ON fipe_preco (referencia_codigo, atualizado_em);
 
 -- Vínculo anúncio -> preço FIPE (com nível de confiança do match automático)
 ALTER TABLE anuncio
