@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Radar, LayoutGrid, Crosshair, Building2, Settings, ListChecks,
-  MapPin, Truck, Clock, ExternalLink, Search, ChevronRight, Menu, X,
+  MapPin, ExternalLink, Search,
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
-  Timer, Flame, PackageOpen, Zap, Gauge
+  Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 
 /* ============================================================
@@ -30,13 +30,21 @@ const T = {
 const API_BASE_URL = 'https://agenciaoper.com.br/oper-radar-api';
 
 /* ---------- dados de referência ---------- */
-const STATE_DATA = [
-  ['SP', 'São Paulo', 409], ['PR', 'Paraná', 364], ['SC', 'Santa Catarina', 182], ['MG', 'Minas Gerais', 163],
-  ['RS', 'Rio Grande do Sul', 146], ['GO', 'Goiás', 88], ['MT', 'Mato Grosso', 87], ['MS', 'Mato Grosso do Sul', 46],
-  ['ES', 'Espírito Santo', 20], ['RJ', 'Rio de Janeiro', 11], ['BA', 'Bahia', 8], ['CE', 'Ceará', 8], ['TO', 'Tocantins', 8],
-  ['PE', 'Pernambuco', 6], ['DF', 'Distrito Federal', 5], ['PA', 'Pará', 5], ['RN', 'Rio Grande do Norte', 3],
-  ['PB', 'Paraíba', 2], ['PI', 'Piauí', 2], ['RO', 'Rondônia', 2], ['SE', 'Sergipe', 2]
-];
+const REGIOES_UFS = {
+  Sul: ['PR', 'SC', 'RS'],
+  Sudeste: ['SP', 'RJ', 'MG', 'ES'],
+  'Centro-Oeste': ['MT', 'MS', 'GO', 'DF'],
+  Nordeste: ['BA', 'PE', 'CE', 'MA', 'PB', 'RN', 'AL', 'PI', 'SE'],
+  Norte: ['AM', 'PA', 'RO', 'RR', 'AC', 'AP', 'TO'],
+};
+const NOMES_UF = {
+  AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará',
+  DF: 'Distrito Federal', ES: 'Espírito Santo', GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso',
+  MS: 'Mato Grosso do Sul', MG: 'Minas Gerais', PA: 'Pará', PB: 'Paraíba', PR: 'Paraná',
+  PE: 'Pernambuco', PI: 'Piauí', RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte',
+  RS: 'Rio Grande do Sul', RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo',
+  SE: 'Sergipe', TO: 'Tocantins',
+};
 
 const STATUS_DB_PARA_UI = {
   ativo: 'ativo',
@@ -95,6 +103,7 @@ function mapeiaAnuncioReal(a) {
     precoFipe: a.preco_fipe ?? null,
     desvioFipePct: a.desvio_fipe_pct ?? null,
     fipeConfianca: a.fipe_match_confianca ?? null,
+    revendaId: a.revenda_id ?? null,
     revenda: a.revenda,
     cidade: a.cidade,
     uf: a.uf,
@@ -114,10 +123,13 @@ function useApi(path) {
   const [data, setData] = useState(null);
   const [erro, setErro] = useState(false);
   useEffect(() => {
-    fetch(`${API_BASE_URL}/${path}`)
+    const controller = new AbortController();
+    setErro(false);
+    fetch(`${API_BASE_URL}/${path}`, { signal: controller.signal })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(setData)
-      .catch(() => setErro(true));
+      .catch(e => { if (e.name !== 'AbortError') setErro(true); });
+    return () => controller.abort();
   }, [path]);
   return { data, erro };
 }
@@ -217,6 +229,87 @@ const inputStyle = {
   borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontFamily: T.fontBody, outline: 'none',
 };
 
+const chipLinhaStyle = { display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8 };
+const rotuloFiltroStyle = { fontSize: 10.5, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.06em' };
+
+function ufsDoContexto(regiao, uf) {
+  if (uf !== 'todas') return [uf];
+  if (regiao !== 'todas') return REGIOES_UFS[regiao] || [];
+  return Object.values(REGIOES_UFS).flat();
+}
+
+function somaPorUfs(facetas, regiao, uf, campo) {
+  if (!facetas) return {};
+  if (regiao === 'todas' && uf === 'todas' && campo === 'categorias') return facetas.categorias || {};
+  return ufsDoContexto(regiao, uf).reduce((acc, sigla) => {
+    Object.entries(facetas.ufs?.[sigla]?.[campo] || {}).forEach(([chave, valor]) => {
+      acc[chave] = (acc[chave] || 0) + Number(valor || 0);
+    });
+    return acc;
+  }, {});
+}
+
+function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anuncios' }) {
+  return (
+    <Card style={{ padding: 14, marginBottom: 12 }}>
+      <div style={rotuloFiltroStyle}>1. REGIÃO</div>
+      <div style={chipLinhaStyle}>
+        {['todas', ...Object.keys(REGIOES_UFS)].map(nome => {
+          const dados = nome === 'todas' ? null : facetas?.regioes?.[nome];
+          const quantidade = nome === 'todas'
+            ? (metrica === 'revendas' ? Object.values(facetas?.revendas_por_uf || {}).reduce((a, b) => a + Number(b), 0) : facetas?.total_geral)
+            : dados?.[metrica];
+          const disponivel = nome === 'todas' || Number(quantidade || 0) > 0;
+          const ativo = regiao === nome;
+          return (
+            <button key={nome} disabled={!disponivel} onClick={() => disponivel && onRegiao(nome)} style={{
+              display: 'flex', alignItems: 'center', gap: 6, minHeight: 38, padding: '7px 12px',
+              background: ativo ? `${STEEL}22` : T.surface2, border: `1px solid ${ativo ? STEEL : T.line}`,
+              borderRadius: 999, color: ativo ? '#8FC2DF' : T.ink, whiteSpace: 'nowrap',
+              cursor: disponivel ? 'pointer' : 'not-allowed', opacity: disponivel ? 1 : 0.35,
+              fontFamily: T.fontBody, fontSize: 12, fontWeight: ativo ? 600 : 450,
+            }} title={disponivel ? '' : 'Coleta ainda não iniciada nesta região'}>
+              <MapPin size={12} /> {nome === 'todas' ? 'Brasil' : nome}
+              <span style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 10 }}>{fmtN(quantidade || 0)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ ...rotuloFiltroStyle, marginTop: 10 }}>2. ESTADO</div>
+      {regiao === 'todas' ? (
+        <div style={{ color: T.inkMuted, fontSize: 12.5, padding: '8px 2px' }}>Escolha uma região para ver seus estados.</div>
+      ) : (
+        <div style={chipLinhaStyle}>
+          <button onClick={() => onUf('todas')} style={{
+            minHeight: 38, padding: '7px 12px', borderRadius: 999, cursor: 'pointer',
+            background: uf === 'todas' ? `${T.signal}20` : T.surface2,
+            border: `1px solid ${uf === 'todas' ? T.signal : T.line}`,
+            color: uf === 'todas' ? T.signal : T.ink, whiteSpace: 'nowrap',
+          }}>Toda a região</button>
+          {(REGIOES_UFS[regiao] || []).map(sigla => {
+            const dados = facetas?.ufs?.[sigla];
+            const quantidade = Number(dados?.[metrica] || 0);
+            const disponivel = quantidade > 0;
+            const ativo = uf === sigla;
+            return (
+              <button key={sigla} disabled={!disponivel} onClick={() => disponivel && onUf(sigla)} style={{
+                minHeight: 38, padding: '7px 12px', borderRadius: 999,
+                background: ativo ? `${T.signal}20` : T.surface2,
+                border: `1px solid ${ativo ? T.signal : T.line}`,
+                color: ativo ? T.signal : T.ink, cursor: disponivel ? 'pointer' : 'not-allowed',
+                opacity: disponivel ? 1 : 0.35, whiteSpace: 'nowrap', fontFamily: T.fontBody,
+              }} title={disponivel ? '' : 'Estado ainda sem dados coletados'}>
+                {dados?.nome || NOMES_UF[sigla]} <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 10 }}>{sigla} · {fmtN(quantidade)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /* ============================================================
    HOJE — feed compacto + KPIs de mercado
    ============================================================ */
@@ -286,21 +379,24 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
     verificacao: { icone: Timer,        cor: T.alert,    rotulo: 'VERIFICAR' },
     saida:       { icone: CheckCircle2, cor: T.positive, rotulo: 'SAIU' },
   };
+  const cobertura = kpis?.ufs_ativas?.length
+    ? `${kpis.ufs_ativas.length} UFs · ${kpis.regioes_ativas?.length || 0} regiões`
+    : usandoReais ? `${Object.keys(facetas?.por_uf || {}).length || 1} UFs` : 'conectando…';
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 22 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 22 }}>
         <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'}
-          sub={usandoReais ? `${Object.keys(facetas?.por_uf || {}).length || 1} UFs · 2×/dia` : 'conectando…'} />
+          sub={`${cobertura} · 2×/dia`} />
         <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />
         <Kpi label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · ausência confirmada" tone={T.positive} />
         <KpiEntradaSaida
-          entrou={sinais.filter(s => s.tipo === 'novo').length}
-          saiu={sinais.filter(s => s.tipo === 'verificacao' || s.tipo === 'saida').length}
+          entrou={kpis?.entradas_48h ?? sinais.filter(s => s.tipo === 'novo').length}
+          saiu={kpis?.saidas_48h ?? sinais.filter(s => s.tipo === 'saida').length}
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1.1fr) 1.4fr', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 430px), 1fr))', gap: 16, alignItems: 'start' }}>
 
         {/* COLUNA ESQUERDA: feed compacto */}
         <div>
@@ -345,7 +441,7 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
         </div>
 
         {/* COLUNA DIREITA: KPIs de mercado */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: 12 }}>
           <PainelKpi titulo="Modelos mais anunciados" subtitulo="Volume ativo · preço médio de mercado"
             dados={stats?.top_modelos}
             renderItem={(m, i) => (
@@ -405,8 +501,9 @@ function PageMercado() {
   const [tipo, setTipo] = useState('todos');
   const [status, setStatus] = useState('ativo');
   const [regiao, setRegiao] = useState('todas');
+  const [uf, setUf] = useState('todas');
   const [cidade, setCidade] = useState('todas');
-  const [revenda, setRevenda] = useState('todas');
+  const [revendaId, setRevendaId] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
   const [ordem, setOrdem] = useState('aleatorio');
@@ -434,17 +531,18 @@ function PageMercado() {
   const queryBase = useMemo(() => {
     const p = new URLSearchParams();
     if (categoria !== 'todas') p.set('categoria', categoria);
-    if (regiao !== 'todas') p.set('regiao', regiao);
+    if (uf !== 'todas') p.set('uf', uf);
+    else if (regiao !== 'todas') p.set('regiao', regiao);
     if (tipo !== 'todos') p.set('tipo', tipo);
     if (statusDb !== 'todos') p.set('status', statusDb);
     if (cidade !== 'todas') p.set('cidade', cidade);
-    if (revenda !== 'todas') p.set('revenda', revenda);
+    if (revendaId !== 'todas') p.set('revenda_id', revendaId);
     if (precoMin) p.set('preco_min', precoMin);
     if (precoMax) p.set('preco_max', precoMax);
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [categoria, regiao, tipo, statusDb, cidade, revenda, precoMin, precoMax, qDebounced, ordem]);
+  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, qDebounced, ordem]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
@@ -504,20 +602,33 @@ function PageMercado() {
     return () => observer.disconnect();
   }, [queryBase, anuncios.length, carregando, fim]);
 
-  const catCounts = facetas?.categorias || {};
-  const totalGeral = facetas?.total_geral ?? 0;
-  const cidades = ['todas', ...(facetas?.cidades || []).map(c => c.cidade)];
-  const revendas = ['todas', ...(facetas?.revendas || []).map(r => r.nome)];
-  const subtipos = categoria === 'todas'
-    ? []
-    : (facetas?.subtipos?.[categoria] || []);
+  const catCounts = useMemo(() => somaPorUfs(facetas, regiao, uf, 'categorias'), [facetas, regiao, uf]);
+  const totalGeral = regiao === 'todas' && uf === 'todas'
+    ? (facetas?.total_geral ?? 0)
+    : ufsDoContexto(regiao, uf).reduce((n, sigla) => n + Number(facetas?.ufs?.[sigla]?.anuncios || 0), 0);
+  const cidades = uf === 'todas' ? [] : (facetas?.ufs?.[uf]?.cidades || []);
+  const revendas = uf === 'todas' ? [] : (facetas?.ufs?.[uf]?.lojistas || []);
+  const tiposContexto = useMemo(() => somaPorUfs(facetas, regiao, uf, 'tipos'), [facetas, regiao, uf]);
+  const subtipos = categoria === 'todas' ? [] : Object.entries(tiposContexto)
+    .filter(([nome]) => categoriaDe(nome) === categoria)
+    .map(([nome, n]) => ({ tipo: nome, n }))
+    .sort((a, b) => b.n - a.n);
 
   const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'ativo',
-    cidade !== 'todas', revenda !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
+    regiao !== 'todas', uf !== 'todas', cidade !== 'todas', revendaId !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
   const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
+  const limparFiltros = () => {
+    setQ(''); setCategoria('todas'); setTipo('todos'); setStatus('ativo'); setRegiao('todas');
+    setUf('todas'); setCidade('todas'); setRevendaId('todas'); setPrecoMin(''); setPrecoMax(''); setOrdem('aleatorio');
+  };
 
   return (
     <div>
+      <SeletorGeografico facetas={facetas} regiao={regiao} uf={uf}
+        onRegiao={valor => { setRegiao(valor); setUf('todas'); setCidade('todas'); setRevendaId('todas'); }}
+        onUf={valor => { setUf(valor); setCidade('todas'); setRevendaId('todas'); }} />
+
+      <div style={rotuloFiltroStyle}>3. SEGMENTO</div>
       <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, marginBottom: 4 }}>
         {chipsCategorias.map(cat => {
           const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
@@ -539,33 +650,7 @@ function PageMercado() {
         })}
       </div>
 
-      {/* Chips de regiao — so aparecem regioes que ja tem dados coletados */}
-      {facetas?.regioes && (
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, marginBottom: 4 }}>
-          {['todas', ...Object.keys(facetas.regioes)].map(rg => {
-            const dados = rg === 'todas' ? null : facetas.regioes[rg];
-            const temDados = rg === 'todas' || (dados && dados.anuncios > 0);
-            const ativa = regiao === rg;
-            const n = rg === 'todas' ? totalGeral : (dados?.anuncios || 0);
-            return (
-              <button key={rg} onClick={() => temDados && setRegiao(rg)} disabled={!temDados} style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px',
-                background: ativa ? `${STEEL}22` : T.surface,
-                border: `1px solid ${ativa ? STEEL : T.line}`,
-                borderRadius: 999, cursor: temDados ? 'pointer' : 'not-allowed',
-                fontSize: 12, fontFamily: T.fontBody,
-                color: ativa ? STEEL : (temDados ? T.ink : T.inkMuted),
-                opacity: temDados ? 1 : 0.4, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
-              }} title={temDados ? '' : 'Regiao ainda nao coletada'}>
-                <MapPin size={11} />
-                <span>{rg === 'todas' ? 'Brasil' : rg}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{fmtN(n)}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
+      <div style={{ ...rotuloFiltroStyle, marginTop: 2 }}>4. BUSCA E ORDENAÇÃO</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
@@ -585,6 +670,9 @@ function PageMercado() {
         }}>
           Filtros{filtrosAtivos ? ` · ${filtrosAtivos}` : ''} {maisFiltros ? '▴' : '▾'}
         </button>
+        {filtrosAtivos > 0 && <button onClick={limparFiltros} style={{ ...inputStyle, cursor: 'pointer', color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <RotateCcw size={13} /> Limpar
+        </button>}
       </div>
 
       {maisFiltros && (
@@ -599,11 +687,13 @@ function PageMercado() {
             <option value="saida_detectada">Saídas detectadas</option>
             <option value="todos">Todos (histórico)</option>
           </select>
-          <select value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle}>
-            {cidades.map(c => <option key={c} value={c}>{c === 'todas' ? 'Todas as cidades' : c}</option>)}
+          <select value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+            <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as cidades de ${uf}`}</option>
+            {cidades.map(c => <option key={`${c.uf}-${c.cidade}`} value={c.cidade}>{c.cidade} ({fmtN(c.n)})</option>)}
           </select>
-          <select value={revenda} onChange={e => setRevenda(e.target.value)} style={inputStyle}>
-            {revendas.map(r => <option key={r} value={r}>{r === 'todas' ? 'Todas as revendas' : r}</option>)}
+          <select value={revendaId} onChange={e => setRevendaId(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+            <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as revendas de ${uf}`}</option>
+            {revendas.map(r => <option key={r.id} value={String(r.id)}>{r.nome} · {r.cidade} ({fmtN(r.n)})</option>)}
           </select>
           <input type="number" value={precoMin} onChange={e => setPrecoMin(e.target.value)} placeholder="Preço mín. (R$)" style={inputStyle} />
           <input type="number" value={precoMax} onChange={e => setPrecoMax(e.target.value)} placeholder="Preço máx. (R$)" style={inputStyle} />
@@ -635,7 +725,7 @@ function PageMercado() {
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
               <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
                 <MapPin size={11} />
-                <button onClick={() => { setRevenda(a.revenda); document.getElementById('app-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                <button onClick={() => { setRegiao(facetas?.ufs?.[a.uf]?.regiao || regiao); setUf(a.uf); setCidade('todas'); setRevendaId(String(a.revendaId)); setMaisFiltros(true); document.getElementById('app-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   style={{ background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', padding: 0, fontSize: 12,
                            textDecoration: 'underline', textDecorationColor: 'transparent' }}
                   onMouseEnter={e => e.currentTarget.style.textDecorationColor = T.signal}
@@ -649,7 +739,7 @@ function PageMercado() {
                   <div style={{ fontSize: 11, marginTop: 2, color: a.precoFipe ? (a.preco < a.precoFipe ? T.positive : T.inkMuted) : T.inkMuted }}>
                     {a.precoFipe
                       ? `FIPE ${fmtBRL(a.precoFipe)} · ${a.preco < a.precoFipe ? '▼' : '▲'} ${Math.abs(Math.round((a.preco - a.precoFipe) / a.precoFipe * 100))}%`
-                      : 'vs FIPE: aguardando Fase 2'}
+                      : 'FIPE ainda não vinculada'}
                   </div>
                 </div>
                 {a.url && <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal"><ExternalLink size={15} /></a>}
@@ -679,15 +769,21 @@ function PageMercado() {
    OPORTUNIDADES — onde há dinheiro na mesa
    ============================================================ */
 function PageOportunidades({ onCriarAcao }) {
+  const [regiao, setRegiao] = useState('todas');
+  const [uf, setUf] = useState('todas');
+  const { data: facetas } = useApi('facetas.php?status=ativo');
+  const escopo = uf !== 'todas' ? `&uf=${uf}` : regiao !== 'todas' ? `&regiao=${encodeURIComponent(regiao)}` : '';
   // Busca no servidor os anuncios ativos ha mais tempo — nao depende do que o Mercado carregou
-  const { data, erro } = useApi('anuncios.php?status=ativo&ordem=mais_tempo&limit=40');
+  const { data, erro } = useApi(`anuncios.php?status=ativo&ordem=mais_tempo&limit=40${escopo}`);
   const lista = useMemo(() => (data?.anuncios || []).map(mapeiaAnuncioReal), [data]);
   const maduros = lista.filter(a => a.dias >= 30).slice(0, 15);
-  const { data: fipeData, erro: fipeErro } = useApi('anuncios.php?status=ativo&abaixo_fipe=1&ordem=desvio_fipe&limit=20');
+  const { data: fipeData, erro: fipeErro } = useApi(`anuncios.php?status=ativo&abaixo_fipe=1&ordem=desvio_fipe&limit=20${escopo}`);
   const abaixoFipe = useMemo(() => (fipeData?.anuncios || []).map(mapeiaAnuncioReal), [fipeData]);
 
   return (
     <div>
+      <SeletorGeografico facetas={facetas} regiao={regiao} uf={uf}
+        onRegiao={valor => { setRegiao(valor); setUf('todas'); }} onUf={setUf} />
       <SectionTitle sub="Anúncio parado há 30+ dias: o vendedor tende a aceitar negociação — oportunidade de compra abaixo do anunciado">
         Anúncios maduros no mercado
       </SectionTitle>
@@ -759,12 +855,12 @@ function PageOportunidades({ onCriarAcao }) {
 /* ============================================================
    CONCORRENTES — quem sao os players + metricas de giro
    ============================================================ */
-const REGIOES_UI = ['Sul', 'Sudeste', 'Centro-Oeste', 'Nordeste', 'Norte'];
-
 function PageConcorrentes() {
   const [regiao, setRegiao] = useState('todas');
+  const [uf, setUf] = useState('todas');
   const { data: facetas } = useApi('facetas.php');
-  const urlLojistas = regiao === 'todas' ? 'lojistas.php' : `lojistas.php?regiao=${encodeURIComponent(regiao)}`;
+  const urlLojistas = uf !== 'todas' ? `lojistas.php?uf=${uf}`
+    : regiao === 'todas' ? 'lojistas.php' : `lojistas.php?regiao=${encodeURIComponent(regiao)}`;
   const { data, erro } = useApi(urlLojistas);
   const [q, setQ] = useState('');
   const [categoria, setCategoria] = useState('todas');
@@ -824,7 +920,7 @@ function PageConcorrentes() {
     return [...lista].sort(ordens[ordem]);
   }, [lojistasComCat, categoria, cidade, q, ordem]);
 
-  useEffect(() => { setMostrados(48); }, [categoria, cidade, q, ordem]);
+  useEffect(() => { setMostrados(48); }, [regiao, uf, categoria, cidade, q, ordem]);
 
   useEffect(() => {
     const root = document.getElementById('app-scroll-container');
@@ -846,36 +942,13 @@ function PageConcorrentes() {
 
   return (
     <div>
-      {/* Chips de regiao — refiltram os lojistas por regiao do Brasil */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.05em' }}>REGIAO DO BRASIL</div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8 }}>
-          {['todas', ...REGIOES_UI].map(rg => {
-            const dados = rg === 'todas' ? null : facetas?.regioes?.[rg];
-            const temDados = rg === 'todas' || (dados && dados.revendas > 0);
-            const ativa = regiao === rg;
-            const n = rg === 'todas' ? '' : (dados?.revendas || 0);
-            return (
-              <button key={rg} onClick={() => temDados && setRegiao(rg)} disabled={!temDados} style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                background: ativa ? `${STEEL}22` : T.surface,
-                border: `1px solid ${ativa ? STEEL : T.line}`, borderRadius: 999,
-                cursor: temDados ? 'pointer' : 'not-allowed', fontSize: 12, fontFamily: T.fontBody,
-                color: ativa ? STEEL : (temDados ? T.ink : T.inkMuted),
-                opacity: temDados ? 1 : 0.4, whiteSpace: 'nowrap', fontWeight: ativa ? 600 : 400,
-              }} title={temDados ? '' : 'Regiao ainda nao coletada'}>
-                <MapPin size={11} />
-                <span>{rg === 'todas' ? 'Brasil inteiro' : rg}</span>
-                {n !== '' && <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{fmtN(n)}</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <SeletorGeografico facetas={facetas} regiao={regiao} uf={uf} metrica="revendas"
+        onRegiao={valor => { setRegiao(valor); setUf('todas'); setCidade('todas'); }}
+        onUf={valor => { setUf(valor); setCidade('todas'); }} />
 
       {/* Chips de categorias — quais lojistas atuam em cada segmento */}
       <div style={{ marginBottom: 4 }}>
-        <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.05em' }}>SEGMENTO DE ATUACAO</div>
+        <div style={rotuloFiltroStyle}>3. SEGMENTO DE ATUAÇÃO</div>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8 }}>
           {chipsCategorias.map(cat => {
             const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
@@ -899,10 +972,10 @@ function PageConcorrentes() {
         </div>
       </div>
 
-      {/* Chips de cidade — top 8 regioes com mais lojistas */}
+      {/* Cidades aparecem apenas depois do estado: hierarquia previsivel no mobile. */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 6, fontFamily: T.fontMono, letterSpacing: '0.05em' }}>REGIAO</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={rotuloFiltroStyle}>4. CIDADE</div>
+        {uf === 'todas' ? <div style={{ color: T.inkMuted, fontSize: 12.5, padding: '7px 2px' }}>Escolha um estado para filtrar por cidade.</div> : <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button onClick={() => setCidade('todas')} style={{
             padding: '5px 10px', background: cidade === 'todas' ? `${T.signal}22` : T.surface,
             border: `1px solid ${cidade === 'todas' ? T.signal : T.line}`, borderRadius: 999,
@@ -917,10 +990,11 @@ function PageConcorrentes() {
               fontWeight: cidade === c ? 600 : 400,
             }}>{c} <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>{contCidade[c]}</span></button>
           ))}
-        </div>
+        </div>}
       </div>
 
       {/* Busca + ordenacao */}
+      <div style={rotuloFiltroStyle}>5. BUSCA E ORDENAÇÃO</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
@@ -936,10 +1010,10 @@ function PageConcorrentes() {
       </div>
 
       <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, margin: '2px 2px 14px' }}>
-        {data ? `${fmtN(filtrados.length)} REVENDAS · ${regiao === 'todas' ? 'BRASIL' : regiao.toUpperCase()}` : erro ? 'API INDISPONIVEL' : 'CARREGANDO...'}
+        {data ? `${fmtN(filtrados.length)} REVENDAS · ${uf !== 'todas' ? `${NOMES_UF[uf]} / ${regiao}` : regiao === 'todas' ? 'BRASIL' : regiao}`.toUpperCase() : erro ? 'API INDISPONÍVEL' : 'CARREGANDO...'}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
         {filtrados.slice(0, mostrados).map((l, i) => (
           <Card key={l.id} style={{ padding: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -1014,7 +1088,7 @@ function PageConcorrentes() {
       )}
 
       {!data && !erro && <EmptyState icon={Building2} titulo="Carregando concorrentes..." texto="Buscando a lista de revendas monitoradas na API." />}
-      {erro && <EmptyState icon={Building2} titulo="API indisponivel" texto={`Nao foi possivel buscar os lojistas em ${API_BASE_URL}. Confirme se a API esta publicada.`} />}
+      {erro && <EmptyState icon={Building2} titulo="API indisponível" texto="Não foi possível carregar as revendas agora. Tente novamente em instantes." />}
     </div>
   );
 }
@@ -1022,12 +1096,11 @@ function PageConcorrentes() {
 /* ============================================================
    AÇÕES — o insight vira tarefa rastreável
    ============================================================ */
-function PageAcoes({ acoes, setAcoes }) {
+function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
   const [novo, setNovo] = useState('');
-  const alternar = id => setAcoes(acoes.map(a => a.id === id ? { ...a, feita: !a.feita } : a));
-  const adicionar = () => {
+  const adicionar = async () => {
     if (!novo.trim()) return;
-    setAcoes([{ id: Date.now(), texto: novo.trim(), feita: false, criadaEm: new Date().toISOString() }, ...acoes]);
+    await onAdicionar(novo.trim(), 'manual');
     setNovo('');
   };
   const pendentes = acoes.filter(a => !a.feita);
@@ -1037,12 +1110,12 @@ function PageAcoes({ acoes, setAcoes }) {
     <div>
       <div style={{ fontSize: 13, color: T.inkMuted, lineHeight: 1.6, maxWidth: 640, marginBottom: 20 }}>
         Dado de mercado diz <em>o que</em> fazer; esta lista registra <em>se foi feito</em>. Crie ações a partir das
-        Oportunidades (botão "Criar ação") ou manualmente aqui — e marque quando executar.
+        Oportunidades (botão "Criar ação") ou manualmente aqui. As ações ficam salvas com privacidade neste navegador.
       </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <input value={novo} onChange={e => setNovo(e.target.value)} onKeyDown={e => e.key === 'Enter' && adicionar()}
           placeholder="Nova ação — ex: ligar pra revenda X sobre a carreta parada há 40 dias…" style={{ ...inputStyle, flex: 1 }} />
-        <button onClick={adicionar} style={{ ...inputStyle, cursor: 'pointer', background: T.signal, color: '#14171C', fontWeight: 600, border: 'none', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button onClick={adicionar} disabled={salvando} style={{ ...inputStyle, cursor: salvando ? 'wait' : 'pointer', background: T.signal, color: '#14171C', fontWeight: 600, border: 'none', display: 'flex', gap: 6, alignItems: 'center', opacity: salvando ? 0.6 : 1 }}>
           <Plus size={14} /> Adicionar
         </button>
       </div>
@@ -1055,7 +1128,7 @@ function PageAcoes({ acoes, setAcoes }) {
       {pendentes.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
           {pendentes.map(a => (
-            <Card key={a.id} onClick={() => alternar(a.id)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
+            <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
               <Circle size={17} style={{ color: T.inkMuted, flexShrink: 0 }} />
               <span style={{ fontSize: 14, flex: 1 }}>{a.texto}</span>
               <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>
@@ -1071,7 +1144,7 @@ function PageAcoes({ acoes, setAcoes }) {
           <SectionTitle>Concluídas</SectionTitle>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {feitas.map(a => (
-              <Card key={a.id} onClick={() => alternar(a.id)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center', opacity: 0.55 }}>
+              <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center', opacity: 0.55 }}>
                 <CheckCircle2 size={17} style={{ color: T.positive, flexShrink: 0 }} />
                 <span style={{ fontSize: 14, flex: 1, textDecoration: 'line-through' }}>{a.texto}</span>
               </Card>
@@ -1087,25 +1160,19 @@ function PageAcoes({ acoes, setAcoes }) {
    AJUSTES
    ============================================================ */
 function PageAjustes() {
-  const [papel, setPapel] = useState('Admin');
   const { data: fipeStatus, erro: fipeErro } = useApi('fipe_status.php');
   const { data: facetas } = useApi('facetas.php?status=ativo');
   const ufsAtivas = Object.entries(facetas?.por_uf || {}).filter(([, n]) => n > 0).map(([uf]) => uf).sort();
   const regioesAtivas = Object.values(facetas?.regioes || {}).filter(r => r.anuncios > 0).length;
-  const cobertura = STATE_DATA.map(([uf, nome, estimado]) => {
-    const coletado = facetas?.revendas_por_uf?.[uf] || 0;
-    return { name: uf, nome, qtd: coletado || estimado, coletado, coletando: coletado > 0 };
-  });
-  const papeis = ['Admin', 'Gestor', 'Analista', 'Visualizador'];
-  const permissoes = {
-    Admin: ['Tudo: coleta, usuários, exportação, configuração'],
-    Gestor: ['Vê tudo · cria ações · exporta relatórios'],
-    Analista: ['Vê mercado e oportunidades · cria ações'],
-    Visualizador: ['Somente leitura do painel Hoje'],
-  };
+  const cobertura = Object.entries(NOMES_UF).map(([uf, nome]) => ({
+    name: uf, nome, qtd: Number(facetas?.revendas_por_uf?.[uf] || 0),
+  })).filter(item => item.qtd > 0).sort((a, b) => b.qtd - a.qtd);
+  const progressoFipe = fipeStatus?.elegiveis
+    ? Math.min(100, Math.round((Number(fipeStatus.vinculados_ativos || 0) / Number(fipeStatus.elegiveis)) * 100)) : 0;
   return (
-    <div style={{ maxWidth: 640 }}>
-      <SectionTitle sub="Estados e frequência da varredura">Coleta</SectionTitle>
+    <div style={{ maxWidth: 980 }}>
+      <SectionTitle sub="Saúde operacional, cobertura e frequência da varredura">Radar</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
       <Card>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13.5 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1116,7 +1183,7 @@ function PageAjustes() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: T.inkMuted }}>Frequência</span>
-            <span style={{ fontFamily: T.fontMono }}>07h · 19h (2×/dia)</span>
+            <span style={{ fontFamily: T.fontMono }}>07h/19h · expansão 07h30/19h30</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: T.inkMuted }}>Regra de saída</span>
@@ -1124,6 +1191,15 @@ function PageAjustes() {
           </div>
         </div>
       </Card>
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: T.positive, marginBottom: 14 }}>
+          <ShieldCheck size={18} /><strong>Leitura dos dados</strong>
+        </div>
+        <div style={{ color: T.inkMuted, fontSize: 12.5, lineHeight: 1.6 }}>
+          “Saída” significa que o anúncio deixou o portal após duas varreduras. É um sinal de mercado, não uma venda comprovada. O giro amadurece após 14 dias de histórico.
+        </div>
+      </Card>
+      </div>
 
       <SectionTitle sub="Cobertura e saúde do vínculo com a referência de caminhões">FIPE</SectionTitle>
       <Card>
@@ -1149,41 +1225,46 @@ function PageAjustes() {
               <span style={{ color: T.inkMuted }}>Preços em cache</span>
               <span style={{ fontFamily: T.fontMono }}>{fmtN(fipeStatus.precos_cache)}</span>
             </div>
+            <div style={{ height: 8, borderRadius: 99, background: T.surface2, overflow: 'hidden' }}>
+              <div style={{ width: `${progressoFipe}%`, height: '100%', background: T.positive, borderRadius: 99 }} />
+            </div>
+            <div style={{ color: T.inkMuted, fontSize: 11.5 }}>{progressoFipe}% dos caminhões elegíveis vinculados · referência {fipeStatus.referencia_mais_recente || '—'}</div>
           </div>
         )}
       </Card>
 
-      <SectionTitle sub="O que cada papel pode ver e fazer">Papéis de acesso</SectionTitle>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        {papeis.map(p => (
-          <button key={p} onClick={() => setPapel(p)} style={{
-            ...inputStyle, cursor: 'pointer', padding: '8px 14px',
-            background: papel === p ? T.signal : T.surface2,
-            color: papel === p ? '#14171C' : T.ink,
-            fontWeight: papel === p ? 600 : 400, border: 'none',
-          }}>{p}</button>
-        ))}
+      <SectionTitle sub={`${ufsAtivas.length} UFs com dados · ${regioesAtivas} regiões ativas · somente coleta real`}>Cobertura nacional</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12, marginBottom: 12 }}>
+        {Object.entries(REGIOES_UFS).map(([nome, ufs]) => {
+          const dados = facetas?.regioes?.[nome];
+          return <Card key={nome} style={{ padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+              <strong>{nome}</strong><Tag tone={dados?.anuncios > 0 ? 'positivo' : 'neutro'}>{fmtN(dados?.anuncios || 0)} ANÚNCIOS</Tag>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {ufs.map(sigla => <span key={sigla} style={{
+                padding: '4px 7px', borderRadius: 6, fontFamily: T.fontMono, fontSize: 10.5,
+                color: facetas?.ufs?.[sigla]?.anuncios > 0 ? T.positive : T.inkMuted,
+                background: facetas?.ufs?.[sigla]?.anuncios > 0 ? `${T.positive}12` : T.surface2,
+              }}>{sigla} · {fmtN(facetas?.ufs?.[sigla]?.revendas || 0)} lojas</span>)}
+            </div>
+          </Card>;
+        })}
       </div>
-      <Card><div style={{ fontSize: 13.5, color: T.inkMuted }}>{permissoes[papel]}</div></Card>
-
-      <SectionTitle sub={`${ufsAtivas.length} UFs com dados · ${regioesAtivas} regiões ativas · verde indica coleta iniciada`}>Cobertura nacional</SectionTitle>
-      <Card style={{ height: 300 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={cobertura} margin={{ left: -22, top: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: T.inkMuted, fontSize: 10, fontFamily: T.fontMono }} axisLine={{ stroke: T.line }} tickLine={false} />
-            <YAxis tick={{ fill: T.inkMuted, fontSize: 10, fontFamily: T.fontMono }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 10, color: T.ink, fontSize: 12 }}
-              formatter={(v, name, props) => [props.payload.coletando ? `${props.payload.coletado} revendas coletadas` : `${v} revendas estimadas · na fila`, props.payload.nome]}
-            />
-            <Bar dataKey="qtd" radius={[3, 3, 0, 0]}
-              shape={(props) => {
-                const { x, y, width, height, payload } = props;
-                return <rect x={x} y={y} width={width} height={height} rx={3} fill={payload.coletando ? T.positive : 'rgba(138,148,166,0.3)'} />;
-              }}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+      <Card style={{ padding: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))', gap: 12, alignItems: 'end' }}>
+          {cobertura.map(item => {
+            const max = Math.max(1, ...cobertura.map(c => c.qtd));
+            return <div key={item.name} title={`${item.nome}: ${item.qtd} revendas coletadas`} style={{ minWidth: 0 }}>
+              <div style={{ height: 96, display: 'flex', alignItems: 'flex-end', background: T.surface2, borderRadius: 7, overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: `${Math.max(5, item.qtd / max * 100)}%`, background: `linear-gradient(180deg, ${T.positive}, #23865A)`, borderRadius: '6px 6px 0 0' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4, marginTop: 6, fontFamily: T.fontMono, fontSize: 10.5 }}>
+                <span>{item.name}</span><span style={{ color: T.inkMuted }}>{fmtN(item.qtd)}</span>
+              </div>
+            </div>;
+          })}
+        </div>
       </Card>
     </div>
   );
@@ -1206,6 +1287,7 @@ function BarraH({ rotulo, valor, max, cor }) {
 
 function PageAnalise() {
   const { data: ins, erro } = useApi('insights.php');
+  const { data: analistaStatus } = useApi('analista_status.php');
   const [msgs, setMsgs] = useState([]);
   const [input, setInput] = useState('');
   const [pensando, setPensando] = useState(false);
@@ -1242,6 +1324,19 @@ function PageAnalise() {
       {!ins && !erro && <EmptyState icon={Gauge} titulo="Calculando insights…" texto="Agregando os dados reais da coleta." />}
       {erro && <EmptyState icon={Gauge} titulo="API indisponível" texto={`Não foi possível buscar ${API_BASE_URL}/insights.php — confirme se o arquivo foi publicado.`} />}
 
+      {ins && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 14 }}>
+          <Kpi label="FIPE vinculados" value={fmtN(ins.fipe?.vinculados || 0)} sub="ativos com preço comparável" />
+          <Kpi label="Abaixo da FIPE" value={fmtN(ins.fipe?.abaixo_fipe || 0)} sub="candidatos para validação" tone={T.positive} />
+          <Kpi label="Desvio médio FIPE" value={ins.fipe?.desvio_medio_pct == null ? '—' : `${ins.fipe.desvio_medio_pct.toLocaleString('pt-BR')}%`} sub="anúncio vs referência" />
+          <Kpi label="Atualizado" value={ins.gerado_em ? new Date(ins.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'} sub="leitura calculada agora" />
+        </div>
+      )}
+
+      {ins?.parciais_indisponiveis?.length > 0 && <Card style={{ padding: 12, marginBottom: 12, color: T.inkMuted, fontSize: 12 }}>
+        Parte da análise está em atualização: {ins.parciais_indisponiveis.join(', ')}. Os demais blocos continuam válidos.
+      </Card>}
+
       {ins && ins.descobertas && ins.descobertas.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           <SectionTitle sub="Insights cruzados calculados a partir dos dados reais desta semana">Descobertas do dia</SectionTitle>
@@ -1261,11 +1356,11 @@ function PageAnalise() {
       )}
 
       {ins && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
           <Card>
             <SectionTitle sub="Onde a oferta se concentra">Marcas com mais anúncios</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {ins.por_marca.slice(0, 8).map(m => (
+              {(ins.por_marca || []).slice(0, 8).map(m => (
                 <BarraH key={m.marca} rotulo={m.marca} valor={m.anuncios} max={ins.por_marca[0]?.anuncios || 1} />
               ))}
             </div>
@@ -1273,19 +1368,19 @@ function PageAnalise() {
           <Card>
             <SectionTitle sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {ins.por_cidade.slice(0, 8).map(c => (
-                <BarraH key={c.cidade} rotulo={c.cidade} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} cor={T.positive} />
+              {(ins.por_cidade || []).slice(0, 8).map(c => (
+                <BarraH key={`${c.uf}-${c.cidade}`} rotulo={`${c.cidade}/${c.uf}`} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} cor={T.positive} />
               ))}
             </div>
           </Card>
           <Card>
             <SectionTitle sub="Saídas detectadas · estoque · idade média — sinais do movimento do mercado">Giro dos concorrentes</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {ins.giro_por_revenda.slice(0, 8).map(g => (
-                <div key={g.revenda} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda}</span>
+              {(ins.giro_por_revenda || []).slice(0, 8).map(g => (
+                <div key={`${g.uf}-${g.revenda}`} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda} <small style={{ color: T.inkMuted }}>{g.uf}</small></span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>
-                    <span style={{ color: T.positive }}>{g.saidas_detectadas ?? g.vendas_confirmadas}s</span> · {g.estoque_ativo}a · {g.idade_media_dias ?? '—'}d
+                    <span style={{ color: T.positive }}>{g.saidas_detectadas ?? 0} saídas</span> · {g.estoque_ativo} ativos · {g.idade_media_dias ?? '—'}d
                   </span>
                 </div>
               ))}
@@ -1294,8 +1389,8 @@ function PageAnalise() {
           <Card>
             <SectionTitle sub="Distribuição do estoque ativo por preço">Faixas de preço</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {ins.faixas_preco.map(f => (
-                <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(...ins.faixas_preco.map(x => x.anuncios))} cor={T.alert} />
+              {(ins.faixas_preco || []).map(f => (
+                <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(1, ...(ins.faixas_preco || []).map(x => x.anuncios))} cor={T.alert} />
               ))}
             </div>
           </Card>
@@ -1303,7 +1398,10 @@ function PageAnalise() {
       )}
 
       <SectionTitle sub="Converse com os dados: peça planos de ação, priorização e leitura de concorrência">Analista IA</SectionTitle>
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
+      {analistaStatus && !analistaStatus.ativo ? (
+        <EmptyState icon={Gauge} titulo="Analista opcional desativado"
+          texto="Os insights calculados acima continuam funcionando normalmente. O chat só deve ser ativado depois de proteger o acesso com autenticação." />
+      ) : <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ maxHeight: 380, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {msgs.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1332,7 +1430,7 @@ function PageAnalise() {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 8, padding: 14, borderTop: `1px solid ${T.line}` }}>
+        <div style={{ display: 'flex', gap: 8, padding: 14, borderTop: `1px solid ${T.line}`, flexWrap: 'wrap' }}>
           <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviar()}
             placeholder="Pergunte ao analista — ex: onde devo focar as vendas esta semana?" style={{ ...inputStyle, flex: 1 }} />
           <button onClick={enviar} disabled={pensando} style={{
@@ -1340,7 +1438,7 @@ function PageAnalise() {
             fontWeight: 600, border: 'none', opacity: pensando ? 0.6 : 1,
           }}>Enviar</button>
         </div>
-      </Card>
+      </Card>}
     </div>
   );
 }
@@ -1357,15 +1455,19 @@ const NAV = [
   { id: 'acoes', rotulo: 'Ações', icone: ListChecks },
   { id: 'ajustes', rotulo: 'Ajustes', icone: Settings },
 ];
+const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'oportunidades', 'concorrentes'].includes(item.id));
+const NAV_MOBILE_MAIS = NAV.filter(item => ['analise', 'acoes', 'ajustes'].includes(item.id));
 
 export default function App() {
   const [pagina, setPagina] = useState('hoje');
   const [menuAberto, setMenuAberto] = useState(false);
-  const [acoes, setAcoes] = useState([]);
+  const [acoes, setAcoes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('oper-radar-acoes') || '[]'); } catch { return []; }
+  });
   const [mobile, setMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 760);
 
   const { data: kpis } = useApi('kpis.php');
-  const { data: anunciosData } = useApi('anuncios.php?limit=200');
+  const { data: anunciosData } = useApi('anuncios.php?ordem=movimento&limit=200');
   const anuncios = useMemo(() => (anunciosData?.anuncios || []).map(mapeiaAnuncioReal), [anunciosData]);
   const usandoReais = anuncios.length > 0;
 
@@ -1375,8 +1477,27 @@ export default function App() {
     return () => window.removeEventListener('resize', f);
   }, []);
 
-  const criarAcao = texto => {
-    setAcoes(prev => [{ id: Date.now(), texto, feita: false, criadaEm: new Date().toISOString() }, ...prev]);
+  useEffect(() => {
+    try { localStorage.setItem('oper-radar-acoes', JSON.stringify(acoes)); } catch {}
+  }, [acoes]);
+
+  useEffect(() => {
+    document.getElementById('app-scroll-container')?.scrollTo({ top: 0 });
+  }, [pagina]);
+
+  const adicionarAcao = async (texto, origem = 'oportunidade') => {
+    const local = { id: `local-${Date.now()}`, texto, feita: false, origem, criadaEm: new Date().toISOString() };
+    setAcoes(prev => [local, ...prev]);
+    return local;
+  };
+
+  const alternarAcao = acao => {
+    const feita = !acao.feita;
+    setAcoes(prev => prev.map(a => a.id === acao.id ? { ...a, feita } : a));
+  };
+
+  const criarAcao = async texto => {
+    await adicionarAcao(texto, 'oportunidade');
     setPagina('acoes');
   };
 
@@ -1386,11 +1507,12 @@ export default function App() {
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrentes />,
     analise: <PageAnalise />,
-    acoes: <PageAcoes acoes={acoes} setAcoes={setAcoes} />,
+    acoes: <PageAcoes acoes={acoes} onAdicionar={adicionarAcao} onAlternar={alternarAcao} salvando={false} />,
     ajustes: <PageAjustes />,
   };
 
   const tituloPagina = NAV.find(n => n.id === pagina)?.rotulo || '';
+  const acoesPendentes = acoes.filter(a => !a.feita).length;
 
   return (
     <div style={{ display: 'flex', height: '100%', background: T.bg, color: T.ink, fontFamily: T.fontBody, overflow: 'hidden' }}>
@@ -1415,6 +1537,7 @@ export default function App() {
                   fontFamily: T.fontBody, transition: 'color 140ms, background 140ms', textAlign: 'left',
                 }}>
                   <item.icone size={16} /> {item.rotulo}
+                  {item.id === 'acoes' && acoesPendentes > 0 && <span style={{ marginLeft: 'auto', fontFamily: T.fontMono, fontSize: 9, color: T.signal }}>{acoesPendentes}</span>}
                 </button>
               );
             })}
@@ -1442,24 +1565,41 @@ export default function App() {
 
       {/* bottom nav mobile */}
       {mobile && (
+        <>
+        {menuAberto && <>
+          <div onClick={() => setMenuAberto(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.48)', zIndex: 48 }} />
+          <div style={{ position: 'fixed', left: 10, right: 10, bottom: 'calc(72px + env(safe-area-inset-bottom))', zIndex: 49, background: T.surface, border: `1px solid ${T.line}`, borderRadius: 16, padding: 10, boxShadow: '0 20px 60px rgba(0,0,0,.45)' }}>
+            {NAV_MOBILE_MAIS.map(item => <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} style={{
+              width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+              background: pagina === item.id ? 'rgba(245,166,35,0.10)' : 'transparent', border: 'none', borderRadius: 10,
+              color: pagina === item.id ? T.signal : T.ink, fontFamily: T.fontBody, fontSize: 14, cursor: 'pointer', textAlign: 'left',
+            }}><item.icone size={18} /> {item.rotulo}{item.id === 'acoes' && acoesPendentes > 0 && <Tag tone="sinal">{acoesPendentes} PENDENTES</Tag>}</button>)}
+          </div>
+        </>}
         <nav style={{
           position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex',
           background: 'rgba(11,14,19,0.94)', backdropFilter: 'blur(14px)',
-          borderTop: `1px solid ${T.line}`, padding: '8px 4px calc(8px + env(safe-area-inset-bottom))',
+          borderTop: `1px solid ${T.line}`, padding: '7px 4px calc(7px + env(safe-area-inset-bottom))', zIndex: 50,
         }}>
-          {NAV.map(item => {
+          {NAV_MOBILE_PRINCIPAL.map(item => {
             const ativo = pagina === item.id;
             return (
-              <button key={item.id} onClick={() => setPagina(item.id)} style={{
+              <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                background: 'none', border: 'none', cursor: 'pointer',
+                background: 'none', border: 'none', cursor: 'pointer', minHeight: 46, justifyContent: 'center',
                 color: ativo ? T.signal : T.inkMuted, fontSize: 9.5, fontFamily: T.fontBody,
               }}>
                 <item.icone size={18} /> {item.rotulo}
               </button>
             );
           })}
+          <button onClick={() => setMenuAberto(v => !v)} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minHeight: 46, justifyContent: 'center',
+            background: 'none', border: 'none', cursor: 'pointer', position: 'relative',
+            color: NAV_MOBILE_MAIS.some(item => item.id === pagina) || menuAberto ? T.signal : T.inkMuted, fontSize: 9.5, fontFamily: T.fontBody,
+          }}><MoreHorizontal size={19} /> Mais{acoesPendentes > 0 && <span style={{ position: 'absolute', top: 3, right: '25%', width: 7, height: 7, borderRadius: '50%', background: T.signal }} />}</button>
         </nav>
+        </>
       )}
     </div>
   );

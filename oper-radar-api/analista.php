@@ -48,8 +48,8 @@ $kpi = linhaUnica($conn, "SELECT
 
 $topMarcas = linhas($conn, "SELECT marca, COUNT(*) n, ROUND(AVG(preco)) preco_medio FROM anuncio
     WHERE status='ativo' AND marca IS NOT NULL GROUP BY marca ORDER BY n DESC LIMIT 8");
-$topCidades = linhas($conn, "SELECT r.cidade, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
-    WHERE a.status='ativo' GROUP BY r.cidade ORDER BY n DESC LIMIT 8");
+$topCidades = linhas($conn, "SELECT r.cidade, r.uf, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+    WHERE a.status='ativo' GROUP BY r.cidade,r.uf ORDER BY n DESC LIMIT 8");
 $giro = linhas($conn, "SELECT r.nome, SUM(a.status='removido_confirmado') saidas, SUM(a.status='ativo') ativos,
     ROUND(AVG(CASE WHEN a.status='ativo' THEN DATEDIFF(NOW(), a.primeira_vez_visto) END)) idade_media
     FROM revenda r JOIN anuncio a ON a.revenda_id=r.id GROUP BY r.id HAVING ativos>5
@@ -58,11 +58,15 @@ $maduros = linhas($conn, "SELECT a.titulo, a.preco, r.nome revenda, r.cidade,
     DATEDIFF(NOW(), a.primeira_vez_visto) dias FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
     WHERE a.status='ativo' ORDER BY a.primeira_vez_visto ASC LIMIT 10");
 
-$contexto = "DADOS ATUAIS DO OPER RADAR (coletados do portal Caminhões e Carretas, estado PR):\n"
+$ufs = linhas($conn, "SELECT r.uf,COUNT(*) ativos FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+    WHERE a.status='ativo' GROUP BY r.uf ORDER BY ativos DESC");
+
+$contexto = "DADOS ATUAIS DO OPER RADAR (coleta nacional em expansão no portal Caminhões e Carretas):\n"
     . "KPIs: {$kpi['revendas']} revendas monitoradas, {$kpi['ativos']} anúncios ativos, "
     . "{$kpi['saidas_mes']} saídas detectadas este mês (ausências confirmadas após duas coletas; não comprovam venda). Última coleta: {$kpi['ultima_coleta']}.\n\n"
     . "TOP MARCAS (ativos | preço médio): " . implode('; ', array_map(fn($m) => "{$m['marca']}: {$m['n']} anúncios, R$ " . number_format((float)$m['preco_medio'], 0, ',', '.'), $topMarcas)) . "\n\n"
-    . "TOP CIDADES POR OFERTA: " . implode('; ', array_map(fn($c2) => "{$c2['cidade']}: {$c2['n']}", $topCidades)) . "\n\n"
+    . "COBERTURA ATUAL: " . implode('; ', array_map(fn($u) => "{$u['uf']}: {$u['ativos']} ativos", $ufs)) . "\n\n"
+    . "TOP CIDADES POR OFERTA: " . implode('; ', array_map(fn($c2) => "{$c2['cidade']}/{$c2['uf']}: {$c2['n']}", $topCidades)) . "\n\n"
     . "MOVIMENTO POR REVENDA (saídas detectadas | estoque ativo | idade média do estoque em dias): "
     . implode('; ', array_map(fn($g) => "{$g['nome']}: {$g['saidas']}s/{$g['ativos']}a/" . ($g['idade_media'] ?? '?') . "d", $giro)) . "\n\n"
     . "ANÚNCIOS HÁ MAIS TEMPO NO AR (candidatos a negociação): "
@@ -74,8 +78,8 @@ $system = "Você é o Analista do OPER RADAR, plataforma de inteligência de mer
     . "planos de ação de vendas, priorização de estoque, oportunidades de compra/arbitragem, leitura de "
     . "concorrência. Seja direto, concreto e proponha próximos passos práticos (quem faz o quê). Quando o "
     . "dado disponível não sustentar uma conclusão, diga isso explicitamente em vez de inventar. Os dados "
-    . "cobrem por enquanto o estado do PR, com coleta 2x/dia; a comparação com FIPE (Fase 2) e o histórico "
-    . "longo ainda estão em construção — considere isso nas suas recomendações.\n\n" . $contexto;
+    . "cobrem somente os estados listados no contexto, com coleta 2x/dia. A FIPE e o histórico ainda estão "
+    . "amadurecendo; diferencie saída detectada de venda comprovada e considere isso nas recomendações.\n\n" . $contexto;
 
 /* ---- chama a API da Anthropic ---- */
 $payload = json_encode([

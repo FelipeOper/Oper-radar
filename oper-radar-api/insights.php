@@ -1,126 +1,125 @@
 <?php
-/**
- * OPER RADAR — API: insights agregados + DESCOBERTAS (insights cruzados)
- * As "descobertas" são frases prontas que juntam 2 dados — o que um analista faria.
- * Uma saida significa ausencia confirmada no portal, nao necessariamente uma venda.
- */
+/** OPER RADAR — inteligência agregada, tolerante a dados ainda incompletos. */
 require_once __DIR__ . '/config.php';
 $conn = conecta();
+$avisos = [];
 
-function rows(mysqli $c, string $sql): array {
-    $out = []; $r = $c->query($sql);
-    if ($r) while ($row = $r->fetch_assoc()) $out[] = $row;
-    return $out;
+function consulta(mysqli $conn, string $nome, string $sql): array {
+    global $avisos;
+    $saida = [];
+    $resultado = $conn->query($sql);
+    if (!$resultado) {
+        $avisos[] = $nome;
+        return [];
+    }
+    while ($linha = $resultado->fetch_assoc()) $saida[] = $linha;
+    return $saida;
 }
 
-$porTipo   = rows($conn, "SELECT tipo, COUNT(*) n, AVG(preco) preco_medio FROM anuncio WHERE status='ativo' AND tipo IS NOT NULL GROUP BY tipo ORDER BY n DESC");
-$porMarca  = rows($conn, "SELECT marca, COUNT(*) n, AVG(preco) preco_medio FROM anuncio WHERE status='ativo' AND marca IS NOT NULL GROUP BY marca ORDER BY n DESC LIMIT 12");
-$porCidade = rows($conn, "SELECT r.cidade, COUNT(*) n FROM anuncio a JOIN revenda r ON r.id=a.revenda_id WHERE a.status='ativo' GROUP BY r.cidade ORDER BY n DESC LIMIT 12");
-
-$giroRevenda = rows($conn, "
-    SELECT r.nome, r.cidade,
-           SUM(CASE WHEN a.status='removido_confirmado' THEN 1 ELSE 0 END) saidas,
-           SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END) ativos,
-           AVG(CASE WHEN a.status='ativo' THEN DATEDIFF(NOW(), a.primeira_vez_visto) END) idade_media_dias
-    FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
-    GROUP BY r.id HAVING ativos>5 ORDER BY saidas DESC, ativos DESC LIMIT 15");
-
-$faixas = rows($conn, "
-    SELECT CASE WHEN preco < 100000 THEN 'até 100 mil'
-                WHEN preco < 250000 THEN '100–250 mil'
-                WHEN preco < 400000 THEN '250–400 mil'
-                WHEN preco < 600000 THEN '400–600 mil'
-                ELSE '600 mil+' END faixa, COUNT(*) n
-    FROM anuncio WHERE status='ativo' AND preco IS NOT NULL GROUP BY faixa");
-
-$fipeRow = $conn->query("SELECT COUNT(*) n, SUM(CASE WHEN a.preco < f.preco THEN 1 ELSE 0 END) abaixo,
-                                AVG((a.preco - f.preco) / f.preco) * 100 desvio
-                         FROM anuncio a JOIN fipe_preco f ON f.id = a.fipe_preco_id
-                         WHERE a.status='ativo' AND a.preco IS NOT NULL AND f.preco IS NOT NULL")->fetch_assoc();
-$fipe = ['vinculados' => (int)($fipeRow['n'] ?? 0),
-         'abaixo_fipe' => (int)($fipeRow['abaixo'] ?? 0),
-         'desvio_medio_pct' => $fipeRow['desvio'] !== null ? round((float)$fipeRow['desvio'], 1) : null];
-
-// ---- DESCOBERTAS: insights cruzados calculados aqui ----
-$descobertas = [];
-
-// 1) Cidade com maior taxa observada de saida/estoque
-$conv = rows($conn, "
-    SELECT r.cidade,
-           SUM(a.status='ativo') estoque,
-           SUM(a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)) saidas
-    FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
-    GROUP BY r.cidade HAVING estoque > 20 ORDER BY (saidas/estoque) DESC LIMIT 1");
-if ($conv && $conv[0]['saidas'] > 0) {
-    $c = $conv[0];
-    $taxa = round(($c['saidas'] / $c['estoque']) * 100, 1);
-    $descobertas[] = ['tipo' => 'conversao', 'titulo' => 'Maior taxa de saída do mercado',
-        'texto' => "{$c['cidade']}: {$c['saidas']} saídas detectadas / {$c['estoque']} anúncios = {$taxa}% no mês. A ausência no portal não comprova venda."];
+function consulta_um(mysqli $conn, string $nome, string $sql): array {
+    $linhas = consulta($conn, $nome, $sql);
+    return $linhas[0] ?? [];
 }
 
-// 2) Marca dominante em uma região
-$dom = rows($conn, "
-    SELECT r.cidade, a.marca, COUNT(*) n,
-           ROUND(COUNT(*) / (SELECT COUNT(*) FROM anuncio a2 JOIN revenda r2 ON r2.id=a2.revenda_id
-                             WHERE r2.cidade=r.cidade AND a2.status='ativo') * 100, 1) pct
+$porTipo = consulta($conn, 'por_tipo', "
+    SELECT tipo, COUNT(*) anuncios, ROUND(AVG(NULLIF(preco,0))) preco_medio
+    FROM anuncio WHERE status='ativo' AND tipo IS NOT NULL
+    GROUP BY tipo ORDER BY anuncios DESC");
+$porMarca = consulta($conn, 'por_marca', "
+    SELECT marca, COUNT(*) anuncios, ROUND(AVG(NULLIF(preco,0))) preco_medio
+    FROM anuncio WHERE status='ativo' AND marca IS NOT NULL AND marca<>''
+    GROUP BY marca ORDER BY anuncios DESC LIMIT 12");
+$porCidade = consulta($conn, 'por_cidade', "
+    SELECT r.cidade, r.uf, COUNT(*) anuncios
     FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
-    WHERE a.status='ativo' AND a.marca IS NOT NULL
-    GROUP BY r.cidade, a.marca HAVING n > 30 AND pct > 30
-    ORDER BY pct DESC LIMIT 1");
-if ($dom) {
-    $d = $dom[0];
-    $descobertas[] = ['tipo' => 'concentracao', 'titulo' => "Concentração em {$d['cidade']}",
-        'texto' => "{$d['marca']} representa {$d['pct']}% dos anúncios da cidade ({$d['n']} unidades). Alta concentração = margem menor de negociação."];
-}
+    WHERE a.status='ativo' GROUP BY r.cidade, r.uf ORDER BY anuncios DESC LIMIT 12");
 
-// 3) Revenda que mais subiu anuncios recentemente vs estoque total
-$novos = rows($conn, "
-    SELECT r.nome, r.cidade,
-           SUM(a.primeira_vez_visto >= DATE_SUB(NOW(), INTERVAL 7 DAY)) novos_7d,
-           SUM(a.status='ativo') ativos
+$giroRevenda = consulta($conn, 'giro_revenda', "
+    SELECT r.nome revenda, r.cidade, r.uf,
+           SUM(CASE WHEN a.status='removido_confirmado' THEN 1 ELSE 0 END) saidas_detectadas,
+           SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END) estoque_ativo,
+           ROUND(AVG(CASE WHEN a.status='ativo' THEN DATEDIFF(NOW(),a.primeira_vez_visto) END)) idade_media_dias
     FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
-    GROUP BY r.id HAVING ativos > 20 ORDER BY (novos_7d/ativos) DESC LIMIT 1");
-if ($novos && $novos[0]['novos_7d'] > 5) {
-    $n = $novos[0];
-    $pct = round(($n['novos_7d'] / $n['ativos']) * 100, 0);
-    $descobertas[] = ['tipo' => 'movimento', 'titulo' => "Loja carregando estoque",
-        'texto' => "{$n['nome']} ({$n['cidade']}) subiu {$n['novos_7d']} anúncios nos últimos 7 dias — {$pct}% do estoque dela é novo. Sinal de reposição ou entrada em novo segmento."];
+    GROUP BY r.id HAVING estoque_ativo>5
+    ORDER BY saidas_detectadas DESC, estoque_ativo DESC LIMIT 15");
+
+$faixas = consulta($conn, 'faixas_preco', "
+    SELECT CASE WHEN preco < 100000 THEN 'Até R$ 100 mil'
+                WHEN preco < 250000 THEN 'R$ 100–250 mil'
+                WHEN preco < 400000 THEN 'R$ 250–400 mil'
+                WHEN preco < 600000 THEN 'R$ 400–600 mil'
+                ELSE 'R$ 600 mil+' END faixa, COUNT(*) anuncios
+    FROM anuncio WHERE status='ativo' AND preco IS NOT NULL AND preco>0
+    GROUP BY faixa ORDER BY MIN(preco)");
+
+$fipeRow = consulta_um($conn, 'fipe', "
+    SELECT COUNT(*) vinculados,
+           SUM(CASE WHEN a.preco < f.preco THEN 1 ELSE 0 END) abaixo_fipe,
+           ROUND(AVG((a.preco-f.preco)/NULLIF(f.preco,0))*100,1) desvio_medio_pct
+    FROM anuncio a JOIN fipe_preco f ON f.id=a.fipe_preco_id
+    WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0 AND f.preco IS NOT NULL AND f.preco>0");
+$fipe = [
+    'vinculados'=>(int)($fipeRow['vinculados'] ?? 0),
+    'abaixo_fipe'=>(int)($fipeRow['abaixo_fipe'] ?? 0),
+    'desvio_medio_pct'=>isset($fipeRow['desvio_medio_pct']) ? (float)$fipeRow['desvio_medio_pct'] : null,
+];
+
+$descobertas = [];
+$conversao = consulta_um($conn, 'descoberta_saida', "
+    SELECT r.cidade, r.uf,
+           SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END) estoque,
+           SUM(CASE WHEN a.status='removido_confirmado' AND a.data_remocao>=DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) saidas
+    FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
+    GROUP BY r.cidade,r.uf HAVING estoque>20 AND saidas>0
+    ORDER BY saidas/estoque DESC LIMIT 1");
+if ($conversao) {
+    $taxa = round(((int)$conversao['saidas']/(int)$conversao['estoque'])*100,1);
+    $descobertas[] = ['tipo'=>'conversao','titulo'=>'Maior movimento relativo',
+        'texto'=>"{$conversao['cidade']}/{$conversao['uf']} registrou {$conversao['saidas']} saídas para {$conversao['estoque']} ativos ({$taxa}%) em 30 dias. Saída do portal não comprova venda."];
 }
 
-// 4) Faixa de preço mais quente (maior giro)
-$hot = rows($conn, "
-    SELECT CASE WHEN a.preco < 100000 THEN 'até 100 mil'
-                WHEN a.preco < 250000 THEN '100–250 mil'
-                WHEN a.preco < 400000 THEN '250–400 mil'
-                WHEN a.preco < 600000 THEN '400–600 mil'
-                ELSE '600 mil+' END faixa,
-           SUM(a.status='ativo') ativos,
-           SUM(a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 30 DAY)) saidas
-    FROM anuncio a WHERE a.preco IS NOT NULL
-    GROUP BY faixa HAVING ativos > 100 ORDER BY (saidas/ativos) DESC LIMIT 1");
-if ($hot && $hot[0]['saidas'] > 0) {
-    $h = $hot[0];
-    $taxa = round(($h['saidas'] / $h['ativos']) * 100, 1);
-    $descobertas[] = ['tipo' => 'faixa', 'titulo' => "Faixa mais quente",
-        'texto' => "Anúncios de {$h['faixa']} têm {$taxa}% de giro no mês — a mais alta entre todas as faixas de preço. Segmento onde o cliente aparece."];
+$novos = consulta_um($conn, 'descoberta_estoque', "
+    SELECT r.nome,r.cidade,r.uf,
+           SUM(CASE WHEN a.primeira_vez_visto>=DATE_SUB(NOW(),INTERVAL 7 DAY) THEN 1 ELSE 0 END) novos_7d,
+           SUM(CASE WHEN a.status='ativo' THEN 1 ELSE 0 END) ativos
+    FROM revenda r JOIN anuncio a ON a.revenda_id=r.id
+    GROUP BY r.id HAVING ativos>20 AND novos_7d>5
+    ORDER BY novos_7d/ativos DESC LIMIT 1");
+if ($novos) {
+    $pct = round(((int)$novos['novos_7d']/(int)$novos['ativos'])*100);
+    $descobertas[] = ['tipo'=>'movimento','titulo'=>'Reposição forte de estoque',
+        'texto'=>"{$novos['nome']} ({$novos['cidade']}/{$novos['uf']}) adicionou {$novos['novos_7d']} anúncios em 7 dias; {$pct}% do estoque atual entrou recentemente."];
 }
 
-foreach ($porTipo as &$m)   { $m['n']=(int)$m['n']; $m['preco_medio']=$m['preco_medio']?round((float)$m['preco_medio']):null; }
-foreach ($porMarca as &$m)  { $m['n']=(int)$m['n']; $m['preco_medio']=$m['preco_medio']?round((float)$m['preco_medio']):null; }
-foreach ($porCidade as &$c) { $c['n']=(int)$c['n']; }
-foreach ($faixas as &$f)    { $f['n']=(int)$f['n']; }
-foreach ($giroRevenda as &$g) {
-    $g['saidas']=(int)$g['saidas']; $g['ativos']=(int)$g['ativos'];
-    $g['idade_media_dias']=$g['idade_media_dias']!==null?round((float)$g['idade_media_dias']):null;
-    $g['revenda']=$g['nome']; unset($g['nome']);
-    $g['saidas_detectadas']=$g['saidas']; unset($g['saidas']);
-    // Compatibilidade temporaria com bundles anteriores.
-    $g['vendas_confirmadas']=$g['saidas_detectadas'];
-    $g['estoque_ativo']=$g['ativos']; unset($g['ativos']);
+$quente = consulta_um($conn, 'descoberta_faixa', "
+    SELECT CASE WHEN preco<100000 THEN 'até R$ 100 mil'
+                WHEN preco<250000 THEN 'de R$ 100 a 250 mil'
+                WHEN preco<400000 THEN 'de R$ 250 a 400 mil'
+                WHEN preco<600000 THEN 'de R$ 400 a 600 mil'
+                ELSE 'acima de R$ 600 mil' END faixa,
+           SUM(CASE WHEN status='ativo' THEN 1 ELSE 0 END) ativos,
+           SUM(CASE WHEN status='removido_confirmado' AND data_remocao>=DATE_SUB(NOW(),INTERVAL 30 DAY) THEN 1 ELSE 0 END) saidas
+    FROM anuncio WHERE preco IS NOT NULL AND preco>0
+    GROUP BY faixa HAVING ativos>100 AND saidas>0 ORDER BY saidas/ativos DESC LIMIT 1");
+if ($quente) {
+    $taxa = round(((int)$quente['saidas']/(int)$quente['ativos'])*100,1);
+    $descobertas[] = ['tipo'=>'faixa','titulo'=>'Faixa com maior movimento',
+        'texto'=>"Veículos {$quente['faixa']} têm a maior relação observada entre saídas e estoque: {$taxa}% nos últimos 30 dias."];
+}
+
+foreach ($porTipo as &$item) { $item['anuncios']=(int)$item['anuncios']; $item['preco_medio']=$item['preco_medio']!==null?(int)$item['preco_medio']:null; }
+foreach ($porMarca as &$item) { $item['anuncios']=(int)$item['anuncios']; $item['preco_medio']=$item['preco_medio']!==null?(int)$item['preco_medio']:null; }
+foreach ($porCidade as &$item) $item['anuncios']=(int)$item['anuncios'];
+foreach ($faixas as &$item) $item['anuncios']=(int)$item['anuncios'];
+foreach ($giroRevenda as &$item) {
+    $item['saidas_detectadas']=(int)$item['saidas_detectadas'];
+    $item['estoque_ativo']=(int)$item['estoque_ativo'];
+    $item['idade_media_dias']=$item['idade_media_dias']!==null?(int)$item['idade_media_dias']:null;
 }
 
 envia_json([
-    'por_tipo' => $porTipo, 'por_marca' => $porMarca, 'por_cidade' => $porCidade,
-    'giro_por_revenda' => $giroRevenda, 'faixas_preco' => $faixas,
-    'fipe' => $fipe, 'descobertas' => $descobertas,
+    'gerado_em'=>date(DATE_ATOM), 'por_tipo'=>$porTipo, 'por_marca'=>$porMarca,
+    'por_cidade'=>$porCidade, 'giro_por_revenda'=>$giroRevenda,
+    'faixas_preco'=>$faixas, 'fipe'=>$fipe, 'descobertas'=>$descobertas,
+    'parciais_indisponiveis'=>$avisos,
 ]);

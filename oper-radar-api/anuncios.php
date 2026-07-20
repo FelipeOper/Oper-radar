@@ -53,6 +53,7 @@ if (!empty($_GET['regiao']) && isset($REGIOES[$_GET['regiao']])) {
     foreach ($ufsR as $u) { $params[] = $u; $types .= 's'; }
 } elseif (!empty($_GET['uf'])) { $where[] = 'r.uf = ?'; $params[] = strtoupper($_GET['uf']); $types .= 's'; }
 if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GET['revenda']; $types .= 's'; }
+if (!empty($_GET['revenda_id'])) { $where[] = 'r.id = ?'; $params[] = (int)$_GET['revenda_id']; $types .= 'i'; }
 if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
 if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
@@ -96,6 +97,7 @@ $ordens = [
     'preco_asc'  => 'a.preco IS NULL, a.preco ASC',
     'preco_desc' => 'a.preco IS NULL, a.preco DESC',
     'mais_tempo' => 'a.primeira_vez_visto ASC',
+    'movimento'  => 'COALESCE(a.data_remocao, a.ultima_vez_ativo, a.primeira_vez_visto) DESC',
     'desvio_fipe' => 'a.preco / NULLIF(f.preco, 0) ASC, a.preco ASC',
 ];
 $ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
@@ -104,7 +106,7 @@ $sql = "SELECT a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.ano_inic
                a.preco, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
                a.fipe_match_confianca, f.preco AS preco_fipe, f.codigo_fipe,
                ROUND((a.preco - f.preco) / NULLIF(f.preco, 0) * 100, 1) AS desvio_fipe_pct,
-               r.nome AS revenda, r.cidade, r.uf
+               r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf
         FROM anuncio a
         JOIN revenda r ON r.id = a.revenda_id
         LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id
@@ -125,6 +127,7 @@ while ($row = $res->fetch_assoc()) {
     $row['preco'] = $row['preco'] !== null ? (float)$row['preco'] : null;
     $row['preco_fipe'] = $row['preco_fipe'] !== null ? (float)$row['preco_fipe'] : null;
     $row['desvio_fipe_pct'] = $row['desvio_fipe_pct'] !== null ? (float)$row['desvio_fipe_pct'] : null;
+    $row['revenda_id'] = (int)$row['revenda_id'];
     $anuncios[] = $row;
 }
 
