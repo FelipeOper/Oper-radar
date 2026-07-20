@@ -1,8 +1,8 @@
 # Fase 2 — Referência FIPE local e mensal
 
 Cruza os caminhões do radar com preços médios FIPE sem consultar a API a cada abertura
-do app ou a cada coleta. A fonte externa é a API v2 da Parallelum, limitada a 500
-requisições gratuitas por dia (1.000 com token gratuito).
+do app ou a cada coleta. A fonte externa é a API v2 da Fipe Online: o acesso público é
+limitado, enquanto o plano PRO contratado permite consultas ilimitadas e CSV completo.
 
 ## Arquitetura
 
@@ -42,12 +42,13 @@ requisição externa é consumida.
 
 ```bash
 python3 importar_fipe_csv.py /CAMINHO/tabela-fipe-335.csv --validar
-python3 importar_fipe_csv.py /CAMINHO/tabela-fipe-335.csv
+python3 importar_fipe_csv.py /CAMINHO/tabela-fipe-335.csv --todos-os-precos
 python3 fipe_sync.py --modo=local --lote=1000
 ```
 
-O código da referência é lido do nome do arquivo (`335`) e também pode ser informado com
-`--referencia-codigo`. O CSV não deve ser versionado no Git.
+No plano PRO, `--todos-os-precos` mantém os 11.386 preços de caminhões disponíveis para
+consulta interna. O código da referência é lido do nome do arquivo (`335`) e também pode
+ser informado com `--referencia-codigo`. O CSV não deve ser versionado no Git.
 
 ### Token da assinatura
 
@@ -55,13 +56,12 @@ Guardar o token somente em `/home1/USUARIO/.oper-radar.env` (permissão `600`):
 
 ```bash
 FIPE_API_TOKEN='COLE_O_TOKEN_FORNECIDO'
-FIPE_API_DAILY_LIMIT=1000
+FIPE_API_UNLIMITED=1
 ```
 
-Não colocar o token no repositório, no cron ou em comandos salvos no histórico. O executor
-preserva 50 chamadas de margem sobre a cota informada e mantém o limite gratuito de 480
-quando o token está ausente. Se o plano contratado tiver outra cota, basta alterar
-`FIPE_API_DAILY_LIMIT`.
+Não colocar o token no repositório, no cron ou em comandos salvos no histórico. Com
+`FIPE_API_UNLIMITED=1`, o executor usa autenticação Bearer, renova o catálogo completo e
+reduz a pausa entre chamadas. Sem token, mantém o limite público de 480.
 
 ## Validação
 
@@ -89,10 +89,9 @@ Atualização mensal manual:
 bash executar_fipe_job.sh mensal
 ```
 
-A primeira requisição mensal consulta `/references`; com assinatura, até 949 ficam
-disponíveis na cota padrão para preços. Se houver mais registros, a execução seguinte
-continua pelos pendentes. A fila atualiza somente preços ligados a anúncios ativos e
-prioriza os mais utilizados.
+A primeira requisição mensal consulta `/references`. No PRO, a execução renova todo o
+catálogo local; se houver interrupção, a próxima execução continua pelos registros ainda
+na referência anterior. Sem PRO, somente preços ligados a anúncios ativos entram na fila.
 
 ## Cron recomendado
 

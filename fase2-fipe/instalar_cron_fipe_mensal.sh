@@ -40,6 +40,6 @@ echo "Backup anterior: $BACKUP"
 echo "Cruzamento local: 12h45 e 23h45 (zero requisicoes FIPE)"
 echo "Atualizacao mensal: dias 1-10, 13h15 (so renova quando a referencia mudar)"
 echo "Combinacoes novas: dias 11-31, 14h30; fila reaberta semanalmente"
-echo "Limite automatico: cota contratada menos 50 com token; 480 sem token"
+echo "Plano PRO: catalogo completo e consultas ilimitadas; 480 sem token"
 echo
 crontab -l | grep -E 'executar_fipe_job\.sh|oper-radar-fipe-bootstrap-ok'

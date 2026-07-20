@@ -26,7 +26,7 @@ import requests
 import mysql.connector
 
 BASE = "https://fipe.parallelum.com.br/api/v2"
-PAUSA = 1.0
+PAUSA = float(os.getenv("FIPE_API_PAUSE", "1.0"))
 
 # Marca como vem do portal -> como aparece na FIPE (quando os nomes diferem)
 MAPA_MARCA = {
@@ -44,7 +44,7 @@ referencia_mes = None
 
 def api_get(path):
     global contador_req
-    if contador_req >= max_req:
+    if max_req > 0 and contador_req >= max_req:
         raise RuntimeError(f"Limite de {max_req} requisicoes atingido — rode de novo depois, continua de onde parou.")
     contador_req += 1
     r = requests.get(f"{BASE}{path}", headers=headers_api, timeout=20)
@@ -261,7 +261,8 @@ def parse_preco(preco_txt):
             if preco_txt else None)
 
 
-def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia):
+def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia,
+                            somente_ativos=True):
     """Atualiza a tabela local apenas quando a referencia publicada mudou.
 
     Precos usados por mais anuncios ativos vem primeiro. Se houver mais registros que o
@@ -270,7 +271,8 @@ def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia):
     if limite <= 0:
         return 0
     cur = conn.cursor(dictionary=True)
-    cur.execute("""
+    filtro_uso = "uso.ativos > 0 AND" if somente_ativos else ""
+    cur.execute(f"""
         SELECT fp.id, fp.ano_codigo, fm.marca_fipe_id, fm.modelo_fipe_id,
                COALESCE(uso.ativos, 0) AS uso_ativo
         FROM fipe_preco fp
@@ -281,8 +283,8 @@ def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia):
             WHERE status='ativo' AND fipe_preco_id IS NOT NULL
             GROUP BY fipe_preco_id
         ) uso ON uso.fipe_preco_id=fp.id
-        WHERE uso.ativos > 0
-          AND (fp.referencia_codigo IS NULL OR fp.referencia_codigo<>%s)
+        WHERE {filtro_uso}
+          (fp.referencia_codigo IS NULL OR fp.referencia_codigo<>%s)
         ORDER BY uso_ativo DESC, fp.atualizado_em, fp.id
         LIMIT %s
     """, (codigo_referencia, limite))
@@ -415,7 +417,12 @@ def roda_debug(conn):
 
 def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None, mes_referencia=None):
     pendentes = anuncios_pendentes(conn, lote)
-    origem = f"API + cache (limite {max_req} req)" if permitir_api else "somente cache local"
+    if not permitir_api:
+        origem = "somente cache local"
+    elif max_req == 0:
+        origem = "API PRO ilimitada + cache"
+    else:
+        origem = f"API + cache (limite {max_req} req)"
     print(f"{len(pendentes)} anuncios de caminhao sem vinculo FIPE — processando com {origem}...")
     vinculados = sem_match = ambiguos = sem_ano = aguardando_cache = processados = 0
     limite_atingido = False
@@ -503,12 +510,12 @@ def roda_local(conn, lote=500):
     )
 
 
-def roda_mensal(conn, max_refresh=480):
+def roda_mensal(conn, max_refresh=480, somente_ativos=True):
     global referencia_codigo, referencia_mes
     referencia_codigo, referencia_mes = obtem_referencia_atual()
     print(f"Referencia FIPE publicada: {referencia_mes} (codigo {referencia_codigo}).")
     atualizados = atualiza_precos_mensais(
-        conn, max_refresh, referencia_codigo, referencia_mes
+        conn, max_refresh, referencia_codigo, referencia_mes, somente_ativos
     )
     print(f"{contador_req} requisicoes usadas nesta rodada mensal.")
     return atualizados
@@ -525,6 +532,8 @@ if __name__ == "__main__":
     ap.add_argument("--modo", choices=("bootstrap", "local", "mensal", "debug"), default="bootstrap",
                     help="bootstrap consulta combinacoes novas; local usa so MySQL; mensal renova precos")
     ap.add_argument("--max-refresh", type=int, default=480, help="quantos precos mensais atualizar por rodada")
+    ap.add_argument("--atualizar-todos-precos", action="store_true",
+                    help="no modo mensal, renova todo o catalogo local (plano PRO)")
     ap.add_argument("--token", default=os.getenv("FIPE_API_TOKEN"), help="token opcional da API FIPE")
     ap.add_argument("--marcador-conclusao",
                     help="no bootstrap, cria este arquivo quando toda a fila atual terminar")
@@ -543,7 +552,7 @@ if __name__ == "__main__":
     contador_req = 0
     headers_api.clear()
     if args.token:
-        headers_api["X-Subscription-Token"] = args.token
+        headers_api["Authorization"] = f"Bearer {args.token}"
 
     conn = mysql.connector.connect(host=args.db_host, user=args.db_user, password=args.db_pass,
                                    database=args.db_name, charset="utf8mb4")
@@ -554,7 +563,10 @@ if __name__ == "__main__":
         elif modo == "local":
             roda_local(conn, lote=args.lote)
         elif modo == "mensal":
-            roda_mensal(conn, max_refresh=args.max_refresh)
+            roda_mensal(
+                conn, max_refresh=args.max_refresh,
+                somente_ativos=not args.atualizar_todos_precos,
+            )
         else:
             resultado = roda_bootstrap(conn, lote=args.lote)
             concluiu = (resultado["pendentes"] < args.lote

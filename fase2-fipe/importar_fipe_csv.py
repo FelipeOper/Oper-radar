@@ -103,7 +103,8 @@ def ids_modelos(conn):
     return resultado
 
 
-def seleciona_precos(linhas, necessarias, mapa_ids, referencia_codigo):
+def seleciona_precos(linhas, necessarias, mapa_ids, referencia_codigo,
+                     todos_os_precos=False):
     selecionados = []
     encontradas = set()
     for linha in linhas:
@@ -113,7 +114,7 @@ def seleciona_precos(linhas, necessarias, mapa_ids, referencia_codigo):
             chave = (int(linha["Brand Code"]), int(linha["Model Code"]), ano)
         except (TypeError, ValueError):
             continue
-        if chave not in necessarias:
+        if not todos_os_precos and chave not in necessarias:
             continue
         modelo_id = mapa_ids.get(chave[:2])
         if not modelo_id:
@@ -126,11 +127,11 @@ def seleciona_precos(linhas, necessarias, mapa_ids, referencia_codigo):
     return selecionados, encontradas
 
 
-def importar(conn, linhas, mes, referencia_codigo):
+def importar(conn, linhas, mes, referencia_codigo, todos_os_precos=False):
     total_modelos = atualiza_catalogo(conn, linhas)
     necessarias, total_anuncios, sem_match = combinacoes_necessarias(conn)
     precos, encontradas = seleciona_precos(
-        linhas, necessarias, ids_modelos(conn), referencia_codigo
+        linhas, necessarias, ids_modelos(conn), referencia_codigo, todos_os_precos
     )
 
     cur = conn.cursor()
@@ -159,7 +160,10 @@ def importar(conn, linhas, mes, referencia_codigo):
     print(f"Anuncios ativos analisados: {total_anuncios}")
     print(f"Combinacoes requeridas: {len(necessarias)}")
     print(f"Precos importados/atualizados: {len(precos)}")
-    print(f"Combinacoes sem preco no CSV: {len(necessarias - encontradas)}")
+    if todos_os_precos:
+        print("Carga de precos: catalogo completo de caminhoes")
+    else:
+        print(f"Combinacoes sem preco no CSV: {len(necessarias - encontradas)}")
     print(f"Anuncios sem match automatico seguro: {sem_match}")
     print(f"Tentativas reabertas apos a carga: {reabertos}")
 
@@ -170,6 +174,8 @@ if __name__ == "__main__":
     ap.add_argument("--referencia-codigo", type=int,
                     help="codigo da referencia; por padrao e lido do nome do arquivo")
     ap.add_argument("--validar", action="store_true", help="valida o CSV sem acessar o banco")
+    ap.add_argument("--todos-os-precos", action="store_true",
+                    help="importa todos os precos de caminhoes para consulta interna")
     ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
     ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"))
     ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"))
@@ -193,7 +199,7 @@ if __name__ == "__main__":
         database=args.db_name, charset="utf8mb4",
     )
     try:
-        importar(conexao, linhas_csv, mes_csv, codigo)
+        importar(conexao, linhas_csv, mes_csv, codigo, args.todos_os_precos)
     except Exception:
         conexao.rollback()
         raise
