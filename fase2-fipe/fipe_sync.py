@@ -2,8 +2,11 @@
 OPER RADAR — Fase 2: sincronizacao com a tabela FIPE
 Fonte: https://fipe.parallelum.com.br/api/v2 (endpoint 'trucks').
 
-Estrategia incremental: nao baixa a FIPE inteira. Olha os anuncios reais do banco
-e busca preco so dos modelos/anos que existem na coleta, cacheando tudo.
+Estrategia incremental: nao baixa a FIPE inteira. Olha os anuncios reais do banco,
+mantem uma tabela local e separa tres operacoes:
+  bootstrap: descobre combinacoes novas usando a API;
+  local: vincula anuncios usando apenas o cache MySQL;
+  mensal: atualiza os precos armazenados quando a referencia FIPE muda.
 
 Uso normal:
   set -a; . /root/.oper-radar.env; set +a
@@ -17,12 +20,13 @@ import os
 import re
 import time
 import unicodedata
+from pathlib import Path
 
 import requests
 import mysql.connector
 
 BASE = "https://fipe.parallelum.com.br/api/v2"
-PAUSA = 1.0
+PAUSA = float(os.getenv("FIPE_API_PAUSE", "1.0"))
 
 # Marca como vem do portal -> como aparece na FIPE (quando os nomes diferem)
 MAPA_MARCA = {
@@ -34,11 +38,13 @@ MAPA_MARCA = {
 contador_req = 0
 max_req = 400
 headers_api = {}
+referencia_codigo = None
+referencia_mes = None
 
 
 def api_get(path):
     global contador_req
-    if contador_req >= max_req:
+    if max_req > 0 and contador_req >= max_req:
         raise RuntimeError(f"Limite de {max_req} requisicoes atingido — rode de novo depois, continua de onde parou.")
     contador_req += 1
     r = requests.get(f"{BASE}{path}", headers=headers_api, timeout=20)
@@ -49,6 +55,23 @@ def api_get(path):
     r.raise_for_status()
     time.sleep(PAUSA)
     return r.json()
+
+
+def com_referencia(path, codigo=None):
+    """Fixa a consulta no mes escolhido sem quebrar caminhos que ja possuem query string."""
+    if not codigo:
+        return path
+    separador = "&" if "?" in path else "?"
+    return f"{path}{separador}reference={codigo}"
+
+
+def obtem_referencia_atual():
+    """Retorna a referencia mais recente publicada pela API."""
+    referencias = api_get("/references")
+    if not referencias:
+        raise RuntimeError("A API FIPE nao retornou referencias mensais.")
+    atual = referencias[0]
+    return int(atual["code"]), atual["month"]
 
 
 # Tokens de marca e ruido que nao servem pra identificar modelo
@@ -127,7 +150,7 @@ def avalia(titulo: str, modelo_fipe: str):
     return 0.60, "so numero"
 
 
-def garante_marcas(conn):
+def garante_marcas(conn, codigo_referencia=None):
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT COUNT(*) AS n FROM fipe_modelo")
     n = cur.fetchone()["n"]
@@ -136,11 +159,11 @@ def garante_marcas(conn):
         print(f"Catalogo FIPE ja em cache: {n} modelos.")
         return
     print("Catalogo FIPE vazio — baixando marcas e modelos de caminhao...")
-    marcas = api_get("/trucks/brands")
+    marcas = api_get(com_referencia("/trucks/brands", codigo_referencia))
     cur = conn.cursor()
     for m in marcas:
         print(f"  {m['name']} (id {m['code']})...")
-        for mod in api_get(f"/trucks/brands/{m['code']}/models"):
+        for mod in api_get(com_referencia(f"/trucks/brands/{m['code']}/models", codigo_referencia)):
             cur.execute(
                 "INSERT IGNORE INTO fipe_modelo (marca_fipe, marca_fipe_id, modelo_fipe, modelo_fipe_id) VALUES (%s,%s,%s,%s)",
                 (m["name"].upper(), int(m["code"]), mod["name"], int(mod["code"])),
@@ -185,28 +208,46 @@ def modelos_da_marca(conn, marca_portal):
     return rows
 
 
-def busca_ou_cria_preco(conn, modelo, ano):
+def busca_preco_cache(conn, modelo, ano, codigo_referencia=None):
     cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT id FROM fipe_preco WHERE fipe_modelo_id=%s AND ano_codigo LIKE %s",
-                (modelo["id"], f"{ano}-%"))
+    sql = "SELECT id FROM fipe_preco WHERE fipe_modelo_id=%s AND ano_codigo LIKE %s"
+    params = [modelo["id"], f"{ano}-%"]
+    if codigo_referencia is not None:
+        sql += " AND referencia_codigo=%s"
+        params.append(codigo_referencia)
+    cur.execute(sql, tuple(params))
     achou = cur.fetchone()
     cur.close()
-    if achou:
-        return achou["id"]
+    return achou["id"] if achou else None
 
-    anos = api_get(f"/trucks/brands/{modelo['marca_fipe_id']}/models/{modelo['modelo_fipe_id']}/years")
+
+def busca_ou_cria_preco(conn, modelo, ano, codigo_referencia=None, mes_referencia=None):
+    achou = busca_preco_cache(conn, modelo, ano, codigo_referencia)
+    if achou:
+        return achou
+
+    anos = api_get(com_referencia(
+        f"/trucks/brands/{modelo['marca_fipe_id']}/models/{modelo['modelo_fipe_id']}/years",
+        codigo_referencia,
+    ))
     ano_alvo = next((a for a in anos if a["code"].startswith(str(ano))), None)
     if not ano_alvo:
         return None
 
-    dados = api_get(f"/trucks/brands/{modelo['marca_fipe_id']}/models/{modelo['modelo_fipe_id']}/years/{ano_alvo['code']}")
+    dados = api_get(com_referencia(
+        f"/trucks/brands/{modelo['marca_fipe_id']}/models/{modelo['modelo_fipe_id']}/years/{ano_alvo['code']}",
+        codigo_referencia,
+    ))
     preco = parse_preco(dados.get("price", ""))
 
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO fipe_preco (fipe_modelo_id, ano_codigo, codigo_fipe, preco, mes_referencia) VALUES (%s,%s,%s,%s,%s) "
-        "ON DUPLICATE KEY UPDATE preco=VALUES(preco), mes_referencia=VALUES(mes_referencia), atualizado_em=NOW()",
-        (modelo["id"], ano_alvo["code"], dados.get("codeFipe"), preco, dados.get("referenceMonth")),
+        "INSERT INTO fipe_preco (fipe_modelo_id, ano_codigo, codigo_fipe, preco, mes_referencia, referencia_codigo) "
+        "VALUES (%s,%s,%s,%s,%s,%s) "
+        "ON DUPLICATE KEY UPDATE preco=VALUES(preco), mes_referencia=VALUES(mes_referencia), "
+        "referencia_codigo=VALUES(referencia_codigo), atualizado_em=NOW()",
+        (modelo["id"], ano_alvo["code"], dados.get("codeFipe"), preco,
+         dados.get("referenceMonth") or mes_referencia, codigo_referencia),
     )
     conn.commit()
     novo = cur.lastrowid
@@ -220,35 +261,51 @@ def parse_preco(preco_txt):
             if preco_txt else None)
 
 
-def atualiza_precos_vencidos(conn, limite):
-    """Atualiza aos poucos precos cujo mes de referencia ja ficou para tras."""
+def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia,
+                            somente_ativos=True):
+    """Atualiza a tabela local apenas quando a referencia publicada mudou.
+
+    Precos usados por mais anuncios ativos vem primeiro. Se houver mais registros que o
+    limite diario, a proxima execucao continua exatamente de onde parou.
+    """
     if limite <= 0:
         return 0
     cur = conn.cursor(dictionary=True)
-    cur.execute("""
-        SELECT fp.id, fp.ano_codigo, fm.marca_fipe_id, fm.modelo_fipe_id
+    filtro_uso = "uso.ativos > 0 AND" if somente_ativos else ""
+    cur.execute(f"""
+        SELECT fp.id, fp.ano_codigo, fm.marca_fipe_id, fm.modelo_fipe_id,
+               COALESCE(uso.ativos, 0) AS uso_ativo
         FROM fipe_preco fp
         JOIN fipe_modelo fm ON fm.id = fp.fipe_modelo_id
-        WHERE fp.atualizado_em < DATE_FORMAT(NOW(), '%Y-%m-01')
-        ORDER BY fp.atualizado_em, fp.id
+        LEFT JOIN (
+            SELECT fipe_preco_id, COUNT(*) AS ativos
+            FROM anuncio
+            WHERE status='ativo' AND fipe_preco_id IS NOT NULL
+            GROUP BY fipe_preco_id
+        ) uso ON uso.fipe_preco_id=fp.id
+        WHERE {filtro_uso}
+          (fp.referencia_codigo IS NULL OR fp.referencia_codigo<>%s)
+        ORDER BY uso_ativo DESC, fp.atualizado_em, fp.id
         LIMIT %s
-    """, (limite,))
+    """, (codigo_referencia, limite))
     vencidos = cur.fetchall()
     cur.close()
     atualizados = 0
     for item in vencidos:
         try:
-            dados = api_get(
+            dados = api_get(com_referencia(
                 f"/trucks/brands/{item['marca_fipe_id']}/models/"
-                f"{item['modelo_fipe_id']}/years/{item['ano_codigo']}"
-            )
+                f"{item['modelo_fipe_id']}/years/{item['ano_codigo']}",
+                codigo_referencia,
+            ))
             cur = conn.cursor()
             cur.execute("""
                 UPDATE fipe_preco
-                SET codigo_fipe=%s, preco=%s, mes_referencia=%s, atualizado_em=NOW()
+                SET codigo_fipe=%s, preco=%s, mes_referencia=%s,
+                    referencia_codigo=%s, atualizado_em=NOW()
                 WHERE id=%s
             """, (dados.get("codeFipe"), parse_preco(dados.get("price", "")),
-                  dados.get("referenceMonth"), item["id"]))
+                  dados.get("referenceMonth") or mes_referencia, codigo_referencia, item["id"]))
             conn.commit()
             cur.close()
             atualizados += 1
@@ -257,7 +314,9 @@ def atualiza_precos_vencidos(conn, limite):
         except requests.RequestException as e:
             print(f"  ! erro ao atualizar preco FIPE {item['id']}: {e}")
     if vencidos:
-        print(f"Precos FIPE vencidos: {len(vencidos)} encontrados, {atualizados} atualizados.")
+        print(f"Referencia {mes_referencia}: {len(vencidos)} precos na fila, {atualizados} atualizados.")
+    else:
+        print(f"Referencia {mes_referencia}: tabela local ja esta atualizada.")
     return atualizados
 
 
@@ -356,20 +415,20 @@ def roda_debug(conn):
           f"{cont['ambiguo']} ambiguos (nao vinculam de proposito)")
 
 
-def roda(conn, lote=200, max_refresh=100):
-    garante_marcas(conn)
-    try:
-        atualiza_precos_vencidos(conn, max_refresh)
-    except RuntimeError as e:
-        print(f"\n{e}")
-        print(f"{contador_req} requisicoes usadas nesta rodada.")
-        return
-
+def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None, mes_referencia=None):
     pendentes = anuncios_pendentes(conn, lote)
-    print(f"{len(pendentes)} anuncios de caminhao sem vinculo FIPE — processando (limite {max_req} req)...")
-    vinculados = sem_match = ambiguos = sem_ano = 0
+    if not permitir_api:
+        origem = "somente cache local"
+    elif max_req == 0:
+        origem = "API PRO ilimitada + cache"
+    else:
+        origem = f"API + cache (limite {max_req} req)"
+    print(f"{len(pendentes)} anuncios de caminhao sem vinculo FIPE — processando com {origem}...")
+    vinculados = sem_match = ambiguos = sem_ano = aguardando_cache = processados = 0
+    limite_atingido = False
 
     for a in pendentes:
+        processados += 1
         try:
             cands, info = escolhe(conn, a)
             if not cands:
@@ -384,11 +443,19 @@ def roda(conn, lote=200, max_refresh=100):
             # Variantes com a mesma assinatura (E5/E6): a primeira que tiver o ano do anuncio vence
             preco_id = escolhido = None
             for c in cands[:3]:
-                preco_id = busca_ou_cria_preco(conn, c, a["ano_inicial"])
+                if permitir_api:
+                    preco_id = busca_ou_cria_preco(
+                        conn, c, a["ano_inicial"], codigo_referencia, mes_referencia
+                    )
+                else:
+                    preco_id = busca_preco_cache(conn, c, a["ano_inicial"], codigo_referencia)
                 if preco_id:
                     escolhido = c
                     break
             if not preco_id:
+                if not permitir_api:
+                    aguardando_cache += 1
+                    continue
                 sem_ano += 1
                 registra_resultado(conn, a["id"], "sem_ano", f"ano {a['ano_inicial']} ausente nos candidatos FIPE")
                 continue
@@ -402,6 +469,7 @@ def roda(conn, lote=200, max_refresh=100):
             print(f"  [{info}] {a['titulo'][:38]:38} -> {escolhido['modelo_fipe'][:36]}")
         except RuntimeError as e:
             print(f"\n{e}")
+            limite_atingido = True
             break
         except requests.RequestException as e:
             print(f"  ! erro de rede em '{a['titulo'][:32]}': {e}")
@@ -409,8 +477,48 @@ def roda(conn, lote=200, max_refresh=100):
             continue
 
     print(f"\n{vinculados} vinculados · {sem_match} sem match · {ambiguos} ambiguos (pulados de proposito) "
-          f"· {sem_ano} sem o ano na FIPE")
+          f"· {sem_ano} sem o ano na FIPE · {aguardando_cache} aguardando carga")
     print(f"{contador_req} requisicoes usadas nesta rodada.")
+    return {
+        "pendentes": len(pendentes), "vinculados": vinculados, "sem_match": sem_match,
+        "ambiguos": ambiguos, "sem_ano": sem_ano, "aguardando_cache": aguardando_cache,
+        "processados": processados, "limite_atingido": limite_atingido,
+    }
+
+
+def roda_bootstrap(conn, lote=300):
+    global referencia_codigo, referencia_mes
+    referencia_codigo, referencia_mes = obtem_referencia_atual()
+    print(f"Referencia FIPE publicada: {referencia_mes} (codigo {referencia_codigo}).")
+    garante_marcas(conn, referencia_codigo)
+    return processa_anuncios(
+        conn, lote=lote, permitir_api=True,
+        codigo_referencia=referencia_codigo, mes_referencia=referencia_mes,
+    )
+
+
+def roda_local(conn, lote=500):
+    """Vincula anuncios sem qualquer chamada externa; faltas de cache permanecem na fila."""
+    cur = conn.cursor(dictionary=True)
+    cur.execute("SELECT MAX(referencia_codigo) AS codigo FROM fipe_preco")
+    atual = cur.fetchone()["codigo"]
+    cur.close()
+    if atual is not None:
+        print(f"Referencia local em uso: codigo {atual}.")
+    return processa_anuncios(
+        conn, lote=lote, permitir_api=False, codigo_referencia=atual
+    )
+
+
+def roda_mensal(conn, max_refresh=480, somente_ativos=True):
+    global referencia_codigo, referencia_mes
+    referencia_codigo, referencia_mes = obtem_referencia_atual()
+    print(f"Referencia FIPE publicada: {referencia_mes} (codigo {referencia_codigo}).")
+    atualizados = atualiza_precos_mensais(
+        conn, max_refresh, referencia_codigo, referencia_mes, somente_ativos
+    )
+    print(f"{contador_req} requisicoes usadas nesta rodada mensal.")
+    return atualizados
 
 
 if __name__ == "__main__":
@@ -421,9 +529,15 @@ if __name__ == "__main__":
     ap.add_argument("--db-name", default=os.getenv("OPER_RADAR_DB_NAME"))
     ap.add_argument("--max-req", type=int, default=400)
     ap.add_argument("--lote", type=int, default=200, help="quantos anuncios examinar por rodada")
-    ap.add_argument("--max-refresh", type=int, default=100, help="quantos precos mensais atualizar por rodada")
+    ap.add_argument("--modo", choices=("bootstrap", "local", "mensal", "debug"), default="bootstrap",
+                    help="bootstrap consulta combinacoes novas; local usa so MySQL; mensal renova precos")
+    ap.add_argument("--max-refresh", type=int, default=480, help="quantos precos mensais atualizar por rodada")
+    ap.add_argument("--atualizar-todos-precos", action="store_true",
+                    help="no modo mensal, renova todo o catalogo local (plano PRO)")
     ap.add_argument("--token", default=os.getenv("FIPE_API_TOKEN"), help="token opcional da API FIPE")
-    ap.add_argument("--debug", action="store_true", help="so mostra os scores do matching, sem chamar a API")
+    ap.add_argument("--marcador-conclusao",
+                    help="no bootstrap, cria este arquivo quando toda a fila atual terminar")
+    ap.add_argument("--debug", action="store_true", help="alias legado de --modo=debug")
     args = ap.parse_args()
 
     faltando = [nome for nome, valor in {
@@ -435,12 +549,37 @@ if __name__ == "__main__":
         ap.error("credenciais ausentes: " + ", ".join(faltando))
 
     max_req = args.max_req
+    contador_req = 0
+    headers_api.clear()
     if args.token:
-        headers_api["X-Subscription-Token"] = args.token
+        headers_api["Authorization"] = f"Bearer {args.token}"
 
     conn = mysql.connector.connect(host=args.db_host, user=args.db_user, password=args.db_pass,
                                    database=args.db_name, charset="utf8mb4")
     try:
-        roda_debug(conn) if args.debug else roda(conn, lote=args.lote, max_refresh=args.max_refresh)
+        modo = "debug" if args.debug else args.modo
+        if modo == "debug":
+            roda_debug(conn)
+        elif modo == "local":
+            roda_local(conn, lote=args.lote)
+        elif modo == "mensal":
+            roda_mensal(
+                conn, max_refresh=args.max_refresh,
+                somente_ativos=not args.atualizar_todos_precos,
+            )
+        else:
+            resultado = roda_bootstrap(conn, lote=args.lote)
+            concluiu = (resultado["pendentes"] < args.lote
+                        and resultado["processados"] == resultado["pendentes"]
+                        and not resultado["limite_atingido"])
+            if concluiu and args.marcador_conclusao:
+                marcador = Path(args.marcador_conclusao)
+                marcador.parent.mkdir(parents=True, exist_ok=True)
+                marcador.write_text(
+                    f"concluido_em={time.strftime('%Y-%m-%dT%H:%M:%S')}\n"
+                    f"referencia={referencia_mes}\n",
+                    encoding="utf-8",
+                )
+                print(f"Carga das combinacoes atuais concluida: {marcador}")
     finally:
         conn.close()

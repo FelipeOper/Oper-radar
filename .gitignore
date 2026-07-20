@@ -9,3 +9,4 @@ __pycache__/
 !.env.example
 fase1-coleta/coleta_multi_uf.lock
 fase1-coleta/coleta_multi_uf_status.json
+fase2-fipe/tabela-fipe-*.csv

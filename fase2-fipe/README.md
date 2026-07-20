@@ -1,54 +1,118 @@
-# Fase 2 — Referência FIPE
+# Fase 2 — Referência FIPE local e mensal
 
-Cruza os anúncios coletados (Fase 1) com o preço médio da tabela FIPE, habilitando:
-desvio vs FIPE por anúncio, oportunidades "abaixo da FIPE" e o desvio médio regional.
+Cruza os caminhões do radar com preços médios FIPE sem consultar a API a cada abertura
+do app ou a cada coleta. A fonte externa é a API v2 da Fipe Online: o acesso público é
+limitado, enquanto o plano PRO contratado permite consultas ilimitadas e CSV completo.
 
-**Fonte**: API pública https://fipe.parallelum.com.br/api/v2 (endpoint `trucks`), gratuita,
-com limite de 500 requisições/dia (1.000 com token gratuito de fipe.online).
+## Arquitetura
 
-## Como funciona (estratégia incremental)
-O sync NÃO baixa a tabela FIPE inteira. Ele olha os anúncios reais do banco e busca preço
-só para os modelos/anos que existem na coleta — cacheando tudo (`fipe_modelo`, `fipe_preco`)
-para nunca repetir requisição. O matching título→modelo FIPE é por tokens com peso dobrado
-em números (530, 6x4...) e guarda o nível de confiança (`alto`/`medio`); match fraco (<0.5)
-fica sem FIPE — melhor sem referência do que com referência errada.
+O catálogo fica dentro do MySQL:
 
-## Passos no servidor
+- `fipe_modelo`: catálogo de modelos de caminhão;
+- `fipe_preco`: preço vigente por modelo e ano, com o código da referência mensal;
+- `anuncio.fipe_preco_id`: vínculo auditável entre anúncio e preço local.
 
-1. Banco novo: importar `schema_fipe_mysql.sql`. Banco que ja tem FIPE: importar uma unica
-   vez `migracao_fipe_fila_mysql.sql`.
-2. Guardar as credenciais fora do repositorio, por exemplo em
-   `/home1/USUARIO/.oper-radar.env`, com permissao `600`:
-   ```bash
-   export OPER_RADAR_DB_HOST='localhost'
-   export OPER_RADAR_DB_USER='USUARIO_MYSQL'
-   export OPER_RADAR_DB_PASS='SENHA_MYSQL'
-   export OPER_RADAR_DB_NAME='BANCO_MYSQL'
-   ```
-3. Fazer primeiro um diagnostico sem consumir a API:
-   ```bash
-   set -a; source /home1/USUARIO/.oper-radar.env; set +a
-   cd /home1/USUARIO/agenciaoper.com.br/oper-radar/fase2-fipe
-   python3 fipe_sync.py --debug
-   ```
-4. Rodar um piloto pequeno:
-   ```bash
-   python3 fipe_sync.py --lote=20 --max-req=50 --max-refresh=10
-   ```
-5. Depois da auditoria do piloto, agendar 1x/dia fora dos horarios do scraper:
-   ```cron
-   0 13 * * * bash -lc 'set -a; source /home1/USUARIO/.oper-radar.env; set +a; cd /home1/USUARIO/agenciaoper.com.br/oper-radar/fase2-fipe && python3 fipe_sync.py --lote=200 --max-req=400 --max-refresh=100 >> fipe.log 2>&1'
-   ```
+Existem três modos independentes:
 
-Cada rodada vincula até ~100-150 anúncios (dentro do limite diário); em poucos dias a base
-inteira de caminhões fica coberta e o app passa a mostrar o desvio vs FIPE automaticamente.
+| Modo | Objetivo | Usa API externa |
+|---|---|---|
+| `local` | Vincula anúncios usando preços já armazenados | Não |
+| `bootstrap` | Descobre combinações novas presentes no radar | Sim, até o limite informado |
+| `mensal` | Renova somente os preços existentes quando a referência muda | Sim, 1 chamada por preço |
 
-Anuncios sem match, ambiguos ou sem ano recebem motivo auditavel e saem da frente da fila.
-Eles podem ser tentados novamente depois de 30 dias; erros de rede voltam em 1 dia. Precos de
-meses anteriores sao atualizados gradualmente a cada rodada.
+Ambiguidades de linha ou eixo continuam sem vínculo automático. Ausências do cache no modo
+local permanecem na fila, sem serem marcadas erroneamente como “sem ano”.
+
+## Instalação em banco existente
+
+```bash
+set -a; . /home1/USUARIO/.oper-radar.env; set +a
+cd /home1/USUARIO/agenciaoper.com.br/oper-radar/fase2-fipe
+python3 migrar_fipe_mensal.py
+```
+
+A migração é idempotente: pode ser executada novamente sem duplicar coluna ou índice.
+
+## Carga inicial por CSV
+
+Quando houver um arquivo completo como `tabela-fipe-335.csv`, ele é a forma mais eficiente
+de iniciar a referência. O importador lê somente `Type=TRUCK`, atualiza o catálogo completo
+de caminhões e grava os preços das combinações necessárias aos anúncios ativos. Nenhuma
+requisição externa é consumida.
+
+```bash
+python3 importar_fipe_csv.py /CAMINHO/tabela-fipe-335.csv --validar
+python3 importar_fipe_csv.py /CAMINHO/tabela-fipe-335.csv --todos-os-precos
+python3 fipe_sync.py --modo=local --lote=1000
+```
+
+No plano PRO, `--todos-os-precos` mantém os 11.386 preços de caminhões disponíveis para
+consulta interna. O código da referência é lido do nome do arquivo (`335`) e também pode
+ser informado com `--referencia-codigo`. O CSV não deve ser versionado no Git.
+
+### Token da assinatura
+
+Guardar o token somente em `/home1/USUARIO/.oper-radar.env` (permissão `600`):
+
+```bash
+FIPE_API_TOKEN='COLE_O_TOKEN_FORNECIDO'
+FIPE_API_UNLIMITED=1
+```
+
+Não colocar o token no repositório, no cron ou em comandos salvos no histórico. Com
+`FIPE_API_UNLIMITED=1`, o executor usa autenticação Bearer, renova o catálogo completo e
+reduz a pausa entre chamadas. Sem token, mantém o limite público de 480.
+
+## Validação
+
+Diagnóstico do matching, sem API:
+
+```bash
+python3 fipe_sync.py --modo=debug
+```
+
+Cruzamento local, sem API:
+
+```bash
+python3 fipe_sync.py --modo=local --lote=1000
+```
+
+Piloto de combinações novas:
+
+```bash
+python3 fipe_sync.py --modo=bootstrap --lote=20 --max-req=50
+```
+
+Atualização mensal manual:
+
+```bash
+bash executar_fipe_job.sh mensal
+```
+
+A primeira requisição mensal consulta `/references`. No PRO, a execução renova todo o
+catálogo local; se houver interrupção, a próxima execução continua pelos registros ainda
+na referência anterior. Sem PRO, somente preços ligados a anúncios ativos entram na fila.
+
+## Cron recomendado
+
+Depois da migração e dos testes:
+
+```bash
+bash instalar_cron_fipe_mensal.sh
+```
+
+O instalador preserva o cron atual, remove agendamentos FIPE antigos e adiciona:
+
+- 12h45 e 23h45: vínculo local, sem chamadas externas;
+- dias 1–10 às 13h15: verifica a referência e atualiza somente quando o mês publicado mudar;
+- dias 11–31 às 14h30: descobre combinações novas; a fila reabre nos dias 11, 18 e 25.
+
+Um marcador interrompe automaticamente o bootstrap quando não restar fila. Ele é removido
+nos dias 11, 18 e 25 para que combinações novas esperem no máximo uma semana.
 
 ## Limitações honestas
-- A FIPE cobre caminhões; **carretas/implementos não têm FIPE** — esses anúncios seguem sem
-  referência (a alternativa futura é uma referência própria por mediana regional de mercado).
-- O matching automático pode errar em modelos muito parecidos; o nível `medio` existe pra
-  ser auditável. Ajustes finos entram na Fase 8 (calibração).
+
+- A FIPE de veículos não cobre carretas e implementos.
+- Veículos profissionais, carrocerias e acessórios podem valer muito mais que o caminhão-base.
+- A referência é nacional; o preço praticado varia por região e estado do veículo.
+- Os 128 anúncios atuais sem número identificável precisam de uma fila de revisão separada.
