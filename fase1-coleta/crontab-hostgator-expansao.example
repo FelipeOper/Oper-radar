@@ -1,0 +1,5 @@
+# Expansao Centro-Oeste + Nordeste + Norte, fora dos horarios do PR.
+# Ajuste apenas SEUUSUARIO antes de instalar.
+
+0 1 * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && python3 coleta_multi_uf.py --plano=expansao --janela=07h >> /home1/SEUUSUARIO/logs/coleta-expansao.log 2>&1
+0 13 * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && python3 coleta_multi_uf.py --plano=expansao --janela=19h >> /home1/SEUUSUARIO/logs/coleta-expansao.log 2>&1

@@ -7,3 +7,5 @@ __pycache__/
 .env
 *.env
 !.env.example
+fase1-coleta/coleta_multi_uf.lock
+fase1-coleta/coleta_multi_uf_status.json
