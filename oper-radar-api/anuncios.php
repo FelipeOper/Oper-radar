@@ -104,12 +104,25 @@ $ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
 
 $sql = "SELECT a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.ano_inicial, a.ano_final,
                a.preco, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
-               a.fipe_match_confianca, f.preco AS preco_fipe, f.codigo_fipe,
+               a.fipe_match_status, a.fipe_match_confianca, a.fipe_match_motivo,
+               f.preco AS preco_fipe, f.codigo_fipe,
                ROUND((a.preco - f.preco) / NULLIF(f.preco, 0) * 100, 1) AS desvio_fipe_pct,
+               mc.anuncios_comparaveis, mc.preco_medio_mercado,
+               mc.menor_preco_mercado, mc.maior_preco_mercado,
+               ROUND((a.preco - mc.preco_medio_mercado) / NULLIF(mc.preco_medio_mercado, 0) * 100, 1) AS desvio_mercado_pct,
                r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf
         FROM anuncio a
         JOIN revenda r ON r.id = a.revenda_id
         LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id
+        LEFT JOIN (
+            SELECT fipe_preco_id, COUNT(*) AS anuncios_comparaveis,
+                   AVG(NULLIF(preco, 0)) AS preco_medio_mercado,
+                   MIN(NULLIF(preco, 0)) AS menor_preco_mercado,
+                   MAX(NULLIF(preco, 0)) AS maior_preco_mercado
+            FROM anuncio
+            WHERE status='ativo' AND fipe_preco_id IS NOT NULL AND preco > 0
+            GROUP BY fipe_preco_id
+        ) mc ON mc.fipe_preco_id=a.fipe_preco_id
         $clausula
         ORDER BY $ordem
         LIMIT ? OFFSET ?";
@@ -127,6 +140,11 @@ while ($row = $res->fetch_assoc()) {
     $row['preco'] = $row['preco'] !== null ? (float)$row['preco'] : null;
     $row['preco_fipe'] = $row['preco_fipe'] !== null ? (float)$row['preco_fipe'] : null;
     $row['desvio_fipe_pct'] = $row['desvio_fipe_pct'] !== null ? (float)$row['desvio_fipe_pct'] : null;
+    $row['preco_medio_mercado'] = $row['preco_medio_mercado'] !== null ? (float)$row['preco_medio_mercado'] : null;
+    $row['menor_preco_mercado'] = $row['menor_preco_mercado'] !== null ? (float)$row['menor_preco_mercado'] : null;
+    $row['maior_preco_mercado'] = $row['maior_preco_mercado'] !== null ? (float)$row['maior_preco_mercado'] : null;
+    $row['desvio_mercado_pct'] = $row['desvio_mercado_pct'] !== null ? (float)$row['desvio_mercado_pct'] : null;
+    $row['anuncios_comparaveis'] = (int)($row['anuncios_comparaveis'] ?? 0);
     $row['revenda_id'] = (int)$row['revenda_id'];
     $anuncios[] = $row;
 }

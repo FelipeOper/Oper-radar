@@ -5,7 +5,7 @@ import {
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
-  Monitor, Moon, Sun, Palette, Save, X
+  Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -95,8 +95,16 @@ function mapeiaAnuncioReal(a) {
     ano: a.ano_inicial ? `${a.ano_inicial}/${a.ano_final}` : '',
     preco: a.preco,
     precoFipe: a.preco_fipe ?? null,
+    codigoFipe: a.codigo_fipe ?? null,
     desvioFipePct: a.desvio_fipe_pct ?? null,
+    fipeStatus: a.fipe_match_status ?? null,
     fipeConfianca: a.fipe_match_confianca ?? null,
+    fipeMotivo: a.fipe_match_motivo ?? null,
+    precoMercado: a.preco_medio_mercado ?? null,
+    menorMercado: a.menor_preco_mercado ?? null,
+    maiorMercado: a.maior_preco_mercado ?? null,
+    desvioMercadoPct: a.desvio_mercado_pct ?? null,
+    mercadoTotal: Number(a.anuncios_comparaveis || 0),
     revendaId: a.revenda_id ?? null,
     revenda: a.revenda,
     cidade: a.cidade,
@@ -226,6 +234,46 @@ function Tag({ children, tone }) {
       color: c, background: `${c}18`, border: `1px solid ${c}30`, whiteSpace: 'nowrap',
     }}>{children}</span>
   );
+}
+
+function textoStatusFipe(anuncio) {
+  if (anuncio.precoFipe) return '';
+  const status = anuncio.fipeStatus;
+  if (status === 'ambiguo') return 'Versão FIPE precisa de validação';
+  if (status === 'sem_match') return 'Sem referência FIPE segura';
+  if (status === 'sem_ano') return 'Ano não disponível na referência';
+  if (status === 'erro_api') return 'Comparativo aguardando nova tentativa';
+  return anuncio.categoria === 'caminhoes' ? 'Comparativo em processamento' : 'FIPE não aplicável a esta categoria';
+}
+
+function ComparativoAnuncio({ anuncio, compacto = false }) {
+  const temFipe = Number(anuncio.precoFipe || 0) > 0;
+  const temMercado = Number(anuncio.precoMercado || 0) > 0 && anuncio.mercadoTotal > 0;
+  const desvioFipe = anuncio.desvioFipePct == null ? null : Number(anuncio.desvioFipePct);
+  const desvioMercado = anuncio.desvioMercadoPct == null ? null : Number(anuncio.desvioMercadoPct);
+  const tom = valor => valor == null ? T.inkMuted : valor < 0 ? T.positive : valor >= 20 ? T.alert : T.signal;
+  const diferenca = valor => valor == null ? '—' : `${valor > 0 ? '+' : ''}${valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+
+  if (!temFipe) {
+    return <div style={{ marginTop: compacto ? 7 : 11, padding: compacto ? '7px 9px' : '9px 10px', borderRadius: 8, background: T.surface2, border: `1px solid ${T.line}`, color: T.inkMuted, fontSize: 10.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <BadgeInfo size={12} style={{ flexShrink: 0 }} /> {textoStatusFipe(anuncio)}
+    </div>;
+  }
+
+  return <div style={{ marginTop: compacto ? 7 : 11, padding: compacto ? 8 : 10, borderRadius: 9, background: `${T.steel}0F`, border: `1px solid ${T.line}` }}>
+    <div style={{ display: 'grid', gridTemplateColumns: temMercado ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 8 }}>
+      <div>
+        <div style={{ color: T.inkMuted, fontSize: 9.5, letterSpacing: '0.05em', fontFamily: T.fontMono }}>TABELA FIPE</div>
+        <div style={{ color: T.ink, fontFamily: T.fontMono, fontSize: compacto ? 11 : 12, marginTop: 3 }}>{fmtBRL(anuncio.precoFipe)}</div>
+        <div style={{ color: tom(desvioFipe), fontSize: 10.5, marginTop: 2 }}>{diferenca(desvioFipe)} vs anúncio</div>
+      </div>
+      {temMercado && <div style={{ borderLeft: `1px solid ${T.line}`, paddingLeft: 8 }}>
+        <div style={{ color: T.inkMuted, fontSize: 9.5, letterSpacing: '0.05em', fontFamily: T.fontMono }}>MERCADO EQUIVALENTE</div>
+        <div style={{ color: T.ink, fontFamily: T.fontMono, fontSize: compacto ? 11 : 12, marginTop: 3 }}>{fmtBRL(anuncio.precoMercado)}</div>
+        <div style={{ color: tom(desvioMercado), fontSize: 10.5, marginTop: 2 }}>{diferenca(desvioMercado)} · {fmtN(anuncio.mercadoTotal)} ofertas</div>
+      </div>}
+    </div>
+  </div>;
 }
 
 function EmptyState({ icon: Icon, titulo, texto }) {
@@ -453,6 +501,7 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
                       <div style={{ marginTop: 10, paddingLeft: 24, fontSize: 12, color: T.inkMuted, display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <div><span style={{ color: T.ink }}>{s.a.revenda}</span> · {s.a.cidade}/{s.a.uf}</div>
                         <div><span style={{ fontFamily: T.fontMono, color: T.ink }}>{fmtBRL(s.a.preco)}</span> · {s.a.dias} dias no ar</div>
+                        <ComparativoAnuncio anuncio={s.a} compacto />
                         {s.a.url && <a href={s.a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, textDecoration: 'none', display: 'inline-flex', gap: 5, alignItems: 'center', marginTop: 4 }}>Ver no portal <ExternalLink size={11} /></a>}
                       </div>
                     )}
@@ -758,16 +807,10 @@ function PageMercado() {
                 <span>· {a.cidade}/{a.uf}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <div>
-                  <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>{fmtBRL(a.preco)}</div>
-                  <div style={{ fontSize: 11, marginTop: 2, color: a.precoFipe ? (a.preco < a.precoFipe ? T.positive : T.inkMuted) : T.inkMuted }}>
-                    {a.precoFipe
-                      ? `FIPE ${fmtBRL(a.precoFipe)} · ${a.preco < a.precoFipe ? '▼' : '▲'} ${Math.abs(Math.round((a.preco - a.precoFipe) / a.precoFipe * 100))}%`
-                      : 'FIPE ainda não vinculada'}
-                  </div>
-                </div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>{fmtBRL(a.preco)}</div>
                 {a.url && <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal"><ExternalLink size={15} /></a>}
               </div>
+              <ComparativoAnuncio anuncio={a} />
             </Card>
           );
         })}
@@ -824,6 +867,7 @@ function PageOportunidades({ onCriarAcao }) {
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{a.titulo}</div>
                 <div style={{ fontSize: 12, color: T.inkMuted }}>{a.revenda} · {a.cidade}/{a.uf} · {fmtBRL(a.preco)}</div>
+                <ComparativoAnuncio anuncio={a} compacto />
               </div>
               <Tag tone="alerta">{a.dias} DIAS NO AR</Tag>
               <button onClick={() => onCriarAcao(`Negociar: ${a.titulo} (${a.revenda}, ${a.dias}d no ar)`)}
@@ -851,9 +895,8 @@ function PageOportunidades({ onCriarAcao }) {
               <TrendingDown size={17} style={{ color: T.positive, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 230 }}>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{a.titulo}</div>
-                <div style={{ fontSize: 12, color: T.inkMuted }}>
-                  {a.revenda} · {a.cidade}/{a.uf} · anunciado {fmtBRL(a.preco)} · FIPE {fmtBRL(a.precoFipe)}
-                </div>
+                <div style={{ fontSize: 12, color: T.inkMuted }}>{a.revenda} · {a.cidade}/{a.uf} · anunciado {fmtBRL(a.preco)}</div>
+                <ComparativoAnuncio anuncio={a} compacto />
               </div>
               <Tag tone="positivo">{Math.abs(a.desvioFipePct ?? 0).toLocaleString('pt-BR')}% ABAIXO</Tag>
               <Tag tone={a.fipeConfianca === 'alto' ? 'positivo' : 'alerta'}>
@@ -1182,9 +1225,128 @@ function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
 }
 
 /* ============================================================
-   CONSULTA FIPE — catálogo local + leitura do mercado monitorado
+   CENTRAL FIPE — placa e catálogo local em fluxos separados
    ============================================================ */
 function PageFipe() {
+  const { data: statusPlaca } = useApi('placa_consulta.php?modo=status');
+  const [modo, setModo] = useState('placa');
+  const [placa, setPlaca] = useState('');
+  const [consultando, setConsultando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState('');
+
+  const placaFormatada = placa.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 7);
+  const consultarPlaca = async e => {
+    e.preventDefault();
+    setErro(''); setResultado(null);
+    if (!/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(placaFormatada)) {
+      setErro('Digite uma placa válida com 7 caracteres. Exemplo: ABC1D23.');
+      return;
+    }
+    setConsultando(true);
+    try {
+      const resposta = await fetch(`${API_BASE_URL}/placa_consulta.php?placa=${encodeURIComponent(placaFormatada)}`, { credentials: 'same-origin' });
+      const dados = await resposta.json().catch(() => ({}));
+      if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível consultar esta placa.');
+      setResultado(dados);
+    } catch (falha) {
+      setErro(falha.message);
+    } finally {
+      setConsultando(false);
+    }
+  };
+
+  return <div style={{ maxWidth: 1400 }}>
+    <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-8px 0 16px', maxWidth: 820 }}>
+      Consulte um veículo pela placa ou pesquise diretamente no catálogo nacional de caminhões. Os dois caminhos cruzam a FIPE com o mercado monitorado pelo radar.
+    </div>
+
+    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18, maxWidth: 640 }}>
+      {[
+        { id: 'placa', titulo: 'Consultar por placa', texto: 'Identifique o veículo e encontre a FIPE', icone: ScanLine },
+        { id: 'catalogo', titulo: 'Catálogo FIPE', texto: 'Busque por marca, modelo, ano ou código', icone: Search },
+      ].map(item => {
+        const Icone = item.icone;
+        const ativo = modo === item.id;
+        return <button key={item.id} role="tab" aria-selected={ativo} onClick={() => setModo(item.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, textAlign: 'left', padding: '12px 14px', cursor: 'pointer',
+          background: ativo ? `${T.signal}18` : T.surface, border: `1px solid ${ativo ? T.signal : T.line}`,
+          borderRadius: 12, color: ativo ? T.signal : T.ink, fontFamily: T.fontBody,
+        }}>
+          <Icone size={19} style={{ flexShrink: 0 }} />
+          <span style={{ minWidth: 0 }}>
+            <strong style={{ display: 'block', fontSize: 13 }}>{item.titulo}</strong>
+            <span style={{ display: 'block', color: T.inkMuted, fontSize: 10.5, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.texto}</span>
+          </span>
+        </button>;
+      })}
+    </div>
+
+    {modo === 'catalogo' ? <PageFipeCatalogo /> : <>
+      <Card style={{ padding: 18, maxWidth: 820 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 600 }}>Identificar veículo</div>
+            <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 4 }}>Placa antiga ou Mercosul. Não armazenamos dados pessoais do proprietário.</div>
+          </div>
+          <Tag tone={statusPlaca?.configurado ? 'positivo' : 'neutro'}>{statusPlaca?.configurado ? 'CONSULTA ATIVA' : 'AGUARDANDO CONECTOR'}</Tag>
+        </div>
+        <form onSubmit={consultarPlaca} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 260px' }}>
+            <ScanLine size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: T.inkMuted }} />
+            <input value={placaFormatada} onChange={e => setPlaca(e.target.value)} autoCapitalize="characters" autoCorrect="off" spellCheck="false"
+              placeholder="Digite a placa — ABC1D23" aria-label="Placa do veículo" maxLength={7}
+              style={{ ...inputStyle, width: '100%', paddingLeft: 40, fontFamily: T.fontMono, fontSize: 17, letterSpacing: '0.12em', textTransform: 'uppercase' }} />
+          </div>
+          <button disabled={consultando || statusPlaca?.configurado === false} style={{ ...inputStyle, flex: '0 0 auto', border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: consultando ? 'wait' : 'pointer', opacity: statusPlaca?.configurado === false ? 0.5 : 1 }}>
+            {consultando ? 'Consultando…' : 'Consultar placa'}
+          </button>
+        </form>
+        {statusPlaca?.configurado === false && <div style={{ color: T.inkMuted, background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 9, padding: 11, fontSize: 11.5, lineHeight: 1.55, marginTop: 12 }}>
+          A tela está pronta. Para consultar placas, falta somente ativar no servidor a chave de um provedor veicular. O catálogo FIPE continua disponível na opção ao lado.
+        </div>}
+        {erro && <div role="alert" style={{ color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}30`, borderRadius: 9, padding: 11, fontSize: 12.5, marginTop: 12 }}>{erro}</div>}
+      </Card>
+
+      {resultado && <div style={{ marginTop: 18 }}>
+        <Card style={{ padding: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div>
+              <Tag tone="positivo">PLACA {resultado.placa}</Tag>
+              <div style={{ fontFamily: T.fontDisplay, fontSize: 22, fontWeight: 650, marginTop: 12 }}>{[resultado.veiculo?.marca, resultado.veiculo?.modelo].filter(Boolean).join(' ') || 'Veículo identificado'}</div>
+              <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 5 }}>{resultado.veiculo?.ano_fabricacao || '—'}/{resultado.veiculo?.ano_modelo || '—'} · {resultado.veiculo?.cor || 'cor não informada'} · {[resultado.veiculo?.cidade, resultado.veiculo?.uf].filter(Boolean).join('/') || 'localidade não informada'}</div>
+            </div>
+            <div style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 10.5 }}>consulta {new Date(resultado.consultado_em).toLocaleString('pt-BR')}</div>
+          </div>
+        </Card>
+
+        <SectionTitle sub="A placa pode retornar mais de uma versão compatível; confirme configuração e ano antes de negociar">Referências encontradas</SectionTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 310px), 1fr))', gap: 12 }}>
+          {(resultado.fipes || []).map((item, indice) => {
+            const mercado = item.mercado;
+            const fipe = mercado?.preco_local ?? item.preco_fipe;
+            const desvio = mercado?.preco_medio_mercado && fipe ? ((mercado.preco_medio_mercado - fipe) / fipe) * 100 : null;
+            return <Card key={`${item.codigo_fipe}-${item.codigo_ano}-${indice}`} style={{ padding: 17 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><Tag tone="sinal">{item.marca || resultado.veiculo?.marca || 'FIPE'}</Tag><span style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 11 }}>{item.ano || item.codigo_ano || '—'}</span></div>
+              <div style={{ fontFamily: T.fontDisplay, fontWeight: 600, lineHeight: 1.4, marginTop: 12 }}>{item.modelo || resultado.veiculo?.modelo || 'Versão não informada'}</div>
+              <div style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 10.5, marginTop: 5 }}>{item.codigo_fipe || 'sem código'} · {mercado?.mes_referencia || item.referencia || 'referência atual'}</div>
+              <div style={{ fontFamily: T.fontDisplay, fontSize: 25, fontWeight: 650, marginTop: 16 }}>{fmtBRL(fipe)}</div>
+              <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12, marginTop: 14 }}>
+                {mercado?.anuncios_ativos > 0 ? <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12 }}><span style={{ color: T.inkMuted }}>Média no radar</span><strong>{fmtBRL(mercado.preco_medio_mercado)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, marginTop: 7 }}><span style={{ color: T.inkMuted }}>{fmtN(mercado.anuncios_ativos)} ofertas equivalentes</span><span style={{ color: desvio <= 0 ? T.positive : T.signal }}>{desvio == null ? '—' : `${desvio > 0 ? '+' : ''}${desvio.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% vs FIPE`}</span></div>
+                </> : <div style={{ color: T.inkMuted, fontSize: 11.5 }}>Sem ofertas equivalentes ativas no radar.</div>}
+              </div>
+            </Card>;
+          })}
+        </div>
+        {resultado.fipes?.length === 0 && <EmptyState icon={Search} titulo="Veículo identificado, sem FIPE retornada" texto="Use o catálogo por marca e modelo para localizar a referência manualmente." />}
+      </div>}
+    </>}
+  </div>;
+}
+
+function PageFipeCatalogo() {
   const [busca, setBusca] = useState('');
   const [buscaAplicada, setBuscaAplicada] = useState('');
   const [marca, setMarca] = useState('todas');
@@ -1229,10 +1391,6 @@ function PageFipe() {
 
   return (
     <div style={{ maxWidth: 1400 }}>
-      <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-8px 0 18px', maxWidth: 760 }}>
-        Consulte a referência nacional e compare cada versão com os anúncios ativos já vinculados no radar.
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: 12 }}>
         <Kpi label="Modelos de caminhão" value={facetas ? fmtN(facetas.resumo?.modelos) : '—'} sub={`${fmtN(facetas?.resumo?.marcas)} marcas no catálogo`} />
         <Kpi label="Preços disponíveis" value={facetas ? fmtN(facetas.resumo?.precos) : '—'} sub="anos e versões consultáveis" />

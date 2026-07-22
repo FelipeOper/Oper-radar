@@ -10,37 +10,43 @@
 // Deixe vazia para desativar o Analista.
 define('ANTHROPIC_API_KEY', '');
 
-function carrega_config_db(): array {
-    $direto = [
-        'host' => getenv('OPER_RADAR_DB_HOST') ?: 'localhost',
-        'user' => getenv('OPER_RADAR_DB_USER') ?: null,
-        'pass' => getenv('OPER_RADAR_DB_PASS') ?: null,
-        'name' => getenv('OPER_RADAR_DB_NAME') ?: null,
-    ];
-    if ($direto['user'] && $direto['pass'] && $direto['name']) {
-        return $direto;
-    }
-
-    $candidatos = array_filter(array_unique([
+function caminhos_env_oper_radar(): array {
+    return array_filter(array_unique([
         getenv('OPER_RADAR_ENV_FILE') ?: null,
         (getenv('HOME') ?: '') . '/.oper-radar.env',
         dirname(__DIR__, 2) . '/.oper-radar.env',
         dirname(__DIR__, 3) . '/.oper-radar.env',
     ]));
-    foreach ($candidatos as $arquivo) {
-        if (!is_readable($arquivo)) continue;
-        $env = parse_ini_file($arquivo, false, INI_SCANNER_RAW);
-        if (!is_array($env)) continue;
-        $config = [
-            'host' => $env['OPER_RADAR_DB_HOST'] ?? 'localhost',
-            'user' => $env['OPER_RADAR_DB_USER'] ?? null,
-            'pass' => $env['OPER_RADAR_DB_PASS'] ?? null,
-            'name' => $env['OPER_RADAR_DB_NAME'] ?? null,
-        ];
-        if ($config['user'] && $config['pass'] && $config['name']) {
-            return $config;
+}
+
+/** Lê uma configuração protegida do ambiente ou do arquivo externo. */
+function valor_config_oper_radar(string $chave, $padrao = null) {
+    $direto = getenv($chave);
+    if ($direto !== false && $direto !== '') return $direto;
+
+    static $arquivos = [];
+    foreach (caminhos_env_oper_radar() as $arquivo) {
+        if (!array_key_exists($arquivo, $arquivos)) {
+            $arquivos[$arquivo] = is_readable($arquivo)
+                ? parse_ini_file($arquivo, false, INI_SCANNER_RAW)
+                : false;
+        }
+        $env = $arquivos[$arquivo];
+        if (is_array($env) && isset($env[$chave]) && $env[$chave] !== '') {
+            return $env[$chave];
         }
     }
+    return $padrao;
+}
+
+function carrega_config_db(): array {
+    $config = [
+        'host' => valor_config_oper_radar('OPER_RADAR_DB_HOST', 'localhost'),
+        'user' => valor_config_oper_radar('OPER_RADAR_DB_USER'),
+        'pass' => valor_config_oper_radar('OPER_RADAR_DB_PASS'),
+        'name' => valor_config_oper_radar('OPER_RADAR_DB_NAME'),
+    ];
+    if ($config['user'] && $config['pass'] && $config['name']) return $config;
     throw new RuntimeException('Configuracao do banco indisponivel');
 }
 
