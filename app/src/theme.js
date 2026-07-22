@@ -1,3 +1,5 @@
+import { DEFAULT_DASHBOARD_LAYOUT, normalizeDashboardLayout } from './dashboardLayout.js';
+
 const STORAGE_KEY = 'oper-radar-ui-preferences-v1';
 
 export const THEMES = {
@@ -85,6 +87,7 @@ export const DEFAULT_UI_PREFERENCES = {
   theme: 'radar',
   density: 'standard',
   reduceMotion: false,
+  dashboardHoje: DEFAULT_DASHBOARD_LAYOUT,
 };
 
 const FONT_TOKENS = {
@@ -111,6 +114,7 @@ export function loadUiPreferences() {
       ...DEFAULT_UI_PREFERENCES,
       ...stored,
       theme: stored.theme === 'auto' || THEMES[stored.theme] ? stored.theme : DEFAULT_UI_PREFERENCES.theme,
+      dashboardHoje: normalizeDashboardLayout(stored.dashboardHoje),
     };
   } catch {
     return DEFAULT_UI_PREFERENCES;

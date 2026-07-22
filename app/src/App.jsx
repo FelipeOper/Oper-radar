@@ -5,13 +5,19 @@ import {
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
-  Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo
+  Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
+  ChevronUp, ChevronDown, Smartphone, Eye, EyeOff
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
   loadUiPreferences, saveUiPreferences, resolveTheme,
   activateTheme, applyUiPreferences,
 } from './theme.js';
+import {
+  DASHBOARD_KPIS, DASHBOARD_SECTIONS, DASHBOARD_PRESETS,
+  DEFAULT_DASHBOARD_LAYOUT, layoutFromPreset, moveDashboardItem,
+  normalizeDashboardLayout,
+} from './dashboardLayout.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
@@ -384,9 +390,9 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
 /* ============================================================
    HOJE — feed compacto + KPIs de mercado
    ============================================================ */
-function PainelKpi({ titulo, subtitulo, dados, renderItem }) {
+function PainelKpi({ titulo, subtitulo, dados, renderItem, style }) {
   return (
-    <Card style={{ padding: 16 }}>
+    <Card style={{ padding: 16, height: '100%', ...style }}>
       <div style={{ fontFamily: T.fontDisplay, fontSize: 13, fontWeight: 600, color: T.ink, marginBottom: 2 }}>{titulo}</div>
       {subtitulo && <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 12 }}>{subtitulo}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -424,10 +430,11 @@ function KpiEntradaSaida({ entrou, saiu }) {
   );
 }
 
-function PageHoje({ kpis, anuncios, usandoReais }) {
+function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonalizar }) {
   const { data: stats } = useApi('hoje_stats.php');
   const { data: facetas } = useApi('facetas.php?status=ativo');
   const [sinalAberto, setSinalAberto] = useState(null);
+  const layout = normalizeDashboardLayout(layoutInput);
 
   const sinais = useMemo(() => {
     const lista = [];
@@ -454,108 +461,65 @@ function PageHoje({ kpis, anuncios, usandoReais }) {
     ? `${kpis.ufs_ativas.length} UFs · ${kpis.regioes_ativas?.length || 0} regiões`
     : usandoReais ? `${Object.keys(facetas?.por_uf || {}).length || 1} UFs` : 'conectando…';
 
+  const kpiWidgets = {
+    revendas: <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={`${cobertura} · 2×/dia`} />,
+    anuncios: <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />,
+    saidas: <Kpi label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · ausência confirmada" tone={T.positive} />,
+    movimento: <KpiEntradaSaida entrou={kpis?.entradas_48h ?? sinais.filter(s => s.tipo === 'novo').length} saiu={kpis?.saidas_48h ?? sinais.filter(s => s.tipo === 'saida').length} />,
+  };
+
+  const sectionWidgets = {
+    feed: (
+      <Card style={{ padding: 16, height: '100%' }}>
+        <div style={{ fontFamily: T.fontDisplay, fontSize: 14, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Movimento do mercado</div>
+        <div style={{ fontSize: 11.5, color: T.inkMuted, marginBottom: 12 }}>O que mudou desde ontem — selecione um anúncio para ver detalhes</div>
+        {sinais.length === 0 ? (
+          <EmptyState icon={Radar} titulo="Sem sinais ainda" texto="Aguardando o próximo ciclo do radar detectar movimento." />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
+            {sinais.map((s, i) => {
+              const C = config[s.tipo];
+              const aberto = sinalAberto === i;
+              return (
+                <div key={`${s.a.id}-${s.tipo}-${i}`} style={{ background: aberto ? T.surface2 : T.surface, border: `1px solid ${aberto ? `${T.signal}4D` : T.line}`, borderRadius: 8, overflow: 'hidden' }}>
+                  <button type="button" aria-expanded={aberto} onClick={() => setSinalAberto(aberto ? null : i)} style={{ width: '100%', display: 'flex', gap: 10, alignItems: 'center', minHeight: 40, padding: '8px 12px', border: 'none', background: 'transparent', color: T.ink, cursor: 'pointer', fontFamily: T.fontBody, textAlign: 'left' }}>
+                    <C.icone size={13} style={{ color: C.cor, flexShrink: 0 }} />
+                    <span style={{ fontFamily: T.fontMono, fontSize: 9.5, color: C.cor, letterSpacing: '0.05em', minWidth: 55 }}>{C.rotulo}</span>
+                    <span style={{ fontSize: 12.5, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.a.titulo}</span>
+                    <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted, whiteSpace: 'nowrap' }}>{new Date(s.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                  </button>
+                  {aberto && <div style={{ padding: '2px 12px 12px 35px', fontSize: 12, color: T.inkMuted, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div><span style={{ color: T.ink }}>{s.a.revenda}</span> · {s.a.cidade}/{s.a.uf}</div>
+                    <div><span style={{ fontFamily: T.fontMono, color: T.ink }}>{fmtBRL(s.a.preco)}</span> · {s.a.dias} dias no ar</div>
+                    <ComparativoAnuncio anuncio={s.a} compacto />
+                    {s.a.url && <a href={s.a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, textDecoration: 'none', display: 'inline-flex', gap: 5, alignItems: 'center', marginTop: 4 }}>Ver no portal <ExternalLink size={11} /></a>}
+                  </div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    ),
+    modelos: <PainelKpi titulo="Modelos mais anunciados" subtitulo="Volume ativo · preço médio de mercado" dados={stats?.top_modelos} renderItem={(m, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{m.modelo}</span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>{m.n}× · <span style={{ color: T.ink }}>{fmtBRL(m.preco_medio)}</span></span></div>} />,
+    regioes: <PainelKpi titulo="Regiões com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias" dados={stats?.regioes_saidas ?? stats?.regioes_vendas} renderItem={(c, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}><span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}><MapPin size={11} style={{ color: T.inkMuted, flexShrink: 0 }} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.cidade}/{c.uf}</span></span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive, whiteSpace: 'nowrap' }}>{c.n} saídas</span></div>} />,
+    lojas_novos: <PainelKpi titulo="Lojas mais ativas" subtitulo="Anúncios novos nos últimos 7 dias" dados={stats?.top_lojas_novos} renderItem={(l, i) => <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.signal }}>+{l.n}</span></div>} />,
+    lojas_saidas: <PainelKpi titulo="Lojas com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias" dados={stats?.top_lojas_saidas ?? stats?.top_lojas_vendas} renderItem={(l, i) => <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{l.n} saídas</span></div>} />,
+  };
+
+  const presetLabel = DASHBOARD_PRESETS[layout.preset]?.label || 'Personalizado';
+
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 22 }}>
-        <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'}
-          sub={`${cobertura} · 2×/dia`} />
-        <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />
-        <Kpi label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · ausência confirmada" tone={T.positive} />
-        <KpiEntradaSaida
-          entrou={kpis?.entradas_48h ?? sinais.filter(s => s.tipo === 'novo').length}
-          saiu={kpis?.saidas_48h ?? sinais.filter(s => s.tipo === 'saida').length}
-        />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: T.inkMuted, fontSize: 11.5 }}><LayoutGrid size={14} />Visão: {presetLabel}</div>
+        {onPersonalizar && <button type="button" onClick={onPersonalizar} style={{ ...inputStyle, minHeight: 34, padding: '6px 10px', cursor: 'pointer', color: T.signal }}><Settings size={13} style={{ verticalAlign: -2, marginRight: 6 }} />Personalizar painel</button>}
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 430px), 1fr))', gap: 16, alignItems: 'start' }}>
-
-        {/* COLUNA ESQUERDA: feed compacto */}
-        <div>
-          <div style={{ fontFamily: T.fontDisplay, fontSize: 14, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Feed do mercado</div>
-          <div style={{ fontSize: 11.5, color: T.inkMuted, marginBottom: 12 }}>O que mudou desde ontem — clique para expandir</div>
-
-          {sinais.length === 0 ? (
-            <EmptyState icon={Radar} titulo="Sem sinais ainda"
-              texto="Aguardando o próximo ciclo do radar detectar movimento." />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 640, overflowY: 'auto', paddingRight: 4 }}>
-              {sinais.map((s, i) => {
-                const C = config[s.tipo];
-                const aberto = sinalAberto === i;
-                return (
-                  <div key={i} onClick={() => setSinalAberto(aberto ? null : i)} style={{
-                    background: aberto ? T.surface2 : T.surface,
-                    border: `1px solid ${aberto ? `${T.signal}4D` : T.line}`,
-                    borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
-                    transition: 'border-color 140ms',
-                  }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <C.icone size={13} style={{ color: C.cor, flexShrink: 0 }} />
-                      <span style={{ fontFamily: T.fontMono, fontSize: 9.5, color: C.cor, letterSpacing: '0.05em', minWidth: 46 }}>{C.rotulo}</span>
-                      <span style={{ fontSize: 12.5, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.a.titulo}</span>
-                      <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted, whiteSpace: 'nowrap' }}>
-                        {new Date(s.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    {aberto && (
-                      <div style={{ marginTop: 10, paddingLeft: 24, fontSize: 12, color: T.inkMuted, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div><span style={{ color: T.ink }}>{s.a.revenda}</span> · {s.a.cidade}/{s.a.uf}</div>
-                        <div><span style={{ fontFamily: T.fontMono, color: T.ink }}>{fmtBRL(s.a.preco)}</span> · {s.a.dias} dias no ar</div>
-                        <ComparativoAnuncio anuncio={s.a} compacto />
-                        {s.a.url && <a href={s.a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, textDecoration: 'none', display: 'inline-flex', gap: 5, alignItems: 'center', marginTop: 4 }}>Ver no portal <ExternalLink size={11} /></a>}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* COLUNA DIREITA: KPIs de mercado */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: 12 }}>
-          <PainelKpi titulo="Modelos mais anunciados" subtitulo="Volume ativo · preço médio de mercado"
-            dados={stats?.top_modelos}
-            renderItem={(m, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{m.modelo}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>
-                  {m.n}× · <span style={{ color: T.ink }}>{fmtBRL(m.preco_medio)}</span>
-                </span>
-              </div>
-            )}
-          />
-
-          <PainelKpi titulo="Regiões com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias"
-            dados={stats?.regioes_saidas ?? stats?.regioes_vendas}
-            renderItem={(c, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><MapPin size={11} style={{ color: T.inkMuted }} />{c.cidade}/{c.uf}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{c.n} saídas</span>
-              </div>
-            )}
-          />
-
-          <PainelKpi titulo="Lojas mais ativas" subtitulo="Anúncios novos nos últimos 7 dias"
-            dados={stats?.top_lojas_novos}
-            renderItem={(l, i) => (
-              <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.signal }}>+{l.n}</span>
-              </div>
-            )}
-          />
-
-          <PainelKpi titulo="Lojas com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias"
-            dados={stats?.top_lojas_saidas ?? stats?.top_lojas_vendas}
-            renderItem={(l, i) => (
-              <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{l.n}v</span>
-              </div>
-            )}
-          />
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 22 }}>
+        {layout.kpis.map(id => <React.Fragment key={id}>{kpiWidgets[id]}</React.Fragment>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: 12, alignItems: 'stretch' }}>
+        {layout.sections.map(section => <div key={section.id} style={{ gridColumn: section.size === 'wide' ? '1 / -1' : 'auto', minWidth: 0 }}>{sectionWidgets[section.id]}</div>)}
       </div>
     </div>
   );
@@ -1737,6 +1701,109 @@ function PageMinhaLoja({ sessao }) {
 /* ============================================================
    CONFIGURAÇÕES
    ============================================================ */
+function DashboardPreview({ layout, mode }) {
+  const sectionLabel = Object.fromEntries(DASHBOARD_SECTIONS.map(item => [item.id, item.label]));
+  const mobile = mode === 'mobile';
+  return (
+    <div aria-hidden="true" style={{ width: mobile ? 270 : '100%', maxWidth: '100%', margin: '0 auto', border: `1px solid ${T.lineStrong}`, borderRadius: 12, background: T.bg, padding: mobile ? 10 : 14, transition: 'width 180ms ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: T.inkMuted, fontFamily: T.fontMono, fontSize: 8.5, marginBottom: 9 }}><span>HOJE</span><span>{mobile ? 'MOBILE' : 'DESKTOP'}</span></div>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : `repeat(${Math.min(4, layout.kpis.length)}, minmax(0, 1fr))`, gap: 5 }}>
+        {layout.kpis.map(id => <div key={id} style={{ minHeight: 42, borderRadius: 6, background: T.surface2, border: `1px solid ${T.line}`, padding: 6 }}><div style={{ width: '65%', height: 4, borderRadius: 3, background: T.inkMuted, opacity: 0.7 }} /><div style={{ width: '40%', height: 9, borderRadius: 3, background: T.signal, opacity: 0.75, marginTop: 8 }} /></div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 5, marginTop: 5 }}>
+        {layout.sections.map(section => <div key={section.id} title={sectionLabel[section.id]} style={{ gridColumn: !mobile && section.size === 'wide' ? '1 / -1' : 'auto', minHeight: section.id === 'feed' ? 70 : 52, borderRadius: 6, background: T.surface, border: `1px solid ${T.line}`, padding: 7 }}><div style={{ color: T.ink, fontSize: 8.5, fontWeight: 650 }}>{sectionLabel[section.id]}</div><div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 7 }}>{[1, 2, 3].map(item => <span key={item} style={{ height: 3, width: `${95 - item * 12}%`, borderRadius: 2, background: T.inkMuted, opacity: 0.35 }} />)}</div></div>)}
+      </div>
+    </div>
+  );
+}
+
+function DashboardOrderRow({ label, active, index, total, onToggle, onMove, size, onSize }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: `1px solid ${active ? T.lineStrong : T.line}`, borderRadius: 9, background: active ? T.surface2 : 'transparent', opacity: active ? 1 : 0.62 }}>
+      <button type="button" aria-label={active ? `Ocultar ${label}` : `Mostrar ${label}`} aria-pressed={active} onClick={onToggle} style={{ minHeight: 30, minWidth: 30, padding: 4, border: 'none', borderRadius: 6, background: active ? `${T.positive}14` : T.surface2, color: active ? T.positive : T.inkMuted, cursor: 'pointer' }}>{active ? <Eye size={15} /> : <EyeOff size={15} />}</button>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: active ? T.ink : T.inkMuted }}>{label}</span>
+      {active && size && <button type="button" aria-label={`Alterar largura de ${label}`} onClick={onSize} style={{ minHeight: 30, padding: '4px 8px', border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, cursor: 'pointer' }}>{size === 'wide' ? 'LARGO' : '½'}</button>}
+      {active && <div style={{ display: 'flex', gap: 3 }}><button type="button" aria-label={`Mover ${label} para cima`} disabled={index === 0} onClick={() => onMove(-1)} style={{ minHeight: 30, minWidth: 30, border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.35 : 1 }}><ChevronUp size={14} /></button><button type="button" aria-label={`Mover ${label} para baixo`} disabled={index === total - 1} onClick={() => onMove(1)} style={{ minHeight: 30, minWidth: 30, border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, cursor: index === total - 1 ? 'default' : 'pointer', opacity: index === total - 1 ? 0.35 : 1 }}><ChevronDown size={14} /></button></div>}
+    </div>
+  );
+}
+
+function DashboardLayoutEditor({ value, onSave }) {
+  const normalizedValue = normalizeDashboardLayout(value);
+  const [draft, setDraft] = useState(normalizedValue);
+  const [previewMode, setPreviewMode] = useState('desktop');
+  const [saved, setSaved] = useState(false);
+  useEffect(() => setDraft(normalizeDashboardLayout(value)), [value]);
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(normalizedValue);
+  const kpiById = Object.fromEntries(DASHBOARD_KPIS.map(item => [item.id, item]));
+  const sectionById = Object.fromEntries(DASHBOARD_SECTIONS.map(item => [item.id, item]));
+  const orderedKpis = [...draft.kpis, ...DASHBOARD_KPIS.map(item => item.id).filter(id => !draft.kpis.includes(id))];
+  const activeSections = draft.sections.map(item => item.id);
+  const orderedSections = [...activeSections, ...DASHBOARD_SECTIONS.map(item => item.id).filter(id => !activeSections.includes(id))];
+
+  const updateDraft = next => { setDraft(normalizeDashboardLayout({ ...next, preset: next.preset || 'personalizado' })); setSaved(false); };
+  const toggleKpi = id => {
+    const active = draft.kpis.includes(id);
+    if (active && draft.kpis.length === 1) return;
+    updateDraft({ ...draft, preset: 'personalizado', kpis: active ? draft.kpis.filter(item => item !== id) : [...draft.kpis, id] });
+  };
+  const toggleSection = id => {
+    const active = activeSections.includes(id);
+    if (active && draft.sections.length === 1) return;
+    updateDraft({ ...draft, preset: 'personalizado', sections: active ? draft.sections.filter(item => item.id !== id) : [...draft.sections, { id, size: 'half' }] });
+  };
+  const save = () => {
+    const clean = normalizeDashboardLayout(draft);
+    onSave({ dashboardHoje: clean });
+    setDraft(clean);
+    setSaved(true);
+  };
+
+  return (
+    <Card style={{ padding: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div><div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 650 }}>Página Hoje</div><div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>Escolha o que aparece e a ordem de leitura. O celular respeita a mesma ordem em uma coluna.</div></div>
+        <Tag tone={dirty ? 'alerta' : 'positivo'}>{dirty ? 'ALTERAÇÕES NÃO SALVAS' : saved ? 'SALVO' : 'ATIVO'}</Tag>
+      </div>
+
+      <div style={{ fontSize: 11, color: T.inkMuted, margin: '18px 0 8px', letterSpacing: '0.06em' }}>MODELOS PRONTOS</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8 }}>
+        {Object.values(DASHBOARD_PRESETS).map(preset => {
+          const active = draft.preset === preset.id;
+          return <button type="button" aria-pressed={active} key={preset.id} onClick={() => updateDraft(layoutFromPreset(preset.id))} style={{ minHeight: 78, padding: 11, textAlign: 'left', border: `1px solid ${active ? T.signal : T.line}`, borderRadius: 10, background: active ? `${T.signal}10` : T.surface2, color: T.ink, cursor: 'pointer', fontFamily: T.fontBody }}><div style={{ fontWeight: 650, fontSize: 12.5 }}>{preset.label}</div><div style={{ color: T.inkMuted, fontSize: 10.5, lineHeight: 1.45, marginTop: 5 }}>{preset.description}</div></button>;
+        })}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 18, marginTop: 20 }}>
+        <div>
+          <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 8, letterSpacing: '0.06em' }}>KPIs DO TOPO</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{orderedKpis.map(id => {
+            const index = draft.kpis.indexOf(id); const active = index >= 0;
+            return <DashboardOrderRow key={id} label={kpiById[id].label} active={active} index={index} total={draft.kpis.length} onToggle={() => toggleKpi(id)} onMove={direction => updateDraft({ ...draft, preset: 'personalizado', kpis: moveDashboardItem(draft.kpis, index, direction) })} />;
+          })}</div>
+          <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 7 }}>Ao menos um KPI deve permanecer ativo.</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 8, letterSpacing: '0.06em' }}>BLOCOS DE CONTEÚDO</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{orderedSections.map(id => {
+            const index = draft.sections.findIndex(item => item.id === id); const active = index >= 0; const section = draft.sections[index];
+            return <DashboardOrderRow key={id} label={sectionById[id].label} active={active} index={index} total={draft.sections.length} size={section?.size} onToggle={() => toggleSection(id)} onSize={() => updateDraft({ ...draft, preset: 'personalizado', sections: draft.sections.map(item => item.id === id ? { ...item, size: item.size === 'wide' ? 'half' : 'wide' } : item) })} onMove={direction => updateDraft({ ...draft, preset: 'personalizado', sections: moveDashboardItem(draft.sections, index, direction) })} />;
+          })}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, margin: '20px 0 9px', flexWrap: 'wrap' }}><div style={{ fontSize: 11, color: T.inkMuted, letterSpacing: '0.06em' }}>PRÉVIA</div><div style={{ display: 'flex', gap: 5 }}><button type="button" aria-pressed={previewMode === 'desktop'} onClick={() => setPreviewMode('desktop')} style={{ ...inputStyle, minHeight: 34, padding: '5px 9px', cursor: 'pointer', color: previewMode === 'desktop' ? T.signal : T.inkMuted, borderColor: previewMode === 'desktop' ? T.signal : T.line }}><Monitor size={14} style={{ verticalAlign: -3, marginRight: 5 }} />Desktop</button><button type="button" aria-pressed={previewMode === 'mobile'} onClick={() => setPreviewMode('mobile')} style={{ ...inputStyle, minHeight: 34, padding: '5px 9px', cursor: 'pointer', color: previewMode === 'mobile' ? T.signal : T.inkMuted, borderColor: previewMode === 'mobile' ? T.signal : T.line }}><Smartphone size={14} style={{ verticalAlign: -3, marginRight: 5 }} />Mobile</button></div></div>
+      <div style={{ background: T.surface2, borderRadius: 12, padding: 12 }}><DashboardPreview layout={draft} mode={previewMode} /></div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+        <button type="button" onClick={() => updateDraft(DEFAULT_DASHBOARD_LAYOUT)} style={{ ...inputStyle, cursor: 'pointer' }}><RotateCcw size={14} style={{ verticalAlign: -3, marginRight: 6 }} />Restaurar página Hoje</button>
+        <button type="button" disabled={!dirty} onClick={save} style={{ ...inputStyle, minWidth: 140, cursor: dirty ? 'pointer' : 'default', border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, opacity: dirty ? 1 : 0.45 }}><Save size={14} style={{ verticalAlign: -3, marginRight: 6 }} />Salvar layout</button>
+      </div>
+    </Card>
+  );
+}
+
 function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvido }) {
   const { data: fipeStatus, erro: fipeErro } = useApi('fipe_status.php');
   const { data: facetas } = useApi('facetas.php?status=ativo');
@@ -1749,6 +1816,8 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
     ? Math.min(100, Math.round((Number(fipeStatus.vinculados_ativos || 0) / Number(fipeStatus.elegiveis)) * 100)) : 0;
   return (
     <div style={{ maxWidth: 980 }}>
+      <SectionTitle sub="Modelos prontos, KPIs e ordem dos blocos para desktop e celular">Personalização do painel</SectionTitle>
+      <DashboardLayoutEditor value={preferencias.dashboardHoje} onSave={onPreferencias} />
       <SectionTitle sub="Tema, densidade e conforto de uso — preferências salvas neste navegador">Aparência</SectionTitle>
       <Card>
         <div style={{ fontSize: 12, color: T.inkMuted, marginBottom: 12 }}>TEMA</div>
@@ -2109,7 +2178,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   };
 
   const paginas = {
-    hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} />,
+    hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
     mercado: <PageMercado />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
