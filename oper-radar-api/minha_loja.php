@@ -26,6 +26,7 @@ function normaliza_estoque(array $dados): array {
         'data_entrada' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($dados['data_entrada'] ?? '')) ? $dados['data_entrada'] : date('Y-m-d'),
         'status' => in_array($dados['status'] ?? '', $statusValidos, true) ? $dados['status'] : 'estoque',
         'fipe_preco_id' => $fipe ?: null,
+        'usar_comparativo' => !isset($dados['usar_comparativo']) || filter_var($dados['usar_comparativo'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0,
     ];
 }
 
@@ -33,7 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $st = $conn->prepare("
         SELECT me.id, me.referencia_interna, me.marca, me.modelo, me.ano,
                me.preco_anunciado, me.cidade, me.uf, me.data_entrada, me.status,
-               me.fipe_preco_id, me.criado_em, me.atualizado_em,
+               me.fipe_preco_id, me.origem, me.placa, me.quilometragem,
+               me.url_anuncio, me.imagem_url, me.usar_comparativo,
+               me.ultima_sincronizacao, me.criado_em, me.atualizado_em,
                fp.preco AS preco_fipe, fp.codigo_fipe, fp.mes_referencia,
                fm.marca_fipe, fm.modelo_fipe,
                DATEDIFF(CURDATE(), me.data_entrada) AS dias_estoque,
@@ -50,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $res = $st->get_result();
     $itens = [];
     while ($row = $res->fetch_assoc()) {
-        foreach (['id', 'ano', 'fipe_preco_id', 'dias_estoque', 'anuncios_ativos'] as $campo) {
+        foreach (['id', 'ano', 'fipe_preco_id', 'dias_estoque', 'anuncios_ativos', 'quilometragem', 'usar_comparativo'] as $campo) {
             $row[$campo] = $row[$campo] !== null ? (int)$row[$campo] : null;
         }
         foreach (['preco_anunciado', 'preco_fipe', 'preco_medio_mercado'] as $campo) {
@@ -88,8 +91,8 @@ if (mb_strlen($item['modelo']) < 2) {
 
 if ($acao === 'atualizar') {
     $id = (int)($corpo['id'] ?? 0);
-    $st = $conn->prepare('UPDATE meu_estoque SET referencia_interna=?,marca=?,modelo=?,ano=?,preco_anunciado=?,cidade=?,uf=?,data_entrada=?,status=?,fipe_preco_id=? WHERE id=? AND usuario_id=?');
-    $st->bind_param('sssidssssiii', $item['referencia_interna'], $item['marca'], $item['modelo'], $item['ano'], $item['preco_anunciado'], $item['cidade'], $item['uf'], $item['data_entrada'], $item['status'], $item['fipe_preco_id'], $id, $usuario['id']);
+    $st = $conn->prepare('UPDATE meu_estoque SET referencia_interna=?,marca=?,modelo=?,ano=?,preco_anunciado=?,cidade=?,uf=?,data_entrada=?,status=?,fipe_preco_id=?,usar_comparativo=? WHERE id=? AND usuario_id=?');
+    $st->bind_param('sssidssssiiii', $item['referencia_interna'], $item['marca'], $item['modelo'], $item['ano'], $item['preco_anunciado'], $item['cidade'], $item['uf'], $item['data_entrada'], $item['status'], $item['fipe_preco_id'], $item['usar_comparativo'], $id, $usuario['id']);
 } else {
     $st = $conn->prepare('INSERT INTO meu_estoque (usuario_id,referencia_interna,marca,modelo,ano,preco_anunciado,cidade,uf,data_entrada,status,fipe_preco_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
     $st->bind_param('isssidssssi', $usuario['id'], $item['referencia_interna'], $item['marca'], $item['modelo'], $item['ano'], $item['preco_anunciado'], $item['cidade'], $item['uf'], $item['data_entrada'], $item['status'], $item['fipe_preco_id']);
