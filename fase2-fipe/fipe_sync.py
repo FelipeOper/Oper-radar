@@ -176,7 +176,9 @@ def anuncios_pendentes(conn, limite):
     cur = conn.cursor(dictionary=True)
     cur.execute("""
         SELECT id, titulo, marca, ano_inicial FROM anuncio
-        WHERE fipe_preco_id IS NULL AND tipo = 'Caminhao' AND marca IS NOT NULL
+        WHERE fipe_preco_id IS NULL
+          AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
+          AND tipo = 'Caminhao' AND marca IS NOT NULL
           AND ano_inicial IS NOT NULL AND status = 'ativo'
           AND (
               fipe_ultima_tentativa IS NULL
@@ -325,13 +327,19 @@ def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianc
     cur.execute("""
         UPDATE anuncio
         SET fipe_preco_id=%s,
+            fipe_preco_automatico_id=%s,
             fipe_match_confianca=%s,
+            fipe_match_confianca_automatico=%s,
             fipe_match_status=%s,
+            fipe_match_status_automatico=%s,
             fipe_match_motivo=%s,
+            fipe_match_motivo_automatico=%s,
+            fipe_vinculo_origem='automatico',
             fipe_ultima_tentativa=NOW(),
             fipe_tentativas=fipe_tentativas+1
         WHERE id=%s
-    """, (preco_id, confianca, status, motivo[:160], anuncio_id))
+    """, (preco_id, preco_id, confianca, confianca, status, status,
+          motivo[:160], motivo[:160], anuncio_id))
     conn.commit()
     cur.close()
 

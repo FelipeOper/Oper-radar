@@ -124,19 +124,21 @@ def salva_estado(conn, revenda_id: int, novo_estado: dict, anuncios_por_id: dict
             # MySQL usa "ON DUPLICATE KEY UPDATE" em vez do "ON CONFLICT ... DO UPDATE" do Postgres.
             cur.execute("""
                 INSERT INTO anuncio (anuncio_portal_id, revenda_id, url, titulo, tipo, marca,
-                    ano_inicial, ano_final, preco, preco_texto_bruto,
+                    ano_inicial, ano_final, km_ou_horas, preco, preco_texto_bruto,
                     primeira_vez_visto, ultima_vez_ativo, status, misses_consecutivos, data_remocao)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON DUPLICATE KEY UPDATE
                     ultima_vez_ativo = VALUES(ultima_vez_ativo),
                     status = VALUES(status),
                     misses_consecutivos = VALUES(misses_consecutivos),
                     data_remocao = VALUES(data_remocao),
+                    km_ou_horas = COALESCE(NULLIF(VALUES(km_ou_horas), ''), km_ou_horas),
                     preco = COALESCE(VALUES(preco), preco)
             """, (
                 anuncio_id, revenda_id,
                 anuncio.url, anuncio.titulo, anuncio.tipo, anuncio.marca,
-                anuncio.ano_inicial, anuncio.ano_final, anuncio.preco, anuncio.preco_texto_bruto,
+                anuncio.ano_inicial, anuncio.ano_final, anuncio.km_ou_horas,
+                anuncio.preco, anuncio.preco_texto_bruto,
                 estado.primeira_vez_visto, estado.ultima_vez_ativo, estado.status,
                 estado.misses_consecutivos, estado.data_remocao,
             ))

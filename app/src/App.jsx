@@ -6,7 +6,8 @@ import {
   Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
-  ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText
+  ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
+  Pencil, History, Undo2, Ruler, Check
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -92,11 +93,14 @@ function categoriaDe(tipo) {
 function mapeiaAnuncioReal(a) {
   const dias = Math.max(0, Math.round((Date.now() - new Date(a.primeira_vez_visto)) / 86400000));
   return {
+    dbId: a.anuncio_id,
     id: a.anuncio_portal_id,
     url: a.url,
     tipo: a.tipo || '—',
     categoria: categoriaDe(a.tipo),
     marca: a.marca || '',
+    modelo: a.modelo || '',
+    cor: a.cor || '',
     titulo: a.titulo,
     ano: a.ano_inicial ? `${a.ano_inicial}/${a.ano_final}` : '',
     preco: a.preco,
@@ -106,6 +110,13 @@ function mapeiaAnuncioReal(a) {
     fipeStatus: a.fipe_match_status ?? null,
     fipeConfianca: a.fipe_match_confianca ?? null,
     fipeMotivo: a.fipe_match_motivo ?? null,
+    fipeOrigem: a.fipe_vinculo_origem || 'automatico',
+    marcaFipe: a.marca_fipe || '',
+    modeloFipe: a.modelo_fipe || '',
+    anoFipe: a.ano_fipe || '',
+    referenciaFipe: a.referencia_fipe || '',
+    quilometragem: a.quilometragem || null,
+    quilometragemOrigem: a.quilometragem_origem || null,
     precoMercado: a.preco_medio_mercado ?? null,
     menorMercado: a.menor_preco_mercado ?? null,
     maiorMercado: a.maior_preco_mercado ?? null,
@@ -198,7 +209,10 @@ function RadarPulse({ ultimaColeta }) {
 function Card({ children, style, onClick }) {
   const usaPaddingPadrao = style?.padding == null;
   return (
-    <div className={usaPaddingPadrao ? 'or-card or-card-density' : 'or-card'} onClick={onClick} style={{
+    <div className={usaPaddingPadrao ? 'or-card or-card-density' : 'or-card'} onClick={onClick}
+      role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); } }) : undefined}
+      style={{
       background: T.surface, border: `1px solid ${T.line}`, borderRadius: 14,
       padding: 20, transition: 'border-color 160ms ease',
       cursor: onClick ? 'pointer' : 'default',
@@ -269,7 +283,7 @@ function ComparativoAnuncio({ anuncio, compacto = false }) {
   return <div style={{ marginTop: compacto ? 7 : 11, padding: compacto ? 8 : 10, borderRadius: 9, background: `${T.steel}0F`, border: `1px solid ${T.line}` }}>
     <div style={{ display: 'grid', gridTemplateColumns: temMercado ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 8 }}>
       <div>
-        <div style={{ color: T.inkMuted, fontSize: 9.5, letterSpacing: '0.05em', fontFamily: T.fontMono }}>TABELA FIPE</div>
+        <div style={{ color: T.inkMuted, fontSize: 9.5, letterSpacing: '0.05em', fontFamily: T.fontMono }}>TABELA FIPE{anuncio.fipeOrigem === 'manual' ? ' · VALIDADA' : ''}</div>
         <div style={{ color: T.ink, fontFamily: T.fontMono, fontSize: compacto ? 11 : 12, marginTop: 3 }}>{fmtBRL(anuncio.precoFipe)}</div>
         <div style={{ color: tom(desvioFipe), fontSize: 10.5, marginTop: 2 }}>{diferenca(desvioFipe)} vs anúncio</div>
       </div>
@@ -279,6 +293,240 @@ function ComparativoAnuncio({ anuncio, compacto = false }) {
         <div style={{ color: tom(desvioMercado), fontSize: 10.5, marginTop: 2 }}>{diferenca(desvioMercado)} · {fmtN(anuncio.mercadoTotal)} ofertas</div>
       </div>}
     </div>
+  </div>;
+}
+
+function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
+  const [dados, setDados] = useState(null);
+  const [erro, setErro] = useState('');
+  const [buscaFipe, setBuscaFipe] = useState('');
+  const [resultadosFipe, setResultadosFipe] = useState([]);
+  const [buscandoFipe, setBuscandoFipe] = useState(false);
+  const [fipeSelecionada, setFipeSelecionada] = useState(null);
+  const [quilometragem, setQuilometragem] = useState('');
+  const [observacao, setObservacao] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [mensagem, setMensagem] = useState('');
+  const podeEditar = ['admin', 'gestor'].includes(String(sessao?.usuario?.papel || '').toLowerCase());
+
+  const carregar = async () => {
+    setErro('');
+    try {
+      const resposta = await fetch(`${API_BASE_URL}/anuncio_detalhe.php?id=${anuncio.dbId}`, { credentials: 'same-origin' });
+      const payload = await resposta.json().catch(() => ({}));
+      if (!resposta.ok) throw new Error(payload.erro || 'Não foi possível carregar o anúncio.');
+      setDados(payload);
+      setQuilometragem(payload.anuncio.quilometragem_manual ?? '');
+      setObservacao(payload.anuncio.curadoria_observacao || '');
+      setFipeSelecionada(null);
+    } catch (e) { setErro(e.message); }
+  };
+
+  useEffect(() => { carregar(); }, [anuncio.dbId]);
+  useEffect(() => {
+    const fechar = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', fechar);
+    return () => window.removeEventListener('keydown', fechar);
+  }, [onClose]);
+
+  useEffect(() => {
+    const termo = buscaFipe.trim();
+    if (termo.length < 2) { setResultadosFipe([]); return undefined; }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setBuscandoFipe(true);
+      fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(termo)}&ordem=mercado&limit=8`, {
+        signal: controller.signal, credentials: 'same-origin',
+      })
+        .then(r => r.ok ? r.json() : Promise.reject(new Error()))
+        .then(d => setResultadosFipe(d.itens || []))
+        .catch(e => { if (e.name !== 'AbortError') setResultadosFipe([]); })
+        .finally(() => setBuscandoFipe(false));
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [buscaFipe]);
+
+  const salvar = async () => {
+    const atual = dados?.anuncio;
+    if (!atual || !podeEditar) return;
+    setSalvando(true); setErro(''); setMensagem('');
+    try {
+      const alterarFipe = Boolean(fipeSelecionada && Number(fipeSelecionada.id) !== Number(atual.fipe_preco_id));
+      const atualKm = atual.quilometragem_manual == null ? '' : String(atual.quilometragem_manual);
+      const alterarKm = String(quilometragem) !== atualKm;
+      const payload = await apiPost('anuncio_detalhe.php', {
+        acao: 'salvar_curadoria', id: atual.id,
+        alterar_fipe: alterarFipe,
+        fipe_preco_id: alterarFipe ? fipeSelecionada.id : null,
+        alterar_quilometragem: alterarKm,
+        quilometragem_manual: quilometragem,
+        observacao,
+      }, sessao.csrf);
+      setDados(payload); setFipeSelecionada(null);
+      setQuilometragem(payload.anuncio.quilometragem_manual ?? '');
+      setMensagem('Curadoria salva. Os comparativos foram recalculados.');
+      onAtualizado?.();
+    } catch (e) { setErro(e.message); }
+    finally { setSalvando(false); }
+  };
+
+  const restaurarAutomatico = async () => {
+    if (!dados?.anuncio || !podeEditar) return;
+    setSalvando(true); setErro(''); setMensagem('');
+    try {
+      const payload = await apiPost('anuncio_detalhe.php', {
+        acao: 'restaurar_fipe_automatico', id: dados.anuncio.id,
+      }, sessao.csrf);
+      setDados(payload); setFipeSelecionada(null);
+      setMensagem('Vínculo automático restaurado.');
+      onAtualizado?.();
+    } catch (e) { setErro(e.message); }
+    finally { setSalvando(false); }
+  };
+
+  const a = dados?.anuncio;
+  const diferenca = (valor, base) => valor && base ? ((valor - base) / base) * 100 : null;
+  const desvioFipe = a ? diferenca(Number(a.preco), Number(a.preco_fipe)) : null;
+  const desvioMercado = a ? diferenca(Number(a.preco), Number(a.preco_medio_mercado)) : null;
+  const pct = valor => valor == null || !Number.isFinite(valor) ? '—' : `${valor > 0 ? '+' : ''}${valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+
+  return <div onClick={onClose} role="presentation" style={{
+    position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2, 6, 12, .68)',
+    backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end',
+  }}>
+    <aside onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Detalhes de ${anuncio.titulo}`} style={{
+      width: 'min(620px, 100vw)', height: '100%', overflowY: 'auto', background: T.bg,
+      borderLeft: `1px solid ${T.line}`, boxShadow: '-20px 0 60px rgba(0,0,0,.35)', color: T.ink,
+    }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 2, background: `${T.bg}F2`, backdropFilter: 'blur(12px)', borderBottom: `1px solid ${T.line}`, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: T.fontMono, fontSize: 10, color: T.signal, marginBottom: 4 }}>LEITURA DO ANÚNCIO · #{anuncio.id}</div>
+          <strong style={{ fontFamily: T.fontDisplay, fontSize: 18, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{anuncio.titulo}</strong>
+        </div>
+        <button onClick={onClose} aria-label="Fechar painel" style={{ ...inputStyle, padding: 8, cursor: 'pointer', flexShrink: 0 }}><X size={18} /></button>
+      </div>
+
+      <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {!dados && !erro && <Card style={{ textAlign: 'center', color: T.inkMuted }}>Carregando leitura completa…</Card>}
+        {erro && <div role="alert" style={{ padding: 12, borderRadius: 9, color: T.alert, background: `${T.alert}15`, border: `1px solid ${T.alert}40` }}>{erro}</div>}
+        {mensagem && <div role="status" style={{ padding: 12, borderRadius: 9, color: T.positive, background: `${T.positive}15`, border: `1px solid ${T.positive}40` }}><Check size={15} style={{ verticalAlign: -3, marginRight: 6 }} />{mensagem}</div>}
+
+        {a && <>
+          <Card style={{ padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <Tag tone={a.status === 'ativo' ? 'positivo' : 'alerta'}>{String(a.status).toUpperCase()}</Tag>
+                <div style={{ fontFamily: T.fontDisplay, fontSize: 19, fontWeight: 650, marginTop: 10 }}>{a.titulo}</div>
+                <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 5 }}><MapPin size={12} style={{ verticalAlign: -2 }} /> {a.revenda} · {a.cidade}/{a.uf}</div>
+              </div>
+              {a.url && <a href={a.url} target="_blank" rel="noreferrer" style={{ ...inputStyle, color: T.signal, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}><ExternalLink size={14} /> Ver original</a>}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: 8, marginTop: 14 }}>
+              {[
+                ['Ano', a.ano_inicial ? `${a.ano_inicial}/${a.ano_final || a.ano_inicial}` : 'Não informado'],
+                ['Preço', fmtBRL(a.preco)],
+                ['KM / uso', a.quilometragem_exibida || 'Não informado'],
+                ['Origem KM', a.quilometragem_origem === 'curadoria' ? 'Curadoria' : a.quilometragem_origem === 'coleta' ? 'Coleta' : '—'],
+              ].map(([label, value]) => <div key={label} style={{ padding: 10, borderRadius: 9, background: T.surface2, border: `1px solid ${T.line}` }}>
+                <div style={{ color: T.inkMuted, fontSize: 9.5, fontFamily: T.fontMono }}>{label.toUpperCase()}</div>
+                <div style={{ marginTop: 4, fontFamily: label === 'Preço' ? T.fontMono : T.fontBody, fontSize: 12.5 }}>{value}</div>
+              </div>)}
+            </div>
+          </Card>
+
+          <div>
+            <SectionTitle sub="O anúncio contra a referência oficial e ofertas equivalentes">Comparação de produto</SectionTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+              {[
+                ['ANÚNCIO', fmtBRL(a.preco), 'Preço publicado'],
+                ['FIPE', fmtBRL(a.preco_fipe), `${pct(desvioFipe)} vs anúncio`],
+                ['MERCADO', fmtBRL(a.preco_medio_mercado), `${pct(desvioMercado)} vs anúncio`],
+                ['OFERTAS', fmtN(a.anuncios_comparaveis || 0), a.fipe_preco_id ? 'mesma referência' : 'sem vínculo'],
+              ].map(([label, value, sub]) => <Card key={label} style={{ padding: 13 }}>
+                <div style={{ color: T.inkMuted, fontSize: 9.5, fontFamily: T.fontMono }}>{label}</div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 15, marginTop: 7 }}>{value}</div>
+                <div style={{ color: T.inkMuted, fontSize: 10, marginTop: 4 }}>{sub}</div>
+              </Card>)}
+            </div>
+          </div>
+
+          <Card style={{ padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontFamily: T.fontDisplay, fontWeight: 600 }}>Referência FIPE</div>
+                <div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Vínculo atual e correção assistida</div>
+              </div>
+              <Tag tone={a.fipe_vinculo_origem === 'manual' ? 'sinal' : 'neutro'}>{a.fipe_vinculo_origem === 'manual' ? 'CURADORIA MANUAL' : 'AUTOMÁTICO'}</Tag>
+            </div>
+            {a.fipe_preco_id ? <div style={{ marginTop: 12, padding: 11, borderRadius: 9, background: T.surface2, border: `1px solid ${T.line}` }}>
+              <strong style={{ display: 'block', fontSize: 13 }}>{a.marca_fipe} · {a.modelo_fipe}</strong>
+              <div style={{ color: T.inkMuted, fontSize: 11, marginTop: 4 }}>{a.ano_codigo} · {a.codigo_fipe} · {a.mes_referencia}</div>
+              <div style={{ fontFamily: T.fontMono, marginTop: 7 }}>{fmtBRL(a.preco_fipe)}</div>
+            </div> : <div style={{ marginTop: 12, color: T.inkMuted, fontSize: 12 }}>Nenhuma referência vinculada com segurança.</div>}
+
+            {podeEditar && <div style={{ marginTop: 14 }}>
+              <label style={{ color: T.inkMuted, fontSize: 11 }}>Localizar outra FIPE por marca, modelo, código ou ano</label>
+              <div style={{ position: 'relative', marginTop: 6 }}>
+                <Search size={14} style={{ position: 'absolute', left: 11, top: 12, color: T.inkMuted }} />
+                <input value={buscaFipe} onChange={e => setBuscaFipe(e.target.value)} placeholder={`Ex.: ${a.marca || ''} ${a.titulo || ''}`} style={{ ...inputStyle, width: '100%', paddingLeft: 33 }} />
+              </div>
+              {buscandoFipe && <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 7 }}>Buscando no catálogo local…</div>}
+              {resultadosFipe.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, maxHeight: 260, overflowY: 'auto' }}>
+                {resultadosFipe.map(item => {
+                  const escolhido = Number(fipeSelecionada?.id) === Number(item.id);
+                  return <button key={item.id} onClick={() => setFipeSelecionada(item)} style={{
+                    textAlign: 'left', padding: 10, borderRadius: 9, cursor: 'pointer', color: T.ink,
+                    background: escolhido ? `${T.signal}18` : T.surface2,
+                    border: `1px solid ${escolhido ? T.signal : T.line}`, fontFamily: T.fontBody,
+                  }}>
+                    <strong style={{ display: 'block', fontSize: 12 }}>{item.marca} · {item.modelo}</strong>
+                    <span style={{ color: T.inkMuted, fontSize: 10.5 }}>{item.ano_codigo} · {item.codigo_fipe} · {fmtBRL(item.preco_fipe)}</span>
+                  </button>;
+                })}
+              </div>}
+              {fipeSelecionada && <div style={{ marginTop: 8, color: T.signal, fontSize: 11 }}><Check size={13} style={{ verticalAlign: -3 }} /> Nova referência selecionada. Salve para aplicar.</div>}
+            </div>}
+          </Card>
+
+          {podeEditar && <Card style={{ padding: 16 }}>
+            <div style={{ fontFamily: T.fontDisplay, fontWeight: 600 }}><Pencil size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Curadoria interna</div>
+            <div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Não altera os dados originais coletados.</div>
+            <label style={{ display: 'block', color: T.inkMuted, fontSize: 11, marginTop: 13 }}>Quilometragem confirmada</label>
+            <div style={{ position: 'relative', marginTop: 6 }}>
+              <Ruler size={14} style={{ position: 'absolute', left: 11, top: 12, color: T.inkMuted }} />
+              <input type="number" min="0" max="5000000" value={quilometragem} onChange={e => setQuilometragem(e.target.value)} placeholder="Ex.: 385000" style={{ ...inputStyle, width: '100%', paddingLeft: 33 }} />
+            </div>
+            <label style={{ display: 'block', color: T.inkMuted, fontSize: 11, marginTop: 12 }}>Observação da equipe</label>
+            <textarea value={observacao} onChange={e => setObservacao(e.target.value)} maxLength={500} rows={3} placeholder="Por que a FIPE foi ajustada? O que devemos observar neste veículo?" style={{ ...inputStyle, width: '100%', marginTop: 6, resize: 'vertical' }} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button onClick={salvar} disabled={salvando} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: salvando ? 'wait' : 'pointer', flex: '1 1 180px' }}><Save size={14} style={{ verticalAlign: -3, marginRight: 6 }} />{salvando ? 'Salvando…' : 'Salvar curadoria'}</button>
+              {a.fipe_vinculo_origem === 'manual' && <button onClick={restaurarAutomatico} disabled={salvando} style={{ ...inputStyle, cursor: salvando ? 'wait' : 'pointer', flex: '1 1 180px' }}><Undo2 size={14} style={{ verticalAlign: -3, marginRight: 6 }} />Restaurar automático</button>}
+            </div>
+          </Card>}
+
+          <div>
+            <SectionTitle sub="Ofertas ativas ligadas à mesma referência">Produtos comparáveis</SectionTitle>
+            {dados.similares.length > 0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {dados.similares.map(item => <a key={item.id} href={item.url} target="_blank" rel="noreferrer" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, padding: 11, borderRadius: 9, border: `1px solid ${T.line}`, background: T.surface, color: T.ink, textDecoration: 'none' }}>
+                <span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.titulo}</strong><small style={{ color: T.inkMuted }}>{item.revenda} · {item.cidade}/{item.uf}{item.quilometragem ? ` · ${item.quilometragem}` : ''}</small></span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 12 }}>{fmtBRL(item.preco)}</span>
+              </a>)}
+            </div> : <div style={{ color: T.inkMuted, fontSize: 12 }}>Vincule uma referência FIPE para encontrar produtos realmente comparáveis.</div>}
+          </div>
+
+          {dados.historico.length > 0 && <Card style={{ padding: 16 }}>
+            <div style={{ fontFamily: T.fontDisplay, fontWeight: 600 }}><History size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Histórico de curadoria</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 }}>
+              {dados.historico.map(item => <div key={item.id} style={{ borderLeft: `2px solid ${T.line}`, paddingLeft: 10 }}>
+                <div style={{ fontSize: 11.5 }}>{String(item.acao).replaceAll('_', ' ')}</div>
+                <div style={{ color: T.inkMuted, fontSize: 10, marginTop: 2 }}>{item.usuario} · {new Date(item.criado_em).toLocaleString('pt-BR')}</div>
+                {item.observacao && <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 3 }}>{item.observacao}</div>}
+              </div>)}
+            </div>
+          </Card>}
+        </>}
+      </div>
+    </aside>
   </div>;
 }
 
@@ -530,7 +778,7 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
    ============================================================ */
 const PAGINA = 60;
 
-function PageMercado() {
+function PageMercado({ sessao }) {
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   const [categoria, setCategoria] = useState('todas');
@@ -544,6 +792,8 @@ function PageMercado() {
   const [precoMax, setPrecoMax] = useState('');
   const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
+  const [anuncioAberto, setAnuncioAberto] = useState(null);
+  const [versaoDados, setVersaoDados] = useState(0);
 
   const statusDb = {
     ativo: 'ativo', em_verificacao: 'removido_candidato',
@@ -600,7 +850,7 @@ function PageMercado() {
         if (!cancelado) setCarregando(false);
       });
     return () => { cancelado = true; };
-  }, [queryBase]);
+  }, [queryBase, versaoDados]);
 
   const carregaMais = () => {
     if (carregandoRef.current || fim) return;
@@ -745,7 +995,7 @@ function PageMercado() {
         {anuncios.map(a => {
           const cat = CATEGORIAS[a.categoria] || CATEGORIAS.outros;
           return (
-            <Card key={a.id} style={{ padding: 18 }}>
+            <Card key={`${a.dbId}-${a.id}`} onClick={() => setAnuncioAberto(a)} style={{ padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                 <Tag tone={a.status === 'saida_detectada' ? 'positivo' : a.status === 'em_verificacao' ? 'alerta' : a.dias >= 30 ? 'sinal' : 'neutro'}>
                   {a.status === 'saida_detectada' ? 'SAIU DO PORTAL'
@@ -760,9 +1010,14 @@ function PageMercado() {
                 <span style={{ fontFamily: T.fontMono, fontSize: 10, color: cat.cor, letterSpacing: '0.04em' }}>{cat.label.toUpperCase()}</span>
               </div>
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: T.inkMuted, fontSize: 10.5, marginBottom: 7 }}>
+                {a.ano && <span>{a.ano}</span>}
+                {a.quilometragem && <span><Ruler size={10} style={{ verticalAlign: -1 }} /> {a.quilometragem}{a.quilometragemOrigem === 'curadoria' ? ' · validado' : ''}</span>}
+                <span style={{ color: T.steel }}>Clique para comparar</span>
+              </div>
               <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
                 <MapPin size={11} />
-                <button onClick={() => { setRegiao(facetas?.ufs?.[a.uf]?.regiao || regiao); setUf(a.uf); setCidade('todas'); setRevendaId(String(a.revendaId)); setMaisFiltros(true); document.getElementById('app-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                <button onClick={e => { e.stopPropagation(); setRegiao(facetas?.ufs?.[a.uf]?.regiao || regiao); setUf(a.uf); setCidade('todas'); setRevendaId(String(a.revendaId)); setMaisFiltros(true); document.getElementById('app-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   style={{ background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', padding: 0, fontSize: 12,
                            textDecoration: 'underline', textDecorationColor: 'transparent' }}
                   onMouseEnter={e => e.currentTarget.style.textDecorationColor = T.signal}
@@ -772,7 +1027,7 @@ function PageMercado() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>{fmtBRL(a.preco)}</div>
-                {a.url && <a href={a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal"><ExternalLink size={15} /></a>}
+                {a.url && <a href={a.url} onClick={e => e.stopPropagation()} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal"><ExternalLink size={15} /></a>}
               </div>
               <ComparativoAnuncio anuncio={a} />
             </Card>
@@ -792,6 +1047,8 @@ function PageMercado() {
         <EmptyState icon={PackageOpen} titulo="Nenhum anúncio com esses filtros"
           texto="Tente ampliar a busca — remova filtros de preço, cidade ou revenda." />
       )}
+      {anuncioAberto && <PainelAnuncio anuncio={anuncioAberto} sessao={sessao}
+        onClose={() => setAnuncioAberto(null)} onAtualizado={() => setVersaoDados(v => v + 1)} />}
     </div>
   );
 }
@@ -2251,7 +2508,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
 
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
-    mercado: <PageMercado />,
+    mercado: <PageMercado sessao={sessao} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,

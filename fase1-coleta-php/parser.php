@@ -44,6 +44,17 @@ function limpa_texto_html(string $texto): string {
     return trim(preg_replace('/\s+/', ' ', $texto));
 }
 
+function extrai_km_ou_horas(string $bloco): ?string {
+    $texto = limpa_texto_html(strip_tags($bloco));
+    if (preg_match('/(?:quilometragem|od[oô]metro)?\s*[:\-]?\s*([\d.]+)\s*(?:km|quil[oô]metros?)\b/iu', $texto, $m)) {
+        return ((int) preg_replace('/\D/', '', $m[1])) . ' km';
+    }
+    if (preg_match('/(?:hor[ií]metro|horas?\s+de\s+uso)\s*[:\-]?\s*([\d.]+)\s*(?:h|horas?)?\b/iu', $texto, $m)) {
+        return ((int) preg_replace('/\D/', '', $m[1])) . ' horas';
+    }
+    return null;
+}
+
 function extrai_tipo_e_marca_da_url(string $url_relativa, array $marcas_conhecidas): array {
     $partes = explode('/', trim($url_relativa, '/'));
     // partes[0] == "veiculo"
@@ -100,6 +111,7 @@ function parse_listings(string $html, array $marcas_conhecidas): array {
         } elseif (stripos($bloco, 'consultar') !== false) {
             $precoTextoBruto = '(A consultar)';
         }
+        $kmOuHoras = extrai_km_ou_horas($bloco);
 
         $anuncios[] = [
             'anuncio_portal_id' => $anuncioId,
@@ -111,6 +123,7 @@ function parse_listings(string $html, array $marcas_conhecidas): array {
             'ano_final' => $anoFinal,
             'preco' => $preco,
             'preco_texto_bruto' => $precoTextoBruto,
+            'km_ou_horas' => $kmOuHoras,
         ];
     }
     return $anuncios;

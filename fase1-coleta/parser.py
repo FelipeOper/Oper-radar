@@ -26,6 +26,8 @@ HREF_RE = re.compile(r'href="(/veiculo/[a-z0-9/-]+/(\d+))"')
 TITULO_RE = re.compile(r'<h2 class="h16">\s*(.*?)\s*</h2>', re.DOTALL)
 PRECO_RE = re.compile(r'<span class="money">\s*(R\$[^<]+)</span>')
 ANO_RE = re.compile(r"(\d{4})/(\d{4})")
+KM_RE = re.compile(r"(?:quilometragem|od[oô]metro)?\s*[:\-]?\s*([\d.]+)\s*(km|quil[oô]metros?)\b", re.IGNORECASE)
+HORAS_RE = re.compile(r"(?:hor[ií]metro|horas?\s+de\s+uso)\s*[:\-]?\s*([\d.]+)\s*(?:h|horas?)?\b", re.IGNORECASE)
 
 # Marcas de caminhão (posição fixa no path: /veiculo/.../<tipo>/<marca>/<modelo>/...)
 # Esta lista pequena é só um FALLBACK para quando taxonomia.json ainda não foi gerado
@@ -68,12 +70,27 @@ class Anuncio:
     ano_final: Optional[int]
     preco: Optional[float]
     preco_texto_bruto: str
+    km_ou_horas: Optional[str] = None
 
 
 def _limpa_texto_html(texto: str) -> str:
     """Decodifica entidades HTML (&nbsp;, &#226; etc) e colapsa espaços/quebras de linha."""
     texto = html_lib.unescape(texto)
     return re.sub(r"\s+", " ", texto).strip()
+
+
+def _extrai_km_ou_horas(bloco: str) -> Optional[str]:
+    """Usa apenas um valor explicitamente rotulado; nunca deduz quilometragem."""
+    texto = _limpa_texto_html(re.sub(r"<[^>]+>", " ", bloco))
+    km = KM_RE.search(texto)
+    if km:
+        valor = int(re.sub(r"\D", "", km.group(1)))
+        return f"{valor} km"
+    horas = HORAS_RE.search(texto)
+    if horas:
+        valor = int(re.sub(r"\D", "", horas.group(1)))
+        return f"{valor} horas"
+    return None
 
 
 def _extrai_tipo_e_marca_da_url(url_relativa: str) -> tuple[Optional[str], Optional[str]]:
@@ -123,10 +140,12 @@ def parse_listings(html: str) -> List[Anuncio]:
             preco = None
             preco_texto_bruto = "(A consultar)" if "consultar" in bloco.lower() else ""
 
+        km_ou_horas = _extrai_km_ou_horas(bloco)
+
         anuncios.append(Anuncio(
             anuncio_portal_id=anuncio_id, url=f"{BASE_URL}{url_relativa}", titulo=titulo,
             tipo=tipo, marca=marca, ano_inicial=ano_inicial, ano_final=ano_final,
-            preco=preco, preco_texto_bruto=preco_texto_bruto,
+            preco=preco, preco_texto_bruto=preco_texto_bruto, km_ou_horas=km_ou_horas,
         ))
     return anuncios
 

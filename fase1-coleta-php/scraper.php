@@ -84,14 +84,15 @@ function carrega_estado_atual(mysqli $conn, int $revenda_id): array {
 
 function salva_estado(mysqli $conn, int $revenda_id, array $novo_estado, array $anuncios_por_id): void {
     $sqlInsert = "INSERT INTO anuncio (anuncio_portal_id, revenda_id, url, titulo, tipo, marca,
-                ano_inicial, ano_final, preco, preco_texto_bruto,
+                ano_inicial, ano_final, km_ou_horas, preco, preco_texto_bruto,
                 primeira_vez_visto, ultima_vez_ativo, status, misses_consecutivos, data_remocao)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON DUPLICATE KEY UPDATE
                 ultima_vez_ativo = VALUES(ultima_vez_ativo),
                 status = VALUES(status),
                 misses_consecutivos = VALUES(misses_consecutivos),
                 data_remocao = VALUES(data_remocao),
+                km_ou_horas = COALESCE(NULLIF(VALUES(km_ou_horas), ''), km_ou_horas),
                 preco = COALESCE(VALUES(preco), preco)";
     $stmtInsert = $conn->prepare($sqlInsert);
 
@@ -113,11 +114,12 @@ function salva_estado(mysqli $conn, int $revenda_id, array $novo_estado, array $
             $anoFinal = $a['ano_final'];
             $preco = $a['preco'];
             $precoTexto = $a['preco_texto_bruto'];
+            $kmOuHoras = $a['km_ou_horas'];
 
             $stmtInsert->bind_param(
-                'iisssssiidsssis',
+                'iissssiisdssssis',
                 $anuncio_id, $revenda_id, $url, $titulo, $tipo, $marca,
-                $anoInicial, $anoFinal, $preco, $precoTexto,
+                $anoInicial, $anoFinal, $kmOuHoras, $preco, $precoTexto,
                 $estado['primeira_vez_visto'], $estado['ultima_vez_ativo'], $estado['status'],
                 $estado['misses_consecutivos'], $estado['data_remocao']
             );
