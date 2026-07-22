@@ -28,7 +28,8 @@ fi
 
 case "$MODO" in
   local)
-    exec python3 -u fipe_sync.py --modo=local --lote=1000
+    python3 -u fipe_sync.py --modo=local --lote=1000
+    exec python3 -u fipe_sync.py --modo=sugestoes --lote=10000
     ;;
   mensal)
     # Uma chamada consulta /references; as demais renovam precos.

@@ -35,7 +35,24 @@ class CuradoriaAnuncioContractTest(unittest.TestCase):
         migrador = (ROOT / "fase4-acesso" / "migrar_curadoria_anuncio.php").read_text(encoding="utf-8")
         self.assertIn("coluna_anuncio_existe", migrador)
         self.assertIn("CREATE TABLE IF NOT EXISTS anuncio_curadoria_log", migrador)
-        self.assertIn("Curadoria de anuncios: banco preparado", migrador)
+        self.assertIn("CREATE TABLE IF NOT EXISTS anuncio_fipe_sugestao", migrador)
+        self.assertIn("Curadoria e sugestoes FIPE: banco preparado", migrador)
+
+    def test_sugestoes_sao_auditaveis_e_nao_entram_nos_kpis_sem_confirmacao(self):
+        api = (ROOT / "oper-radar-api" / "anuncio_detalhe.php").read_text(encoding="utf-8")
+        app = (ROOT / "app" / "src" / "App.jsx").read_text(encoding="utf-8")
+        job = (ROOT / "fase2-fipe" / "executar_fipe_job.sh").read_text(encoding="utf-8")
+        self.assertIn("sugestoes_fipe", api)
+        self.assertIn("Sugestões inteligentes", app)
+        self.assertIn("Uma sugestão só entra nos KPIs depois da sua confirmação", app)
+        self.assertIn("FIPE · com sugestão", app)
+        self.assertIn("--modo=sugestoes", job)
+
+    def test_publicacao_hostgator_faz_backup_antes_da_migracao(self):
+        source = (ROOT / "fase4-acesso" / "publicar_sugestoes_fipe_hostgator.sh").read_text(encoding="utf-8")
+        self.assertLess(source.index("mysqldump"), source.index("migrar_curadoria_anuncio.php"))
+        self.assertIn("frontend-fipe-sugestoes-curadoria.zip", source)
+        self.assertIn("--modo=sugestoes", source)
 
     def test_parser_captura_km_e_horas_quando_explicitos(self):
         pasta = ROOT / "fase1-coleta"

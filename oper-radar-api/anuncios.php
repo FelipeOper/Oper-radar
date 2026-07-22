@@ -65,6 +65,18 @@ if (!empty($_GET['fipe_confianca']) && in_array($_GET['fipe_confianca'], ['alto'
     $where[] = 'a.fipe_match_confianca = ?';
     $params[] = $_GET['fipe_confianca']; $types .= 's';
 }
+$fipeFila = $_GET['fipe_fila'] ?? 'todos';
+if ($fipeFila === 'revisar') {
+    $where[] = "a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_preco_id IS NULL";
+} elseif ($fipeFila === 'com_sugestao') {
+    $where[] = "a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_preco_id IS NULL
+                AND EXISTS (SELECT 1 FROM anuncio_fipe_sugestao sx WHERE sx.anuncio_id=a.id)";
+} elseif ($fipeFila === 'sem_sugestao') {
+    $where[] = "a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_preco_id IS NULL
+                AND NOT EXISTS (SELECT 1 FROM anuncio_fipe_sugestao sx WHERE sx.anuncio_id=a.id)";
+} elseif ($fipeFila === 'vinculado') {
+    $where[] = "a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_preco_id IS NOT NULL";
+}
 if (!empty($_GET['q'])) {
     // Cada palavra precisa existir em algum campo do veiculo. Assim, "DAF XF 530"
     // encontra titulos com palavras intermediarias sem misturar a revenda/cidade.
@@ -110,7 +122,8 @@ $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo,
                     WHEN a.km_ou_horas IS NOT NULL AND a.km_ou_horas<>'' THEN 'coleta' ELSE NULL END AS quilometragem_origem,
                a.preco, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
                a.fipe_match_status, a.fipe_match_confianca, a.fipe_match_motivo,
-               a.fipe_vinculo_origem, f.preco AS preco_fipe, f.codigo_fipe,
+               a.fipe_vinculo_origem, COALESCE(fs.total, 0) AS fipe_sugestoes,
+               f.preco AS preco_fipe, f.codigo_fipe,
                f.ano_codigo AS ano_fipe, f.mes_referencia AS referencia_fipe,
                fm.marca_fipe, fm.modelo_fipe,
                ROUND((a.preco - f.preco) / NULLIF(f.preco, 0) * 100, 1) AS desvio_fipe_pct,
@@ -122,6 +135,10 @@ $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo,
         JOIN revenda r ON r.id = a.revenda_id
         LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id
         LEFT JOIN fipe_modelo fm ON fm.id = f.fipe_modelo_id
+        LEFT JOIN (
+            SELECT anuncio_id, COUNT(*) AS total
+            FROM anuncio_fipe_sugestao GROUP BY anuncio_id
+        ) fs ON fs.anuncio_id=a.id
         LEFT JOIN (
             SELECT fipe_preco_id, COUNT(*) AS anuncios_comparaveis,
                    AVG(NULLIF(preco, 0)) AS preco_medio_mercado,
@@ -158,6 +175,7 @@ while ($row = $res->fetch_assoc()) {
     $row['maior_preco_mercado'] = $row['maior_preco_mercado'] !== null ? (float)$row['maior_preco_mercado'] : null;
     $row['desvio_mercado_pct'] = $row['desvio_mercado_pct'] !== null ? (float)$row['desvio_mercado_pct'] : null;
     $row['anuncios_comparaveis'] = (int)($row['anuncios_comparaveis'] ?? 0);
+    $row['fipe_sugestoes'] = (int)($row['fipe_sugestoes'] ?? 0);
     $row['revenda_id'] = (int)$row['revenda_id'];
     $anuncios[] = $row;
 }

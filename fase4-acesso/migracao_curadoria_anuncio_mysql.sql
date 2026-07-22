@@ -31,3 +31,18 @@ CREATE TABLE IF NOT EXISTS anuncio_curadoria_log (
     CONSTRAINT fk_curadoria_anuncio FOREIGN KEY (anuncio_id) REFERENCES anuncio(id) ON DELETE CASCADE,
     CONSTRAINT fk_curadoria_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS anuncio_fipe_sugestao (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    anuncio_id      INT NOT NULL,
+    fipe_preco_id   INT NOT NULL,
+    posicao         TINYINT UNSIGNED NOT NULL,
+    score           TINYINT UNSIGNED NOT NULL,
+    confianca       VARCHAR(12) NOT NULL,
+    motivos         VARCHAR(255) NOT NULL,
+    atualizado_em   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_sugestao_anuncio_preco (anuncio_id, fipe_preco_id),
+    KEY idx_sugestao_anuncio_posicao (anuncio_id, posicao),
+    CONSTRAINT fk_sugestao_anuncio FOREIGN KEY (anuncio_id) REFERENCES anuncio(id) ON DELETE CASCADE,
+    CONSTRAINT fk_sugestao_preco FOREIGN KEY (fipe_preco_id) REFERENCES fipe_preco(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -24,8 +24,9 @@ except ModuleNotFoundError:
 
 from fipe_sync import (
     ano_modelo, avalia, com_referencia, eixos, emissao_no_texto,
-    emissao_preferida, escolhe, normaliza, obtem_referencia_atual,
-    parse_preco, palavras_chave, processa_anuncios,
+    emissao_preferida, escolhe, familia_comercial, identificadores_modelo, normaliza, numero_modelo,
+    obtem_referencia_atual, parse_preco, palavras_chave, pontua_sugestao,
+    processa_anuncios,
 )
 from importar_fipe_csv import codigo_pelo_nome, preco_decimal
 
@@ -33,6 +34,27 @@ from importar_fipe_csv import codigo_pelo_nome, preco_decimal
 class MatchingFipeTest(unittest.TestCase):
     def test_normaliza_numero_com_pontuacao(self):
         self.assertIn("11180", normaliza("VW 11.180 Delivery"))
+
+    def test_numero_tecnico_nao_e_confundido_com_ano(self):
+        self.assertEqual("1938", numero_modelo("MB 1938 2001/2001"))
+        self.assertEqual("11180", numero_modelo("VW 11.180 Delivery 2021/2022"))
+
+    def test_formatos_tecnicos_equivalentes(self):
+        self.assertIn("29480", identificadores_modelo("MAN TGX 29 480 2018/2019"))
+        self.assertIn("29480", identificadores_modelo("TGX 29.480 6x4"))
+        self.assertIn("31300", identificadores_modelo("TECTOR 31-300 8x2"))
+        self.assertIn("440", identificadores_modelo("STRALIS 490-S44T"))
+
+    def test_sugestao_restringe_familia_comercial(self):
+        anuncio = {
+            "titulo": "VW Delivery 2022/2022", "url": "", "marca": "VW",
+            "ano_inicial": 2022, "ano_final": 2022,
+        }
+        delivery = {"modelo_fipe": "11-180 Delivery 2p (diesel)(E5)"}
+        worker = {"modelo_fipe": "17-190 E Worker 2p (diesel)(E5)"}
+        self.assertEqual("DELIVERY", familia_comercial(anuncio["titulo"]))
+        self.assertGreaterEqual(pontua_sugestao(anuncio, delivery)[0], 65)
+        self.assertEqual(0, pontua_sugestao(anuncio, worker)[0])
 
     def test_daf_xf_530_casa_por_numero(self):
         score, motivo = avalia("DAF XF FTS 530 2024/2024", "XF 530 6x2 Diesel")

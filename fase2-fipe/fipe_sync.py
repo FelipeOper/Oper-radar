@@ -80,7 +80,20 @@ MARCAS_RUIDO = {"MB", "VW", "GM", "MERCEDES", "BENZ", "SCANIA", "VOLVO", "DAF", 
 # Palavras da FIPE que descrevem acabamento/combustivel, nao a linha do caminhao.
 # Comparadas por PREFIXO porque a FIPE abrevia: "Dies.", "Stre.", "High.", "Constel."
 RUIDO_RAIZES = ("DIESEL", "STREAMLINE", "HIGHLINE", "TOPLINE", "ELETRICO",
-                "EIXOS", "CABINE", "LEITO", "TURBO", "NORMAL", "AUTOMATICO")
+                "EIXOS", "CABINE", "LEITO", "TURBO", "NORMAL", "AUTOMATICO",
+                "CAVALO", "MECANICO", "CAMINHAO", "TRUCK", "SPACE", "CAB")
+
+FAMILIAS_FIPE = {
+    "DELIVERY": ("DELIVERY",), "CONSTELLATION": ("CONSTELLATION", "CONSTEL"),
+    "WORKER": ("WORKER", "WORK"), "METEOR": ("METEOR",),
+    "ATEGO": ("ATEGO",), "ACCELO": ("ACCELO",), "AXOR": ("AXOR",),
+    "ACTROS": ("ACTROS",), "ATRON": ("ATRON",), "EUROCARGO": ("EUROCARGO",),
+    "CARGO": ("CARGO",), "TECTOR": ("TECTOR",), "HI-WAY": ("HIWAY",),
+    "S-WAY": ("SWAY",), "STRALIS": ("STRALIS",), "DAILY": ("DAILY",),
+    "F-MAX": ("FMAX",), "XF": ("XF",), "CF": ("CF",), "LF": ("LF",),
+    "FH": ("FH",), "FM": ("FM",), "VM": ("VM",), "VERTIS": ("VERTIS",),
+    "TGX": ("TGX",), "TGS": ("TGS",), "TGM": ("TGM",),
+}
 
 
 def normaliza(s: str) -> str:
@@ -89,19 +102,41 @@ def normaliza(s: str) -> str:
     return re.sub(r"[^A-Z0-9]+", " ", s)
 
 
+def texto_sem_anos(s: str) -> str:
+    """Remove apenas anos em posicao de ano; preserva modelos como MB 1938."""
+    s = s or ""
+    return re.sub(
+        r"\b(?:19|20)\d{2}\s*/\s*(?:\d{2}|(?:19|20)\d{2})\b(?:\s*\(\s*(?:19|20)\d{2}\s*\))?",
+        " ", s,
+    )
+
+
 def numero_modelo(s: str):
     """O numero que identifica o modelo (440, 2430, 11180), ignorando anos."""
-    for n in re.findall(r"\d{3,5}", normaliza(s)):
-        if not 1900 <= int(n) <= 2100:
-            return n
-    return None
+    numeros = re.findall(r"\d{3,5}", normaliza(texto_sem_anos(s)))
+    return numeros[0] if numeros else None
+
+
+def identificadores_modelo(s: str) -> set:
+    """Formas equivalentes do número técnico: 29 480, 29.480 e 29-480."""
+    base = unicodedata.normalize("NFD", texto_sem_anos(s) or "").encode("ascii", "ignore").decode().upper()
+    grupos = re.findall(r"\d+", base)
+    ids = {g for g in grupos if 3 <= len(g) <= 5}
+    for esquerdo, direito in zip(grupos, grupos[1:]):
+        unido = esquerdo + direito
+        if 3 <= len(unido) <= 5 and 1 <= len(esquerdo) <= 2 and 2 <= len(direito) <= 3:
+            ids.add(unido)
+    # IVECO escreve a potência como S44T/S48T na FIPE e 440/480 no anúncio.
+    for potencia in re.findall(r"\bS\s*(\d{2})\s*T\b", base):
+        ids.add(potencia + "0")
+    return ids
 
 
 def serie(s: str):
     """Letra(s) de serie coladas ao numero: 'R440' -> 'R'; 'G-440' -> 'G'.
     Marca nao conta como serie: 'MB 2430' -> None."""
-    for pref, num in re.findall(r"\b([A-Z]{1,2})[ ]?(\d{3,5})\b", normaliza(s)):
-        if pref not in MARCAS_RUIDO and not 1900 <= int(num) <= 2100:
+    for pref, num in re.findall(r"\b([A-Z]{1,2})[ ]?(\d{3,5})\b", normaliza(texto_sem_anos(s))):
+        if pref not in MARCAS_RUIDO:
             return pref
     return None
 
@@ -119,6 +154,17 @@ def palavras_chave(s: str) -> set:
     Pode vir vazio — varios nomes FIPE sao so numero + eixo ('R-440 A 4x2 2p (diesel)')."""
     return {t for t in normaliza(s).split()
             if t.isalpha() and len(t) >= 4 and not eh_ruido(t)}
+
+
+def familia_comercial(s: str):
+    """Reconhece a linha comercial sem casar siglas curtas dentro de outra palavra."""
+    tokens = normaliza(texto_sem_anos(s)).split()
+    compacto = "".join(tokens)
+    for familia, aliases in FAMILIAS_FIPE.items():
+        for alias in aliases:
+            if alias in tokens or (len(alias) >= 4 and alias in compacto):
+                return familia
+    return None
 
 
 def mesma_linha(a: set, b: set) -> bool:
@@ -163,6 +209,68 @@ def emissao_preferida(anuncio: dict):
     if 2012 <= fabricacao <= 2022:
         return "E5", "estimada_fabricacao"
     return None, None
+
+
+def pontua_sugestao(anuncio: dict, modelo: dict):
+    """Pontua uma possibilidade sem transforma-la automaticamente em verdade."""
+    titulo = anuncio.get("titulo", "")
+    nome_fipe = modelo.get("modelo_fipe", "")
+    pontos = 20  # modelos_da_marca ja restringiu a marca
+    motivos = ["marca"]
+
+    numeros_anuncio = identificadores_modelo(titulo)
+    numeros_fipe = identificadores_modelo(nome_fipe)
+    anos_conhecidos = {str(a) for a in (anuncio.get("ano_inicial"), anuncio.get("ano_final")) if a}
+    numeros_anuncio -= anos_conhecidos
+    numeros_fipe -= anos_conhecidos
+    numeros_iguais = numeros_anuncio & numeros_fipe
+
+    familia_anuncio, familia_fipe = familia_comercial(titulo), familia_comercial(nome_fipe)
+    familia_igual = bool(familia_anuncio and familia_fipe == familia_anuncio)
+    if numeros_anuncio:
+        if numeros_iguais:
+            numero_confirmado = sorted(numeros_iguais, key=lambda n: (-len(n), n))[0]
+            pontos += 48
+            motivos.append(f"modelo {numero_confirmado}")
+        elif not familia_igual:
+            return 0, []
+        else:
+            motivos.append("versao a confirmar")
+
+    if familia_anuncio:
+        if familia_fipe and familia_anuncio != familia_fipe:
+            return 0, []
+        if familia_igual:
+            pontos += 28 if numeros_iguais else 45
+            motivos.append(f"familia {familia_anuncio}")
+
+    serie_anuncio, serie_fipe = serie(titulo), serie(nome_fipe)
+    if serie_anuncio and serie_fipe:
+        if serie_anuncio != serie_fipe:
+            return 0, []
+        pontos += 12
+        motivos.append(f"serie {serie_anuncio}")
+
+    eixo_anuncio, eixo_fipe = eixos(titulo), eixos(nome_fipe)
+    if eixo_anuncio and eixo_fipe:
+        if eixo_anuncio == eixo_fipe:
+            pontos += 8
+            motivos.append(eixo_anuncio)
+        else:
+            pontos -= 18
+
+    emissao, _ = emissao_preferida(anuncio)
+    emissao_fipe = emissao_no_texto(nome_fipe)
+    if emissao and emissao_fipe:
+        if emissao == emissao_fipe:
+            pontos += 8
+            motivos.append(emissao)
+        else:
+            pontos -= 20
+
+    if not numeros_anuncio and not familia_anuncio:
+        return 0, []
+    return max(0, min(99, pontos)), motivos
 
 
 def avalia(titulo: str, modelo_fipe: str):
@@ -384,6 +492,92 @@ def melhores_candidatos(conn, anuncio, quantos=3):
     return pontuados[:quantos]
 
 
+def melhores_sugestoes(conn, anuncio, quantos=12, modelos=None):
+    pontuados = []
+    for modelo in modelos if modelos is not None else modelos_da_marca(conn, anuncio["marca"]):
+        score, motivos = pontua_sugestao(anuncio, modelo)
+        if score >= 45:
+            pontuados.append((score, motivos, modelo))
+    pontuados.sort(key=lambda item: (-item[0], len(item[2]["modelo_fipe"])))
+    return pontuados[:quantos]
+
+
+def salva_sugestoes(conn, anuncio, modelos=None, commit=True):
+    """Persiste alternativas do ano-modelo atual para a curadoria humana."""
+    cur = conn.cursor(dictionary=True)
+    cur.execute("DELETE FROM anuncio_fipe_sugestao WHERE anuncio_id=%s", (anuncio["id"],))
+    gravadas = 0
+    posicao = 0
+    candidatos = melhores_sugestoes(conn, anuncio, modelos=modelos)
+    precos = {}
+    if candidatos:
+        ids = [modelo["id"] for _, _, modelo in candidatos]
+        marcadores = ",".join(["%s"] * len(ids))
+        cur.execute(f"""
+            SELECT id, fipe_modelo_id FROM fipe_preco
+            WHERE fipe_modelo_id IN ({marcadores}) AND ano_codigo LIKE %s
+            ORDER BY referencia_codigo DESC, atualizado_em DESC, id DESC
+        """, tuple(ids) + (f"{ano_modelo(anuncio)}-%",))
+        for preco in cur.fetchall():
+            precos.setdefault(preco["fipe_modelo_id"], preco["id"])
+
+    for score, motivos, modelo in candidatos:
+        preco_id = precos.get(modelo["id"])
+        if not preco_id:
+            continue
+        posicao += 1
+        confianca = "alta" if score >= 85 else "media" if score >= 65 else "baixa"
+        cur.execute("""
+            INSERT INTO anuncio_fipe_sugestao
+                (anuncio_id, fipe_preco_id, posicao, score, confianca, motivos, atualizado_em)
+            VALUES (%s,%s,%s,%s,%s,%s,NOW())
+            ON DUPLICATE KEY UPDATE posicao=VALUES(posicao), score=VALUES(score),
+                confianca=VALUES(confianca), motivos=VALUES(motivos), atualizado_em=NOW()
+        """, (anuncio["id"], preco_id, posicao, score, confianca, " + ".join(motivos)))
+        gravadas += 1
+        if gravadas >= 8:
+            break
+    if commit:
+        conn.commit()
+    cur.close()
+    return gravadas
+
+
+def gera_sugestoes_pendentes(conn, lote=5000):
+    cur = conn.cursor(dictionary=True)
+    cur.execute("""
+        SELECT id, titulo, url, marca, ano_inicial, ano_final
+        FROM anuncio
+        WHERE status='ativo' AND tipo='Caminhao' AND marca IS NOT NULL
+          AND COALESCE(ano_final, ano_inicial) IS NOT NULL
+          AND fipe_preco_id IS NULL
+          AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
+        ORDER BY id LIMIT %s
+    """, (lote,))
+    anuncios = cur.fetchall()
+    cur.close()
+    com_sugestao = total_sugestoes = 0
+    modelos_cache = {}
+    for indice, anuncio in enumerate(anuncios, 1):
+        chave_marca = " ".join(normaliza(anuncio["marca"]).split())
+        if chave_marca not in modelos_cache:
+            modelos_cache[chave_marca] = modelos_da_marca(conn, anuncio["marca"])
+        quantidade = salva_sugestoes(
+            conn, anuncio, modelos=modelos_cache[chave_marca], commit=False,
+        )
+        if quantidade:
+            com_sugestao += 1
+            total_sugestoes += quantidade
+        if indice % 100 == 0:
+            conn.commit()
+    conn.commit()
+    print(
+        f"Sugestoes locais: {len(anuncios)} anuncios analisados · "
+        f"{com_sugestao} com candidatos · {total_sugestoes} opcoes gravadas."
+    )
+    return {"analisados": len(anuncios), "com_sugestao": com_sugestao, "opcoes": total_sugestoes}
+
+
 def escolhe(conn, anuncio):
     """Devolve (candidatos, confianca) ou (None, motivo).
 
@@ -581,7 +775,7 @@ if __name__ == "__main__":
     ap.add_argument("--db-name", default=os.getenv("OPER_RADAR_DB_NAME"))
     ap.add_argument("--max-req", type=int, default=400)
     ap.add_argument("--lote", type=int, default=200, help="quantos anuncios examinar por rodada")
-    ap.add_argument("--modo", choices=("bootstrap", "local", "mensal", "debug"), default="bootstrap",
+    ap.add_argument("--modo", choices=("bootstrap", "local", "mensal", "sugestoes", "debug"), default="bootstrap",
                     help="bootstrap consulta combinacoes novas; local usa so MySQL; mensal renova precos")
     ap.add_argument("--max-refresh", type=int, default=480, help="quantos precos mensais atualizar por rodada")
     ap.add_argument("--atualizar-todos-precos", action="store_true",
@@ -619,6 +813,8 @@ if __name__ == "__main__":
                 conn, max_refresh=args.max_refresh,
                 somente_ativos=not args.atualizar_todos_precos,
             )
+        elif modo == "sugestoes":
+            gera_sugestoes_pendentes(conn, lote=args.lote)
         else:
             resultado = roda_bootstrap(conn, lote=args.lote)
             concluiu = (resultado["pendentes"] < args.lote
