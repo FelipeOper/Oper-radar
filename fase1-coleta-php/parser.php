@@ -10,7 +10,7 @@ const BASE_URL_PARSER = 'https://www.caminhoesecarretas.com.br';
 const HREF_RE = '/href="(\/veiculo\/[a-z0-9\/\-]+\/(\d+))"/';
 const TITULO_RE = '/<h2 class="h16">\s*(.*?)\s*<\/h2>/s';
 const PRECO_RE = '/<span class="money">\s*(R\$[^<]+)<\/span>/';
-const ANO_RE_PARSER = '/(\d{4})\/(\d{4})/';
+const ANO_RE_PARSER = '/\b((?:19|20)\d{2})\s*\/\s*(\d{2}|(?:19|20)\d{2})\b(?:\s*\(\s*((?:19|20)\d{2})\s*\))?/';
 
 const MARCAS_CAMINHAO_FALLBACK = [
     "daf", "volvo", "scania", "mercedes-benz", "iveco", "man", "ford", "vw",
@@ -42,6 +42,37 @@ function carrega_marcas_conhecidas(string $caminho_taxonomia = __DIR__ . '/taxon
 function limpa_texto_html(string $texto): string {
     $texto = html_entity_decode($texto, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     return trim(preg_replace('/\s+/', ' ', $texto));
+}
+
+function extrai_km_ou_horas(string $bloco): ?string {
+    $texto = limpa_texto_html(strip_tags($bloco));
+    if (preg_match('/(?:quilometragem|od[oô]metro)?\s*[:\-]?\s*([\d.]+)\s*(?:km|quil[oô]metros?)\b/iu', $texto, $m)) {
+        return ((int) preg_replace('/\D/', '', $m[1])) . ' km';
+    }
+    if (preg_match('/(?:hor[ií]metro|horas?\s+de\s+uso)\s*[:\-]?\s*([\d.]+)\s*(?:h|horas?)?\b/iu', $texto, $m)) {
+        return ((int) preg_replace('/\D/', '', $m[1])) . ' horas';
+    }
+    return null;
+}
+
+function extrai_anos(string $titulo): array {
+    if (!preg_match(ANO_RE_PARSER, $titulo, $m)) {
+        return [null, null];
+    }
+    $fabricacao = (int) $m[1];
+    if (strlen($m[2]) === 2) {
+        $modelo = intdiv($fabricacao, 100) * 100 + (int) $m[2];
+        if ($modelo < $fabricacao - 1) {
+            $modelo += 100;
+        }
+    } else {
+        $modelo = (int) $m[2];
+    }
+    $modeloParenteses = isset($m[3]) && $m[3] !== '' ? (int) $m[3] : null;
+    if ($modeloParenteses !== null && $modeloParenteses >= $fabricacao && $modeloParenteses <= $fabricacao + 2) {
+        $modelo = $modeloParenteses;
+    }
+    return [$fabricacao, $modelo];
 }
 
 function extrai_tipo_e_marca_da_url(string $url_relativa, array $marcas_conhecidas): array {
@@ -84,11 +115,7 @@ function parse_listings(string $html, array $marcas_conhecidas): array {
             $titulo = limpa_texto_html($tituloM[1]);
         }
 
-        $anoInicial = $anoFinal = null;
-        if (preg_match(ANO_RE_PARSER, $titulo, $anoM)) {
-            $anoInicial = (int) $anoM[1];
-            $anoFinal = (int) $anoM[2];
-        }
+        [$anoInicial, $anoFinal] = extrai_anos($titulo);
 
         $preco = null;
         $precoTextoBruto = '';
@@ -100,6 +127,7 @@ function parse_listings(string $html, array $marcas_conhecidas): array {
         } elseif (stripos($bloco, 'consultar') !== false) {
             $precoTextoBruto = '(A consultar)';
         }
+        $kmOuHoras = extrai_km_ou_horas($bloco);
 
         $anuncios[] = [
             'anuncio_portal_id' => $anuncioId,
@@ -111,6 +139,7 @@ function parse_listings(string $html, array $marcas_conhecidas): array {
             'ano_final' => $anoFinal,
             'preco' => $preco,
             'preco_texto_bruto' => $precoTextoBruto,
+            'km_ou_horas' => $kmOuHoras,
         ];
     }
     return $anuncios;

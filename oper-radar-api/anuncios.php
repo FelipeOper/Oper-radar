@@ -102,10 +102,17 @@ $ordens = [
 ];
 $ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
 
-$sql = "SELECT a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.ano_inicial, a.ano_final,
+$sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo,
+               a.ano_inicial, a.ano_final,
+               a.ano_inicial AS ano_fabricacao, a.ano_final AS ano_modelo, a.cor,
+               COALESCE(CONCAT(a.quilometragem_manual, ' km'), a.km_ou_horas) AS quilometragem,
+               CASE WHEN a.quilometragem_manual IS NOT NULL THEN 'curadoria'
+                    WHEN a.km_ou_horas IS NOT NULL AND a.km_ou_horas<>'' THEN 'coleta' ELSE NULL END AS quilometragem_origem,
                a.preco, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
                a.fipe_match_status, a.fipe_match_confianca, a.fipe_match_motivo,
-               f.preco AS preco_fipe, f.codigo_fipe,
+               a.fipe_vinculo_origem, f.preco AS preco_fipe, f.codigo_fipe,
+               f.ano_codigo AS ano_fipe, f.mes_referencia AS referencia_fipe,
+               fm.marca_fipe, fm.modelo_fipe,
                ROUND((a.preco - f.preco) / NULLIF(f.preco, 0) * 100, 1) AS desvio_fipe_pct,
                mc.anuncios_comparaveis, mc.preco_medio_mercado,
                mc.menor_preco_mercado, mc.maior_preco_mercado,
@@ -114,6 +121,7 @@ $sql = "SELECT a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.ano_inic
         FROM anuncio a
         JOIN revenda r ON r.id = a.revenda_id
         LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id
+        LEFT JOIN fipe_modelo fm ON fm.id = f.fipe_modelo_id
         LEFT JOIN (
             SELECT fipe_preco_id, COUNT(*) AS anuncios_comparaveis,
                    AVG(NULLIF(preco, 0)) AS preco_medio_mercado,
@@ -137,6 +145,11 @@ $res = $stmt->get_result();
 
 $anuncios = [];
 while ($row = $res->fetch_assoc()) {
+    $row['anuncio_id'] = (int)$row['anuncio_id'];
+    $row['anuncio_portal_id'] = (int)$row['anuncio_portal_id'];
+    foreach (['ano_inicial', 'ano_final', 'ano_fabricacao', 'ano_modelo'] as $campo) {
+        $row[$campo] = $row[$campo] !== null ? (int)$row[$campo] : null;
+    }
     $row['preco'] = $row['preco'] !== null ? (float)$row['preco'] : null;
     $row['preco_fipe'] = $row['preco_fipe'] !== null ? (float)$row['preco_fipe'] : null;
     $row['desvio_fipe_pct'] = $row['desvio_fipe_pct'] !== null ? (float)$row['desvio_fipe_pct'] : null;

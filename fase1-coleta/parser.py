@@ -25,7 +25,9 @@ BLOCO_INICIO_RE = re.compile(r'(?=<div class="list-product list-view-item">)')
 HREF_RE = re.compile(r'href="(/veiculo/[a-z0-9/-]+/(\d+))"')
 TITULO_RE = re.compile(r'<h2 class="h16">\s*(.*?)\s*</h2>', re.DOTALL)
 PRECO_RE = re.compile(r'<span class="money">\s*(R\$[^<]+)</span>')
-ANO_RE = re.compile(r"(\d{4})/(\d{4})")
+ANO_RE = re.compile(r"\b((?:19|20)\d{2})\s*/\s*(\d{2}|(?:19|20)\d{2})\b(?:\s*\(\s*((?:19|20)\d{2})\s*\))?")
+KM_RE = re.compile(r"(?:quilometragem|od[oô]metro)?\s*[:\-]?\s*([\d.]+)\s*(km|quil[oô]metros?)\b", re.IGNORECASE)
+HORAS_RE = re.compile(r"(?:hor[ií]metro|horas?\s+de\s+uso)\s*[:\-]?\s*([\d.]+)\s*(?:h|horas?)?\b", re.IGNORECASE)
 
 # Marcas de caminhão (posição fixa no path: /veiculo/.../<tipo>/<marca>/<modelo>/...)
 # Esta lista pequena é só um FALLBACK para quando taxonomia.json ainda não foi gerado
@@ -68,12 +70,46 @@ class Anuncio:
     ano_final: Optional[int]
     preco: Optional[float]
     preco_texto_bruto: str
+    km_ou_horas: Optional[str] = None
 
 
 def _limpa_texto_html(texto: str) -> str:
     """Decodifica entidades HTML (&nbsp;, &#226; etc) e colapsa espaços/quebras de linha."""
     texto = html_lib.unescape(texto)
     return re.sub(r"\s+", " ", texto).strip()
+
+
+def _extrai_km_ou_horas(bloco: str) -> Optional[str]:
+    """Usa apenas um valor explicitamente rotulado; nunca deduz quilometragem."""
+    texto = _limpa_texto_html(re.sub(r"<[^>]+>", " ", bloco))
+    km = KM_RE.search(texto)
+    if km:
+        valor = int(re.sub(r"\D", "", km.group(1)))
+        return f"{valor} km"
+    horas = HORAS_RE.search(texto)
+    if horas:
+        valor = int(re.sub(r"\D", "", horas.group(1)))
+        return f"{valor} horas"
+    return None
+
+
+def _extrai_anos(titulo: str) -> tuple[Optional[int], Optional[int]]:
+    """Retorna (fabricacao, modelo), inclusive para formatos como 2021/22 (2022)."""
+    match = ANO_RE.search(titulo)
+    if not match:
+        return None, None
+    fabricacao = int(match.group(1))
+    modelo_bruto = match.group(2)
+    if len(modelo_bruto) == 2:
+        modelo = (fabricacao // 100) * 100 + int(modelo_bruto)
+        if modelo < fabricacao - 1:
+            modelo += 100
+    else:
+        modelo = int(modelo_bruto)
+    modelo_parenteses = int(match.group(3)) if match.group(3) else None
+    if modelo_parenteses is not None and fabricacao <= modelo_parenteses <= fabricacao + 2:
+        modelo = modelo_parenteses
+    return fabricacao, modelo
 
 
 def _extrai_tipo_e_marca_da_url(url_relativa: str) -> tuple[Optional[str], Optional[str]]:
@@ -110,9 +146,7 @@ def parse_listings(html: str) -> List[Anuncio]:
         titulo_m = TITULO_RE.search(bloco)
         titulo = _limpa_texto_html(titulo_m.group(1)) if titulo_m else str(anuncio_id)
 
-        ano_m = ANO_RE.search(titulo)
-        ano_inicial = int(ano_m.group(1)) if ano_m else None
-        ano_final = int(ano_m.group(2)) if ano_m else None
+        ano_inicial, ano_final = _extrai_anos(titulo)
 
         preco_m = PRECO_RE.search(bloco)
         if preco_m:
@@ -123,10 +157,12 @@ def parse_listings(html: str) -> List[Anuncio]:
             preco = None
             preco_texto_bruto = "(A consultar)" if "consultar" in bloco.lower() else ""
 
+        km_ou_horas = _extrai_km_ou_horas(bloco)
+
         anuncios.append(Anuncio(
             anuncio_portal_id=anuncio_id, url=f"{BASE_URL}{url_relativa}", titulo=titulo,
             tipo=tipo, marca=marca, ano_inicial=ano_inicial, ano_final=ano_final,
-            preco=preco, preco_texto_bruto=preco_texto_bruto,
+            preco=preco, preco_texto_bruto=preco_texto_bruto, km_ou_horas=km_ou_horas,
         ))
     return anuncios
 

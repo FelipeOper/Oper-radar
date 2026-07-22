@@ -135,6 +135,36 @@ def eixos(s: str):
     return f"{m.group(1)}X{m.group(2)}" if m else None
 
 
+def ano_modelo(anuncio: dict):
+    """A FIPE e consultada pelo ano-modelo, nunca pelo ano de fabricacao."""
+    return anuncio.get("ano_final") or anuncio.get("ano_inicial")
+
+
+def emissao_no_texto(texto: str):
+    """Le Euro 5/6 e seus equivalentes Proconve somente quando explicitos."""
+    texto = normaliza(texto)
+    if re.search(r"\b(?:E|EURO)\s*6\b", texto) or re.search(r"\b(?:PROCONVE\s*)?P8\b", texto):
+        return "E6"
+    if re.search(r"\b(?:E|EURO)\s*5\b", texto) or re.search(r"\b(?:PROCONVE\s*)?P7\b", texto):
+        return "E5"
+    return None
+
+
+def emissao_preferida(anuncio: dict):
+    """Retorna (norma, origem). Informacao explicita sempre supera a estimativa."""
+    explicita = emissao_no_texto(f"{anuncio.get('titulo', '')} {anuncio.get('url', '')}")
+    if explicita:
+        return explicita, "explicita"
+    fabricacao = anuncio.get("ano_inicial")
+    if fabricacao is None:
+        return None, None
+    if fabricacao >= 2023:
+        return "E6", "estimada_fabricacao"
+    if 2012 <= fabricacao <= 2022:
+        return "E5", "estimada_fabricacao"
+    return None, None
+
+
 def avalia(titulo: str, modelo_fipe: str):
     """Devolve (score, motivo). Regra: o numero do modelo TEM que bater; se ambos
     tem letra de serie, elas TEM que ser iguais (senao 'R440' casaria com 'G-440',
@@ -175,9 +205,11 @@ def garante_marcas(conn, codigo_referencia=None):
 def anuncios_pendentes(conn, limite):
     cur = conn.cursor(dictionary=True)
     cur.execute("""
-        SELECT id, titulo, marca, ano_inicial FROM anuncio
-        WHERE fipe_preco_id IS NULL AND tipo = 'Caminhao' AND marca IS NOT NULL
-          AND ano_inicial IS NOT NULL AND status = 'ativo'
+        SELECT id, titulo, url, marca, ano_inicial, ano_final FROM anuncio
+        WHERE (fipe_preco_id IS NULL OR fipe_match_status = 'reprocessar_ano_modelo')
+          AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
+          AND tipo = 'Caminhao' AND marca IS NOT NULL
+          AND COALESCE(ano_final, ano_inicial) IS NOT NULL AND status = 'ativo'
           AND (
               fipe_ultima_tentativa IS NULL
               OR (fipe_match_status = 'erro_api'
@@ -325,13 +357,19 @@ def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianc
     cur.execute("""
         UPDATE anuncio
         SET fipe_preco_id=%s,
+            fipe_preco_automatico_id=%s,
             fipe_match_confianca=%s,
+            fipe_match_confianca_automatico=%s,
             fipe_match_status=%s,
+            fipe_match_status_automatico=%s,
             fipe_match_motivo=%s,
+            fipe_match_motivo_automatico=%s,
+            fipe_vinculo_origem='automatico',
             fipe_ultima_tentativa=NOW(),
             fipe_tentativas=fipe_tentativas+1
         WHERE id=%s
-    """, (preco_id, confianca, status, motivo[:160], anuncio_id))
+    """, (preco_id, preco_id, confianca, confianca, status, status,
+          motivo[:160], motivo[:160], anuncio_id))
     conn.commit()
     cur.close()
 
@@ -350,10 +388,12 @@ def escolhe(conn, anuncio):
     """Devolve (candidatos, confianca) ou (None, motivo).
 
     Regras, nesta ordem:
-      1. Se o titulo informa o eixo ('R440 6X4'), filtra por ele.
-      2. Linhas comerciais em conflito (Atego x Atron) -> nao vincula.
+      1. Prioriza a geracao de emissoes explicita; sem ela, usa a fabricacao
+         apenas como preferencia segura (2012-2022 E5; 2023+ E6).
+      2. Se o titulo informa o eixo ('R440 6X4'), filtra por ele.
+      3. Linhas comerciais em conflito (Atego x Atron) -> nao vincula.
          Conjunto vazio nunca conflita: 'R-440 A 4x2 (diesel)' nao declara linha.
-      3. Eixos explicitos em conflito (6x2 x 8x2) -> tenta o nome base da FIPE,
+      4. Eixos explicitos em conflito (6x2 x 8x2) -> tenta o nome base da FIPE,
          aquele que nao declara eixo ('11-180 Delivery 2p'), que e o modelo padrao.
          Se nao houver base, ai sim nao vincula.
     """
@@ -361,13 +401,24 @@ def escolhe(conn, anuncio):
     if not validos:
         return None, "sem match"
 
+    emissao, origem_emissao = emissao_preferida(anuncio)
+    if emissao:
+        com_emissao = [v for v in validos if emissao_no_texto(v[2]["modelo_fipe"]) == emissao]
+        sem_emissao = [v for v in validos if emissao_no_texto(v[2]["modelo_fipe"]) is None]
+        if com_emissao:
+            validos = com_emissao
+        elif origem_emissao == "explicita" and sem_emissao:
+            validos = sem_emissao
+        elif origem_emissao == "explicita":
+            return None, f"sem match emissao {emissao}"
+
     eixo_titulo = eixos(anuncio["titulo"])
     if eixo_titulo:
         filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_titulo, None)]
         if filtrados:
             validos = filtrados
 
-    # 2) linhas conflitantes: dois conjuntos nao-vazios e sem interseccao
+    # 3) linhas conflitantes: dois conjuntos nao-vazios e sem interseccao
     chaves = [palavras_chave(c["modelo_fipe"]) for _, _, c in validos]
     nao_vazias = [k for k in chaves if k]
     for i_ in range(len(nao_vazias)):
@@ -376,7 +427,7 @@ def escolhe(conn, anuncio):
                 conflito = "/".join(sorted(nao_vazias[i_] | nao_vazias[j_]))[:26]
                 return None, f"ambiguo linha ({conflito})"
 
-    # 3) eixos conflitantes: prefere o nome base (sem eixo declarado)
+    # 4) eixos conflitantes: prefere o nome base (sem eixo declarado)
     eixos_expl = {e for e in (eixos(c["modelo_fipe"]) for _, _, c in validos) if e}
     if len(eixos_expl) > 1:
         base = [v for v in validos if eixos(v[2]["modelo_fipe"]) is None]
@@ -440,15 +491,16 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                     registra_resultado(conn, a["id"], "sem_match", info)
                 continue
 
-            # Variantes com a mesma assinatura (E5/E6): a primeira que tiver o ano do anuncio vence
+            # O preco FIPE usa o ano-modelo. Fabricacao serve apenas para a geracao de emissoes.
+            modelo_ano = ano_modelo(a)
             preco_id = escolhido = None
             for c in cands[:3]:
                 if permitir_api:
                     preco_id = busca_ou_cria_preco(
-                        conn, c, a["ano_inicial"], codigo_referencia, mes_referencia
+                        conn, c, modelo_ano, codigo_referencia, mes_referencia
                     )
                 else:
-                    preco_id = busca_preco_cache(conn, c, a["ano_inicial"], codigo_referencia)
+                    preco_id = busca_preco_cache(conn, c, modelo_ano, codigo_referencia)
                 if preco_id:
                     escolhido = c
                     break
@@ -457,7 +509,7 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                     aguardando_cache += 1
                     continue
                 sem_ano += 1
-                registra_resultado(conn, a["id"], "sem_ano", f"ano {a['ano_inicial']} ausente nos candidatos FIPE")
+                registra_resultado(conn, a["id"], "sem_ano", f"ano-modelo {modelo_ano} ausente nos candidatos FIPE")
                 continue
 
             registra_resultado(
