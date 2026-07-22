@@ -6,7 +6,7 @@ import {
   Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
-  ChevronUp, ChevronDown, Smartphone, Eye, EyeOff
+  ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -1579,6 +1579,9 @@ function PageMinhaLoja({ sessao }) {
   const [form, setForm] = useState(NOVO_VEICULO);
   const [comparacao, setComparacao] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [xmlAberto, setXmlAberto] = useState(false);
+  const [xmlEstado, setXmlEstado] = useState({ arquivo: null, analisando: false, importando: false, analise: null, resultado: null, erro: '' });
+  const [xmlOpcoes, setXmlOpcoes] = useState({ usar_comparativo: true, marcar_ausentes: false });
 
   const carregar = async () => {
     setCarregando(true); setErro('');
@@ -1636,15 +1639,57 @@ function PageMinhaLoja({ sessao }) {
     }
   };
 
+  const enviarXml = async (arquivo, acao) => {
+    const corpo = new FormData();
+    corpo.append('arquivo', arquivo);
+    corpo.append('usar_comparativo', xmlOpcoes.usar_comparativo ? '1' : '0');
+    corpo.append('marcar_ausentes', xmlOpcoes.marcar_ausentes ? '1' : '0');
+    const r = await fetch(`${API_BASE_URL}/minha_loja_xml.php?acao=${acao}`, {
+      method: 'POST', body: corpo, credentials: 'same-origin', headers: { 'X-CSRF-Token': sessao.csrf },
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.erro || 'Não foi possível processar o XML.');
+    return d;
+  };
+
+  const selecionarXml = async e => {
+    const arquivo = e.target.files?.[0] || null;
+    if (!arquivo) return;
+    if (arquivo.size > 20 * 1024 * 1024) {
+      setXmlEstado({ arquivo: null, analisando: false, importando: false, analise: null, resultado: null, erro: 'O XML deve ter no máximo 20 MB.' });
+      return;
+    }
+    setXmlEstado({ arquivo, analisando: true, importando: false, analise: null, resultado: null, erro: '' });
+    try {
+      const analise = await enviarXml(arquivo, 'analisar');
+      setXmlEstado({ arquivo, analisando: false, importando: false, analise, resultado: null, erro: '' });
+    } catch (e2) {
+      setXmlEstado({ arquivo, analisando: false, importando: false, analise: null, resultado: null, erro: e2.message });
+    }
+  };
+
+  const importarXml = async () => {
+    if (!xmlEstado.arquivo || !xmlEstado.analise) return;
+    setXmlEstado(v => ({ ...v, importando: true, erro: '', resultado: null }));
+    try {
+      const resultado = await enviarXml(xmlEstado.arquivo, 'importar');
+      setXmlEstado(v => ({ ...v, importando: false, resultado }));
+      await carregar();
+    } catch (e) { setXmlEstado(v => ({ ...v, importando: false, erro: e.message })); }
+  };
+
   const ativos = itens.filter(i => i.status !== 'vendido');
   const valor = ativos.reduce((s, i) => s + Number(i.preco_anunciado || 0), 0);
   const mediaDias = ativos.length ? Math.round(ativos.reduce((s, i) => s + Number(i.dias_estoque || 0), 0) / ativos.length) : 0;
-  const vinculados = ativos.filter(i => i.fipe_preco_id).length;
+  const vinculados = ativos.filter(i => i.fipe_preco_id && Number(i.usar_comparativo ?? 1) === 1).length;
 
   return <div>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-      <SectionTitle sub="Seu estoque como base privada de comparação com FIPE e mercado">Meu estoque</SectionTitle>
-      <button onClick={() => setFormAberto(v => !v)} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}>{formAberto ? <X size={16} /> : <Plus size={16} />}{formAberto ? 'Fechar' : 'Adicionar veículo'}</button>
+      <SectionTitle sub="Seu estoque publicado como base interna de comparação com FIPE e mercado">Meu estoque</SectionTitle>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={() => { setXmlAberto(v => !v); setFormAberto(false); }} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}><UploadCloud size={16} />{xmlAberto ? 'Fechar XML' : 'Importar XML'}</button>
+        <button onClick={() => { setFormAberto(v => !v); setXmlAberto(false); }} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}>{formAberto ? <X size={16} /> : <Plus size={16} />}{formAberto ? 'Fechar' : 'Adicionar veículo'}</button>
+      </div>
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10 }}>
       <Kpi label="No estoque" value={fmtN(ativos.length)} sub="veículos próprios" />
@@ -1652,6 +1697,33 @@ function PageMinhaLoja({ sessao }) {
       <Kpi label="Idade média" value={`${mediaDias}d`} sub="tempo em estoque" />
       <Kpi label="Comparados" value={`${vinculados}/${ativos.length}`} sub="vínculo FIPE automático" tone={T.positive} />
     </div>
+
+    {xmlAberto && <Card style={{ marginTop: 16, borderColor: `${T.signal}55` }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, marginBottom: 15 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${T.signal}16`, color: T.signal, flex: '0 0 auto' }}><FileText size={19} /></div>
+        <div><strong>Sincronizar estoque por XML</strong><div style={{ color: T.inkMuted, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>Primeiro analisamos o arquivo. Nada é alterado até sua confirmação. Limite de 20 MB.</div></div>
+      </div>
+      <label style={{ display: 'grid', placeItems: 'center', minHeight: 104, padding: 16, border: `1px dashed ${T.lineStrong}`, borderRadius: 11, background: T.surface2, cursor: 'pointer', textAlign: 'center' }}>
+        <UploadCloud size={23} color={T.steel} />
+        <strong style={{ fontSize: 12.5, marginTop: 7 }}>{xmlEstado.arquivo?.name || 'Selecionar arquivo XML'}</strong>
+        <span style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>veículos, preços e localização serão reconhecidos automaticamente</span>
+        <input type="file" accept=".xml,text/xml,application/xml" onChange={selecionarXml} style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} />
+      </label>
+      {xmlEstado.analisando && <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 12 }}>Analisando estrutura e validando veículos…</div>}
+      {xmlEstado.erro && <div role="alert" style={{ color: T.alert, fontSize: 12, marginTop: 12 }}>{xmlEstado.erro}</div>}
+      {xmlEstado.analise && <div style={{ marginTop: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+          {[['Válidos', xmlEstado.analise.resumo.validos], ['Com preço', xmlEstado.analise.resumo.com_preco], ['Identificados', xmlEstado.analise.resumo.com_referencia], ['Ignorados', xmlEstado.analise.resumo.ignorados + xmlEstado.analise.resumo.duplicados]].map(([rotulo, valor]) => <div key={rotulo} style={{ padding: 10, borderRadius: 8, background: T.surface2 }}><small style={{ color: T.inkMuted }}>{rotulo}</small><div style={{ fontFamily: T.fontMono, fontSize: 16, marginTop: 3 }}>{fmtN(valor)}</div></div>)}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 7, marginTop: 12 }}>{(xmlEstado.analise.amostra || []).slice(0, 5).map((i, idx) => <div key={`${i.referencia_interna}-${idx}`} style={{ minWidth: 0, padding: 10, border: `1px solid ${T.line}`, borderRadius: 8, background: T.surface2 }}><div style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5 }}>{i.referencia_interna || i.placa || 'SEM REFERÊNCIA'}</div><strong style={{ display: 'block', fontSize: 11.5, marginTop: 4, overflowWrap: 'anywhere' }}>{[i.marca, i.modelo].filter(Boolean).join(' ')}</strong><div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{i.ano || '—'} · {fmtBRL(i.preco_anunciado)} · {[i.cidade, i.uf].filter(Boolean).join('/') || '—'}</div></div>)}</div>
+        <div style={{ display: 'grid', gap: 9, marginTop: 13 }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, color: T.ink, fontSize: 12 }}><input type="checkbox" checked={xmlOpcoes.usar_comparativo} onChange={e => setXmlOpcoes(v => ({ ...v, usar_comparativo: e.target.checked }))} /> <span><strong>Publicar no comparativo do Radar</strong><br /><span style={{ color: T.inkMuted }}>Usa preço, FIPE e mercado dentro da área autenticada; placa não é exposta.</span></span></label>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, color: T.ink, fontSize: 12 }}><input type="checkbox" checked={xmlOpcoes.marcar_ausentes} onChange={e => setXmlOpcoes(v => ({ ...v, marcar_ausentes: e.target.checked }))} /> <span><strong>Marcar ausentes como vendidos</strong><br /><span style={{ color: T.inkMuted }}>Ative apenas quando o XML representar todo o estoque atual da loja.</span></span></label>
+        </div>
+        <button onClick={importarXml} disabled={xmlEstado.importando} style={{ ...inputStyle, marginTop: 14, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer' }}>{xmlEstado.importando ? 'Sincronizando…' : `Confirmar ${fmtN(xmlEstado.analise.resumo.validos)} veículos`}</button>
+      </div>}
+      {xmlEstado.resultado && <div role="status" style={{ marginTop: 13, padding: 11, borderRadius: 9, background: `${T.positive}12`, border: `1px solid ${T.positive}35`, color: T.positive, fontSize: 12.5 }}><strong>Estoque sincronizado.</strong> {fmtN(xmlEstado.resultado.novos)} novos, {fmtN(xmlEstado.resultado.atualizados)} atualizados e {fmtN(xmlEstado.resultado.ausentes_marcados_vendidos)} ausentes marcados como vendidos.</div>}
+    </Card>}
 
     {formAberto && <Card style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16 }}><Store size={18} color={T.signal} /><strong>Novo veículo</strong></div>
@@ -1683,15 +1755,15 @@ function PageMinhaLoja({ sessao }) {
           const preco = Number(item.preco_anunciado || 0);
           const delta = mercado && preco ? Math.round((preco / mercado - 1) * 100) : null;
           return <Card key={item.id} style={{ padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><select aria-label="Status do veículo" value={item.status} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select><button aria-label="Excluir veículo" onClick={() => excluir(item.id)} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><select aria-label="Status do veículo" value={item.status} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select>{item.origem === 'xml' && <Tag tone="sinal">XML</Tag>}</div><button aria-label="Excluir veículo" onClick={() => excluir(item.id)} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
             <div style={{ fontFamily: T.fontDisplay, fontSize: 16, fontWeight: 650, marginTop: 12 }}>{[item.marca, item.modelo].filter(Boolean).join(' ')}</div>
-            <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.ano || 'Ano não informado'} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias</div>
+            <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.ano || 'Ano não informado'} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias{item.quilometragem ? ` · ${fmtN(item.quilometragem)} km` : ''}</div>
             <div style={{ fontFamily: T.fontMono, fontSize: 19, fontWeight: 650, marginTop: 15 }}>{fmtBRL(item.preco_anunciado)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
               <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>FIPE</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_fipe)}</div></div>
               <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>Mercado</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_medio_mercado)}</div></div>
             </div>
-            <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{delta == null ? 'Aguardando comparação compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da média · ${fmtN(item.anuncios_ativos)} anúncios comparáveis`}</div>
+            <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{Number(item.usar_comparativo ?? 1) !== 1 ? 'Fora da base comparativa' : delta == null ? 'Aguardando comparação compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da média · ${fmtN(item.anuncios_ativos)} anúncios comparáveis`}</div>
           </Card>;
         })}
       </div>}

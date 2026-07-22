@@ -2,6 +2,8 @@
 
 Esta etapa protege o Oper Radar com sessão PHP e associa cada item do estoque ao usuário autenticado.
 
+O estoque também pode ser sincronizado por XML. Consulte [ESTOQUE_XML.md](ESTOQUE_XML.md).
+
 No servidor, depois do `git pull`:
 
 ```bash
@@ -12,4 +14,4 @@ php fase4-acesso/criar_admin.php
 
 O segundo comando pede nome, e-mail e senha. A senha não aparece na tela nem entra no histórico do terminal.
 
-Depois, publique `config.php`, `auth.php` e `minha_loja.php` na pasta pública da API e publique o novo bundle do frontend. Faça as duas publicações na mesma janela, pois as APIs passam a exigir login.
+Depois, publique `config.php`, `auth.php`, `minha_loja.php`, `minha_loja_xml.php` e a pasta `oper-radar-api/lib` na pasta pública da API; então publique o novo bundle do frontend. Faça as publicações na mesma janela, pois as APIs passam a exigir login.

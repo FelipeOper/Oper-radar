@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<estoque>
+  <veiculo>
+    <codigoEstoque>OP-001</codigoEstoque>
+    <marca>Mercedes-Benz</marca>
+    <modelo>Actros 2651 6x4</modelo>
+    <anoModelo>2022</anoModelo>
+    <precoVenda>510000.00</precoVenda>
+    <quilometragem>185000</quilometragem>
+    <cidade>Curitiba</cidade>
+    <uf>PR</uf>
+    <dataEntrada>2026-07-01</dataEntrada>
+    <status>disponivel</status>
+    <codigoFipe>509317-1</codigoFipe>
+    <urlAnuncio>https://exemplo.com.br/veiculos/op-001</urlAnuncio>
+  </veiculo>
+  <veiculo>
+    <codigoEstoque>OP-002</codigoEstoque>
+    <marca>Scania</marca>
+    <modelo>R450</modelo>
+    <anoModelo>2020</anoModelo>
+    <precoVenda>475000</precoVenda>
+    <cidade>Cascavel</cidade>
+    <uf>PR</uf>
+    <status>reservado</status>
+  </veiculo>
+</estoque>
