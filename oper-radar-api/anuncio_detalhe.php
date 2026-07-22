@@ -57,6 +57,8 @@ function envia_detalhe_anuncio(mysqli $conn, int $id): void {
               'fipe_preco_automatico_id', 'quilometragem_manual'] as $campo) {
         $anuncio[$campo] = $anuncio[$campo] === null ? null : (int)$anuncio[$campo];
     }
+    $anuncio['ano_fabricacao'] = $anuncio['ano_inicial'];
+    $anuncio['ano_modelo'] = $anuncio['ano_final'] ?: $anuncio['ano_inicial'];
     $anuncio['preco'] = detalhe_numero($anuncio['preco']);
     $anuncio['preco_fipe'] = detalhe_numero($anuncio['preco_fipe']);
     $anuncio['anuncios_comparaveis'] = (int)($anuncio['anuncios_comparaveis'] ?? 0);

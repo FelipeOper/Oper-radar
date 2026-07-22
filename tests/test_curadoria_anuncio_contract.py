@@ -57,6 +57,37 @@ class CuradoriaAnuncioContractTest(unittest.TestCase):
         finally:
             sys.path.pop(0)
 
+    def test_parser_separa_fabricacao_e_modelo_com_ano_abreviado(self):
+        pasta = ROOT / "fase1-coleta"
+        sys.path.insert(0, str(pasta))
+        try:
+            spec = importlib.util.spec_from_file_location("parser_anos_oper_radar", pasta / "parser.py")
+            modulo = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = modulo
+            spec.loader.exec_module(modulo)
+            html = '''<div class="list-product list-view-item">
+                <a href="/veiculo/curitiba/pr/caminhao/daf/daf-xf-530/2022/cavalo/loja/999"></a>
+                <h2 class="h16">DAF XF 530 2021/22 (2022)</h2>
+                <span class="money">R$ 500.000,00</span></div>'''
+            anuncio = modulo.parse_listings(html)[0]
+            self.assertEqual(2021, anuncio.ano_inicial)
+            self.assertEqual(2022, anuncio.ano_final)
+        finally:
+            sys.path.pop(0)
+
+    def test_php_tambem_separa_fabricacao_e_modelo(self):
+        source = (ROOT / "fase1-coleta-php" / "parser.php").read_text(encoding="utf-8")
+        self.assertIn("function extrai_anos", source)
+        self.assertIn("strlen($m[2]) === 2", source)
+
+    def test_reauditoria_preserva_manual_e_vinculo_ate_processar(self):
+        source = (ROOT / "fase2-fipe" / "reabrir_fipe_fabricacao_modelo.py").read_text(encoding="utf-8")
+        sync = (ROOT / "fase2-fipe" / "fipe_sync.py").read_text(encoding="utf-8")
+        self.assertIn("<> 'manual'", source)
+        self.assertIn("reprocessar_ano_modelo", source)
+        self.assertNotIn("fipe_preco_id = NULL", source)
+        self.assertIn("fipe_match_status = 'reprocessar_ano_modelo'", sync)
+
 
 if __name__ == "__main__":
     unittest.main()

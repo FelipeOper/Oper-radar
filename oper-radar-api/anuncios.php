@@ -103,7 +103,8 @@ $ordens = [
 $ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
 
 $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo,
-               a.ano_inicial, a.ano_final, a.cor,
+               a.ano_inicial, a.ano_final,
+               a.ano_inicial AS ano_fabricacao, a.ano_final AS ano_modelo, a.cor,
                COALESCE(CONCAT(a.quilometragem_manual, ' km'), a.km_ou_horas) AS quilometragem,
                CASE WHEN a.quilometragem_manual IS NOT NULL THEN 'curadoria'
                     WHEN a.km_ou_horas IS NOT NULL AND a.km_ou_horas<>'' THEN 'coleta' ELSE NULL END AS quilometragem_origem,
@@ -146,6 +147,9 @@ $anuncios = [];
 while ($row = $res->fetch_assoc()) {
     $row['anuncio_id'] = (int)$row['anuncio_id'];
     $row['anuncio_portal_id'] = (int)$row['anuncio_portal_id'];
+    foreach (['ano_inicial', 'ano_final', 'ano_fabricacao', 'ano_modelo'] as $campo) {
+        $row[$campo] = $row[$campo] !== null ? (int)$row[$campo] : null;
+    }
     $row['preco'] = $row['preco'] !== null ? (float)$row['preco'] : null;
     $row['preco_fipe'] = $row['preco_fipe'] !== null ? (float)$row['preco_fipe'] : null;
     $row['desvio_fipe_pct'] = $row['desvio_fipe_pct'] !== null ? (float)$row['desvio_fipe_pct'] : null;

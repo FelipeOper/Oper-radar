@@ -92,6 +92,9 @@ function categoriaDe(tipo) {
 
 function mapeiaAnuncioReal(a) {
   const dias = Math.max(0, Math.round((Date.now() - new Date(a.primeira_vez_visto)) / 86400000));
+  const anoFabricacao = a.ano_fabricacao ?? a.ano_inicial ?? null;
+  const anoModelo = a.ano_modelo ?? a.ano_final ?? anoFabricacao;
+  const emissao = classificaEmissao(a.titulo, a.url, anoFabricacao);
   return {
     dbId: a.anuncio_id,
     id: a.anuncio_portal_id,
@@ -102,7 +105,10 @@ function mapeiaAnuncioReal(a) {
     modelo: a.modelo || '',
     cor: a.cor || '',
     titulo: a.titulo,
-    ano: a.ano_inicial ? `${a.ano_inicial}/${a.ano_final}` : '',
+    anoFabricacao,
+    anoModelo,
+    ano: anoFabricacao ? `${anoFabricacao}/${anoModelo || anoFabricacao}` : '',
+    emissao,
     preco: a.preco,
     precoFipe: a.preco_fipe ?? null,
     codigoFipe: a.codigo_fipe ?? null,
@@ -132,6 +138,15 @@ function mapeiaAnuncioReal(a) {
     status: STATUS_DB_PARA_UI[a.status] || 'ativo',
     dias,
   };
+}
+
+function classificaEmissao(titulo, url, anoFabricacao) {
+  const texto = `${titulo || ''} ${url || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  if (/\b(?:E|EURO)\s*6\b|\b(?:PROCONVE\s*)?P8\b/.test(texto)) return { norma: 'E6', origem: 'informado' };
+  if (/\b(?:E|EURO)\s*5\b|\b(?:PROCONVE\s*)?P7\b/.test(texto)) return { norma: 'E5', origem: 'informado' };
+  if (Number(anoFabricacao) >= 2023) return { norma: 'E6', origem: 'provável' };
+  if (Number(anoFabricacao) >= 2012 && Number(anoFabricacao) <= 2022) return { norma: 'E5', origem: 'provável' };
+  return null;
 }
 
 const fmtBRL = v => v == null ? 'A consultar' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -423,7 +438,9 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: 8, marginTop: 14 }}>
               {[
-                ['Ano', a.ano_inicial ? `${a.ano_inicial}/${a.ano_final || a.ano_inicial}` : 'Não informado'],
+                ['Fabricação', a.ano_fabricacao || a.ano_inicial || 'Não informado'],
+                ['Modelo', a.ano_modelo || a.ano_final || a.ano_inicial || 'Não informado'],
+                ['Emissões', (() => { const e = classificaEmissao(a.titulo, a.url, a.ano_fabricacao || a.ano_inicial); return e ? `${e.norma} · ${e.origem}` : 'Não identificada'; })()],
                 ['Preço', fmtBRL(a.preco)],
                 ['KM / uso', a.quilometragem_exibida || 'Não informado'],
                 ['Origem KM', a.quilometragem_origem === 'curadoria' ? 'Curadoria' : a.quilometragem_origem === 'coleta' ? 'Coleta' : '—'],
@@ -1011,7 +1028,8 @@ function PageMercado({ sessao }) {
               </div>
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: T.inkMuted, fontSize: 10.5, marginBottom: 7 }}>
-                {a.ano && <span>{a.ano}</span>}
+                {a.ano && <span title="Fabricação / modelo">Fab/Mod {a.ano}</span>}
+                {a.emissao && <span title={a.emissao.origem === 'informado' ? 'Norma informada no anúncio' : 'Estimativa pelo ano de fabricação'}>{a.emissao.norma} · {a.emissao.origem}</span>}
                 {a.quilometragem && <span><Ruler size={10} style={{ verticalAlign: -1 }} /> {a.quilometragem}{a.quilometragemOrigem === 'curadoria' ? ' · validado' : ''}</span>}
                 <span style={{ color: T.steel }}>Clique para comparar</span>
               </div>

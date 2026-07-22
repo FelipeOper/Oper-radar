@@ -84,6 +84,8 @@ def salva_estado(conn, revenda_id: int, novo_estado: dict, anuncios_por_id: dict
                         status = EXCLUDED.status,
                         misses_consecutivos = EXCLUDED.misses_consecutivos,
                         data_remocao = EXCLUDED.data_remocao,
+                        ano_inicial = COALESCE(EXCLUDED.ano_inicial, anuncio.ano_inicial),
+                        ano_final = COALESCE(EXCLUDED.ano_final, anuncio.ano_final),
                         km_ou_horas = COALESCE(NULLIF(EXCLUDED.km_ou_horas, ''), anuncio.km_ou_horas),
                         preco = COALESCE(EXCLUDED.preco, anuncio.preco)
                 """, (

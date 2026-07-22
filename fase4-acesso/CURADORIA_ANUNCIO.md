@@ -10,6 +10,9 @@ Esta entrega adiciona uma leitura aprofundada aos cards do Mercado sem alterar o
 - Cada mudança registra usuário, data, FIPE anterior/nova, KM anterior/novo e observação.
 - Analista e Visualizador enxergam o painel e os comparativos, mas não editam.
 - KM só é coletado automaticamente quando estiver explicitamente visível no HTML já baixado. A coleta não abre milhares de páginas adicionais.
+- Fabricação e modelo são preservados como campos diferentes. `2021/22 (2022)` vira fabricação 2021 e modelo 2022.
+- A consulta de preço FIPE usa o ano-modelo. O ano de fabricação nunca substitui o ano-modelo quando este está disponível.
+- Euro 5/Euro 6 explícito no anúncio tem prioridade. Sem informação explícita, fabricação 2012–2022 apenas prefere E5 e fabricação 2023+ apenas prefere E6; a estimativa não força um vínculo incompatível.
 
 ## Publicação segura
 
@@ -28,6 +31,25 @@ php fase4-acesso/migrar_curadoria_anuncio.php
 
 5. O coletor e o motor FIPE passam a depender das novas colunas. Depois da migração, o `git pull` já deixa os arquivos de cron atualizados.
 6. Publique o bundle gerado pelo frontend.
+
+### Reauditoria única de fabricação, modelo e emissões
+
+Depois do backup e da publicação, carregue o ambiente e confira primeiro a simulação:
+
+```bash
+set -a; . /home1/pro93061/.oper-radar.env; set +a
+python3 fase2-fipe/reabrir_fipe_fabricacao_modelo.py
+```
+
+Se a contagem estiver correta, marque a fila e execute o cruzamento local, sem consumir a API:
+
+```bash
+python3 fase2-fipe/reabrir_fipe_fabricacao_modelo.py --aplicar
+cd fase2-fipe
+for rodada in 1 2 3 4 5; do bash executar_fipe_job.sh local; done
+```
+
+Cada rodada processa até 1.000 registros; a última normalmente encontrará a fila vazia. O vínculo anterior permanece disponível até o registro ser reprocessado. Correções manuais nunca entram nessa fila.
 
 ## Validação
 

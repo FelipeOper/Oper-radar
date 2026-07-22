@@ -132,6 +132,8 @@ def salva_estado(conn, revenda_id: int, novo_estado: dict, anuncios_por_id: dict
                     status = VALUES(status),
                     misses_consecutivos = VALUES(misses_consecutivos),
                     data_remocao = VALUES(data_remocao),
+                    ano_inicial = COALESCE(VALUES(ano_inicial), ano_inicial),
+                    ano_final = COALESCE(VALUES(ano_final), ano_final),
                     km_ou_horas = COALESCE(NULLIF(VALUES(km_ou_horas), ''), km_ou_horas),
                     preco = COALESCE(VALUES(preco), preco)
             """, (
