@@ -5,17 +5,24 @@ $conn = conecta();
 
 $resumo = $conn->query("
     SELECT
-        SUM(tipo='Caminhao' AND status='ativo' AND marca IS NOT NULL AND ano_inicial IS NOT NULL) AS elegiveis,
-        SUM(tipo='Caminhao' AND status='ativo' AND marca IS NOT NULL AND ano_inicial IS NOT NULL
-            AND fipe_preco_id IS NOT NULL) AS vinculados_ativos,
-        SUM(tipo='Caminhao' AND status='ativo' AND marca IS NOT NULL AND ano_inicial IS NOT NULL
-            AND fipe_preco_id IS NULL AND fipe_ultima_tentativa IS NULL) AS nunca_tentados,
-        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='sem_match') AS sem_match,
-        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='ambiguo') AS ambiguos,
-        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='sem_ano') AS sem_ano,
-        SUM(tipo='Caminhao' AND status='ativo' AND fipe_match_status='erro_api') AS erros_api,
-        MAX(fipe_ultima_tentativa) AS ultima_tentativa
-    FROM anuncio
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.marca IS NOT NULL AND a.ano_inicial IS NOT NULL) AS elegiveis,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.marca IS NOT NULL AND a.ano_inicial IS NOT NULL
+            AND a.fipe_preco_id IS NOT NULL) AS vinculados_ativos,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.marca IS NOT NULL AND a.ano_inicial IS NOT NULL
+            AND a.fipe_preco_id IS NULL) AS aguardando_curadoria,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.marca IS NOT NULL AND a.ano_inicial IS NOT NULL
+            AND a.fipe_preco_id IS NULL AND s.anuncio_id IS NOT NULL) AS com_sugestao,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.marca IS NOT NULL AND a.ano_inicial IS NOT NULL
+            AND a.fipe_preco_id IS NULL AND s.anuncio_id IS NULL) AS sem_sugestao,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.marca IS NOT NULL AND a.ano_inicial IS NOT NULL
+            AND a.fipe_preco_id IS NULL AND a.fipe_ultima_tentativa IS NULL) AS nunca_tentados,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_match_status='sem_match') AS sem_match,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_match_status='ambiguo') AS ambiguos,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_match_status='sem_ano') AS sem_ano,
+        SUM(a.tipo='Caminhao' AND a.status='ativo' AND a.fipe_match_status='erro_api') AS erros_api,
+        MAX(a.fipe_ultima_tentativa) AS ultima_tentativa
+    FROM anuncio a
+    LEFT JOIN (SELECT DISTINCT anuncio_id FROM anuncio_fipe_sugestao) s ON s.anuncio_id=a.id
 ")->fetch_assoc();
 
 $precos = $conn->query("
@@ -25,7 +32,8 @@ $precos = $conn->query("
     FROM fipe_preco
 ")->fetch_assoc();
 
-foreach (['elegiveis', 'vinculados_ativos', 'nunca_tentados', 'sem_match', 'ambiguos', 'sem_ano', 'erros_api'] as $campo) {
+foreach (['elegiveis', 'vinculados_ativos', 'aguardando_curadoria', 'com_sugestao', 'sem_sugestao',
+          'nunca_tentados', 'sem_match', 'ambiguos', 'sem_ano', 'erros_api'] as $campo) {
     $resumo[$campo] = (int)($resumo[$campo] ?? 0);
 }
 $precos['precos_cache'] = (int)($precos['precos_cache'] ?? 0);

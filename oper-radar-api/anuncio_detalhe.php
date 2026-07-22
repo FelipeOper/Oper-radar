@@ -93,6 +93,28 @@ function envia_detalhe_anuncio(mysqli $conn, int $id): void {
         $st->close();
     }
 
+    $sugestoes = [];
+    if (!$anuncio['fipe_preco_id']) {
+        $st = $conn->prepare("SELECT fp.id, s.posicao, s.score, s.confianca, s.motivos,
+                                    fp.preco AS preco_fipe, fp.codigo_fipe, fp.ano_codigo,
+                                    fp.mes_referencia, fm.marca_fipe AS marca, fm.modelo_fipe AS modelo
+                             FROM anuncio_fipe_sugestao s
+                             JOIN fipe_preco fp ON fp.id=s.fipe_preco_id
+                             JOIN fipe_modelo fm ON fm.id=fp.fipe_modelo_id
+                             WHERE s.anuncio_id=?
+                             ORDER BY s.posicao, s.score DESC, fp.id
+                             LIMIT 8");
+        $st->bind_param('i', $id);
+        $st->execute();
+        $res = $st->get_result();
+        while ($row = $res->fetch_assoc()) {
+            foreach (['id', 'posicao', 'score'] as $campo) $row[$campo] = (int)$row[$campo];
+            $row['preco_fipe'] = detalhe_numero($row['preco_fipe']);
+            $sugestoes[] = $row;
+        }
+        $st->close();
+    }
+
     $historico = [];
     $st = $conn->prepare("SELECT l.id, l.acao, l.fipe_preco_anterior_id, l.fipe_preco_novo_id,
                                 l.quilometragem_anterior, l.quilometragem_nova,
@@ -111,7 +133,12 @@ function envia_detalhe_anuncio(mysqli $conn, int $id): void {
     }
     $st->close();
 
-    envia_json(['anuncio' => $anuncio, 'similares' => $similares, 'historico' => $historico]);
+    envia_json([
+        'anuncio' => $anuncio,
+        'sugestoes_fipe' => $sugestoes,
+        'similares' => $similares,
+        'historico' => $historico,
+    ]);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -177,6 +204,7 @@ try {
         $st->bind_param('ii', $usuario['id'], $id);
         $st->execute();
         $st->close();
+        $conn->query('DELETE FROM anuncio_fipe_sugestao WHERE anuncio_id=' . (int)$id);
         $fipeDepois = $atual['fipe_preco_automatico_id'] === null ? null : (int)$atual['fipe_preco_automatico_id'];
         $observacao = 'Vínculo automático restaurado';
         $log = $conn->prepare("INSERT INTO anuncio_curadoria_log
@@ -239,6 +267,9 @@ try {
             $autoConfianca, $motivo, $autoMotivo, $origem, $novoKm, $observacao, $usuario['id'], $id);
         $st->execute();
         $st->close();
+        if ($alterarFipe) {
+            $conn->query('DELETE FROM anuncio_fipe_sugestao WHERE anuncio_id=' . (int)$id);
+        }
 
         $kmDepois = $novoKm !== null ? $novoKm . ' km' : ($atual['km_ou_horas'] ?: null);
         $acaoLog = $alterarFipe && $alterarKm ? 'fipe_e_km' : ($alterarFipe ? 'fipe_manual' : ($alterarKm ? 'quilometragem' : 'observacao'));

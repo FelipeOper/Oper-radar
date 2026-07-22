@@ -117,6 +117,7 @@ function mapeiaAnuncioReal(a) {
     fipeConfianca: a.fipe_match_confianca ?? null,
     fipeMotivo: a.fipe_match_motivo ?? null,
     fipeOrigem: a.fipe_vinculo_origem || 'automatico',
+    fipeSugestoes: Number(a.fipe_sugestoes || 0),
     marcaFipe: a.marca_fipe || '',
     modeloFipe: a.modelo_fipe || '',
     anoFipe: a.ano_fipe || '',
@@ -482,7 +483,33 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
             </div> : <div style={{ marginTop: 12, color: T.inkMuted, fontSize: 12 }}>Nenhuma referência vinculada com segurança.</div>}
 
             {podeEditar && <div style={{ marginTop: 14 }}>
-              <label style={{ color: T.inkMuted, fontSize: 11 }}>Localizar outra FIPE por marca, modelo, código ou ano</label>
+              {!a.fipe_preco_id && <div style={{ marginBottom: 14 }}>
+                <div style={{ fontFamily: T.fontDisplay, fontSize: 13, fontWeight: 600 }}>Sugestões inteligentes</div>
+                <div style={{ color: T.inkMuted, fontSize: 10.5, lineHeight: 1.5, marginTop: 3 }}>Candidatos restritos à marca, família, modelo, ano-modelo, eixo e emissão. Uma sugestão só entra nos KPIs depois da sua confirmação.</div>
+                {(dados.sugestoes_fipe || []).length > 0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 9 }}>
+                  {dados.sugestoes_fipe.map(item => {
+                    const escolhido = Number(fipeSelecionada?.id) === Number(item.id);
+                    const tone = item.score >= 85 ? T.positive : item.score >= 65 ? T.signal : T.steel;
+                    const exigeVersao = String(item.motivos || '').includes('versao a confirmar');
+                    return <button key={`sugestao-${item.id}`} onClick={() => setFipeSelecionada(item)} style={{
+                      textAlign: 'left', padding: 11, borderRadius: 10, cursor: 'pointer', color: T.ink,
+                      background: escolhido ? `${tone}18` : T.surface2,
+                      border: `1px solid ${escolhido ? tone : T.line}`, fontFamily: T.fontBody,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: 'block', color: exigeVersao ? T.signal : T.positive, fontFamily: T.fontMono, fontSize: 9, marginBottom: 3 }}>{exigeVersao ? 'VERSÃO A CONFIRMAR' : item.posicao === 1 ? 'CANDIDATO PRINCIPAL' : 'ALTERNATIVA COMPATÍVEL'}</span>
+                          <strong style={{ fontSize: 12.5 }}>{item.marca} · {item.modelo}</strong>
+                        </span>
+                        <span style={{ flexShrink: 0, color: tone, fontFamily: T.fontMono, fontSize: 10 }}>{item.score}% compatível</span>
+                      </div>
+                      <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{item.ano_codigo} · {item.codigo_fipe} · {fmtBRL(item.preco_fipe)}</div>
+                      <div style={{ color: tone, fontSize: 10, marginTop: 5 }}>Evidências: {String(item.motivos || '').replaceAll(' + ', ' · ')}</div>
+                    </button>;
+                  })}
+                </div> : <div style={{ marginTop: 8, padding: 10, borderRadius: 9, background: T.surface2, color: T.inkMuted, fontSize: 11, lineHeight: 1.5 }}>Dados insuficientes para sugerir sem misturar famílias. Use a pesquisa livre ou complemente eixo, versão e emissão na observação.</div>}
+              </div>}
+              <label style={{ color: T.inkMuted, fontSize: 11 }}>{a.fipe_preco_id ? 'Localizar outra FIPE por marca, modelo, código ou ano' : 'Pesquisar fora das sugestões'}</label>
               <div style={{ position: 'relative', marginTop: 6 }}>
                 <Search size={14} style={{ position: 'absolute', left: 11, top: 12, color: T.inkMuted }} />
                 <input value={buscaFipe} onChange={e => setBuscaFipe(e.target.value)} placeholder={`Ex.: ${a.marca || ''} ${a.titulo || ''}`} style={{ ...inputStyle, width: '100%', paddingLeft: 33 }} />
@@ -807,6 +834,7 @@ function PageMercado({ sessao }) {
   const [revendaId, setRevendaId] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
+  const [fipeFila, setFipeFila] = useState('todos');
   const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
   const [anuncioAberto, setAnuncioAberto] = useState(null);
@@ -842,10 +870,11 @@ function PageMercado({ sessao }) {
     if (revendaId !== 'todas') p.set('revenda_id', revendaId);
     if (precoMin) p.set('preco_min', precoMin);
     if (precoMax) p.set('preco_max', precoMax);
+    if (fipeFila !== 'todos') p.set('fipe_fila', fipeFila);
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, qDebounced, ordem]);
+  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, fipeFila, qDebounced, ordem]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
@@ -918,11 +947,13 @@ function PageMercado({ sessao }) {
     .sort((a, b) => b.n - a.n);
 
   const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'ativo',
-    regiao !== 'todas', uf !== 'todas', cidade !== 'todas', revendaId !== 'todas', !!precoMin, !!precoMax].filter(Boolean).length;
+    regiao !== 'todas', uf !== 'todas', cidade !== 'todas', revendaId !== 'todas', !!precoMin, !!precoMax,
+    fipeFila !== 'todos'].filter(Boolean).length;
   const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
   const limparFiltros = () => {
     setQ(''); setCategoria('todas'); setTipo('todos'); setStatus('ativo'); setRegiao('todas');
-    setUf('todas'); setCidade('todas'); setRevendaId('todas'); setPrecoMin(''); setPrecoMax(''); setOrdem('aleatorio');
+    setUf('todas'); setCidade('todas'); setRevendaId('todas'); setPrecoMin(''); setPrecoMax('');
+    setFipeFila('todos'); setOrdem('aleatorio');
   };
 
   return (
@@ -991,6 +1022,13 @@ function PageMercado({ sessao }) {
             <option value="saida_detectada">Saídas detectadas</option>
             <option value="todos">Todos (histórico)</option>
           </select>
+          <select value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={inputStyle}>
+            <option value="todos">FIPE · todos</option>
+            <option value="revisar">FIPE · precisa revisar</option>
+            <option value="com_sugestao">FIPE · com sugestão</option>
+            <option value="sem_sugestao">FIPE · dados insuficientes</option>
+            <option value="vinculado">FIPE · vinculados</option>
+          </select>
           <select value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as cidades de ${uf}`}</option>
             {cidades.map(c => <option key={`${c.uf}-${c.cidade}`} value={c.cidade}>{c.cidade} ({fmtN(c.n)})</option>)}
@@ -1025,6 +1063,7 @@ function PageMercado({ sessao }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 12 }}>{cat.icone}</span>
                 <span style={{ fontFamily: T.fontMono, fontSize: 10, color: cat.cor, letterSpacing: '0.04em' }}>{cat.label.toUpperCase()}</span>
+                {!a.precoFipe && a.fipeSugestoes > 0 && <Tag tone="sinal">{a.fipeSugestoes} SUGESTÕES FIPE</Tag>}
               </div>
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: T.inkMuted, fontSize: 10.5, marginBottom: 7 }}>
@@ -2236,6 +2275,14 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: T.inkMuted }}>Vinculados ativos</span>
               <span style={{ fontFamily: T.fontMono, color: T.positive }}>{fmtN(fipeStatus.vinculados_ativos)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: T.inkMuted }}>Sugestão pronta para revisar</span>
+              <span style={{ fontFamily: T.fontMono, color: T.signal }}>{fmtN(fipeStatus.com_sugestao)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: T.inkMuted }}>Dados insuficientes</span>
+              <span style={{ fontFamily: T.fontMono }}>{fmtN(fipeStatus.sem_sugestao)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: T.inkMuted }}>Ainda não tentados</span>
