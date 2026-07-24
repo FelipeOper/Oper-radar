@@ -1,0 +1,18 @@
+# OPER RADAR — coleta da pagina de detalhe do anuncio (Cor, KM, Modelo, Carroceria, Tracao,
+# Opcionais, Descricao). Ajuste apenas SEUUSUARIO antes de instalar.
+#
+# Duas fases, com o MESMO comando — a fila (`detalhe_coletado_em IS NULL`) e quem decide o
+# que falta, nao ha "modo backfill" separado de "modo continuo":
+#
+# 1) BACKFILL (temporario): rode a cada 10 minutos ate a fila dos ~7.300 anuncios ativos
+#    esvaziar (o log passa a mostrar sempre "0 detalhes salvos") — depois REMOVA esta linha.
+#    Se o log mostrar "ABORTANDO — suspeita de bloqueio", pare e investigue antes de religar.
+#
+#    */10 * * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && python3 scraper_detalhe.py --lote=250 --pausa-requisicoes=4 >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1
+#
+# 2) FLUXO CONTINUO (permanente, depois do backfill drenado): lote pequeno a cada 3h, separado
+#    dos jobs 07h/19h do scraper_hostgator.py de proposito — aquele ja e o gargalo de CPU do
+#    plano compartilhado (limite de 25% por janelas >=90s), nao vale empilhar carga no mesmo
+#    horario.
+
+15 */3 * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && python3 scraper_detalhe.py --lote=80 --pausa-requisicoes=4 >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1

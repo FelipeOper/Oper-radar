@@ -440,7 +440,11 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: 8, marginTop: 14 }}>
               {[
                 ['Fabricação', a.ano_fabricacao || a.ano_inicial || 'Não informado'],
-                ['Modelo', a.ano_modelo || a.ano_final || a.ano_inicial || 'Não informado'],
+                ['Ano-modelo', a.ano_modelo || a.ano_final || a.ano_inicial || 'Não informado'],
+                ['Modelo (veículo)', a.modelo || 'Não informado'],
+                ['Cor', a.cor || 'Não informado'],
+                ['Carroceria', a.carroceria || 'Não informado'],
+                ['Tração', a.tracao || 'Não informado'],
                 ['Emissões', (() => { const e = classificaEmissao(a.titulo, a.url, a.ano_fabricacao || a.ano_inicial); return e ? `${e.norma} · ${e.origem}` : 'Não identificada'; })()],
                 ['Preço', fmtBRL(a.preco)],
                 ['KM / uso', a.quilometragem_exibida || 'Não informado'],
@@ -451,6 +455,18 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
               </div>)}
             </div>
           </Card>
+
+          {a.descricao && <Card style={{ padding: 16 }}>
+            <div style={{ fontFamily: T.fontDisplay, fontWeight: 600, marginBottom: 8 }}>Descrição do anunciante</div>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: 12.5, color: T.inkMuted, lineHeight: 1.5 }}>{a.descricao}</div>
+          </Card>}
+
+          {Array.isArray(a.opcionais) && a.opcionais.length > 0 && <Card style={{ padding: 16 }}>
+            <div style={{ fontFamily: T.fontDisplay, fontWeight: 600, marginBottom: 8 }}>Opcionais</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
+              {a.opcionais.map(item => <Tag key={item} tone="neutro">{item}</Tag>)}
+            </div>
+          </Card>}
 
           <div>
             <SectionTitle sub="O anúncio contra a referência oficial e ofertas equivalentes">Comparação de produto</SectionTitle>
@@ -1070,6 +1086,7 @@ function PageMercado({ sessao }) {
                 {a.ano && <span title="Fabricação / modelo">Fab/Mod {a.ano}</span>}
                 {a.emissao && <span title={a.emissao.origem === 'informado' ? 'Norma informada no anúncio' : 'Estimativa pelo ano de fabricação'}>{a.emissao.norma} · {a.emissao.origem}</span>}
                 {a.quilometragem && <span><Ruler size={10} style={{ verticalAlign: -1 }} /> {a.quilometragem}{a.quilometragemOrigem === 'curadoria' ? ' · validado' : ''}</span>}
+                {a.cor && <span>{a.cor}</span>}
                 <span style={{ color: T.steel }}>Clique para comparar</span>
               </div>
               <div style={{ fontSize: 12, color: T.inkMuted, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>

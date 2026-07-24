@@ -16,7 +16,8 @@ function detalhe_numero($valor) {
 
 function envia_detalhe_anuncio(mysqli $conn, int $id): void {
     $sql = "SELECT a.id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo,
-                   a.ano_inicial, a.ano_final, a.cor, a.km_ou_horas, a.quilometragem_manual,
+                   a.ano_inicial, a.ano_final, a.cor, a.carroceria, a.tracao, a.opcionais,
+                   a.descricao, a.km_ou_horas, a.quilometragem_manual,
                    a.preco, a.preco_texto_bruto, a.status, a.primeira_vez_visto,
                    a.ultima_vez_ativo, a.data_remocao, a.fipe_preco_id,
                    a.fipe_preco_automatico_id, a.fipe_vinculo_origem,
@@ -70,6 +71,7 @@ function envia_detalhe_anuncio(mysqli $conn, int $id): void {
         : ($anuncio['km_ou_horas'] ?: null);
     $anuncio['quilometragem_origem'] = $anuncio['quilometragem_manual'] !== null
         ? 'curadoria' : ($anuncio['km_ou_horas'] ? 'coleta' : null);
+    $anuncio['opcionais'] = $anuncio['opcionais'] ? (json_decode($anuncio['opcionais'], true) ?: []) : [];
 
     $similares = [];
     if ($anuncio['fipe_preco_id']) {
