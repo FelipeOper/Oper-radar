@@ -56,9 +56,12 @@ class ParserDetalheTest(unittest.TestCase):
     def test_pagina_pequena_sem_specs_e_suspeita(self):
         self.assertTrue(parece_bloqueio_ou_pagina_invalida("<html>pagina curta</html>", 0))
 
-    def test_pagina_valida_grande_sem_specs_nao_e_falso_positivo(self):
+    def test_pagina_grande_sem_specs_e_marcada_como_inesperada(self):
+        # Zero campos reconhecidos e suspeito independente do tamanho da pagina — uma pagina
+        # grande sem nenhum campo e exatamente o sintoma de mudanca de template do portal,
+        # nao pode passar como valida so por ser grande.
         pagina_grande_sem_specs = "<html>" + ("x" * 9000) + "</html>"
-        self.assertFalse(parece_bloqueio_ou_pagina_invalida(pagina_grande_sem_specs, 0))
+        self.assertTrue(parece_bloqueio_ou_pagina_invalida(pagina_grande_sem_specs, 0))
 
     def test_pagina_real_nao_e_falso_positivo_do_breaker(self):
         campos = parse_detalhe(HTML_REAL)
@@ -70,9 +73,31 @@ class ParserDetalheTest(unittest.TestCase):
 
     def test_pagina_sem_campos_esperados_isolada(self):
         self.assertTrue(pagina_sem_campos_esperados("<html>curta e vazia</html>", 0))
-        self.assertFalse(pagina_sem_campos_esperados("<html>" + ("x" * 9000) + "</html>", 0))
+        self.assertTrue(pagina_sem_campos_esperados("<html>" + ("x" * 9000) + "</html>", 0))
         campos = parse_detalhe(HTML_REAL)
         self.assertFalse(pagina_sem_campos_esperados(HTML_REAL, campos["campos_encontrados"]))
+
+    def test_campo_vazio_normaliza_para_none_nao_string_vazia(self):
+        html_cor_vazia = HTML_REAL.replace(
+            "Cor:\n                                                        <strong> BRANCO</strong>",
+            "Cor:\n                                                        <strong></strong>",
+        )
+        self.assertNotEqual(HTML_REAL, html_cor_vazia, "fixture mudou — trecho de Cor nao encontrado")
+        campos = parse_detalhe(html_cor_vazia)
+        self.assertIsNone(campos["cor"])
+
+    def test_opcional_vazio_e_filtrado(self):
+        html_com_opcional_vazio = HTML_REAL.replace(
+            '<i class="fa fa-check"></i>&nbsp;<h3 style="display: inline; margin: 0; padding: 0; '
+            'font-size: inherit; font-weight: inherit; line-height: inherit;">Teto Alto</h3>',
+            '<i class="fa fa-check"></i>&nbsp;<h3 style="display: inline; margin: 0; padding: 0; '
+            'font-size: inherit; font-weight: inherit; line-height: inherit;"></h3>',
+        )
+        self.assertNotEqual(HTML_REAL, html_com_opcional_vazio, "fixture mudou — 'Teto Alto' nao encontrado")
+        campos = parse_detalhe(html_com_opcional_vazio)
+        opcionais = json.loads(campos["opcionais_json"])
+        self.assertNotIn("", opcionais)
+        self.assertEqual(8, len(opcionais))
 
 
 if __name__ == "__main__":

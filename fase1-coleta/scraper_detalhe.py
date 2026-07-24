@@ -132,8 +132,8 @@ def roda_lote(conn, lote: int, pausa: float) -> dict:
             elif resp.status_code in STATUS_HTTP_BLOQUEIO:
                 print(f"  ! HTTP {resp.status_code} no anuncio {item['id']} — "
                       f"sinal explicito de bloqueio/rate-limit, abortando imediatamente.")
-                registra_tentativa(conn, item["id"], "erro_http")
-                contagem["erro_http"] += 1
+                registra_tentativa(conn, item["id"], "bloqueio_confirmado")
+                contagem["bloqueio_confirmado"] += 1
                 abortado = True
                 motivo_abortado = f"HTTP {resp.status_code} (bloqueio/rate-limit explicito do portal)"
                 break
