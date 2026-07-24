@@ -39,11 +39,17 @@ def busca_pendentes(conn, lote: int) -> list[dict]:
           AND tipo = 'Caminhao'
           AND (
               detalhe_ultima_tentativa IS NULL
+              -- Backoff progressivo (1, 2, 4, 8... dias, teto 14): cada falha nova dobra a
+              -- espera, em vez de um intervalo fixo — erros persistentes esfriam sozinhos
+              -- sem precisar de outra fila ou coluna de estado.
               OR (status = 'ativo'
                   AND detalhe_status IN ('erro_rede', 'erro_http', 'pagina_inesperada')
-                  AND detalhe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 1 DAY))
+                  AND detalhe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL
+                      LEAST(POW(2, GREATEST(detalhe_tentativas - 1, 0)), 14) DAY))
+              -- Bloqueio confirmado começa mais cauteloso (3, 6, 12, 24 dias, teto 30).
               OR (status = 'ativo' AND detalhe_status = 'bloqueio_confirmado'
-                  AND detalhe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 3 DAY))
+                  AND detalhe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL
+                      LEAST(POW(2, GREATEST(detalhe_tentativas - 1, 0)) * 3, 30) DAY))
           )
         ORDER BY detalhe_ultima_tentativa IS NULL DESC, id
         LIMIT %s
