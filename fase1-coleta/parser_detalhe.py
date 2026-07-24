@@ -28,12 +28,16 @@ DESCRICAO_RE = re.compile(
     re.DOTALL,
 )
 
-TAMANHO_MINIMO_PAGINA_VALIDA = 8000
-
-
 def _limpa(texto: str) -> str:
     texto = html_lib.unescape(texto)
     return re.sub(r"\s+", " ", texto).strip()
+
+
+def _ou_none(valor):
+    """Normaliza string vazia para None — um <strong></strong> vazio no HTML não pode virar
+    '' e sobreviver até o UPDATE: COALESCE só preserva o dado existente se o valor novo for
+    NULL: uma string vazia é "valor válido" para o SQL e apagaria o campo."""
+    return valor if valor else None
 
 
 def _normaliza_rotulo(rotulo: str) -> str:
@@ -62,7 +66,7 @@ def _extrai_km(ficha: dict):
 
 def parse_detalhe(html: str) -> dict:
     ficha = _extrai_ficha_tecnica(html)
-    opcionais = [_limpa(o) for o in OPCIONAL_RE.findall(html)]
+    opcionais = [o for o in (_limpa(bruto) for bruto in OPCIONAL_RE.findall(html)) if o]
 
     descricao = None
     descricao_m = DESCRICAO_RE.search(html)
@@ -73,10 +77,10 @@ def parse_detalhe(html: str) -> dict:
         descricao = bruto or None
 
     return {
-        "modelo": ficha.get("modelo"),
-        "cor": ficha.get("cor"),
-        "carroceria": ficha.get("carroceria"),
-        "tracao": ficha.get("tracao"),
+        "modelo": _ou_none(ficha.get("modelo")),
+        "cor": _ou_none(ficha.get("cor")),
+        "carroceria": _ou_none(ficha.get("carroceria")),
+        "tracao": _ou_none(ficha.get("tracao")),
         "km_ou_horas": _extrai_km(ficha),
         "opcionais_json": json.dumps(opcionais, ensure_ascii=False) if opcionais else None,
         "descricao": descricao,
@@ -84,16 +88,29 @@ def parse_detalhe(html: str) -> dict:
     }
 
 
-def parece_bloqueio_ou_pagina_invalida(html: str, campos_encontrados: int) -> bool:
-    """Circuit breaker: distingue "anúncio genuinamente pobre em specs" de "página de
-    challenge/erro do Cloudflare" — sem isso, um bloqueio no meio de um lote gravaria
-    detalhe_coletado_em em massa com campos vazios, e a fila nunca mais os reprocessaria."""
+def contem_marcador_de_bloqueio(html: str) -> bool:
+    """Evidência textual explícita de challenge/bloqueio do Cloudflare (ou serviço similar)."""
     amostra = html[:3000].lower()
-    if "cloudflare" in amostra or "challenge" in amostra or "attention required" in amostra:
-        return True
-    if campos_encontrados == 0 and len(html) < TAMANHO_MINIMO_PAGINA_VALIDA:
-        return True
-    return False
+    return "cloudflare" in amostra or "challenge" in amostra or "attention required" in amostra
+
+
+def pagina_sem_campos_esperados(html: str, campos_encontrados: int) -> bool:
+    """Zero campos reconhecidos, independente do tamanho da página — causa ambígua: pode ser
+    bloqueio sem o marcador textual acima, OU o portal mudou a estrutura do HTML (os regex
+    pararam de casar). Reportado como categoria própria, distinta do bloqueio confirmado,
+    porque a ação corretiva é diferente (esperar/investigar bloqueio vs. atualizar o parser).
+    Não depende de len(html): uma página grande com zero campos reconhecidos é exatamente o
+    sintoma de uma mudança de template — restringir por tamanho deixaria passar como válida."""
+    return campos_encontrados == 0
+
+
+def parece_bloqueio_ou_pagina_invalida(html: str, campos_encontrados: int) -> bool:
+    """Circuit breaker combinado: distingue "anúncio genuinamente pobre em specs" de "página
+    suspeita" (bloqueio confirmado OU estrutura inesperada) — sem isso, um bloqueio no meio de
+    um lote gravaria detalhe_coletado_em em massa com campos vazios, e a fila nunca mais os
+    reprocessaria. Ver contem_marcador_de_bloqueio/pagina_sem_campos_esperados para a causa
+    especifica."""
+    return contem_marcador_de_bloqueio(html) or pagina_sem_campos_esperados(html, campos_encontrados)
 
 
 if __name__ == "__main__":
