@@ -38,11 +38,15 @@ def coluna_existe(conn, coluna: str) -> bool:
 
 
 def indice_existe(conn, nome_indice: str) -> bool:
+    # SHOW INDEX retorna uma linha POR COLUNA do indice — para o nosso indice composto de 3
+    # colunas isso e 3 linhas. fetchone() so le a primeira e deixa 2 pendentes; o cursor fecha
+    # sem consumir o resto, e a proxima query na mesma conexao quebra com
+    # "mysql.connector.errors.InternalError: Unread result found". fetchall() consome tudo.
     cur = conn.cursor()
     cur.execute("SHOW INDEX FROM anuncio WHERE Key_name = %s", (nome_indice,))
-    existe = cur.fetchone() is not None
+    linhas = cur.fetchall()
     cur.close()
-    return existe
+    return bool(linhas)
 
 
 def migrar(conn) -> None:
