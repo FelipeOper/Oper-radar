@@ -6,7 +6,12 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from parser_detalhe import parse_detalhe, parece_bloqueio_ou_pagina_invalida
+from parser_detalhe import (
+    parse_detalhe,
+    parece_bloqueio_ou_pagina_invalida,
+    contem_marcador_de_bloqueio,
+    pagina_sem_campos_esperados,
+)
 
 DIRETORIO = Path(__file__).resolve().parent
 HTML_REAL = (DIRETORIO / "sample_detalhe_real.html").read_text(encoding="utf-8")
@@ -58,6 +63,16 @@ class ParserDetalheTest(unittest.TestCase):
     def test_pagina_real_nao_e_falso_positivo_do_breaker(self):
         campos = parse_detalhe(HTML_REAL)
         self.assertFalse(parece_bloqueio_ou_pagina_invalida(HTML_REAL, campos["campos_encontrados"]))
+
+    def test_marcador_de_bloqueio_isolado(self):
+        self.assertTrue(contem_marcador_de_bloqueio("<html>Cloudflare - Attention Required</html>"))
+        self.assertFalse(contem_marcador_de_bloqueio("<html>pagina normal sem marcador</html>"))
+
+    def test_pagina_sem_campos_esperados_isolada(self):
+        self.assertTrue(pagina_sem_campos_esperados("<html>curta e vazia</html>", 0))
+        self.assertFalse(pagina_sem_campos_esperados("<html>" + ("x" * 9000) + "</html>", 0))
+        campos = parse_detalhe(HTML_REAL)
+        self.assertFalse(pagina_sem_campos_esperados(HTML_REAL, campos["campos_encontrados"]))
 
 
 if __name__ == "__main__":

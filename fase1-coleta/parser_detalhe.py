@@ -84,16 +84,27 @@ def parse_detalhe(html: str) -> dict:
     }
 
 
-def parece_bloqueio_ou_pagina_invalida(html: str, campos_encontrados: int) -> bool:
-    """Circuit breaker: distingue "anúncio genuinamente pobre em specs" de "página de
-    challenge/erro do Cloudflare" — sem isso, um bloqueio no meio de um lote gravaria
-    detalhe_coletado_em em massa com campos vazios, e a fila nunca mais os reprocessaria."""
+def contem_marcador_de_bloqueio(html: str) -> bool:
+    """Evidência textual explícita de challenge/bloqueio do Cloudflare (ou serviço similar)."""
     amostra = html[:3000].lower()
-    if "cloudflare" in amostra or "challenge" in amostra or "attention required" in amostra:
-        return True
-    if campos_encontrados == 0 and len(html) < TAMANHO_MINIMO_PAGINA_VALIDA:
-        return True
-    return False
+    return "cloudflare" in amostra or "challenge" in amostra or "attention required" in amostra
+
+
+def pagina_sem_campos_esperados(html: str, campos_encontrados: int) -> bool:
+    """Página pequena e sem nenhum campo reconhecido — causa ambígua: pode ser bloqueio sem
+    o marcador textual acima, OU o portal mudou a estrutura do HTML (os regex pararam de
+    casar). Reportado como categoria própria, distinta do bloqueio confirmado, porque a ação
+    corretiva é diferente (esperar/investigar bloqueio vs. atualizar o parser)."""
+    return campos_encontrados == 0 and len(html) < TAMANHO_MINIMO_PAGINA_VALIDA
+
+
+def parece_bloqueio_ou_pagina_invalida(html: str, campos_encontrados: int) -> bool:
+    """Circuit breaker combinado: distingue "anúncio genuinamente pobre em specs" de "página
+    suspeita" (bloqueio confirmado OU estrutura inesperada) — sem isso, um bloqueio no meio de
+    um lote gravaria detalhe_coletado_em em massa com campos vazios, e a fila nunca mais os
+    reprocessaria. Ver contem_marcador_de_bloqueio/pagina_sem_campos_esperados para a causa
+    especifica."""
+    return contem_marcador_de_bloqueio(html) or pagina_sem_campos_esperados(html, campos_encontrados)
 
 
 if __name__ == "__main__":
