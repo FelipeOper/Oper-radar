@@ -10,6 +10,11 @@ Pesquisei as principais plataformas de inteligência de mercado para revendas de
 (mercado americano, que é o mais maduro): CarGurus PriceVantage, vAuto ProfitTime GPS,
 vAuto Provision, Carbly, VinAssessment, MarketCheck, Lotlinx, Catalyst IQ MarketAI, autoniq.
 
+> **Nota de rastreabilidade**: esta análise competitiva veio de pesquisa geral (sem links,
+> datas ou capturas salvas por produto) — trate como leitura de mercado plausível, não como
+> benchmarking documentalmente verificável. Antes de citar externamente, revalidar cada
+> plataforma.
+
 **Todas elas resolvem a mesma pergunta:** "quanto o *meu* carro no *meu* pátio vale, e por
 quanto devo anunciá-lo?". Elas cruzam o estoque do próprio lojista com dados de mercado para
 recomendar preço.
@@ -22,9 +27,13 @@ Essa diferença é estratégica:
 - As ferramentas americanas partem do estoque interno (precisam de integração com o DMS/IMS
   do lojista). O OPER RADAR parte do **mercado público** — ele enxerga o estoque dos
   concorrentes, não só o seu.
-- O sinal central do OPER RADAR — **anúncio que some = venda estimada** — dá uma métrica de
-  *giro do concorrente* que nenhuma dessas ferramentas oferece, porque elas só veem o próprio
-  pátio do cliente.
+- O sinal central do OPER RADAR — **anúncio que some indica saída de estoque, um proxy de
+  giro** — dá uma métrica de giro do concorrente que nenhuma dessas ferramentas oferece, porque
+  elas só veem o próprio pátio do cliente. **Importante**: saída de estoque (duas coletas
+  consecutivas sem o anúncio) não comprova venda — o veículo pode ter sido retirado do
+  anúncio por outro motivo (ver `fase1-coleta/diff_logic.py`, que documenta essa distinção
+  explicitamente). A confiança da estimativa ("saida_de_estoque" vs "venda_provavel", ver
+  tabela `venda_estimada`) ainda depende da Fase 3, não implementada.
 - Nicho: todas são de veículos leves nos EUA. **Não há concorrente direto** para pesados e
   extrapesados no Brasil. O portal Caminhões e Carretas é a maior base do nicho no país.
 

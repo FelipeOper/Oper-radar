@@ -7,12 +7,12 @@
  * ele recebe um RESUMO REAL do banco (KPIs, giro por revenda, concentrações, anúncios
  * maduros) e responde com base nesses dados — não em achismo.
  *
- * REQUISITO: preencher ANTHROPIC_API_KEY no config.php (chave da API da Anthropic,
- * criada em console.anthropic.com — o custo das chamadas é da conta do dono da chave).
+ * REQUISITO: definir ANTHROPIC_API_KEY em /.oper-radar.env no servidor (chave da API da
+ * Anthropic, criada em console.anthropic.com — o custo das chamadas é da conta do dono da
+ * chave). Nunca colar a chave direto no config.php: esse arquivo é versionado no GitHub
+ * público do projeto.
  *
- * NOTA DE SEGURANÇA (honesta): este endpoint é público como os demais. Qualquer pessoa
- * que descobrir a URL pode gastar créditos da sua chave. Para o piloto interno tudo bem;
- * antes de abrir o app para fora, a Fase 4 (autenticação) precisa proteger este endpoint.
+ * Protegido pela Fase 4 (autenticação) — exige sessão válida, como os demais endpoints.
  */
 require_once __DIR__ . '/config.php';
 
@@ -23,10 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+inicia_sessao_oper_radar();
+exige_autenticacao();
+
 if (!defined('ANTHROPIC_API_KEY') || ANTHROPIC_API_KEY === '') {
     http_response_code(503);
     envia_json(['erro' => 'chave_nao_configurada',
-        'mensagem' => 'Defina ANTHROPIC_API_KEY no config.php do servidor para ativar o Analista.']);
+        'mensagem' => 'Defina ANTHROPIC_API_KEY em .oper-radar.env no servidor para ativar o Analista.']);
 }
 
 $body = json_decode(file_get_contents('php://input'), true);

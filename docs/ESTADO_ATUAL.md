@@ -1,6 +1,12 @@
 # OPER RADAR — Estado atual e próximos passos
 
-*Documento de continuidade — Julho/2026*
+> ⚠️ **ARQUIVADO / DESATUALIZADO** — este documento é uma fotografia de início de julho/2026 e
+> fica desatualizado a cada fase entregue. Vários números e afirmações abaixo já não são
+> verdade (ex.: cobertura só do PR, ausência de autenticação, FIPE não executada). Para o
+> estado real, consulte `CLAUDE.md` na raiz do repositório ou o commit mais recente. Mantido
+> aqui só como registro histórico de decisões e lições aprendidas (seção final).
+
+*Documento de continuidade — Julho/2026 (histórico — ver aviso acima)*
 
 ## O que está funcionando em produção
 
@@ -16,7 +22,7 @@
 
 - **cPanel HostGator**: usuário `pro93061`
 - **Banco MySQL**: usuário `pro93061_pro93061`, banco `pro93061_radar_oper`, senha guardada no `config.php` da API e nas tarefas cron
-- **Chave Anthropic** (Analista IA): configurada no `config.php` da API (`ANTHROPIC_API_KEY`) — deixar limite de gasto baixo no billing enquanto não houver autenticação
+- **Chave Anthropic** (Analista IA): ~~configurada no `config.php` da API~~ **corrigido depois deste documento** — agora vive em `.oper-radar.env` (`ANTHROPIC_API_KEY`), lida por `valor_config_oper_radar()`; nunca colar a chave direto no `config.php` (arquivo versionado, repositório público). O endpoint `analista.php` também passou a exigir autenticação da Fase 4
 
 ## Fases do roteiro — status
 

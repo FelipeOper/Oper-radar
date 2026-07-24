@@ -6,10 +6,6 @@
  * Este arquivo pode permanecer versionado porque nao contem segredos.
  */
 
-// Chave da API da Anthropic para o Analista IA (analista.php).
-// Deixe vazia para desativar o Analista.
-define('ANTHROPIC_API_KEY', '');
-
 function caminhos_env_oper_radar(): array {
     return array_filter(array_unique([
         getenv('OPER_RADAR_ENV_FILE') ?: null,
@@ -38,6 +34,11 @@ function valor_config_oper_radar(string $chave, $padrao = null) {
     }
     return $padrao;
 }
+
+// Chave da API da Anthropic para o Analista IA (analista.php). Lida de .oper-radar.env
+// (chave ANTHROPIC_API_KEY), nunca hardcoded aqui — este arquivo é versionado no GitHub
+// publico. Deixe ausente/vazia no .env para desativar o Analista.
+define('ANTHROPIC_API_KEY', (string) valor_config_oper_radar('ANTHROPIC_API_KEY', ''));
 
 function carrega_config_db(): array {
     $config = [
