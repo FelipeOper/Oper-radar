@@ -10,16 +10,23 @@ o que destrava:
 
 ## Peças
 
-1. **`schema_series_mysql.sql`** — 3 tabelas novas:
+1. **`migrar_series.py`** — migrador idempotente para banco existente. Sem `--aplicar`,
+   apenas inspeciona e informa o que falta; com `--aplicar`, cria e valida as tabelas.
+   **`schema_series_mysql.sql`** preserva o desenho SQL original, mas não deve ser usado
+   diretamente em produção porque não é idempotente.
+
+   As 3 tabelas da fase são:
    - `anuncio_snapshot`: uma linha por anúncio × dia (materialização histórica)
    - `mudanca_preco`: log de cada queda/aumento detectado
    - `consolidacao_mensal`: agregações pré-computadas (mais rápidas de consultar no app)
 
-2. **`snapshot_diario.py`** (a criar) — job noturno que:
+2. **`snapshot_diario.py`** — já escrito e testado localmente, **ainda não agendado em
+   produção**. Job noturno que:
    - Lê a tabela `anuncio` viva
    - Grava uma linha por anúncio na `anuncio_snapshot` com data de hoje
    - Detecta mudanças de preço vs. snapshot do dia anterior → grava em `mudanca_preco`
-   - Agenda: 1×/dia, depois da última coleta do scraper (ex: 23h)
+   - Agenda sugerida (ver cabeçalho do próprio arquivo): 23h, depois da última coleta do dia
+     (07h/19h) — `0 23 * * * ... python3 snapshot_diario.py`
 
 3. **`consolida_mensal.py`** (a criar) — job semanal que reagrega o mês corrente e
    os 2 meses anteriores, atualizando `consolidacao_mensal`.
@@ -36,11 +43,15 @@ o que destrava:
 
 ## Ordem sugerida
 
-1. Rodar `schema_series_mysql.sql`
-2. Criar e testar `snapshot_diario.py` — rodar manualmente 1 vez para popular o "dia zero"
-3. Agendar no cron (23h todo dia)
-4. Deixar rodando por 7-10 dias para acumular histórico mínimo
-5. Só depois criar endpoints e telas do app — sem histórico acumulado, tela vazia
+1. Fazer e verificar backup do banco.
+2. Carregar as variáveis protegidas e simular a migração:
+   `python3 migrar_series.py`
+3. Aplicar e validar a migração: `python3 migrar_series.py --aplicar`
+4. Rodar `snapshot_diario.py` manualmente 1 vez contra o banco de produção para popular o
+   "dia zero" e validar
+5. Agendar no cron (23h todo dia)
+6. Deixar rodando por 7-10 dias para acumular histórico mínimo
+7. Só depois criar endpoints e telas do app — sem histórico acumulado, tela vazia
 
 ## Nota honesta
 
