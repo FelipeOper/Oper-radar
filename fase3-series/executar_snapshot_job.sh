@@ -14,7 +14,7 @@ fi
 # Reabre o proprio script sob flock. Se outra execucao estiver ativa, sai sem sobrepor.
 if [[ "${OPER_RADAR_SNAPSHOT_LOCKED:-0}" != "1" ]]; then
   export OPER_RADAR_SNAPSHOT_LOCKED=1
-  exec flock -n "$LOCK_FILE" "$0" "$@"
+  exec flock -n "$LOCK_FILE" bash "$0" "$@"
 fi
 
 set -a
