@@ -28,6 +28,10 @@ o que destrava:
    - Agenda sugerida (ver cabeçalho do próprio arquivo): 23h, depois da última coleta do dia
      (07h/19h) — `0 23 * * * ... python3 snapshot_diario.py`
 
+   **`executar_snapshot_job.sh`** carrega o ambiente protegido e impede concorrência com
+   `flock`. **`instalar_cron_series.sh`** preserva e faz backup do crontab atual, substitui
+   somente o bloco da Fase 3 e agenda o executor diariamente às 23h10.
+
 3. **`consolida_mensal.py`** (a criar) — job semanal que reagrega o mês corrente e
    os 2 meses anteriores, atualizando `consolidacao_mensal`.
 
@@ -49,7 +53,7 @@ o que destrava:
 3. Aplicar e validar a migração: `python3 migrar_series.py --aplicar`
 4. Rodar `snapshot_diario.py` manualmente 1 vez contra o banco de produção para popular o
    "dia zero" e validar
-5. Agendar no cron (23h todo dia)
+5. Agendar no cron: `bash instalar_cron_series.sh`
 6. Deixar rodando por 7-10 dias para acumular histórico mínimo
 7. Só depois criar endpoints e telas do app — sem histórico acumulado, tela vazia
 
