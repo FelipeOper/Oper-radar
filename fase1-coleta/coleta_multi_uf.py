@@ -9,7 +9,6 @@ Exemplos:
   python3 coleta_multi_uf.py --ufs=MT,MS,GO,DF --janela=07h
 """
 import argparse
-import fcntl
 import json
 import os
 import subprocess
@@ -17,6 +16,11 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - disponivel no Linux de producao
+    fcntl = None
 
 REGIOES = {
     "sul": ["PR", "SC", "RS"],
@@ -94,6 +98,10 @@ def atualiza_status(caminho, dados, ciclo, uf, status, detalhe="", duracao=0):
 
 
 def main():
+    if fcntl is None:
+        print("ERRO: a coleta multi-UF requer Linux/Unix para o lock exclusivo.", file=sys.stderr)
+        return 2
+
     diretorio = Path(__file__).resolve().parent
     ap = argparse.ArgumentParser(description="Coleta estados em sequencia com lock e retomada")
     grupo = ap.add_mutually_exclusive_group(required=True)
