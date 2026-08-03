@@ -43,7 +43,7 @@ jobs:
 
       - name: Instalar dependencias do frontend
         working-directory: app
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Verificar projeto
         run: python scripts/verificar_qualidade.py --exigir-ferramentas
