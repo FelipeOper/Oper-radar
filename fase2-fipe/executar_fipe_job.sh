@@ -8,8 +8,12 @@ ATUALIZAR_TODOS=()
 LOTE=1000
 if [[ -n "${FIPE_API_TOKEN:-}" && "${FIPE_API_UNLIMITED:-0}" == "1" ]]; then
   LIMITE_API=0
-  # Atualiza em lotes para respeitar o tempo de processo da hospedagem compartilhada.
-  MAX_REFRESH=5000
+  # Mantem cada rodada abaixo do limite de processo da hospedagem compartilhada.
+  MAX_REFRESH="${FIPE_MONTHLY_BATCH:-2500}"
+  if [[ ! "$MAX_REFRESH" =~ ^[0-9]+$ ]] || (( MAX_REFRESH < 100 || MAX_REFRESH > 5000 )); then
+    echo "ERRO: FIPE_MONTHLY_BATCH deve estar entre 100 e 5000" >&2
+    exit 2
+  fi
   LOTE=10000
   ATUALIZAR_TODOS=(--atualizar-todos-precos)
   export FIPE_API_PAUSE="${FIPE_API_PAUSE:-0.05}"
