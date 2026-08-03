@@ -3,6 +3,12 @@ set -euo pipefail
 
 MODO="${1:-}"
 MARCADOR="${2:-/home1/pro93061/.oper-radar-fipe-bootstrap-ok}"
+PYTHON_BIN="${OPER_RADAR_PYTHON:-python3}"
+
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  echo "ERRO: interpretador Python nao encontrado: $PYTHON_BIN" >&2
+  exit 2
+fi
 
 ATUALIZAR_TODOS=()
 LOTE=1000
@@ -32,16 +38,16 @@ fi
 
 case "$MODO" in
   local)
-    python3 -u fipe_sync.py --modo=local --lote=1000
-    exec python3 -u fipe_sync.py --modo=sugestoes --lote=10000
+    "$PYTHON_BIN" -u fipe_sync.py --modo=local --lote=1000
+    exec "$PYTHON_BIN" -u fipe_sync.py --modo=sugestoes --lote=10000
     ;;
   mensal)
     # Uma chamada consulta /references; as demais renovam precos.
-    exec python3 -u fipe_sync.py --modo=mensal \
+    exec "$PYTHON_BIN" -u fipe_sync.py --modo=mensal \
       --max-req="$LIMITE_API" --max-refresh="$MAX_REFRESH" "${ATUALIZAR_TODOS[@]}"
     ;;
   bootstrap)
-    exec python3 -u fipe_sync.py --modo=bootstrap --lote="$LOTE" \
+    exec "$PYTHON_BIN" -u fipe_sync.py --modo=bootstrap --lote="$LOTE" \
       --max-req="$LIMITE_API" --marcador-conclusao="$MARCADOR"
     ;;
   *)

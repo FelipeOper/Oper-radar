@@ -9,6 +9,23 @@ oferecer essa versão, para a versão suportada mais recente com manutenção at
 Esta migração não deve ser combinada com alteração de banco, cron, FIPE ou coleta. Cada etapa
 precisa ser validada e reversível antes da seguinte.
 
+## Inventário confirmado em 03/08/2026
+
+- `python3` resolve para `/usr/bin/python3.9`;
+- versão disponível: Python 3.9.25;
+- `pip` 20.3.4;
+- `requests` 2.25.1;
+- `mysql-connector-python` 8.0.33;
+- nenhum ambiente virtual encontrado na conta;
+- nenhum interpretador alternativo acessível em `/usr/local`, `/opt` ou no jailshell;
+- Python Selector/Setup Python App indisponível para a conta.
+
+**Estado:** migração bloqueada pela hospedagem. Não compilar Python manualmente, não substituir
+`/bin/python3` e não alterar os crons enquanto o provedor não oferecer uma versão suportada.
+
+Como mitigação, os wrappers aceitam `OPER_RADAR_PYTHON` e mantêm `python3` como fallback. Essa
+variável só deve receber um caminho absoluto depois que um interpretador paralelo for validado.
+
 ## Condições para iniciar
 
 - segunda data do snapshot diário confirmada;

@@ -10,13 +10,13 @@ Com as variaveis `OPER_RADAR_DB_*` ja carregadas:
 
 ```bash
 cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta
-python3 coleta_multi_uf.py --ufs=DF --janela=07h
-python3 status_coleta.py
+"${OPER_RADAR_PYTHON:-python3}" coleta_multi_uf.py --ufs=DF --janela=07h
+"${OPER_RADAR_PYTHON:-python3}" status_coleta.py
 ```
 
 ## Agendamento recomendado
 
-Mantenha PR as 07h e 19h. Instale a expansao as 01h e 13h com:
+Mantenha PR as 07h e 19h. Instale a expansao as 07h30 e 19h30 com:
 
 ```bash
 bash instalar_cron_expansao.sh
@@ -28,7 +28,7 @@ novamente sem duplicar a expansao. Assim os trabalhos nao concorrem entre si.
 Para acompanhar sem mostrar senhas:
 
 ```bash
-python3 status_coleta.py
+"${OPER_RADAR_PYTHON:-python3}" status_coleta.py
 tail -50 /home1/SEUUSUARIO/logs/coleta-expansao.log
 ```
 
