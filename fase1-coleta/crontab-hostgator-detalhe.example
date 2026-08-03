@@ -23,7 +23,7 @@
 # 1) BACKFILL (temporario): rode a cada 10 minutos ate a fila dos ~7.300 anuncios ativos
 #    esvaziar (log passa a mostrar "FILA VAZIA") — depois REMOVA esta linha.
 
-*/10 * * * * flock -n /home1/SEUUSUARIO/logs/detalhe.lock -c 'set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && python3 scraper_detalhe.py --lote=250 --pausa-requisicoes=4' >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1
+*/10 * * * * flock -n /home1/SEUUSUARIO/logs/detalhe.lock -c 'set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" scraper_detalhe.py --lote=250 --pausa-requisicoes=4' >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1
 
 # 2) FLUXO CONTINUO (permanente, depois do backfill drenado): lote pequeno a cada 3h, separado
 #    dos jobs 07h/19h do scraper_hostgator.py de proposito — aquele ja e o gargalo de CPU do
@@ -31,4 +31,4 @@
 #    horario. So processa anuncios novos, sem detalhe ainda, ou cuja coleta de detalhe falhou
 #    e ja passou o backoff — nunca revisita os ~7.300 inteiros a cada execucao.
 
-15 */3 * * * flock -n /home1/SEUUSUARIO/logs/detalhe.lock -c 'set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && python3 scraper_detalhe.py --lote=80 --pausa-requisicoes=4' >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1
+15 */3 * * * flock -n /home1/SEUUSUARIO/logs/detalhe.lock -c 'set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" scraper_detalhe.py --lote=80 --pausa-requisicoes=4' >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1

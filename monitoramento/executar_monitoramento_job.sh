@@ -21,8 +21,14 @@ set -a
 . "$ENV_FILE"
 set +a
 
+PYTHON_BIN="${OPER_RADAR_PYTHON:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  echo "ERRO: interpretador Python nao encontrado: $PYTHON_BIN" >&2
+  exit 2
+fi
+
 set +e
-saida="$(python3 "$SCRIPT_DIR/verificar_saude.py" 2>&1)"
+saida="$("$PYTHON_BIN" "$SCRIPT_DIR/verificar_saude.py" 2>&1)"
 status=$?
 set -e
 

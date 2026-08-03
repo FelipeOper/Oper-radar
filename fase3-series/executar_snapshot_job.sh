@@ -22,5 +22,11 @@ set -a
 . "$ENV_FILE"
 set +a
 
+PYTHON_BIN="${OPER_RADAR_PYTHON:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  echo "ERRO: interpretador Python nao encontrado: $PYTHON_BIN" >&2
+  exit 2
+fi
+
 cd "$SCRIPT_DIR"
-exec python3 -u snapshot_diario.py
+exec "$PYTHON_BIN" -u snapshot_diario.py

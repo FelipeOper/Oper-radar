@@ -16,6 +16,12 @@ set -a
 . "$ENV_FILE"
 set +a
 
+PYTHON_BIN="${OPER_RADAR_PYTHON:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  echo "ERRO: interpretador Python nao encontrado: $PYTHON_BIN" >&2
+  exit 2
+fi
+
 mkdir -p "$BACKUP" "$HOME/logs"
 chmod 700 "$BACKUP" "$HOME/logs"
 cp -a "$ROOT/index.html" "$ROOT/assets" "$API_PUBLIC" "$BACKUP/"
@@ -43,7 +49,7 @@ chmod 644 "$ROOT/index.html"
 find "$ROOT/assets" -type f -exec chmod 644 {} \;
 
 cd "$ROOT/fase2-fipe"
-python3 -u fipe_sync.py --modo=sugestoes --lote=10000 \
+"$PYTHON_BIN" -u fipe_sync.py --modo=sugestoes --lote=10000 \
   | tee "$HOME/logs/fipe-sugestoes-inicial.log"
 
 echo
