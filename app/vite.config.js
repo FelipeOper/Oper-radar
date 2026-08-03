@@ -7,9 +7,18 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom'],
-          icons: ['lucide-react'],
+        manualChunks(id) {
+          const caminho = id.replaceAll('\\', '/');
+          if (caminho.includes('/node_modules/lucide-react/')) {
+            return 'icons';
+          }
+          if (
+            caminho.includes('/node_modules/react/')
+            || caminho.includes('/node_modules/react-dom/')
+            || caminho.includes('/node_modules/scheduler/')
+          ) {
+            return 'react';
+          }
         },
       },
     },

@@ -1,1 +1,11 @@
--r fase1-coleta/requirements-hostgator.txt
+# Lock da CI. As versoes divergem onde o Python 3.9 ja nao recebe
+# as edicoes mais recentes dos pacotes.
+certifi==2026.7.22
+charset-normalizer==3.4.9
+idna==3.18
+mysql-connector-python==9.4.0; python_version < "3.10"
+mysql-connector-python==26.7.0; python_version >= "3.10"
+requests==2.32.5; python_version < "3.10"
+requests==2.34.2; python_version >= "3.10"
+urllib3==2.6.3; python_version < "3.10"
+urllib3==2.7.0; python_version >= "3.10"
