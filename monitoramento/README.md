@@ -22,3 +22,13 @@ python3 monitoramento/verificar_saude.py
 ```
 
 O script não altera tabelas, arquivos, crons ou integrações externas.
+
+## Execução recorrente
+
+`executar_monitoramento_job.sh` carrega o ambiente protegido, usa `flock` e executa a
+verificação. Se o estado for crítico e `OPER_RADAR_ALERT_EMAIL` estiver definido no arquivo
+de ambiente, tenta enviar o resultado por `mail` ou `mailx`. O endereço nunca fica no Git.
+
+`instalar_cron_monitoramento.sh` preserva e faz backup do crontab atual, substitui somente o
+bloco deste monitor e agenda verificações às 12h15 e 23h30. Sem e-mail configurado, os
+resultados continuam disponíveis em `/home1/pro93061/logs/monitoramento.log`.
