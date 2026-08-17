@@ -23,6 +23,42 @@ def pendentes(n):
     return [{"id": i, "url": f"https://exemplo/veiculo/{i}"} for i in range(1, n + 1)]
 
 
+class CursorCaptura:
+    def __init__(self):
+        self.sql = ""
+        self.params = None
+
+    def execute(self, sql, params):
+        self.sql = sql
+        self.params = params
+
+    def fetchall(self):
+        return []
+
+    def close(self):
+        pass
+
+
+class ConexaoCaptura:
+    def __init__(self):
+        self.cursor_criado = CursorCaptura()
+
+    def cursor(self, dictionary=False):
+        return self.cursor_criado
+
+
+class BuscaPendentesTest(unittest.TestCase):
+    def test_fila_restringe_primeira_tentativa_a_anuncios_ativos(self):
+        conn = ConexaoCaptura()
+
+        resultado = sd.busca_pendentes(conn, 80)
+
+        sql_normalizado = " ".join(conn.cursor_criado.sql.split())
+        self.assertEqual([], resultado)
+        self.assertIn("AND status = 'ativo'", sql_normalizado)
+        self.assertEqual((80,), conn.cursor_criado.params)
+
+
 class RodaLoteTest(unittest.TestCase):
     def setUp(self):
         # patcha as 4 funcoes de escrita no banco e a fila, deixando roda_lote isolado de
