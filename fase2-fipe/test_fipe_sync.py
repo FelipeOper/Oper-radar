@@ -225,6 +225,25 @@ class MatchingFipeTest(unittest.TestCase):
         busca_cache.assert_called_once_with(conn, candidato, 2022, None)
         self.assertEqual(1, resumo["aguardando_cache"])
 
+    def test_modo_local_nao_escolhe_primeiro_quando_dois_precos_sao_validos(self):
+        anuncio = {
+            "id": 1, "titulo": "DAF XF FTT 530 2021/2021", "marca": "DAF",
+            "ano_inicial": 2021, "ano_final": 2021,
+        }
+        space = {"id": 10, "marca_fipe": "DAF", "modelo_fipe": "XF FTT530 Space Cab"}
+        super_space = {"id": 11, "marca_fipe": "DAF", "modelo_fipe": "XF FTT530 Super Space Cab"}
+        conn = object()
+        with patch("fipe_sync.anuncios_pendentes", return_value=[anuncio]), \
+             patch("fipe_sync.escolhe", return_value=([space, super_space], "alto")), \
+             patch("fipe_sync.busca_preco_cache", side_effect=[101, 102]), \
+             patch("fipe_sync.registra_resultado") as registra:
+            resumo = processa_anuncios(conn, lote=1, permitir_api=False)
+        registra.assert_called_once_with(
+            conn, 1, "ambiguo", "ambiguo 2 candidatos FIPE no ano-modelo 2021",
+        )
+        self.assertEqual(1, resumo["ambiguos"])
+        self.assertEqual(0, resumo["vinculados"])
+
 
 if __name__ == "__main__":
     unittest.main()

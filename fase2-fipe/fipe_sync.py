@@ -833,8 +833,16 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
 
             # O preco FIPE usa o ano-modelo. Fabricacao serve apenas para a geracao de emissoes.
             modelo_ano = ano_modelo(a)
-            preco_id = escolhido = None
-            for c in cands[:3]:
+            if len(cands) > 8:
+                ambiguos += 1
+                registra_resultado(
+                    conn, a["id"], "ambiguo",
+                    f"ambiguo {len(cands)} candidatos antes do filtro por ano",
+                )
+                continue
+
+            precos_validos = []
+            for c in cands:
                 if permitir_api:
                     preco_id = busca_ou_cria_preco(
                         conn, c, modelo_ano, codigo_referencia, mes_referencia
@@ -842,9 +850,17 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                 else:
                     preco_id = busca_preco_cache(conn, c, modelo_ano, codigo_referencia)
                 if preco_id:
-                    escolhido = c
-                    break
-            if not preco_id:
+                    precos_validos.append((c, preco_id))
+
+            if len(precos_validos) > 1:
+                ambiguos += 1
+                registra_resultado(
+                    conn, a["id"], "ambiguo",
+                    f"ambiguo {len(precos_validos)} candidatos FIPE no ano-modelo {modelo_ano}",
+                )
+                continue
+
+            if not precos_validos:
                 if not permitir_api:
                     aguardando_cache += 1
                     continue
@@ -852,6 +868,7 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                 registra_resultado(conn, a["id"], "sem_ano", f"ano-modelo {modelo_ano} ausente nos candidatos FIPE")
                 continue
 
+            escolhido, preco_id = precos_validos[0]
             registra_resultado(
                 conn, a["id"], "vinculado",
                 f"{escolhido['marca_fipe']} | {escolhido['modelo_fipe']}",

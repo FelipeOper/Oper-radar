@@ -7,7 +7,7 @@ processamento terminar.
 import argparse
 import os
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -41,7 +41,7 @@ def conecta(args):
     )
 
 
-def executa(conn, aplicar=False):
+def executa(conn, aplicar=False, max_exemplos=2):
     cur = conn.cursor(dictionary=True)
     cur.execute("""
         SELECT id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final
@@ -57,6 +57,7 @@ def executa(conn, aplicar=False):
     alteracoes = 0
     modelo_preenchido = tracao_preenchida = anos_corrigidos = 0
     diagnostico = Counter()
+    exemplos = defaultdict(list)
     if aplicar:
         cur = conn.cursor()
 
@@ -68,6 +69,16 @@ def executa(conn, aplicar=False):
         else:
             chave = motivo
         diagnostico[chave] += 1
+        if len(exemplos[chave]) < max_exemplos:
+            nomes = [c["modelo_fipe"] for c in candidatos] if candidatos else []
+            exemplos[chave].append({
+                "id": anuncio["id"],
+                "titulo": anuncio["titulo"],
+                "modelo": dados["modelo"],
+                "tracao": dados["tracao"],
+                "anos": f"{dados['ano_inicial']}/{dados['ano_final']}",
+                "candidatos": nomes,
+            })
         if not anuncio.get("modelo") and dados["modelo"]:
             modelo_preenchido += 1
         if not anuncio.get("tracao") and dados["tracao"]:
@@ -109,6 +120,18 @@ def executa(conn, aplicar=False):
     print("Previa do matching (nenhum vinculo FIPE gravado por este diagnostico):")
     for chave, quantidade in diagnostico.most_common():
         print(f"  {quantidade:4}  {chave}")
+    if max_exemplos > 0:
+        print("Exemplos por grupo:")
+        for chave, _ in diagnostico.most_common():
+            print(f"\n[{chave}]")
+            for exemplo in exemplos[chave]:
+                print(
+                    f"  #{exemplo['id']} {exemplo['titulo']} | "
+                    f"modelo={exemplo['modelo'] or '-'} | tracao={exemplo['tracao'] or '-'} | "
+                    f"anos={exemplo['anos']}"
+                )
+                for nome in exemplo["candidatos"]:
+                    print(f"      -> {nome}")
     return {
         "registros": alteracoes,
         "modelos": modelo_preenchido,
@@ -120,6 +143,8 @@ def executa(conn, aplicar=False):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--aplicar", action="store_true")
+    ap.add_argument("--exemplos", type=int, default=2,
+                    help="quantos exemplos mostrar por grupo no diagnostico")
     ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
     ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"))
     ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"))
@@ -135,6 +160,6 @@ if __name__ == "__main__":
 
     conexao = conecta(args)
     try:
-        executa(conexao, aplicar=args.aplicar)
+        executa(conexao, aplicar=args.aplicar, max_exemplos=max(0, args.exemplos))
     finally:
         conexao.close()
