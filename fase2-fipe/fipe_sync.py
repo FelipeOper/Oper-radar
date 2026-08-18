@@ -109,15 +109,13 @@ def texto_anuncio(anuncio: dict) -> str:
     ))
 
 
-POTENCIAS_DAF = {"410", "460", "480", "510", "520", "530"}
 EIXO_CONFIGURACAO_DAF = {"FT": "4X2", "FTS": "6X2", "FTT": "6X4"}
 
 
 def potencia_daf(s: str):
-    """Potencia comercial DAF; 105 e geracao, nao potencia."""
+    """Ultimo numero de tres digitos; 105 e geracao e 85 tem dois digitos."""
     texto = normaliza(texto_sem_anos(s))
-    opcoes = "|".join(sorted(POTENCIAS_DAF))
-    encontradas = re.findall(rf"(?<!\d)({opcoes})(?!\d)", texto)
+    encontradas = [n for n in re.findall(r"(?<!\d)(\d{3})(?!\d)", texto) if n != "105"]
     return encontradas[-1] if encontradas else None
 
 
@@ -126,8 +124,12 @@ def geracao_daf(s: str, nome_fipe=False):
     texto = normaliza(texto_sem_anos(s))
     if re.search(r"\bXF(?:\s+(?:FTT|FTS|FT))?\s*105\b", texto):
         return "XF105"
-    if nome_fipe and re.search(r"\bXF\b", texto):
-        return "XF"
+    if re.search(r"\bCF\s*85\b", texto):
+        return "CF85"
+    if nome_fipe:
+        familia = familia_comercial(texto)
+        if familia in ("XF", "CF"):
+            return familia
     return None
 
 
@@ -141,8 +143,21 @@ def cabine_daf(s: str):
     texto = normaliza(s)
     if re.search(r"\b(?:SUPER\s+SPACE|SUP\s+SPA)(?:\s+CAB)?\b", texto):
         return "SUPER SPACE"
+    if re.search(r"\bDAY(?:\s+CAB)?\b", texto):
+        return "DAY"
+    if re.search(r"\b(?:SLEEP|SLEEPER|SPLEEP)(?:\s+CAB)?\b", texto):
+        return "SLEEPER"
     if re.search(r"\bSPACE(?:\s+CAB)?\b", texto):
         return "SPACE"
+    return None
+
+
+def cambio_daf(s: str):
+    texto = normaliza(s)
+    if re.search(r"\b(?:AUT|AUTO|AUTOMATICO|AUTOMATICA)\b", texto):
+        return "AUTOMATICO"
+    if re.search(r"\b(?:MEC|MECANICO|MECANICA|MANUAL)\b", texto):
+        return "MECANICO"
     return None
 
 
@@ -360,6 +375,10 @@ def avalia(titulo: str, modelo_fipe: str):
     que e outro caminhao e outro preco)."""
     # Na DAF, 105 identifica a geracao XF105. A potencia e outro numero (460/510 etc.).
     if "DAF" in normaliza(titulo) or familia_comercial(titulo) in ("XF", "CF"):
+        familia_t = familia_comercial(titulo)
+        familia_f = familia_comercial(modelo_fipe)
+        if familia_t and familia_f and familia_t != familia_f:
+            return 0.0, f"familia {familia_t}!={familia_f}"
         potencia_t, potencia_f = potencia_daf(titulo), potencia_daf(modelo_fipe)
         if potencia_t and potencia_f:
             if potencia_t != potencia_f:
@@ -757,6 +776,17 @@ def escolhe(conn, anuncio):
         validos = com_hr
     elif len(hr_candidatos) > 1:
         return None, "ambiguo modificador HR"
+
+    cambio_anuncio = cambio_daf(texto)
+    cambios_candidatos = {cambio_daf(c["modelo_fipe"]) for _, _, c in validos if cambio_daf(c["modelo_fipe"])}
+    if cambio_anuncio:
+        com_cambio = [v for v in validos if cambio_daf(v[2]["modelo_fipe"]) == cambio_anuncio]
+        if com_cambio:
+            validos = com_cambio
+        elif daf and cambios_candidatos:
+            return None, f"sem match cambio {cambio_anuncio}"
+    elif len(cambios_candidatos) > 1:
+        return None, "ambiguo cambio (" + "/".join(sorted(cambios_candidatos)) + ")"
 
     # 3) linhas conflitantes: dois conjuntos nao-vazios e sem interseccao
     chaves = [palavras_chave(c["modelo_fipe"]) for _, _, c in validos]

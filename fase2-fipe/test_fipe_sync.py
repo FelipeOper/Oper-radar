@@ -23,7 +23,7 @@ except ModuleNotFoundError:
     sys.modules["mysql.connector"] = connector_mod
 
 from fipe_sync import (
-    ano_modelo, avalia, cabine_daf, com_referencia, eixo_do_anuncio, eixos, emissao_no_texto,
+    ano_modelo, avalia, cabine_daf, cambio_daf, com_referencia, eixo_do_anuncio, eixos, emissao_no_texto,
     emissao_preferida, escolhe, familia_comercial, identificadores_modelo, normaliza, numero_modelo,
     obtem_referencia_atual, parse_preco, palavras_chave, pontua_sugestao, potencia_daf,
     processa_anuncios,
@@ -99,6 +99,37 @@ class MatchingFipeTest(unittest.TestCase):
     def test_reconhece_cabines_daf(self):
         self.assertEqual("SPACE", cabine_daf("XF FTT530 6x4 Space Cab"))
         self.assertEqual("SUPER SPACE", cabine_daf("XF FTT530 6x4 Super Space Cab"))
+        self.assertEqual("DAY", cabine_daf("CF FAS 300 Day Cab"))
+        self.assertEqual("SLEEPER", cabine_daf("CF FAS 300 SPLEEP CAB"))
+
+    def test_reconhece_cambio_daf(self):
+        self.assertEqual("AUTOMATICO", cambio_daf("Day Cab Aut (Die)"))
+        self.assertEqual("MECANICO", cambio_daf("Space Cab Mec (Die)"))
+
+    def test_daf_nao_mistura_familias_cf_e_xf(self):
+        score, motivo = avalia("DAF CF 410 2020/2020", "XF 105 FTS 410 6x2 (diesel)(E5)")
+        self.assertEqual(0.0, score)
+        self.assertEqual("familia CF!=XF", motivo)
+
+    def test_daf_cf85_explicito_nao_casa_com_cf_atual(self):
+        score, motivo = avalia("DAF CF85 360 2017/2017", "CF FT 360 4x2 (diesel)(E5)")
+        self.assertEqual(0.0, score)
+        self.assertIn("geracao", motivo)
+
+    def test_daf_cf_sem_cabine_fica_ambiguo(self):
+        anuncio = {
+            "titulo": "DAF CF 300 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        space = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Space Cab Aut (Die)(E5)"}
+        sleeper = {"id": 3, "modelo_fipe": "CF FAS 300 6x2 Sleep. Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", day), (0.90, "potencia", space), (0.90, "potencia", sleeper),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("ambiguo cabine (DAY/SLEEPER/SPACE)", motivo)
 
     def test_fipe_usa_ano_modelo(self):
         self.assertEqual(2023, ano_modelo({"ano_inicial": 2022, "ano_final": 2023}))
