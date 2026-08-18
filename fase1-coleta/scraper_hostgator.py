@@ -124,10 +124,43 @@ def salva_estado(conn, revenda_id: int, novo_estado: dict, anuncios_por_id: dict
             # MySQL usa "ON DUPLICATE KEY UPDATE" em vez do "ON CONFLICT ... DO UPDATE" do Postgres.
             cur.execute("""
                 INSERT INTO anuncio (anuncio_portal_id, revenda_id, url, titulo, tipo, marca,
-                    ano_inicial, ano_final, km_ou_horas, preco, preco_texto_bruto,
+                    modelo, tracao, ano_inicial, ano_final, km_ou_horas, preco, preco_texto_bruto,
                     primeira_vez_visto, ultima_vez_ativo, status, misses_consecutivos, data_remocao)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON DUPLICATE KEY UPDATE
+                    fipe_match_status = IF(
+                        COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual' AND (
+                            NOT (url <=> VALUES(url)) OR NOT (titulo <=> VALUES(titulo)) OR
+                            NOT (ano_inicial <=> COALESCE(VALUES(ano_inicial), ano_inicial)) OR
+                            NOT (ano_final <=> COALESCE(VALUES(ano_final), ano_final)) OR
+                            (modelo IS NULL AND VALUES(modelo) IS NOT NULL) OR
+                            (tracao IS NULL AND VALUES(tracao) IS NOT NULL)
+                        ), 'reprocessar_dados_brutos', fipe_match_status
+                    ),
+                    fipe_match_status_automatico = IF(
+                        COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual' AND (
+                            NOT (url <=> VALUES(url)) OR NOT (titulo <=> VALUES(titulo)) OR
+                            NOT (ano_inicial <=> COALESCE(VALUES(ano_inicial), ano_inicial)) OR
+                            NOT (ano_final <=> COALESCE(VALUES(ano_final), ano_final)) OR
+                            (modelo IS NULL AND VALUES(modelo) IS NOT NULL) OR
+                            (tracao IS NULL AND VALUES(tracao) IS NOT NULL)
+                        ), 'reprocessar_dados_brutos', fipe_match_status_automatico
+                    ),
+                    fipe_ultima_tentativa = IF(
+                        COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual' AND (
+                            NOT (url <=> VALUES(url)) OR NOT (titulo <=> VALUES(titulo)) OR
+                            NOT (ano_inicial <=> COALESCE(VALUES(ano_inicial), ano_inicial)) OR
+                            NOT (ano_final <=> COALESCE(VALUES(ano_final), ano_final)) OR
+                            (modelo IS NULL AND VALUES(modelo) IS NOT NULL) OR
+                            (tracao IS NULL AND VALUES(tracao) IS NOT NULL)
+                        ), NULL, fipe_ultima_tentativa
+                    ),
+                    url = VALUES(url),
+                    titulo = VALUES(titulo),
+                    tipo = COALESCE(VALUES(tipo), tipo),
+                    marca = COALESCE(VALUES(marca), marca),
+                    modelo = COALESCE(modelo, VALUES(modelo)),
+                    tracao = COALESCE(tracao, VALUES(tracao)),
                     ultima_vez_ativo = VALUES(ultima_vez_ativo),
                     status = VALUES(status),
                     misses_consecutivos = VALUES(misses_consecutivos),
@@ -135,10 +168,12 @@ def salva_estado(conn, revenda_id: int, novo_estado: dict, anuncios_por_id: dict
                     ano_inicial = COALESCE(VALUES(ano_inicial), ano_inicial),
                     ano_final = COALESCE(VALUES(ano_final), ano_final),
                     km_ou_horas = COALESCE(NULLIF(VALUES(km_ou_horas), ''), km_ou_horas),
-                    preco = COALESCE(VALUES(preco), preco)
+                    preco = COALESCE(VALUES(preco), preco),
+                    preco_texto_bruto = COALESCE(NULLIF(VALUES(preco_texto_bruto), ''), preco_texto_bruto)
             """, (
                 anuncio_id, revenda_id,
                 anuncio.url, anuncio.titulo, anuncio.tipo, anuncio.marca,
+                anuncio.modelo, anuncio.tracao,
                 anuncio.ano_inicial, anuncio.ano_final, anuncio.km_ou_horas,
                 anuncio.preco, anuncio.preco_texto_bruto,
                 estado.primeira_vez_visto, estado.ultima_vez_ativo, estado.status,

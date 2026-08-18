@@ -71,6 +71,8 @@ class Anuncio:
     preco: Optional[float]
     preco_texto_bruto: str
     km_ou_horas: Optional[str] = None
+    modelo: Optional[str] = None
+    tracao: Optional[str] = None
 
 
 def _limpa_texto_html(texto: str) -> str:
@@ -125,6 +127,30 @@ def _extrai_tipo_e_marca_da_url(url_relativa: str) -> tuple[Optional[str], Optio
     return tipo, None  # marca não reconhecida — fica None em vez de errada
 
 
+def _extrai_modelo_e_tracao_da_url(url_relativa: str, marca: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """Extrai evidencias estruturadas dos segmentos publicos da URL."""
+    partes = url_relativa.strip("/").split("/")
+    modelo = None
+    if marca:
+        marca_slug = marca.lower().replace(" ", "-")
+        for indice, segmento in enumerate(partes[:-1]):
+            if segmento.lower() == marca_slug and indice + 1 < len(partes):
+                candidato = partes[indice + 1]
+                if candidato and not re.fullmatch(r"(?:19|20)\d{2}", candidato):
+                    if candidato.lower().startswith(marca_slug + "-"):
+                        candidato = candidato[len(marca_slug) + 1:]
+                    modelo = candidato.replace("-", " ").upper()
+                break
+
+    tracao = None
+    for segmento in partes:
+        eixo = re.search(r"(?:^|-)(\d)x(\d)(?:-|$)", segmento, re.IGNORECASE)
+        if eixo:
+            tracao = f"{eixo.group(1)}X{eixo.group(2)}"
+            break
+    return modelo, tracao
+
+
 def parse_listings(html: str) -> List[Anuncio]:
     """Extrai todos os anúncios de uma página de revenda (HTML bruto, como vem do `requests`)."""
     anuncios = []
@@ -142,6 +168,7 @@ def parse_listings(html: str) -> List[Anuncio]:
         ids_ja_processados.add(anuncio_id)
 
         tipo, marca = _extrai_tipo_e_marca_da_url(url_relativa)
+        modelo, tracao = _extrai_modelo_e_tracao_da_url(url_relativa, marca)
 
         titulo_m = TITULO_RE.search(bloco)
         titulo = _limpa_texto_html(titulo_m.group(1)) if titulo_m else str(anuncio_id)
@@ -163,6 +190,7 @@ def parse_listings(html: str) -> List[Anuncio]:
             anuncio_portal_id=anuncio_id, url=f"{BASE_URL}{url_relativa}", titulo=titulo,
             tipo=tipo, marca=marca, ano_inicial=ano_inicial, ano_final=ano_final,
             preco=preco, preco_texto_bruto=preco_texto_bruto, km_ou_horas=km_ou_horas,
+            modelo=modelo, tracao=tracao,
         ))
     return anuncios
 

@@ -102,6 +102,54 @@ def normaliza(s: str) -> str:
     return re.sub(r"[^A-Z0-9]+", " ", s)
 
 
+def texto_anuncio(anuncio: dict) -> str:
+    """Junta apenas evidencias estruturadas do portal usadas no matching automatico."""
+    return " ".join(str(anuncio.get(campo) or "") for campo in (
+        "titulo", "url", "modelo", "tracao",
+    ))
+
+
+POTENCIAS_DAF = {"410", "460", "480", "510", "520", "530"}
+EIXO_CONFIGURACAO_DAF = {"FT": "4X2", "FTS": "6X2", "FTT": "6X4"}
+
+
+def potencia_daf(s: str):
+    """Potencia comercial DAF; 105 e geracao, nao potencia."""
+    texto = normaliza(texto_sem_anos(s))
+    opcoes = "|".join(sorted(POTENCIAS_DAF))
+    encontradas = re.findall(rf"(?<!\d)({opcoes})(?!\d)", texto)
+    return encontradas[-1] if encontradas else None
+
+
+def geracao_daf(s: str, nome_fipe=False):
+    """XF105 so e afirmado pelo anuncio quando o 105 esta explicito."""
+    texto = normaliza(texto_sem_anos(s))
+    if re.search(r"\bXF(?:\s+(?:FTT|FTS|FT))?\s*105\b", texto):
+        return "XF105"
+    if nome_fipe and re.search(r"\bXF\b", texto):
+        return "XF"
+    return None
+
+
+def configuracao_daf(s: str):
+    texto = normaliza(texto_sem_anos(s))
+    m = re.search(r"\b(FTT|FTS|FT)(?=\s|\d|$)", texto)
+    return m.group(1) if m else None
+
+
+def cabine_daf(s: str):
+    texto = normaliza(s)
+    if re.search(r"\b(?:SUPER\s+SPACE|SUP\s+SPA)(?:\s+CAB)?\b", texto):
+        return "SUPER SPACE"
+    if re.search(r"\bSPACE(?:\s+CAB)?\b", texto):
+        return "SPACE"
+    return None
+
+
+def tem_modificador_hr(s: str) -> bool:
+    return bool(re.search(r"\bHR\b", normaliza(s)))
+
+
 def texto_sem_anos(s: str) -> str:
     """Remove apenas anos em posicao de ano; preserva modelos como MB 1938."""
     s = s or ""
@@ -176,9 +224,27 @@ def mesma_linha(a: set, b: set) -> bool:
 
 
 def eixos(s: str):
-    """Configuracao de eixos: '4X2', '6X4', '8X2'... Diferencia caminhoes de preco distinto."""
+    """Configuracao de eixos explicita ou codificada por FT/FTS/FTT na linha DAF."""
     m = re.search(r"\b(\d)\s?X\s?(\d)\b", normaliza(s))
-    return f"{m.group(1)}X{m.group(2)}" if m else None
+    if m:
+        return f"{m.group(1)}X{m.group(2)}"
+    configuracao = configuracao_daf(s)
+    return EIXO_CONFIGURACAO_DAF.get(configuracao)
+
+
+def eixo_do_anuncio(anuncio: dict):
+    """Retorna (eixo, conflito), sem esconder divergencias entre titulo, URL e detalhe."""
+    encontrados = set()
+    for campo in ("titulo", "url", "modelo", "tracao"):
+        valor = anuncio.get(campo)
+        if not valor:
+            continue
+        eixo = eixos(str(valor))
+        if eixo:
+            encontrados.add(eixo)
+    if len(encontrados) > 1:
+        return None, "conflito eixo (" + "/".join(sorted(encontrados)) + ")"
+    return (next(iter(encontrados)), None) if encontrados else (None, None)
 
 
 def ano_modelo(anuncio: dict):
@@ -198,25 +264,40 @@ def emissao_no_texto(texto: str):
 
 def emissao_preferida(anuncio: dict):
     """Retorna (norma, origem). Informacao explicita sempre supera a estimativa."""
-    explicita = emissao_no_texto(f"{anuncio.get('titulo', '')} {anuncio.get('url', '')}")
+    explicita = emissao_no_texto(texto_anuncio(anuncio))
     if explicita:
         return explicita, "explicita"
     fabricacao = anuncio.get("ano_inicial")
-    if fabricacao is None:
+    modelo = ano_modelo(anuncio)
+    if fabricacao is None and modelo is None:
         return None, None
-    if fabricacao >= 2023:
+    if fabricacao is not None and fabricacao >= 2023:
         return "E6", "estimada_fabricacao"
-    if 2012 <= fabricacao <= 2022:
+    if modelo is not None and modelo <= 2022:
+        return "E5", "estimada_ano_modelo"
+    if fabricacao is not None and 2012 <= fabricacao <= 2021:
         return "E5", "estimada_fabricacao"
+    # 2022/2023 e a transicao: a propria FIPE possui E5 e E6 no ano-modelo 2023.
+    if fabricacao == 2022 and modelo == 2023:
+        return None, "transicao_2022_2023"
     return None, None
 
 
 def pontua_sugestao(anuncio: dict, modelo: dict):
     """Pontua uma possibilidade sem transforma-la automaticamente em verdade."""
-    titulo = anuncio.get("titulo", "")
+    titulo = texto_anuncio(anuncio)
     nome_fipe = modelo.get("modelo_fipe", "")
     pontos = 20  # modelos_da_marca ja restringiu a marca
     motivos = ["marca"]
+
+    if normaliza(anuncio.get("marca", "")) == "DAF":
+        potencia_anuncio, potencia_fipe = potencia_daf(titulo), potencia_daf(nome_fipe)
+        if potencia_anuncio and potencia_fipe and potencia_anuncio != potencia_fipe:
+            return 0, []
+        geracao_anuncio = geracao_daf(titulo)
+        geracao_fipe = geracao_daf(nome_fipe, nome_fipe=True)
+        if geracao_anuncio and geracao_fipe and geracao_anuncio != geracao_fipe:
+            return 0, []
 
     numeros_anuncio = identificadores_modelo(titulo)
     numeros_fipe = identificadores_modelo(nome_fipe)
@@ -277,6 +358,21 @@ def avalia(titulo: str, modelo_fipe: str):
     """Devolve (score, motivo). Regra: o numero do modelo TEM que bater; se ambos
     tem letra de serie, elas TEM que ser iguais (senao 'R440' casaria com 'G-440',
     que e outro caminhao e outro preco)."""
+    # Na DAF, 105 identifica a geracao XF105. A potencia e outro numero (460/510 etc.).
+    if "DAF" in normaliza(titulo) or familia_comercial(titulo) in ("XF", "CF"):
+        potencia_t, potencia_f = potencia_daf(titulo), potencia_daf(modelo_fipe)
+        if potencia_t and potencia_f:
+            if potencia_t != potencia_f:
+                return 0.0, f"potencia {potencia_t}!={potencia_f}"
+            geracao_t = geracao_daf(titulo)
+            geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
+            if geracao_t and geracao_f and geracao_t != geracao_f:
+                return 0.0, f"geracao {geracao_t}!={geracao_f}"
+            config_t, config_f = configuracao_daf(titulo), configuracao_daf(modelo_fipe)
+            if config_t and config_f and config_t == config_f:
+                return 0.99, f"potencia+configuracao {potencia_t}/{config_t}"
+            return 0.90, f"potencia {potencia_t}"
+
     n_t, n_f = numero_modelo(titulo), numero_modelo(modelo_fipe)
     if not n_t or not n_f or n_t != n_f:
         return 0.0, "numero difere"
@@ -313,8 +409,8 @@ def garante_marcas(conn, codigo_referencia=None):
 def anuncios_pendentes(conn, limite):
     cur = conn.cursor(dictionary=True)
     cur.execute("""
-        SELECT id, titulo, url, marca, ano_inicial, ano_final FROM anuncio
-        WHERE (fipe_preco_id IS NULL OR fipe_match_status = 'reprocessar_ano_modelo')
+        SELECT id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final FROM anuncio
+        WHERE (fipe_preco_id IS NULL OR fipe_match_status LIKE 'reprocessar_%')
           AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
           AND tipo = 'Caminhao' AND marca IS NOT NULL
           AND COALESCE(ano_final, ano_inicial) IS NOT NULL AND status = 'ativo'
@@ -322,6 +418,7 @@ def anuncios_pendentes(conn, limite):
               fipe_ultima_tentativa IS NULL
               OR (fipe_match_status = 'erro_api'
                   AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 1 DAY))
+              OR fipe_match_status LIKE 'reprocessar_%'
               OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano')
                   AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 30 DAY))
           )
@@ -486,7 +583,7 @@ def melhores_candidatos(conn, anuncio, quantos=3):
     cands = modelos_da_marca(conn, anuncio["marca"])
     pontuados = []
     for c in cands:
-        score, motivo = avalia(anuncio["titulo"], c["modelo_fipe"])
+        score, motivo = avalia(texto_anuncio(anuncio), c["modelo_fipe"])
         pontuados.append((score, motivo, c))
     pontuados.sort(key=lambda x: (-x[0], len(x[2]["modelo_fipe"])))
     return pontuados[:quantos]
@@ -546,7 +643,7 @@ def salva_sugestoes(conn, anuncio, modelos=None, commit=True):
 def gera_sugestoes_pendentes(conn, lote=5000):
     cur = conn.cursor(dictionary=True)
     cur.execute("""
-        SELECT id, titulo, url, marca, ano_inicial, ano_final
+        SELECT id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final
         FROM anuncio
         WHERE status='ativo' AND tipo='Caminhao' AND marca IS NOT NULL
           AND COALESCE(ano_final, ano_inicial) IS NOT NULL
@@ -591,6 +688,7 @@ def escolhe(conn, anuncio):
          aquele que nao declara eixo ('11-180 Delivery 2p'), que e o modelo padrao.
          Se nao houver base, ai sim nao vincula.
     """
+    daf = normaliza(anuncio.get("marca", "")) == "DAF"
     validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=100) if s >= 0.5]
     if not validos:
         return None, "sem match"
@@ -605,12 +703,60 @@ def escolhe(conn, anuncio):
             validos = sem_emissao
         elif origem_emissao == "explicita":
             return None, f"sem match emissao {emissao}"
+        elif daf and any(emissao_no_texto(v[2]["modelo_fipe"]) for v in validos):
+            return None, f"sem match emissao {emissao}"
 
-    eixo_titulo = eixos(anuncio["titulo"])
-    if eixo_titulo:
-        filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_titulo, None)]
+    eixo_anuncio, conflito_eixo = eixo_do_anuncio(anuncio)
+    if conflito_eixo:
+        return None, conflito_eixo
+    if eixo_anuncio:
+        filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_anuncio, None)]
         if filtrados:
             validos = filtrados
+        elif daf:
+            return None, f"sem match eixo {eixo_anuncio}"
+
+    emissoes_candidatas = {
+        emissao_no_texto(c["modelo_fipe"]) for _, _, c in validos
+        if emissao_no_texto(c["modelo_fipe"])
+    }
+    if not emissao and len(emissoes_candidatas) > 1:
+        return None, "ambiguo emissao (" + "/".join(sorted(emissoes_candidatas)) + ")"
+
+    if daf and not eixo_anuncio:
+        eixos_daf = {eixos(c["modelo_fipe"]) for _, _, c in validos if eixos(c["modelo_fipe"])}
+        if len(eixos_daf) > 1:
+            return None, "ambiguo eixo (" + "/".join(sorted(eixos_daf)) + ")"
+
+    texto = texto_anuncio(anuncio)
+    if re.search(r"\bOFF\s+ROAD\b", normaliza(texto)):
+        com_off_road = [v for v in validos if re.search(r"\bOFF\s+ROAD\b", normaliza(v[2]["modelo_fipe"]))]
+        if not com_off_road:
+            return None, "sem match versao OFF ROAD"
+        validos = com_off_road
+
+    # A FIPE separa Space Cab, Super Space Cab e, em alguns anos, HR.
+    # Sem evidencia no anuncio, escolher uma delas seria inventar uma versao.
+    cabine_anuncio = cabine_daf(texto)
+    cabines_candidatas = {cabine_daf(c["modelo_fipe"]) for _, _, c in validos if cabine_daf(c["modelo_fipe"])}
+    if cabine_anuncio:
+        com_cabine = [v for v in validos if cabine_daf(v[2]["modelo_fipe"]) == cabine_anuncio]
+        if com_cabine:
+            validos = com_cabine
+        elif daf and cabines_candidatas:
+            return None, f"sem match cabine {cabine_anuncio}"
+    elif len(cabines_candidatas) > 1:
+        return None, "ambiguo cabine (" + "/".join(sorted(cabines_candidatas)) + ")"
+
+    hr_anuncio = tem_modificador_hr(texto)
+    hr_candidatos = {tem_modificador_hr(c["modelo_fipe"]) for _, _, c in validos}
+    if hr_anuncio:
+        com_hr = [v for v in validos if tem_modificador_hr(v[2]["modelo_fipe"])]
+        if not com_hr:
+            return None, "sem match modificador HR"
+        validos = com_hr
+    elif len(hr_candidatos) > 1:
+        return None, "ambiguo modificador HR"
 
     # 3) linhas conflitantes: dois conjuntos nao-vazios e sem interseccao
     chaves = [palavras_chave(c["modelo_fipe"]) for _, _, c in validos]

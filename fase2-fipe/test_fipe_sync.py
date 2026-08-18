@@ -23,12 +23,13 @@ except ModuleNotFoundError:
     sys.modules["mysql.connector"] = connector_mod
 
 from fipe_sync import (
-    ano_modelo, avalia, com_referencia, eixos, emissao_no_texto,
+    ano_modelo, avalia, cabine_daf, com_referencia, eixo_do_anuncio, eixos, emissao_no_texto,
     emissao_preferida, escolhe, familia_comercial, identificadores_modelo, normaliza, numero_modelo,
-    obtem_referencia_atual, parse_preco, palavras_chave, pontua_sugestao,
+    obtem_referencia_atual, parse_preco, palavras_chave, pontua_sugestao, potencia_daf,
     processa_anuncios,
 )
 from importar_fipe_csv import codigo_pelo_nome, preco_decimal
+from reabrir_fipe_taxonomia_daf import dados_derivados
 
 
 class MatchingFipeTest(unittest.TestCase):
@@ -59,7 +60,7 @@ class MatchingFipeTest(unittest.TestCase):
     def test_daf_xf_530_casa_por_numero(self):
         score, motivo = avalia("DAF XF FTS 530 2024/2024", "XF 530 6x2 Diesel")
         self.assertGreaterEqual(score, 0.5)
-        self.assertEqual("so numero", motivo)
+        self.assertEqual("potencia 530", motivo)
 
     def test_scania_nao_mistura_series(self):
         score, _ = avalia("SCANIA R440 2014", "G-440 A 6x4 Diesel")
@@ -67,6 +68,37 @@ class MatchingFipeTest(unittest.TestCase):
 
     def test_detecta_eixo(self):
         self.assertEqual("6X4", eixos("DAF XF 530 cavalo 6x4"))
+
+    def test_daf_traduz_configuracao_em_eixo(self):
+        self.assertEqual("4X2", eixos("XF FT530 4x2 Space Cab"))
+        self.assertEqual("6X2", eixos("DAF XF FTS 530"))
+        self.assertEqual("6X4", eixos("DAF XF FTT 530"))
+
+    def test_daf_combina_eixo_do_titulo_e_da_url(self):
+        anuncio = {
+            "titulo": "DAF XF FTT 530 2021/2021",
+            "url": "https://portal/veiculo/daf/daf-xf-ftt-530/2021/cavalo-6x4/1",
+        }
+        self.assertEqual(("6X4", None), eixo_do_anuncio(anuncio))
+
+    def test_daf_detecta_conflito_de_eixo(self):
+        anuncio = {"titulo": "DAF XF FTS 530", "url": "https://portal/cavalo-6x4/1"}
+        self.assertEqual((None, "conflito eixo (6X2/6X4)"), eixo_do_anuncio(anuncio))
+
+    def test_daf_105_e_geracao_e_530_e_potencia(self):
+        self.assertEqual("530", potencia_daf("DAF XF105 530 2021/2021"))
+        score, motivo = avalia("DAF XF105 530 2021/2021", "XF 105 FTT 510 6x4 (diesel)(E5)")
+        self.assertEqual(0.0, score)
+        self.assertIn("potencia", motivo)
+
+    def test_daf_xf105_530_nao_casa_com_nova_geracao(self):
+        score, motivo = avalia("DAF XF105 530 2021/2021", "XF FTT530 6x4 Space Cab (diesel)(E5)")
+        self.assertEqual(0.0, score)
+        self.assertIn("geracao", motivo)
+
+    def test_reconhece_cabines_daf(self):
+        self.assertEqual("SPACE", cabine_daf("XF FTT530 6x4 Space Cab"))
+        self.assertEqual("SUPER SPACE", cabine_daf("XF FTT530 6x4 Super Space Cab"))
 
     def test_fipe_usa_ano_modelo(self):
         self.assertEqual(2023, ano_modelo({"ano_inicial": 2022, "ano_final": 2023}))
@@ -77,7 +109,7 @@ class MatchingFipeTest(unittest.TestCase):
         self.assertEqual(("E6", "explicita"), emissao_preferida(anuncio))
         self.assertEqual("E5", emissao_no_texto("XF 530 6x2 (diesel)(E5)"))
 
-    def test_fabricacao_2022_modelo_2023_prefere_euro_5(self):
+    def test_fabricacao_2022_modelo_2023_preserva_transicao(self):
         anuncio = {
             "titulo": "DAF XF 530 2022/2023", "url": "", "marca": "DAF",
             "ano_inicial": 2022, "ano_final": 2023,
@@ -87,8 +119,66 @@ class MatchingFipeTest(unittest.TestCase):
         with patch("fipe_sync.melhores_candidatos", return_value=[
             (0.95, "numero+serie", e6), (0.95, "numero+serie", e5),
         ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("ambiguo emissao (E5/E6)", motivo)
+
+    def test_daf_sem_cabine_nao_escolhe_space_ao_acaso(self):
+        anuncio = {
+            "titulo": "DAF XF FTT 530 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        space = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "XF FTT530 6x4 Super Space Cab (die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", space),
+            (0.99, "potencia+configuracao", super_space),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("ambiguo cabine (SPACE/SUPER SPACE)", motivo)
+
+    def test_daf_sem_configuracao_prioriza_ambiguidade_de_eixo(self):
+        anuncio = {
+            "titulo": "DAF XF 480 2021/2022", "url": "https://portal/daf-xf-480/2022/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2022,
+        }
+        ft = {"id": 1, "modelo_fipe": "XF FT480 4x2 Space Cab (diesel)(E5)"}
+        fts = {"id": 2, "modelo_fipe": "XF FTS480 6x2 Space Cab (diesel)(E5)"}
+        ftt = {"id": 3, "modelo_fipe": "XF FTT480 6x4 Space Cab (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", ft), (0.90, "potencia", fts), (0.90, "potencia", ftt),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("ambiguo eixo (4X2/6X2/6X4)", motivo)
+
+    def test_daf_cabine_explicita_define_versao(self):
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SUPER SPACE 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        space = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "XF FTT530 6x4 Super Space Cab (die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", space),
+            (0.99, "potencia+configuracao", super_space),
+        ]):
             candidatos, _ = escolhe(None, anuncio)
-        self.assertEqual([e5], candidatos)
+        self.assertEqual([super_space], candidatos)
+
+    def test_backfill_daf_extrai_url_e_corrige_anos_pelo_titulo(self):
+        dados = dados_derivados({
+            "titulo": "DAF XF FTT 530 2022/2023",
+            "url": "https://portal/veiculo/cidade/uf/caminhao/daf/daf-xf-ftt-530/2023/cavalo-6x4/1",
+            "marca": "DAF", "modelo": None, "tracao": None,
+            "ano_inicial": 2021, "ano_final": 2022,
+        })
+        self.assertEqual("XF FTT 530", dados["modelo"])
+        self.assertEqual("6X4", dados["tracao"])
+        self.assertEqual((2022, 2023), (dados["ano_inicial"], dados["ano_final"]))
 
     def test_fabricacao_2023_prefere_euro_6(self):
         self.assertEqual(

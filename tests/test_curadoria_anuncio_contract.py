@@ -92,6 +92,23 @@ class CuradoriaAnuncioContractTest(unittest.TestCase):
         finally:
             sys.path.pop(0)
 
+    def test_parser_extrai_modelo_e_tracao_da_url(self):
+        pasta = ROOT / "fase1-coleta"
+        sys.path.insert(0, str(pasta))
+        try:
+            spec = importlib.util.spec_from_file_location("parser_url_oper_radar", pasta / "parser.py")
+            modulo = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = modulo
+            spec.loader.exec_module(modulo)
+            html = '''<div class="list-product list-view-item">
+                <a href="/veiculo/curitiba/pr/caminhao/daf/daf-xf-ftt-530/2023/cavalo-6x4/loja/123"></a>
+                <h2 class="h16">DAF XF FTT 530 2022/2023</h2></div>'''
+            anuncio = modulo.parse_listings(html)[0]
+            self.assertEqual("XF FTT 530", anuncio.modelo)
+            self.assertEqual("6X4", anuncio.tracao)
+        finally:
+            sys.path.pop(0)
+
     def test_php_tambem_separa_fabricacao_e_modelo(self):
         source = (ROOT / "fase1-coleta-php" / "parser.php").read_text(encoding="utf-8")
         self.assertIn("function extrai_anos", source)
@@ -103,7 +120,7 @@ class CuradoriaAnuncioContractTest(unittest.TestCase):
         self.assertIn("<> 'manual'", source)
         self.assertIn("reprocessar_ano_modelo", source)
         self.assertNotIn("fipe_preco_id = NULL", source)
-        self.assertIn("fipe_match_status = 'reprocessar_ano_modelo'", sync)
+        self.assertIn("fipe_match_status LIKE 'reprocessar_%'", sync)
 
 
 if __name__ == "__main__":
