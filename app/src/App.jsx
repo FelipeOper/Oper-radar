@@ -2079,6 +2079,132 @@ function PageConta({ sessao, onSessao, onLogout }) {
 
 const NOVO_VEICULO = { referencia_interna: '', marca: '', modelo: '', ano: '', preco_anunciado: '', cidade: '', uf: '', data_entrada: new Date().toISOString().slice(0, 10), status: 'estoque', fipe_preco_id: null };
 
+function CampoMeuVeiculo({ rotulo, children }) {
+  return <label style={{ fontSize: 10.5, color: T.inkMuted }}>{rotulo}{children}</label>;
+}
+
+function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
+  const [dados, setDados] = useState(null);
+  const [rascunho, setRascunho] = useState(null);
+  const [aba, setAba] = useState('cadastro');
+  const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [comparando, setComparando] = useState(false);
+  const [referenciaNova, setReferenciaNova] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/minha_loja_detalhe.php?id=${itemInicial.id}`, { credentials: 'same-origin', signal: controller.signal })
+      .then(async resposta => {
+        const payload = await resposta.json().catch(() => ({}));
+        if (!resposta.ok) throw new Error(payload.erro || 'Não foi possível carregar o veículo.');
+        return payload;
+      })
+      .then(payload => { setDados(payload); setRascunho({ ...payload.item }); })
+      .catch(e => { if (e.name !== 'AbortError') setErro(e.message); });
+    return () => controller.abort();
+  }, [itemInicial.id]);
+  useEffect(() => {
+    const fechar = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', fechar);
+    return () => window.removeEventListener('keydown', fechar);
+  }, [onClose]);
+
+  const alteraIdentificacao = (campo, valor) => {
+    setReferenciaNova(null);
+    setRascunho(atual => ({ ...atual, [campo]: valor, fipe_preco_id: null }));
+  };
+  const compararFipe = async () => {
+    if (!rascunho?.modelo?.trim()) return;
+    setComparando(true); setErro(''); setAviso('');
+    try {
+      const q = [rascunho.marca, rascunho.modelo, rascunho.ano].filter(Boolean).join(' ');
+      const resposta = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=1`, { credentials: 'same-origin' });
+      const payload = await resposta.json();
+      const referencia = payload.itens?.[0];
+      if (!referencia) { setAviso('Nenhuma referência FIPE segura foi encontrada. Revise marca, modelo e ano.'); return; }
+      setReferenciaNova(referencia);
+      setRascunho(atual => ({ ...atual, fipe_preco_id: referencia.id }));
+      setAviso(`Referência selecionada: ${referencia.marca} ${referencia.modelo} · ${referencia.ano}. Salve para recalcular o mercado.`);
+    } catch { setErro('Não foi possível consultar a FIPE agora.'); }
+    finally { setComparando(false); }
+  };
+  const salvar = async () => {
+    if (!rascunho?.modelo?.trim()) { setErro('Informe o modelo do veículo.'); return; }
+    setSalvando(true); setErro(''); setAviso('');
+    try {
+      await apiPost('minha_loja.php', {
+        acao: 'atualizar', id: rascunho.id, referencia_interna: rascunho.referencia_interna,
+        marca: rascunho.marca, modelo: rascunho.modelo, ano: rascunho.ano,
+        preco_anunciado: rascunho.preco_anunciado, cidade: rascunho.cidade, uf: rascunho.uf,
+        data_entrada: rascunho.data_entrada, status: rascunho.status,
+        fipe_preco_id: rascunho.fipe_preco_id, usar_comparativo: Boolean(Number(rascunho.usar_comparativo)),
+      }, sessao.csrf);
+      await onSalvo();
+      const resposta = await fetch(`${API_BASE_URL}/minha_loja_detalhe.php?id=${rascunho.id}`, { credentials: 'same-origin' });
+      const payload = await resposta.json().catch(() => ({}));
+      if (!resposta.ok) throw new Error(payload.erro || 'O veículo foi salvo, mas a análise não pôde ser atualizada.');
+      setDados(payload); setRascunho({ ...payload.item }); setReferenciaNova(null);
+      setAviso('Veículo atualizado e comparativos recalculados.');
+    } catch (e) { setErro(e.message); }
+    finally { setSalvando(false); }
+  };
+
+  const mercado = dados?.mercado_nacional;
+  const regioes = dados?.regioes || [];
+  const melhor = dados?.melhor_regiao_observada;
+  const precoAtual = Number(rascunho?.preco_anunciado || 0);
+  const deltaMercado = mercado?.preco_mediano > 0 && precoAtual > 0 ? Math.round((precoAtual / mercado.preco_mediano - 1) * 1000) / 10 : null;
+  const abas = [['cadastro', 'Cadastro'], ['mercado', 'Mercado nacional'], ['regioes', `Regiões · ${regioes.length}`]];
+  const campoStyle = { ...inputStyle, width: '100%' };
+
+  return <div onClick={onClose} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2, 6, 12, .68)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end' }}>
+    <aside onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Análise de ${itemInicial.marca || ''} ${itemInicial.modelo || 'veículo'}`} style={{ width: 'min(760px, 100vw)', height: '100%', overflowY: 'auto', background: T.bg, borderLeft: `1px solid ${T.line}`, boxShadow: '-20px 0 60px rgba(0,0,0,.35)', color: T.ink }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 3, background: `${T.bg}F2`, backdropFilter: 'blur(12px)', borderBottom: `1px solid ${T.line}`, padding: '14px 18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+          <div><div style={{ fontFamily: T.fontMono, fontSize: 10, color: T.signal }}>MINHA LOJA · VEÍCULO #{itemInicial.id}</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 19, display: 'block', marginTop: 4 }}>{[rascunho?.marca || itemInicial.marca, rascunho?.modelo || itemInicial.modelo].filter(Boolean).join(' ')}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>{rascunho?.ano || 'Ano não informado'} · {[rascunho?.cidade, rascunho?.uf].filter(Boolean).join('/') || 'Local não informado'}</div></div>
+          <button onClick={onClose} aria-label="Fechar painel do veículo" style={{ ...inputStyle, padding: 8, cursor: 'pointer' }}><X size={18} /></button>
+        </div>
+        <div role="tablist" aria-label="Seções do veículo" style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto' }}>{abas.map(([id, label]) => <button key={id} role="tab" aria-selected={aba === id} onClick={() => setAba(id)} style={{ ...inputStyle, cursor: 'pointer', padding: '7px 10px', whiteSpace: 'nowrap', fontSize: 11, borderColor: aba === id ? T.signal : T.line, color: aba === id ? T.signal : T.inkMuted }}>{label}</button>)}</div>
+      </div>
+      <div style={{ padding: 18 }}>
+        {!dados && !erro && <Card style={{ textAlign: 'center', color: T.inkMuted }}>Carregando análise do veículo…</Card>}
+        {erro && <div role="alert" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}35` }}>{erro}</div>}
+        {aviso && <div role="status" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.positive, background: `${T.positive}12`, border: `1px solid ${T.positive}35` }}>{aviso}</div>}
+
+        {dados && rascunho && aba === 'cadastro' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {rascunho.origem === 'xml' && <div role="note" style={{ padding: 11, borderRadius: 9, color: T.inkMuted, background: `${T.signal}10`, border: `1px solid ${T.signal}30`, fontSize: 11.5 }}>Este veículo veio do XML. Uma próxima sincronização pode substituir os campos também presentes no arquivo.</div>}
+          <Card style={{ padding: 15 }}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 10 }}>
+            <CampoMeuVeiculo rotulo="Referência interna"><input value={rascunho.referencia_interna || ''} onChange={e => setRascunho(v => ({ ...v, referencia_interna: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Marca"><input value={rascunho.marca || ''} onChange={e => alteraIdentificacao('marca', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Modelo"><input value={rascunho.modelo || ''} onChange={e => alteraIdentificacao('modelo', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Ano"><input type="number" min="1950" max="2030" value={rascunho.ano || ''} onChange={e => alteraIdentificacao('ano', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Preço anunciado"><input type="number" min="0" step="1000" value={rascunho.preco_anunciado || ''} onChange={e => setRascunho(v => ({ ...v, preco_anunciado: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Cidade"><input value={rascunho.cidade || ''} onChange={e => setRascunho(v => ({ ...v, cidade: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="UF"><select value={rascunho.uf || ''} onChange={e => setRascunho(v => ({ ...v, uf: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Entrada no estoque"><input type="date" value={rascunho.data_entrada || ''} onChange={e => setRascunho(v => ({ ...v, data_entrada: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Status"><select value={rascunho.status} onChange={e => setRascunho(v => ({ ...v, status: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }}><option value="estoque">No estoque</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option></select></CampoMeuVeiculo>
+          </div><label style={{ display: 'flex', gap: 8, marginTop: 13, fontSize: 11.5 }}><input type="checkbox" checked={Boolean(Number(rascunho.usar_comparativo))} onChange={e => setRascunho(v => ({ ...v, usar_comparativo: e.target.checked ? 1 : 0 }))} /><span><strong>Usar nos comparativos internos</strong><br /><span style={{ color: T.inkMuted }}>O preço participa somente da área autenticada.</span></span></label></Card>
+          <Card style={{ padding: 14 }}><strong style={{ fontSize: 12.5 }}>Referência FIPE</strong><div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 5 }}>{referenciaNova ? `${referenciaNova.marca} ${referenciaNova.modelo} · ${referenciaNova.ano}` : rascunho.fipe_preco_id ? `${dados.item.marca_fipe || ''} ${dados.item.modelo_fipe || ''} · ${dados.item.codigo_fipe || 'código vinculado'}` : 'Sem vínculo após a alteração. Consulte novamente antes de salvar.'}</div><button onClick={compararFipe} disabled={comparando || !rascunho.modelo?.trim()} style={{ ...inputStyle, cursor: 'pointer', marginTop: 10 }}><Search size={14} style={{ verticalAlign: -3, marginRight: 5 }} />{comparando ? 'Consultando…' : 'Recalcular FIPE'}</button></Card>
+          <button onClick={salvar} disabled={salvando} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer' }}><Save size={15} style={{ verticalAlign: -3, marginRight: 6 }} />{salvando ? 'Salvando…' : 'Salvar alterações'}</button>
+        </div>}
+
+        {dados && aba === 'mercado' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!mercado ? <EmptyState icon={Gauge} titulo="Comparação indisponível" texto={dados.nota} /> : <><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}><Kpi label="Seu preço" value={fmtBRL(precoAtual)} sub={`${fmtN(rascunho.dias_estoque)} dias em estoque`} /><Kpi label="Mediana nacional" value={fmtBRL(mercado.preco_mediano)} sub={`${fmtN(mercado.comparaveis)} equivalentes qualificados`} /><Kpi label="Posicionamento" value={deltaMercado == null ? '—' : `${deltaMercado > 0 ? '+' : ''}${deltaMercado}%`} sub="versus mediana anunciada" tone={deltaMercado != null && deltaMercado <= 0 ? T.positive : T.alert} /><Kpi label="Faixa central" value={mercado.preco_p25 == null ? '—' : `${fmtBRL(mercado.preco_p25)}–${fmtBRL(mercado.preco_p75)}`} sub={`confiança ${mercado.confianca}`} /></div><Card style={{ padding: 15 }}><strong style={{ fontSize: 13 }}>Leitura de precificação</strong><div style={{ color: T.inkMuted, fontSize: 11.5, lineHeight: 1.55, marginTop: 7 }}>{deltaMercado == null ? 'Informe preço e referência FIPE para posicionar o veículo.' : deltaMercado > 8 ? 'Preço acima da mediana observada. Revise configuração, condição e região antes de concluir que existe sobrepreço.' : deltaMercado < -8 ? 'Preço abaixo da mediana observada. Confirme se não há condição especial ou diferença de configuração.' : 'Preço próximo da faixa central do mercado equivalente observado.'}</div></Card></>}
+          <div role="note" style={{ color: T.inkMuted, fontSize: 11, lineHeight: 1.5 }}>{dados.nota}</div>
+        </div>}
+
+        {dados && aba === 'regioes' && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {melhor ? <Card style={{ padding: 15, borderColor: `${T.positive}55`, background: `${T.positive}0B` }}><div style={{ fontFamily: T.fontMono, fontSize: 9.5, color: T.positive }}>MELHOR REGIÃO OBSERVADA · NÃO É GARANTIA DE VENDA</div><strong style={{ display: 'block', fontSize: 18, marginTop: 6 }}>{NOMES_UF[melhor.uf] || melhor.uf} · índice {melhor.avaliacao.pontuacao}/100</strong><div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 7 }}>{melhor.texto}</div></Card> : <div role="note" style={{ padding: 12, borderRadius: 9, background: `${T.alert}10`, border: `1px solid ${T.alert}30`, color: T.inkMuted, fontSize: 11.5 }}>Ainda não há região com amostra e histórico suficientes para uma recomendação publicável.</div>}
+          {regioes.length === 0 ? <EmptyState icon={MapPin} titulo="Sem recorte regional" texto="Vincule uma FIPE com ofertas equivalentes para comparar estados." /> : regioes.map(regiao => <Card key={regiao.uf} style={{ padding: 14, borderColor: regiao.uf === rascunho.uf ? `${T.signal}55` : T.line }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><strong>{NOMES_UF[regiao.uf] || regiao.uf}{regiao.uf === rascunho.uf ? ' · sua localização' : ''}</strong><div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{regiao.texto}</div></div><Tag tone={regiao.avaliacao.confianca === 'alta' ? 'positivo' : regiao.avaliacao.confianca === 'media' ? 'sinal' : 'alerta'}>{regiao.avaliacao.pontuacao}/100</Tag></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: 7, marginTop: 11 }}>{[['Ofertas', fmtN(regiao.comparaveis)], ['Revendas', fmtN(regiao.revendas)], ['Saídas 180d', fmtN(regiao.saidas_observadas)], ['Tempo mediano', regiao.mediana_dias_saida == null ? '—' : `${fmtN(regiao.mediana_dias_saida)}d`], ['Preço mediano', fmtBRL(regiao.preco_mediano)]].map(([rotulo, valor]) => <div key={rotulo} style={{ padding: 8, borderRadius: 7, background: T.surface2 }}><small style={{ color: T.inkMuted }}>{rotulo}</small><div style={{ fontFamily: T.fontMono, fontSize: 11, marginTop: 3 }}>{valor}</div></div>)}</div><div style={{ color: T.inkMuted, fontSize: 10, marginTop: 9 }}>Confiança {regiao.avaliacao.confianca}: {regiao.avaliacao.motivo_confianca}.</div></Card>)}
+          <div role="note" style={{ color: T.inkMuted, fontSize: 11, lineHeight: 1.5 }}>{dados.nota} O índice pondera movimento (30%), concorrência (20%), tempo de saída (20%), preço (15%) e qualidade dos dados (15%).</div>
+        </div>}
+      </div>
+    </aside>
+  </div>;
+}
+
 function PageMinhaLoja({ sessao }) {
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -2095,6 +2221,7 @@ function PageMinhaLoja({ sessao }) {
   const [ordemEstoque, setOrdemEstoque] = useState('recente');
   const [statusSalvandoId, setStatusSalvandoId] = useState(null);
   const [ultimaAlteracao, setUltimaAlteracao] = useState(null);
+  const [itemAberto, setItemAberto] = useState(null);
 
   const carregar = async () => {
     setCarregando(true); setErro('');
@@ -2299,8 +2426,8 @@ function PageMinhaLoja({ sessao }) {
           const mercado = item.mercado_amostra_suficiente ? Number(item.preco_mediana_mercado || 0) : 0;
           const preco = Number(item.preco_anunciado || 0);
           const delta = mercado && preco ? Math.round((preco / mercado - 1) * 100) : null;
-          return <Card key={item.id} style={{ padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><select aria-label={`Status de ${item.marca || ''} ${item.modelo || ''}`} disabled={statusSalvandoId === item.id} value={item.status} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted, opacity: statusSalvandoId === item.id ? 0.6 : 1 }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select>{item.origem === 'xml' && <Tag tone="sinal">XML</Tag>}</div><button aria-label={`Excluir ${item.marca || ''} ${item.modelo || 'veículo'}`} onClick={() => excluir(item.id)} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
+          return <Card key={item.id} onClick={() => setItemAberto(item)} style={{ padding: 16, cursor: 'pointer' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><select aria-label={`Status de ${item.marca || ''} ${item.modelo || ''}`} disabled={statusSalvandoId === item.id} value={item.status} onClick={e => e.stopPropagation()} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted, opacity: statusSalvandoId === item.id ? 0.6 : 1 }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select>{item.origem === 'xml' && <Tag tone="sinal">XML</Tag>}</div><button aria-label={`Excluir ${item.marca || ''} ${item.modelo || 'veículo'}`} onClick={e => { e.stopPropagation(); excluir(item.id); }} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
             <div style={{ fontFamily: T.fontDisplay, fontSize: 16, fontWeight: 650, marginTop: 12 }}>{[item.marca, item.modelo].filter(Boolean).join(' ')}</div>
             <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.ano || 'Ano não informado'} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias{item.quilometragem ? ` · ${fmtN(item.quilometragem)} km` : ''}</div>
             <div style={{ fontFamily: T.fontMono, fontSize: 19, fontWeight: 650, marginTop: 15 }}>{fmtBRL(item.preco_anunciado)}</div>
@@ -2309,9 +2436,11 @@ function PageMinhaLoja({ sessao }) {
               <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>Mediana de mercado</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{item.mercado_amostra_suficiente ? fmtBRL(item.preco_mediana_mercado) : 'Amostra insuficiente'}</div></div>
             </div>
             <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{Number(item.usar_comparativo ?? 1) !== 1 ? 'Fora da base comparativa' : delta == null ? 'Aguardando amostra mínima compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da mediana · ${fmtN(item.anuncios_ativos)} anúncios · confiança ${item.mercado_confianca}`}</div>
+            <div style={{ color: T.signal, fontFamily: T.fontMono, fontSize: 9.5, marginTop: 12 }}>ABRIR CADASTRO E ANÁLISE →</div>
           </Card>;
         })}
       </div>}
+    {itemAberto && <PainelMeuVeiculo itemInicial={itemAberto} sessao={sessao} onClose={() => setItemAberto(null)} onSalvo={carregar} />}
   </div>;
 }
 
