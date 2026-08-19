@@ -22,6 +22,9 @@ import {
 import {
   classificaEmissao, filtraOrdenaEstoque, normalizaTracao, rotuloTempoObservado, textoEmissao,
 } from './domainRules.js';
+import {
+  CATEGORIAS_MERCADO, categoriaDeTipo, filtrosDaCategoria, rotuloTipo,
+} from './marketTaxonomy.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
@@ -53,44 +56,10 @@ const STATUS_DB_PARA_UI = {
 };
 
 
-// Agrupa os 33 "tipos" do portal em 8 categorias de negocio (definidas com base
-// nos dados reais do banco em 08/jul). Cada anuncio tem 1 categoria a partir do tipo.
-const CATEGORIAS = {
-  'caminhoes':      { label: 'Caminhoes',                    icone: '🚛', cor: '#F5A623' },
-  'implementos':    { label: 'Implementos rodoviarios',     icone: '🚚', cor: '#D9714F' },
-  'onibus_vans':    { label: 'Onibus e vans',                icone: '🚌', cor: '#5B8AA6' },
-  'leves':          { label: 'Leves',                        icone: '🚗', cor: '#8A94A6' },
-  'agricolas':      { label: 'Maquinas agricolas',           icone: '🌾', cor: '#3DD68C' },
-  'construcao':     { label: 'Maquinas construcao',          icone: '🏗️', cor: '#FFB347' },
-  'pecas':          { label: 'Pecas e acessorios',           icone: '🔧', cor: '#B98CE0' },
-  'outros':         { label: 'Outros',                       icone: '🌀', cor: '#6B7280' },
-};
-const ROTULOS_CATEGORIA_FILTRO = {
-  caminhoes: 'Caminhões', implementos: 'Implementos', onibus_vans: 'Ônibus e vans',
-  leves: 'Leves', agricolas: 'Agrícolas', construcao: 'Construção', pecas: 'Peças', outros: 'Outros',
-};
-
-// De qual categoria e cada tipo. Fonte: consulta ao banco pro93061_radar_oper em 08/jul.
-const TIPO_PARA_CATEGORIA = {
-  'Caminhao': 'caminhoes', 'Motorhome': 'caminhoes',
-  'Implemento': 'implementos', 'Carroceria-sobre-chassi': 'implementos', 'Trailer': 'implementos',
-  'Onibus': 'onibus_vans', 'Micro-onibus': 'onibus_vans', 'Vans': 'onibus_vans', 'Utilitarios': 'onibus_vans',
-  'Carro': 'leves',
-  'Trator': 'agricolas', 'Trator-esteira': 'agricolas', 'Micro-trator': 'agricolas',
-  'Plantadeira': 'agricolas', 'Colheitadeira': 'agricolas', 'Plataforma-colheitadeira': 'agricolas',
-  'Pulverizador': 'agricolas', 'Semeadeira': 'agricolas', 'Distribuidor-autopropelido': 'agricolas',
-  'Forragem-e-feno': 'agricolas', 'Florestal': 'agricolas',
-  'Pa-carregadeira': 'construcao', 'Escavadeira': 'construcao', 'Retro-escavadeira': 'construcao',
-  'Motoniveladora': 'construcao', 'Rolo-compactador': 'construcao', 'Guindaste': 'construcao',
-  'Mini-carregadeira': 'construcao', 'Auto-carregavel': 'construcao', 'Mini-escavadeira': 'construcao',
-  'Empilhadeira': 'construcao', 'Plataforma-elevatoria': 'construcao', 'Maquinas': 'construcao',
-  'Equipamentos': 'construcao',
-  'Pecas-a-venda': 'pecas',
-  'Moto': 'outros', 'Imoveis': 'outros', 'Quadriciclo': 'outros', 'Nautico': 'outros',
-};
+const CATEGORIAS = CATEGORIAS_MERCADO;
 
 function categoriaDe(tipo) {
-  return TIPO_PARA_CATEGORIA[tipo] || 'outros';
+  return categoriaDeTipo(tipo);
 }
 
 function mapeiaAnuncioReal(a) {
@@ -856,6 +825,8 @@ function PageMercado({ sessao }) {
   const [revendaId, setRevendaId] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
+  const [marca, setMarca] = useState('todas');
+  const [carroceria, setCarroceria] = useState('todas');
   const [tracao, setTracao] = useState('todas');
   const [fipeFila, setFipeFila] = useState('todos');
   const [ordem, setOrdem] = useState('aleatorio');
@@ -867,7 +838,7 @@ function PageMercado({ sessao }) {
     ativo: 'ativo', em_verificacao: 'removido_candidato',
     saida_detectada: 'removido_confirmado', todos: 'todos',
   }[status] || 'ativo';
-  const { data: facetas } = useApi(`facetas.php?status=${statusDb}`);
+  const { data: facetas } = useApi(`facetas.php?status=${statusDb}&categoria=${categoria}`);
 
   const [anuncios, setAnuncios] = useState([]);
   const [total, setTotal] = useState(null);
@@ -893,12 +864,14 @@ function PageMercado({ sessao }) {
     if (revendaId !== 'todas') p.set('revenda_id', revendaId);
     if (precoMin) p.set('preco_min', precoMin);
     if (precoMax) p.set('preco_max', precoMax);
+    if (marca !== 'todas') p.set('marca', marca);
+    if (carroceria !== 'todas') p.set('carroceria', carroceria);
     if (tracao !== 'todas') p.set('tracao', tracao);
     if (fipeFila !== 'todos') p.set('fipe_fila', fipeFila);
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, tracao, fipeFila, qDebounced, ordem]);
+  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, marca, carroceria, tracao, fipeFila, qDebounced, ordem]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
@@ -965,7 +938,15 @@ function PageMercado({ sessao }) {
   const cidades = uf === 'todas' ? [] : (facetas?.ufs?.[uf]?.cidades || []);
   const revendas = uf === 'todas' ? [] : (facetas?.ufs?.[uf]?.lojistas || []);
   const tiposContexto = useMemo(() => somaPorUfs(facetas, regiao, uf, 'tipos'), [facetas, regiao, uf]);
+  const marcasContexto = useMemo(() => somaPorUfs(facetas, regiao, uf, 'marcas'), [facetas, regiao, uf]);
+  const carroceriasContexto = useMemo(() => somaPorUfs(facetas, regiao, uf, 'carrocerias'), [facetas, regiao, uf]);
   const tracoesContexto = useMemo(() => somaPorUfs(facetas, regiao, uf, 'tracoes'), [facetas, regiao, uf]);
+  const opcoesMarca = useMemo(() => Object.entries(marcasContexto)
+    .map(([valor, n]) => ({ valor, n: Number(n) }))
+    .sort((a, b) => b.n - a.n || a.valor.localeCompare(b.valor, 'pt-BR')), [marcasContexto]);
+  const opcoesCarroceria = useMemo(() => Object.entries(carroceriasContexto)
+    .map(([valor, n]) => ({ valor, n: Number(n) }))
+    .sort((a, b) => b.n - a.n || a.valor.localeCompare(b.valor, 'pt-BR')), [carroceriasContexto]);
   const opcoesTracao = useMemo(() => Object.entries(tracoesContexto)
     .map(([valor, n]) => ({ valor, n: Number(n) }))
     .sort((a, b) => {
@@ -977,15 +958,24 @@ function PageMercado({ sessao }) {
     .filter(([nome]) => categoriaDe(nome) === categoria)
     .map(([nome, n]) => ({ tipo: nome, n }))
     .sort((a, b) => b.n - a.n);
+  const filtrosDisponiveis = filtrosDaCategoria(categoria);
 
   const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'ativo',
     regiao !== 'todas', uf !== 'todas', cidade !== 'todas', revendaId !== 'todas', !!precoMin, !!precoMax,
-    tracao !== 'todas', fipeFila !== 'todos'].filter(Boolean).length;
+    marca !== 'todas', carroceria !== 'todas', tracao !== 'todas', fipeFila !== 'todos'].filter(Boolean).length;
   const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
+  const selecionarCategoria = cat => {
+    setCategoria(cat);
+    setTipo('todos');
+    setMarca('todas');
+    setCarroceria('todas');
+    setTracao('todas');
+    setFipeFila('todos');
+  };
   const limparFiltros = () => {
     setQ(''); setCategoria('todas'); setTipo('todos'); setStatus('ativo'); setRegiao('todas');
     setUf('todas'); setCidade('todas'); setRevendaId('todas'); setPrecoMin(''); setPrecoMax('');
-    setTracao('todas'); setFipeFila('todos'); setOrdem('aleatorio');
+    setMarca('todas'); setCarroceria('todas'); setTracao('todas'); setFipeFila('todos'); setOrdem('aleatorio');
   };
 
   return (
@@ -1008,11 +998,11 @@ function PageMercado({ sessao }) {
       <div style={{ ...filtroGridSegmentoStyle, marginBottom: 14 }}>
         {chipsCategorias.map(cat => {
           const info = cat === 'todas' ? { label: 'Todos', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
-          const rotulo = cat === 'todas' ? info.label : ROTULOS_CATEGORIA_FILTRO[cat];
+          const rotulo = info.label;
           const ativa = categoria === cat;
           const n = cat === 'todas' ? totalGeral : (catCounts[cat] || 0);
           return (
-            <button key={cat} aria-pressed={ativa} onClick={() => { setCategoria(cat); setTipo('todos'); if (cat !== 'caminhoes') setTracao('todas'); }} style={{
+            <button key={cat} aria-pressed={ativa} title={rotulo} onClick={() => selecionarCategoria(cat)} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px', minWidth: 0,
               background: ativa ? `${info.cor}22` : T.surface,
               border: `1px solid ${ativa ? info.cor : T.line}`,
@@ -1049,27 +1039,35 @@ function PageMercado({ sessao }) {
 
       {maisFiltros && (
         <Card id="mercado-filtros-avancados" style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
-          <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle} disabled={categoria === 'todas'}>
+          {filtrosDisponiveis.includes('tipo') && <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle}>
             <option value="todos">{categoria === 'todas' ? 'Escolha uma categoria' : 'Todos os subtipos'}</option>
-            {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{s.tipo} ({s.n})</option>)}
-          </select>
-          <select aria-label="Tração ou configuração de eixos" value={tracao} onChange={e => { const valor = e.target.value; setTracao(valor); if (valor !== 'todas') { setCategoria('caminhoes'); setTipo('todos'); } }} style={inputStyle}>
+            {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{rotuloTipo(s.tipo)} ({s.n})</option>)}
+          </select>}
+          {filtrosDisponiveis.includes('marca') && <select aria-label="Marca" value={marca} onChange={e => setMarca(e.target.value)} style={inputStyle}>
+            <option value="todas">Todas as marcas</option>
+            {opcoesMarca.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
+          </select>}
+          {filtrosDisponiveis.includes('carroceria') && <select aria-label="Carroceria ou configuração" value={carroceria} onChange={e => setCarroceria(e.target.value)} style={inputStyle}>
+            <option value="todas">Todas as carrocerias</option>
+            {opcoesCarroceria.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
+          </select>}
+          {filtrosDisponiveis.includes('tracao') && <select aria-label="Tração ou configuração de eixos" value={tracao} onChange={e => setTracao(e.target.value)} style={inputStyle}>
             <option value="todas">Todas as trações</option>
             {opcoesTracao.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
-          </select>
+          </select>}
           <select aria-label="Situação do anúncio" value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
             <option value="ativo">No mercado</option>
             <option value="em_verificacao">Em verificação</option>
             <option value="saida_detectada">Saídas detectadas</option>
             <option value="todos">Todos (histórico)</option>
           </select>
-          <select aria-label="Situação do vínculo FIPE" value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('fipe') && <select aria-label="Situação do vínculo FIPE" value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={inputStyle}>
             <option value="todos">FIPE · todos</option>
             <option value="revisar">FIPE · precisa revisar</option>
             <option value="com_sugestao">FIPE · com sugestão</option>
             <option value="sem_sugestao">FIPE · dados insuficientes</option>
             <option value="vinculado">FIPE · vinculados</option>
-          </select>
+          </select>}
           <select aria-label="Cidade" value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as cidades de ${uf}`}</option>
             {cidades.map(c => <option key={`${c.uf}-${c.cidade}`} value={c.cidade}>{c.cidade} ({fmtN(c.n)})</option>)}
@@ -1338,11 +1336,11 @@ function PageConcorrentes() {
         <div style={filtroGridSegmentoStyle}>
           {chipsCategorias.map(cat => {
             const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
-            const rotulo = cat === 'todas' ? info.label : ROTULOS_CATEGORIA_FILTRO[cat];
+            const rotulo = info.label;
             const ativa = categoria === cat;
             const n = cat === 'todas' ? lojistasComCat.length : (contCat[cat] || 0);
             return (
-              <button key={cat} onClick={() => setCategoria(cat)} style={{
+              <button key={cat} title={rotulo} onClick={() => setCategoria(cat)} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px', minWidth: 0,
                 background: ativa ? `${info.cor}22` : T.surface,
                 border: `1px solid ${ativa ? info.cor : T.line}`,

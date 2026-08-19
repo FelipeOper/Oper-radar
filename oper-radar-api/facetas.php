@@ -7,6 +7,7 @@
  * nao apenas do que foi carregado na tela.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/vehicle_taxonomy.php';
 $conn = conecta();
 
@@ -17,20 +18,13 @@ if (!in_array($statusFiltro, $statusPermitidos, true)) $statusFiltro = 'ativo';
 $whereStatus = $statusFiltro === 'todos' ? '' : " WHERE status='$statusFiltro'";
 $whereStatusA = $statusFiltro === 'todos' ? '' : " WHERE a.status='$statusFiltro'";
 
-$CATEGORIA_TIPOS = [
-  'caminhoes'   => ['Caminhao','Motorhome'],
-  'implementos' => ['Implemento','Carroceria-sobre-chassi','Trailer'],
-  'onibus_vans' => ['Onibus','Micro-onibus','Vans','Utilitarios'],
-  'leves'       => ['Carro'],
-  'agricolas'   => ['Trator','Trator-esteira','Micro-trator','Plantadeira','Colheitadeira',
-                    'Plataforma-colheitadeira','Pulverizador','Semeadeira',
-                    'Distribuidor-autopropelido','Forragem-e-feno','Florestal'],
-  'construcao'  => ['Pa-carregadeira','Escavadeira','Retro-escavadeira','Motoniveladora',
-                    'Rolo-compactador','Guindaste','Mini-carregadeira','Auto-carregavel',
-                    'Mini-escavadeira','Empilhadeira','Plataforma-elevatoria','Maquinas','Equipamentos'],
-  'pecas'       => ['Pecas-a-venda'],
-  'outros'      => ['Moto','Imoveis','Quadriciclo','Nautico'],
-];
+$CATEGORIA_TIPOS = oper_taxonomia_tipos_por_categoria();
+$categoriaAtributos = $_GET['categoria'] ?? 'todas';
+$condicaoCategoriaAtributos = '';
+if ($categoriaAtributos !== 'todas' && isset($CATEGORIA_TIPOS[$categoriaAtributos])) {
+    $tiposSeguros = array_map(fn($tipo) => "'" . $conn->real_escape_string($tipo) . "'", $CATEGORIA_TIPOS[$categoriaAtributos]);
+    $condicaoCategoriaAtributos = ' AND a.tipo IN (' . implode(',', $tiposSeguros) . ')';
+}
 
 // Contagem por tipo (uma consulta), depois soma nas categorias
 $porTipo = [];
@@ -110,6 +104,36 @@ $r = $conn->query("SELECT r.uf, a.tipo, COUNT(*) n FROM anuncio a JOIN revenda r
                    $whereTiposUf a.tipo IS NOT NULL GROUP BY r.uf, a.tipo");
 while ($row = $r->fetch_assoc()) $tiposPorUf[$row['uf']][$row['tipo']] = (int)$row['n'];
 
+// Marca e carroceria alimentam apenas os filtros dos segmentos em que fazem sentido.
+// O valor retornado continua sendo o valor real do banco, para o filtro ser exato.
+$marcas = [];
+$marcasPorUf = [];
+$carrocerias = [];
+$carroceriasPorUf = [];
+$whereAtributo = $whereStatusA ? "$whereStatusA AND" : ' WHERE';
+$r = $conn->query("SELECT r.uf, UPPER(TRIM(a.marca)) valor, COUNT(*) n
+                   FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+                   $whereAtributo a.marca IS NOT NULL AND TRIM(a.marca)<>'' $condicaoCategoriaAtributos
+                   GROUP BY r.uf, UPPER(TRIM(a.marca))");
+while ($row = $r->fetch_assoc()) {
+    $valor = $row['valor'];
+    $quantidade = (int)$row['n'];
+    $marcas[$valor] = ($marcas[$valor] ?? 0) + $quantidade;
+    $marcasPorUf[$row['uf']][$valor] = $quantidade;
+}
+$r = $conn->query("SELECT r.uf, TRIM(a.carroceria) valor, COUNT(*) n
+                   FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+                   $whereAtributo a.carroceria IS NOT NULL AND TRIM(a.carroceria)<>'' $condicaoCategoriaAtributos
+                   GROUP BY r.uf, TRIM(a.carroceria)");
+while ($row = $r->fetch_assoc()) {
+    $valor = $row['valor'];
+    $quantidade = (int)$row['n'];
+    $carrocerias[$valor] = ($carrocerias[$valor] ?? 0) + $quantidade;
+    $carroceriasPorUf[$row['uf']][$valor] = $quantidade;
+}
+uksort($marcas, 'strnatcasecmp');
+uksort($carrocerias, 'strnatcasecmp');
+
 // Tração/configuração de eixos vem da coleta de detalhe. Valores como
 // "Cavalo 6X4" e "6x4" são reunidos na mesma faceta sem inferência.
 $tracoes = [];
@@ -164,6 +188,8 @@ foreach ($REGIOES as $nomeRegiao => $ufs) {
             'nome' => $NOMES_UF[$sigla], 'regiao' => $nomeRegiao,
             'anuncios' => $porUf[$sigla] ?? 0, 'revendas' => $revendasUf[$sigla] ?? 0,
             'categorias' => $categoriasUf, 'tipos' => $tiposPorUf[$sigla] ?? [],
+            'marcas' => $marcasPorUf[$sigla] ?? [],
+            'carrocerias' => $carroceriasPorUf[$sigla] ?? [],
             'tracoes' => $tracoesPorUf[$sigla] ?? [],
             'cidades' => $cidadesPorUf[$sigla] ?? [],
             'lojistas' => $revendasPorUfLista[$sigla] ?? [],
@@ -180,6 +206,8 @@ envia_json([
     'regioes' => $regioes,
     'categorias' => $categorias,
     'subtipos' => $subtipos,
+    'marcas' => $marcas,
+    'carrocerias' => $carrocerias,
     'tracoes' => $tracoes,
     'cidades' => $cidades,
     'revendas' => $revendas,
