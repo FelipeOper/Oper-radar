@@ -27,6 +27,11 @@ presentes no banco. A normalização possui teste independente em
 `eventos.php` exige autenticação. Sem a migração `fase3-series/migrar_eventos.py`, responde
 com `EVENTOS_NAO_MIGRADOS` e não tenta improvisar uma série.
 
+`lojista_detalhe.php` alimenta o painel de concorrentes. Quando `anuncio_evento` existe,
+lista episódios de saída e reaparecimento; antes da migração, retorna um modo parcial usando
+somente o status atual. Em ambos os casos a resposta declara que saída observada não comprova
+venda. Preços resumidos passam pelas regras de qualidade de `lib/market_quality.php`.
+
 ## Compatibilidade
 
 Durante a publicação gradual, campos antigos como `preco_medio_mercado`,

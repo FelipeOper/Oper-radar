@@ -1239,6 +1239,157 @@ function PageOportunidades({ onCriarAcao }) {
 /* ============================================================
    CONCORRENTES — players e sinais de movimento observados
    ============================================================ */
+const fmtDataObservada = valor => {
+  if (!valor) return '—';
+  const data = new Date(`${String(valor).slice(0, 10)}T12:00:00`);
+  return Number.isNaN(data.getTime()) ? '—' : data.toLocaleDateString('pt-BR');
+};
+
+function ListaConcorrente({ itens, tipo }) {
+  if (!itens?.length) return <EmptyState icon={PackageOpen}
+    titulo={tipo === 'saida' ? 'Nenhuma saída observada neste recorte' : 'Nenhum anúncio ativo neste recorte'}
+    texto={tipo === 'saida'
+      ? 'A lista será preenchida quando uma ausência for confirmada pelo Radar.'
+      : 'Amplie o segmento ou consulte o estoque completo do lojista.'} />;
+
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    {itens.map((item, indice) => {
+      const preco = tipo === 'saida' ? (item.preco_saida ?? item.preco) : item.preco;
+      return <Card key={`${item.evento_id || item.anuncio_id}-${indice}`} style={{ padding: 13 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+          <div style={{ minWidth: 0 }}>
+            <strong style={{ display: 'block', fontSize: 13, lineHeight: 1.35 }}>{item.titulo}</strong>
+            <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>
+              {[item.modelo, item.ano_inicial && `${item.ano_inicial}/${item.ano_final || item.ano_inicial}`, item.tracao].filter(Boolean).join(' · ') || item.tipo}
+            </div>
+          </div>
+          <span style={{ fontFamily: T.fontMono, fontSize: 11.5, whiteSpace: 'nowrap' }}>{fmtBRL(preco)}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
+          <Tag tone={tipo === 'saida' ? 'positivo' : 'neutro'}>
+            {tipo === 'saida' ? `SAÍDA ${fmtDataObservada(item.data_saida)}` : `${fmtN(item.dias_observados)}D OBSERVADOS`}
+          </Tag>
+          {tipo === 'saida' && <Tag tone="neutro">{fmtN(item.dias_observados)}D ATÉ A SAÍDA</Tag>}
+          {item.reapareceu && <Tag tone="alerta">REAPARECEU</Tag>}
+          {item.carroceria && <Tag tone="neutro">{item.carroceria}</Tag>}
+        </div>
+        {item.url && <a href={item.url} target="_blank" rel="noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: T.signal, textDecoration: 'none', fontSize: 10.5, marginTop: 9 }}>
+          Ver anúncio <ExternalLink size={10} />
+        </a>}
+      </Card>;
+    })}
+  </div>;
+}
+
+function PainelLojista({ lojista, categoria, onClose }) {
+  const [dados, setDados] = useState(null);
+  const [erro, setErro] = useState('');
+  const [aba, setAba] = useState('resumo');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDados(null); setErro(''); setAba('resumo');
+    fetch(`${API_BASE_URL}/lojista_detalhe.php?id=${lojista.id}&categoria=${categoria}`, {
+      credentials: 'same-origin', signal: controller.signal,
+    })
+      .then(async resposta => {
+        const payload = await resposta.json().catch(() => ({}));
+        if (!resposta.ok) throw new Error(payload.erro || 'Não foi possível carregar o histórico do lojista.');
+        return payload;
+      })
+      .then(setDados)
+      .catch(e => { if (e.name !== 'AbortError') setErro(e.message); });
+    return () => controller.abort();
+  }, [lojista.id, categoria]);
+
+  useEffect(() => {
+    const fechar = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', fechar);
+    return () => window.removeEventListener('keydown', fechar);
+  }, [onClose]);
+
+  const resumo = dados?.resumo;
+  const historico = dados?.historico_eventos;
+  const recorte = categoria === 'todas' ? 'Todo o estoque' : CATEGORIAS[categoria]?.label || 'Segmento selecionado';
+  const abas = [
+    ['resumo', 'Resumo'],
+    ['estoque', `Estoque · ${fmtN(resumo?.ativos)}`],
+    ['saidas', `Saídas · ${fmtN(resumo?.saidas_observadas)}`],
+  ];
+
+  return <div onClick={onClose} role="presentation" style={{
+    position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2, 6, 12, .68)',
+    backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end',
+  }}>
+    <aside onClick={e => e.stopPropagation()} role="dialog" aria-modal="true"
+      aria-label={`Histórico observado de ${lojista.nome}`} style={{
+        width: 'min(720px, 100vw)', height: '100%', overflowY: 'auto', background: T.bg,
+        borderLeft: `1px solid ${T.line}`, boxShadow: '-20px 0 60px rgba(0,0,0,.35)', color: T.ink,
+      }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 3, background: `${T.bg}F2`, backdropFilter: 'blur(12px)', borderBottom: `1px solid ${T.line}`, padding: '14px 18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: T.fontMono, fontSize: 10, color: T.signal }}>CONCORRENTE · {recorte.toUpperCase()}</div>
+            <strong style={{ fontFamily: T.fontDisplay, fontSize: 19, display: 'block', marginTop: 4 }}>{lojista.nome}</strong>
+            <div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}><MapPin size={11} style={{ verticalAlign: -2 }} /> {lojista.cidade}/{lojista.uf}</div>
+          </div>
+          <button onClick={onClose} aria-label="Fechar painel do lojista" style={{ ...inputStyle, padding: 8, cursor: 'pointer', flexShrink: 0 }}><X size={18} /></button>
+        </div>
+        <div role="tablist" aria-label="Seções do histórico do lojista" style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto' }}>
+          {abas.map(([id, label]) => <button key={id} role="tab" aria-selected={aba === id} onClick={() => setAba(id)} style={{
+            ...inputStyle, cursor: 'pointer', padding: '7px 10px', whiteSpace: 'nowrap', fontSize: 11,
+            borderColor: aba === id ? T.signal : T.line, color: aba === id ? T.signal : T.inkMuted,
+          }}>{label}</button>)}
+        </div>
+      </div>
+
+      <div style={{ padding: 18 }}>
+        {!dados && !erro && <Card style={{ textAlign: 'center', color: T.inkMuted }}>Carregando histórico observado…</Card>}
+        {erro && <div role="alert" style={{ padding: 12, borderRadius: 9, color: T.alert, background: `${T.alert}15`, border: `1px solid ${T.alert}40` }}>{erro}</div>}
+
+        {dados && aba === 'resumo' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 8 }}>
+            <Kpi label="Estoque ativo" value={fmtN(resumo.ativos)} sub="anúncios no portal" />
+            <Kpi label="Saídas observadas" value={fmtN(resumo.saidas_observadas)} sub={`${fmtN(resumo.saidas_30d)} nos últimos 30 dias`} tone={T.positive} />
+            <Kpi label="Tempo mediano" value={resumo.mediana_dias_ate_saida == null ? '—' : `${fmtN(resumo.mediana_dias_ate_saida)}d`} sub="observado até a saída" />
+            <Kpi label="Preço mediano" value={fmtBRL(resumo.preco_mediano_ativo)} sub={`${fmtN(resumo.preco_ativo_amostra)} preços qualificados · confiança ${resumo.preco_ativo_confianca}`} />
+          </div>
+
+          <Card style={{ padding: 15 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div>
+                <strong style={{ fontSize: 13 }}>Qualidade do histórico</strong>
+                <div style={{ color: T.inkMuted, fontSize: 11, marginTop: 4 }}>{dados.confianca.motivo}</div>
+              </div>
+              <Tag tone={dados.confianca.nivel === 'alta' ? 'positivo' : dados.confianca.nivel === 'media' ? 'sinal' : 'alerta'}>
+                CONFIANÇA {String(dados.confianca.nivel).toUpperCase()}
+              </Tag>
+            </div>
+            <div style={{ color: T.inkMuted, fontSize: 11, lineHeight: 1.55, marginTop: 10 }}>
+              {historico.disponivel
+                ? `${fmtN(historico.cobertura_dias)} dias de eventos · ${fmtN(resumo.reaparecimentos)} reaparecimentos · cobertura de ${fmtDataObservada(historico.cobertura_inicio)} a ${fmtDataObservada(historico.cobertura_fim)}.`
+                : 'O painel está usando o estado atual dos anúncios. Reaparecimentos e episódios anteriores ficarão disponíveis após a materialização segura dos eventos.'}
+            </div>
+          </Card>
+
+          <div role="note" style={{ padding: 12, borderRadius: 9, background: `${T.alert}10`, border: `1px solid ${T.alert}30`, color: T.inkMuted, fontSize: 11.5, lineHeight: 1.5 }}>
+            {dados.nota} O preço exibido é o último preço publicado, não o valor de uma transação.
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {dados.lojista.url_perfil && <a href={dados.lojista.url_perfil} target="_blank" rel="noreferrer" style={{ ...inputStyle, textDecoration: 'none', color: T.signal, display: 'inline-flex', gap: 5, alignItems: 'center' }}>Estoque no portal <ExternalLink size={12} /></a>}
+            {dados.lojista.telefone && <span style={{ ...inputStyle, color: T.inkMuted }}>{dados.lojista.telefone}</span>}
+          </div>
+        </div>}
+
+        {dados && aba === 'estoque' && <ListaConcorrente itens={dados.estoque_ativo} tipo="estoque" />}
+        {dados && aba === 'saidas' && <ListaConcorrente itens={dados.saidas_observadas} tipo="saida" />}
+      </div>
+    </aside>
+  </div>;
+}
+
 function PageConcorrentes() {
   const [regiao, setRegiao] = useState('todas');
   const [uf, setUf] = useState('todas');
@@ -1251,6 +1402,7 @@ function PageConcorrentes() {
   const [cidade, setCidade] = useState('todas');
   const [ordem, setOrdem] = useState('ativos');
   const [mostrados, setMostrados] = useState(48);
+  const [lojistaAberto, setLojistaAberto] = useState(null);
   const sentinelaRef = useRef(null);
 
   const lojistas = data?.lojistas || [];
@@ -1400,7 +1552,7 @@ function PageConcorrentes() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
         {filtrados.slice(0, mostrados).map((l, i) => (
-          <Card key={l.id} style={{ padding: 18 }}>
+          <Card key={l.id} onClick={() => setLojistaAberto(l)} style={{ padding: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontFamily: T.fontMono, fontSize: 11, color: i < 3 ? T.signal : T.inkMuted }}>#{String(i + 1).padStart(2, '0')}</span>
               <Tag tone={l.saidas_30d > 3 ? 'positivo' : l.ativos > 30 ? 'sinal' : 'neutro'}>
@@ -1446,7 +1598,7 @@ function PageConcorrentes() {
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11.5 }}>
               {l.url_perfil && (
-                <a href={l.url_perfil} target="_blank" rel="noreferrer"
+                <a href={l.url_perfil} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
                   style={{ color: T.signal, display: 'inline-flex', gap: 4, alignItems: 'center', textDecoration: 'none' }}>
                   Ver estoque <ExternalLink size={11} />
                 </a>
@@ -1455,6 +1607,7 @@ function PageConcorrentes() {
                 <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 11 }}>· {l.telefone}</span>
               )}
             </div>
+            <div style={{ marginTop: 10, color: T.signal, fontFamily: T.fontMono, fontSize: 9.5 }}>ABRIR HISTÓRICO OBSERVADO →</div>
           </Card>
         ))}
       </div>
@@ -1474,6 +1627,7 @@ function PageConcorrentes() {
 
       {!data && !erro && <EmptyState icon={Building2} titulo="Carregando concorrentes..." texto="Buscando a lista de revendas monitoradas na API." />}
       {erro && <EmptyState icon={Building2} titulo="API indisponível" texto="Não foi possível carregar as revendas agora. Tente novamente em instantes." />}
+      {lojistaAberto && <PainelLojista lojista={lojistaAberto} categoria={categoria} onClose={() => setLojistaAberto(null)} />}
     </div>
   );
 }

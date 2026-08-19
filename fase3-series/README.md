@@ -20,6 +20,7 @@ o bloco de cron de forma idempotente.
 - `migrar_eventos.py`: simula por padrão; com `--aplicar`, cria `anuncio_evento` e adiciona
   colunas semânticas sem remover as antigas.
 - `materializar_eventos.py`: simula por padrão; com `--aplicar`, grava eventos idempotentes.
+  Aceita um dia (`--dia`) ou intervalo inclusivo (`--inicio` e `--fim`) de até 366 dias.
 - `executar_eventos_job.sh`: executor protegido, preparado mas não agendado.
 - `oper-radar-api/eventos.php`: leitura autenticada por anúncio ou resumo diário.
 
@@ -42,8 +43,9 @@ em falsa saída.
 2. Simular: `python3 migrar_eventos.py`.
 3. Aplicar a migração: `python3 migrar_eventos.py --aplicar`.
 4. Simular um dia explícito: `python3 materializar_eventos.py --dia=AAAA-MM-DD`.
-5. Aplicar manualmente e conferir contagens.
-6. Publicar `eventos.php` e o executor.
-7. Só então decidir se o job será agendado após o snapshot diário.
+5. Simular o histórico disponível: `python3 materializar_eventos.py --inicio=AAAA-MM-DD --fim=AAAA-MM-DD`.
+6. Aplicar manualmente o mesmo intervalo e conferir contagens.
+7. Publicar `eventos.php` e o executor.
+8. Só então decidir se o job será agendado após o snapshot diário.
 
 Nada desta nova fundação é ativado no servidor apenas por existir no repositório.

@@ -64,6 +64,22 @@ class EventosSeriesTest(unittest.TestCase):
     def test_data_cli_iso(self):
         self.assertEqual(date(2026, 8, 19), date.fromisoformat("2026-08-19"))
 
+    def test_intervalo_historico_inclusivo_e_limitado(self):
+        dias = self.modulo.dias_processamento(
+            inicio=date(2026, 8, 3), fim=date(2026, 8, 5)
+        )
+        self.assertEqual(
+            [date(2026, 8, 3), date(2026, 8, 4), date(2026, 8, 5)], dias
+        )
+        with self.assertRaisesRegex(ValueError, "não ambos"):
+            self.modulo.dias_processamento(
+                dia=date(2026, 8, 5), inicio=date(2026, 8, 3), fim=date(2026, 8, 5)
+            )
+        with self.assertRaisesRegex(ValueError, "366"):
+            self.modulo.dias_processamento(
+                inicio=date(2025, 1, 1), fim=date(2026, 1, 2)
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
