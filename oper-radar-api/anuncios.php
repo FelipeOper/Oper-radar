@@ -8,6 +8,7 @@
  * infinito e pras contagens honestas.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_quality.php';
 $conn = conecta();
 
 $REGIOES = [
@@ -35,6 +36,7 @@ $CATEGORIA_TIPOS = [
 
 $limit  = min(max((int)($_GET['limit'] ?? 60), 1), 200);
 $offset = max((int)($_GET['offset'] ?? 0), 0);
+$somenteAbaixoFipe = (($_GET['abaixo_fipe'] ?? '') === '1');
 
 $where = []; $params = []; $types = '';
 
@@ -58,8 +60,12 @@ if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GE
 if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
 if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
-if (($_GET['abaixo_fipe'] ?? '') === '1') {
-    $where[] = 'a.preco IS NOT NULL AND f.preco IS NOT NULL AND a.preco < f.preco';
+if ($somenteAbaixoFipe) {
+    $where[] = "a.preco IS NOT NULL AND f.preco IS NOT NULL
+                AND a.preco >= f.preco * " . OPER_RADAR_RAZAO_MIN_FIPE . "
+                AND a.preco < f.preco
+                AND UPPER(CONCAT_WS(' ', a.titulo, a.preco_texto_bruto))
+                    NOT REGEXP 'PARCEL|LEIL|LANCE|CONSORC|MENSAL|A[[:space:]]+PARTIR[[:space:]]+DE'";
 }
 if (!empty($_GET['fipe_confianca']) && in_array($_GET['fipe_confianca'], ['alto', 'medio'], true)) {
     $where[] = 'a.fipe_match_confianca = ?';
@@ -120,16 +126,17 @@ $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo,
                COALESCE(CONCAT(a.quilometragem_manual, ' km'), a.km_ou_horas) AS quilometragem,
                CASE WHEN a.quilometragem_manual IS NOT NULL THEN 'curadoria'
                     WHEN a.km_ou_horas IS NOT NULL AND a.km_ou_horas<>'' THEN 'coleta' ELSE NULL END AS quilometragem_origem,
-               a.preco, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
+               a.preco, a.preco_texto_bruto, a.status, a.primeira_vez_visto, a.ultima_vez_ativo, a.data_remocao,
+               a.fipe_preco_id,
                a.fipe_match_status, a.fipe_match_confianca, a.fipe_match_motivo,
                a.fipe_vinculo_origem, COALESCE(fs.total, 0) AS fipe_sugestoes,
                f.preco AS preco_fipe, f.codigo_fipe,
                f.ano_codigo AS ano_fipe, f.mes_referencia AS referencia_fipe,
                fm.marca_fipe, fm.modelo_fipe,
                ROUND((a.preco - f.preco) / NULLIF(f.preco, 0) * 100, 1) AS desvio_fipe_pct,
-               mc.anuncios_comparaveis, mc.preco_medio_mercado,
-               mc.menor_preco_mercado, mc.maior_preco_mercado,
-               ROUND((a.preco - mc.preco_medio_mercado) / NULLIF(mc.preco_medio_mercado, 0) * 100, 1) AS desvio_mercado_pct,
+               0 AS anuncios_comparaveis, NULL AS preco_medio_mercado,
+               NULL AS menor_preco_mercado, NULL AS maior_preco_mercado,
+               NULL AS desvio_mercado_pct,
                r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf
         FROM anuncio a
         JOIN revenda r ON r.id = a.revenda_id
@@ -139,21 +146,16 @@ $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo,
             SELECT anuncio_id, COUNT(*) AS total
             FROM anuncio_fipe_sugestao GROUP BY anuncio_id
         ) fs ON fs.anuncio_id=a.id
-        LEFT JOIN (
-            SELECT fipe_preco_id, COUNT(*) AS anuncios_comparaveis,
-                   AVG(NULLIF(preco, 0)) AS preco_medio_mercado,
-                   MIN(NULLIF(preco, 0)) AS menor_preco_mercado,
-                   MAX(NULLIF(preco, 0)) AS maior_preco_mercado
-            FROM anuncio
-            WHERE status='ativo' AND fipe_preco_id IS NOT NULL AND preco > 0
-            GROUP BY fipe_preco_id
-        ) mc ON mc.fipe_preco_id=a.fipe_preco_id
         $clausula
         ORDER BY $ordem
         LIMIT ? OFFSET ?";
 $paramsPag = $params; $typesPag = $types;
-$paramsPag[] = $limit;  $typesPag .= 'i';
-$paramsPag[] = $offset; $typesPag .= 'i';
+// O filtro estatístico é aplicado após a consulta. Buscamos candidatos suficientes
+// para que um preço inválido no início não esconda oportunidades válidas posteriores.
+$limiteSql = $somenteAbaixoFipe ? 1000 : $limit;
+$offsetSql = $somenteAbaixoFipe ? 0 : $offset;
+$paramsPag[] = $limiteSql;  $typesPag .= 'i';
+$paramsPag[] = $offsetSql; $typesPag .= 'i';
 
 $stmt = $conn->prepare($sql);
 $stmt->bind_param($typesPag, ...$paramsPag);
@@ -180,8 +182,27 @@ while ($row = $res->fetch_assoc()) {
     $anuncios[] = $row;
 }
 
+$estatisticas = mercado_estatisticas_por_fipe($conn, array_column($anuncios, 'fipe_preco_id'));
+foreach ($anuncios as &$row) {
+    $fipeId = (int)($row['fipe_preco_id'] ?? 0);
+    $row['fipe_preco_id'] = $fipeId ?: null;
+    mercado_aplica_estatisticas($row, $estatisticas[$fipeId] ?? null);
+}
+unset($row);
+
+if ($somenteAbaixoFipe) {
+    $totalBruto = $total;
+    $anuncios = array_values(array_filter($anuncios, fn($row) =>
+        $row['preco_qualidade_status'] === 'valido'
+        && $row['mercado_amostra_suficiente']
+    ));
+    $total = count($anuncios);
+    $anuncios = array_slice($anuncios, $offset, $limit);
+}
+
 envia_json([
     'total' => $total,               // total no banco com os filtros aplicados
+    'total_bruto' => $totalBruto ?? $total,
     'retornados' => count($anuncios),
     'offset' => $offset,
     'limit' => $limit,

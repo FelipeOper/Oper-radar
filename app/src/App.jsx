@@ -19,6 +19,9 @@ import {
   DEFAULT_DASHBOARD_LAYOUT, layoutFromPreset, moveDashboardItem,
   normalizeDashboardLayout,
 } from './dashboardLayout.js';
+import {
+  classificaEmissao, filtraOrdenaEstoque, rotuloTempoObservado, textoEmissao,
+} from './domainRules.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
@@ -94,7 +97,7 @@ function mapeiaAnuncioReal(a) {
   const dias = Math.max(0, Math.round((Date.now() - new Date(a.primeira_vez_visto)) / 86400000));
   const anoFabricacao = a.ano_fabricacao ?? a.ano_inicial ?? null;
   const anoModelo = a.ano_modelo ?? a.ano_final ?? anoFabricacao;
-  const emissao = classificaEmissao(a.titulo, a.url, anoFabricacao);
+  const emissao = classificaEmissao(a.tipo, a.titulo, a.url, anoFabricacao);
   return {
     dbId: a.anuncio_id,
     id: a.anuncio_portal_id,
@@ -125,10 +128,17 @@ function mapeiaAnuncioReal(a) {
     quilometragem: a.quilometragem || null,
     quilometragemOrigem: a.quilometragem_origem || null,
     precoMercado: a.preco_medio_mercado ?? null,
+    precoMedianaMercado: a.preco_mediana_mercado ?? null,
+    precoP25Mercado: a.preco_p25_mercado ?? null,
+    precoP75Mercado: a.preco_p75_mercado ?? null,
     menorMercado: a.menor_preco_mercado ?? null,
     maiorMercado: a.maior_preco_mercado ?? null,
     desvioMercadoPct: a.desvio_mercado_pct ?? null,
     mercadoTotal: Number(a.anuncios_comparaveis || 0),
+    mercadoConfianca: a.mercado_confianca || 'insuficiente',
+    mercadoSuficiente: Boolean(a.mercado_amostra_suficiente),
+    precoQualidadeStatus: a.preco_qualidade_status || 'valido',
+    precoQualidadeMotivo: a.preco_qualidade_motivo || null,
     revendaId: a.revenda_id ?? null,
     revenda: a.revenda,
     cidade: a.cidade,
@@ -139,15 +149,6 @@ function mapeiaAnuncioReal(a) {
     status: STATUS_DB_PARA_UI[a.status] || 'ativo',
     dias,
   };
-}
-
-function classificaEmissao(titulo, url, anoFabricacao) {
-  const texto = `${titulo || ''} ${url || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  if (/\b(?:E|EURO)\s*6\b|\b(?:PROCONVE\s*)?P8\b/.test(texto)) return { norma: 'E6', origem: 'informado' };
-  if (/\b(?:E|EURO)\s*5\b|\b(?:PROCONVE\s*)?P7\b/.test(texto)) return { norma: 'E5', origem: 'informado' };
-  if (Number(anoFabricacao) >= 2023) return { norma: 'E6', origem: 'provável' };
-  if (Number(anoFabricacao) >= 2012 && Number(anoFabricacao) <= 2022) return { norma: 'E5', origem: 'provável' };
-  return null;
 }
 
 const fmtBRL = v => v == null ? 'A consultar' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -284,7 +285,8 @@ function textoStatusFipe(anuncio) {
 
 function ComparativoAnuncio({ anuncio, compacto = false }) {
   const temFipe = Number(anuncio.precoFipe || 0) > 0;
-  const temMercado = Number(anuncio.precoMercado || 0) > 0 && anuncio.mercadoTotal > 0;
+  const precoMercado = anuncio.precoMedianaMercado ?? anuncio.precoMercado;
+  const temMercado = Number(precoMercado || 0) > 0 && anuncio.mercadoSuficiente;
   const desvioFipe = anuncio.desvioFipePct == null ? null : Number(anuncio.desvioFipePct);
   const desvioMercado = anuncio.desvioMercadoPct == null ? null : Number(anuncio.desvioMercadoPct);
   const tom = valor => valor == null ? T.inkMuted : valor < 0 ? T.positive : valor >= 20 ? T.alert : T.signal;
@@ -305,10 +307,11 @@ function ComparativoAnuncio({ anuncio, compacto = false }) {
       </div>
       {temMercado && <div style={{ borderLeft: `1px solid ${T.line}`, paddingLeft: 8 }}>
         <div style={{ color: T.inkMuted, fontSize: 9.5, letterSpacing: '0.05em', fontFamily: T.fontMono }}>MERCADO EQUIVALENTE</div>
-        <div style={{ color: T.ink, fontFamily: T.fontMono, fontSize: compacto ? 11 : 12, marginTop: 3 }}>{fmtBRL(anuncio.precoMercado)}</div>
-        <div style={{ color: tom(desvioMercado), fontSize: 10.5, marginTop: 2 }}>{diferenca(desvioMercado)} · {fmtN(anuncio.mercadoTotal)} ofertas</div>
+        <div style={{ color: T.ink, fontFamily: T.fontMono, fontSize: compacto ? 11 : 12, marginTop: 3 }}>{fmtBRL(precoMercado)}</div>
+        <div style={{ color: tom(desvioMercado), fontSize: 10.5, marginTop: 2 }}>{diferenca(desvioMercado)} · {fmtN(anuncio.mercadoTotal)} ofertas · confiança {anuncio.mercadoConfianca}</div>
       </div>}
     </div>
+    {!temMercado && <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 8 }}>Mercado equivalente sem amostra mínima para comparação.</div>}
   </div>;
 }
 
@@ -403,7 +406,8 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
   const a = dados?.anuncio;
   const diferenca = (valor, base) => valor && base ? ((valor - base) / base) * 100 : null;
   const desvioFipe = a ? diferenca(Number(a.preco), Number(a.preco_fipe)) : null;
-  const desvioMercado = a ? diferenca(Number(a.preco), Number(a.preco_medio_mercado)) : null;
+  const referenciaMercado = a?.mercado_amostra_suficiente ? Number(a.preco_mediana_mercado) : null;
+  const desvioMercado = a ? diferenca(Number(a.preco), referenciaMercado) : null;
   const pct = valor => valor == null || !Number.isFinite(valor) ? '—' : `${valor > 0 ? '+' : ''}${valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
   return <div onClick={onClose} role="presentation" style={{
@@ -445,7 +449,7 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
                 ['Cor', a.cor || 'Não informado'],
                 ['Carroceria', a.carroceria || 'Não informado'],
                 ['Tração', a.tracao || 'Não informado'],
-                ['Emissões', (() => { const e = classificaEmissao(a.titulo, a.url, a.ano_fabricacao || a.ano_inicial); return e ? `${e.norma} · ${e.origem}` : 'Não identificada'; })()],
+                ['Emissões', textoEmissao(classificaEmissao(a.tipo, a.titulo, a.url, a.ano_fabricacao || a.ano_inicial))],
                 ['Preço', fmtBRL(a.preco)],
                 ['KM / uso', a.quilometragem_exibida || 'Não informado'],
                 ['Origem KM', a.quilometragem_origem === 'curadoria' ? 'Curadoria' : a.quilometragem_origem === 'coleta' ? 'Coleta' : '—'],
@@ -474,8 +478,8 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
               {[
                 ['ANÚNCIO', fmtBRL(a.preco), 'Preço publicado'],
                 ['FIPE', fmtBRL(a.preco_fipe), `${pct(desvioFipe)} vs anúncio`],
-                ['MERCADO', fmtBRL(a.preco_medio_mercado), `${pct(desvioMercado)} vs anúncio`],
-                ['OFERTAS', fmtN(a.anuncios_comparaveis || 0), a.fipe_preco_id ? 'mesma referência' : 'sem vínculo'],
+                ['MERCADO', referenciaMercado ? fmtBRL(referenciaMercado) : 'Amostra insuficiente', referenciaMercado ? `${pct(desvioMercado)} vs mediana` : 'sem referência estatística segura'],
+                ['OFERTAS', fmtN(a.anuncios_comparaveis || 0), a.fipe_preco_id ? `mesma referência · confiança ${a.mercado_confianca || 'insuficiente'}` : 'sem vínculo'],
               ].map(([label, value, sub]) => <Card key={label} style={{ padding: 13 }}>
                 <div style={{ color: T.inkMuted, fontSize: 9.5, fontFamily: T.fontMono }}>{label}</div>
                 <div style={{ fontFamily: T.fontMono, fontSize: 15, marginTop: 7 }}>{value}</div>
@@ -643,7 +647,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
           const disponivel = nome === 'todas' || Number(quantidade || 0) > 0;
           const ativo = regiao === nome;
           return (
-            <button key={nome} disabled={!disponivel} onClick={() => disponivel && onRegiao(nome)} style={{
+            <button key={nome} disabled={!disponivel} aria-pressed={ativo} onClick={() => disponivel && onRegiao(nome)} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px',
               background: ativo ? `${T.steel}22` : T.surface2, border: `1px solid ${ativo ? T.steel : T.line}`,
               borderRadius: 10, color: ativo ? T.steel : T.ink,
@@ -662,7 +666,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
         <div style={{ color: T.inkMuted, fontSize: 12.5, padding: '8px 2px' }}>Escolha uma região para ver seus estados.</div>
       ) : (
         <div style={filtroGridUfStyle}>
-          <button onClick={() => onUf('todas')} style={{
+          <button aria-pressed={uf === 'todas'} onClick={() => onUf('todas')} style={{
             minHeight: 40, padding: '7px 9px', borderRadius: 10, cursor: 'pointer',
             background: uf === 'todas' ? `${T.signal}20` : T.surface2,
             border: `1px solid ${uf === 'todas' ? T.signal : T.line}`,
@@ -675,7 +679,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
             const disponivel = quantidade > 0;
             const ativo = uf === sigla;
             return (
-              <button key={sigla} disabled={!disponivel} onClick={() => disponivel && onUf(sigla)} style={{
+              <button key={sigla} disabled={!disponivel} aria-pressed={ativo} onClick={() => disponivel && onUf(sigla)} style={{
                 minHeight: 40, padding: '7px 9px', borderRadius: 10,
                 background: ativo ? `${T.signal}20` : T.surface2,
                 border: `1px solid ${ativo ? T.signal : T.line}`,
@@ -974,6 +978,16 @@ function PageMercado({ sessao }) {
 
   return (
     <div>
+      <div style={{ marginBottom: 12 }}>
+        <label htmlFor="mercado-busca" style={rotuloFiltroStyle}>BUSCA PRINCIPAL</label>
+        <div style={{ position: 'relative', marginTop: 6 }}>
+          <Search size={14} aria-hidden="true" style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
+          <input id="mercado-busca" value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Buscar veículo, marca ou modelo..." aria-label="Buscar veículo, marca ou modelo"
+            style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
+        </div>
+      </div>
+
       <SeletorGeografico facetas={facetas} regiao={regiao} uf={uf}
         onRegiao={valor => { setRegiao(valor); setUf('todas'); setCidade('todas'); setRevendaId('todas'); }}
         onUf={valor => { setUf(valor); setCidade('todas'); setRevendaId('todas'); }} />
@@ -986,7 +1000,7 @@ function PageMercado({ sessao }) {
           const ativa = categoria === cat;
           const n = cat === 'todas' ? totalGeral : (catCounts[cat] || 0);
           return (
-            <button key={cat} onClick={() => { setCategoria(cat); setTipo('todos'); }} style={{
+            <button key={cat} aria-pressed={ativa} onClick={() => { setCategoria(cat); setTipo('todos'); }} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px', minWidth: 0,
               background: ativa ? `${info.cor}22` : T.surface,
               border: `1px solid ${ativa ? info.cor : T.line}`,
@@ -1001,21 +1015,16 @@ function PageMercado({ sessao }) {
         })}
       </div>
 
-      <div style={{ ...rotuloFiltroStyle, marginTop: 2 }}>4. BUSCA E ORDENAÇÃO</div>
+      <div style={{ ...rotuloFiltroStyle, marginTop: 2 }}>4. ORDENAÇÃO E FILTROS</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <Search size={14} style={{ position: 'absolute', top: 12, left: 12, color: T.inkMuted }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar veículo, marca ou modelo..."
-            style={{ ...inputStyle, width: '100%', paddingLeft: 34 }} />
-        </div>
-        <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, flex: '1 1 190px' }}>
+        <select aria-label="Ordenar anúncios" value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, flex: '1 1 190px' }}>
           <option value="aleatorio">Amostra do mercado</option>
           <option value="recente">Mais recentes</option>
           <option value="preco_asc">Menor preço</option>
           <option value="preco_desc">Maior preço</option>
-          <option value="mais_tempo">Há mais tempo no ar</option>
+          <option value="mais_tempo">Observados há mais tempo</option>
         </select>
-        <button onClick={() => setMaisFiltros(!maisFiltros)} style={{
+        <button aria-expanded={maisFiltros} aria-controls="mercado-filtros-avancados" onClick={() => setMaisFiltros(!maisFiltros)} style={{
           ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', flex: '0 1 auto',
           borderColor: filtrosAtivos ? T.signal : T.line, color: filtrosAtivos ? T.signal : T.ink,
         }}>
@@ -1027,34 +1036,34 @@ function PageMercado({ sessao }) {
       </div>
 
       {maisFiltros && (
-        <Card style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
-          <select value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle} disabled={categoria === 'todas'}>
+        <Card id="mercado-filtros-avancados" style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+          <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle} disabled={categoria === 'todas'}>
             <option value="todos">{categoria === 'todas' ? 'Escolha uma categoria' : 'Todos os subtipos'}</option>
             {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{s.tipo} ({s.n})</option>)}
           </select>
-          <select value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
+          <select aria-label="Situação do anúncio" value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
             <option value="ativo">No mercado</option>
             <option value="em_verificacao">Em verificação</option>
             <option value="saida_detectada">Saídas detectadas</option>
             <option value="todos">Todos (histórico)</option>
           </select>
-          <select value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={inputStyle}>
+          <select aria-label="Situação do vínculo FIPE" value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={inputStyle}>
             <option value="todos">FIPE · todos</option>
             <option value="revisar">FIPE · precisa revisar</option>
             <option value="com_sugestao">FIPE · com sugestão</option>
             <option value="sem_sugestao">FIPE · dados insuficientes</option>
             <option value="vinculado">FIPE · vinculados</option>
           </select>
-          <select value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+          <select aria-label="Cidade" value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as cidades de ${uf}`}</option>
             {cidades.map(c => <option key={`${c.uf}-${c.cidade}`} value={c.cidade}>{c.cidade} ({fmtN(c.n)})</option>)}
           </select>
-          <select value={revendaId} onChange={e => setRevendaId(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+          <select aria-label="Revenda" value={revendaId} onChange={e => setRevendaId(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as revendas de ${uf}`}</option>
             {revendas.map(r => <option key={r.id} value={String(r.id)}>{r.nome} · {r.cidade} ({fmtN(r.n)})</option>)}
           </select>
-          <input type="number" value={precoMin} onChange={e => setPrecoMin(e.target.value)} placeholder="Preço mín. (R$)" style={inputStyle} />
-          <input type="number" value={precoMax} onChange={e => setPrecoMax(e.target.value)} placeholder="Preço máx. (R$)" style={inputStyle} />
+          <input aria-label="Preço mínimo" type="number" value={precoMin} onChange={e => setPrecoMin(e.target.value)} placeholder="Preço mín. (R$)" style={inputStyle} />
+          <input aria-label="Preço máximo" type="number" value={precoMax} onChange={e => setPrecoMax(e.target.value)} placeholder="Preço máx. (R$)" style={inputStyle} />
         </Card>
       )}
 
@@ -1069,10 +1078,7 @@ function PageMercado({ sessao }) {
             <Card key={`${a.dbId}-${a.id}`} onClick={() => setAnuncioAberto(a)} style={{ padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                 <Tag tone={a.status === 'saida_detectada' ? 'positivo' : a.status === 'em_verificacao' ? 'alerta' : a.dias >= 30 ? 'sinal' : 'neutro'}>
-                  {a.status === 'saida_detectada' ? 'SAIU DO PORTAL'
-                    : a.status === 'em_verificacao' ? 'EM VERIFICAÇÃO'
-                    : a.dias >= 30 ? `${a.dias}D NO AR`
-                    : a.dias < 2 ? 'NOVO' : 'ATIVO'}
+                  {rotuloTempoObservado(a.dias, a.status)}
                 </Tag>
                 <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>#{a.id}</span>
               </div>
@@ -1084,7 +1090,7 @@ function PageMercado({ sessao }) {
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: T.inkMuted, fontSize: 10.5, marginBottom: 7 }}>
                 {a.ano && <span title="Fabricação / modelo">Fab/Mod {a.ano}</span>}
-                {a.emissao && <span title={a.emissao.origem === 'informado' ? 'Norma informada no anúncio' : 'Estimativa pelo ano de fabricação'}>{a.emissao.norma} · {a.emissao.origem}</span>}
+                {a.emissao?.norma && <span title={a.emissao.origem === 'informado' ? 'Norma informada no anúncio' : 'Inferência pelo ano de fabricação'}>{textoEmissao(a.emissao)}</span>}
                 {a.quilometragem && <span><Ruler size={10} style={{ verticalAlign: -1 }} /> {a.quilometragem}{a.quilometragemOrigem === 'curadoria' ? ' · validado' : ''}</span>}
                 {a.cor && <span>{a.cor}</span>}
                 <span style={{ color: T.steel }}>Clique para comparar</span>
@@ -1140,19 +1146,20 @@ function PageOportunidades({ onCriarAcao }) {
   const lista = useMemo(() => (data?.anuncios || []).map(mapeiaAnuncioReal), [data]);
   const maduros = lista.filter(a => a.dias >= 30).slice(0, 15);
   const { data: fipeData, erro: fipeErro } = useApi(`anuncios.php?status=ativo&abaixo_fipe=1&ordem=desvio_fipe&limit=20${escopo}`);
-  const abaixoFipe = useMemo(() => (fipeData?.anuncios || []).map(mapeiaAnuncioReal), [fipeData]);
+  const abaixoFipe = useMemo(() => (fipeData?.anuncios || []).map(mapeiaAnuncioReal)
+    .filter(a => a.mercadoSuficiente && a.precoQualidadeStatus === 'valido'), [fipeData]);
 
   return (
     <div>
       <SeletorGeografico facetas={facetas} regiao={regiao} uf={uf}
         onRegiao={valor => { setRegiao(valor); setUf('todas'); }} onUf={setUf} />
-      <SectionTitle sub="Anúncio parado há 30+ dias: o vendedor tende a aceitar negociação — oportunidade de compra abaixo do anunciado">
-        Anúncios maduros no mercado
+      <SectionTitle sub="Tempo contado desde a primeira observação pelo Radar; não representa a data real de publicação nem garante disposição para negociar">
+        Anúncios observados há mais tempo
       </SectionTitle>
       {!data && !erro && <EmptyState icon={Timer} titulo="Consultando o mercado..." texto="Buscando os anúncios que estão no ar há mais tempo." />}
       {data && maduros.length === 0 && (
-        <EmptyState icon={Timer} titulo="Ainda sem anúncios com 30+ dias registrados"
-          texto={`O mais antigo do radar hoje está há ${lista[0]?.dias ?? 0} dias. A idade só conta a partir da primeira coleta (07/jul) — conforme os dias passam, os anúncios realmente parados aparecem aqui.`} />
+        <EmptyState icon={Timer} titulo="Ainda sem anúncios observados por 30+ dias"
+          texto={`O mais antigo foi observado pelo Radar há ${lista[0]?.dias ?? 0} dias. Isso não informa quando o anúncio foi publicado originalmente.`} />
       )}
       {maduros.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1164,8 +1171,8 @@ function PageOportunidades({ onCriarAcao }) {
                 <div style={{ fontSize: 12, color: T.inkMuted }}>{a.revenda} · {a.cidade}/{a.uf} · {fmtBRL(a.preco)}</div>
                 <ComparativoAnuncio anuncio={a} compacto />
               </div>
-              <Tag tone="alerta">{a.dias} DIAS NO AR</Tag>
-              <button onClick={() => onCriarAcao(`Negociar: ${a.titulo} (${a.revenda}, ${a.dias}d no ar)`)}
+              <Tag tone="alerta">OBSERVADO HÁ {a.dias} DIAS</Tag>
+              <button onClick={() => onCriarAcao(`Avaliar: ${a.titulo} (${a.revenda}, observado há ${a.dias}d)`)}
                 style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
                 <Plus size={13} /> Criar ação
               </button>
@@ -1174,14 +1181,14 @@ function PageOportunidades({ onCriarAcao }) {
         </div>
       )}
 
-      <SectionTitle sub="Diferença entre preço anunciado e referência FIPE — valide modelo, estado e configuração antes de negociar">
-        Preço abaixo da FIPE
+      <SectionTitle sub="Somente anúncios com preço plausível, vínculo auditado e amostra mínima de mercado equivalente">
+        Preço anunciado abaixo da FIPE
       </SectionTitle>
       {!fipeData && !fipeErro && <EmptyState icon={TrendingDown} titulo="Consultando referências FIPE..." texto="Buscando anúncios ativos já vinculados ao catálogo FIPE." />}
       {fipeErro && <EmptyState icon={TrendingDown} titulo="FIPE temporariamente indisponível" texto="Não foi possível consultar os vínculos FIPE agora." />}
       {fipeData && abaixoFipe.length === 0 && (
-        <EmptyState icon={TrendingDown} titulo="Nenhum anúncio abaixo da FIPE ainda"
-          texto="A sincronização FIPE está sendo ampliada gradualmente. Esta seção preencherá automaticamente conforme os vínculos forem auditados." />
+        <EmptyState icon={TrendingDown} titulo="Nenhuma oportunidade com amostra suficiente"
+          texto="Vínculos sem comparáveis suficientes ou com preço anormal ficam fora do ranking principal." />
       )}
       {abaixoFipe.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1215,7 +1222,7 @@ function PageOportunidades({ onCriarAcao }) {
 
 
 /* ============================================================
-   CONCORRENTES — quem sao os players + metricas de giro
+   CONCORRENTES — players e sinais de movimento observados
    ============================================================ */
 function PageConcorrentes() {
   const [regiao, setRegiao] = useState('todas');
@@ -1367,7 +1374,7 @@ function PageConcorrentes() {
           <option value="ativos">Mais anuncios ativos</option>
           <option value="saidas_30d">Mais saídas (30d)</option>
           <option value="saidas">Mais saídas (total)</option>
-          <option value="giro">Melhor giro (menor idade)</option>
+          <option value="giro">Menor idade média observada</option>
           <option value="historico">Maior historico</option>
         </select>
       </div>
@@ -1417,8 +1424,8 @@ function PageConcorrentes() {
                 <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.positive }}>{fmtN(l.saidas_detectadas)}</div>
               </div>
               <div>
-                <div style={{ color: T.inkMuted, fontSize: 10 }} title={l.giro_confiavel ? '' : 'Aguardando 14+ dias de coleta pra ser confiavel'}>GIRO MEDIO</div>
-                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: l.giro_confiavel ? T.ink : T.inkMuted }}>{l.giro_confiavel && l.idade_media_estoque != null ? `${Math.round(l.idade_media_estoque)}d` : '—'}</div>
+                <div style={{ color: T.inkMuted, fontSize: 10 }} title={(l.idade_observada_confiavel ?? l.giro_confiavel) ? 'Idade desde a primeira observação do Radar' : 'Aguardando 14+ dias de coleta'}>IDADE OBSERVADA</div>
+                <div style={{ fontFamily: T.fontMono, fontSize: 13, color: (l.idade_observada_confiavel ?? l.giro_confiavel) ? T.ink : T.inkMuted }}>{(l.idade_observada_confiavel ?? l.giro_confiavel) && l.idade_media_estoque != null ? `${Math.round(l.idade_media_estoque)}d` : '—'}</div>
               </div>
             </div>
 
@@ -1477,7 +1484,7 @@ function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <input value={novo} onChange={e => setNovo(e.target.value)} onKeyDown={e => e.key === 'Enter' && adicionar()}
-          placeholder="Nova ação — ex: ligar pra revenda X sobre a carreta parada há 40 dias…" style={{ ...inputStyle, flex: 1 }} />
+          aria-label="Descrição da nova ação" placeholder="Nova ação — ex: avaliar a carreta observada há 40 dias…" style={{ ...inputStyle, flex: 1 }} />
         <button onClick={adicionar} disabled={salvando} style={{ ...inputStyle, cursor: salvando ? 'wait' : 'pointer', background: T.signal, color: T.signalInk, fontWeight: 600, border: 'none', display: 'flex', gap: 6, alignItems: 'center', opacity: salvando ? 0.6 : 1 }}>
           <Plus size={14} /> Adicionar
         </button>
@@ -1620,17 +1627,18 @@ function PageFipe() {
           {(resultado.fipes || []).map((item, indice) => {
             const mercado = item.mercado;
             const fipe = mercado?.preco_local ?? item.preco_fipe;
-            const desvio = mercado?.preco_medio_mercado && fipe ? ((mercado.preco_medio_mercado - fipe) / fipe) * 100 : null;
+            const mediana = mercado?.mercado_amostra_suficiente ? Number(mercado.preco_mediana_mercado) : null;
+            const desvio = mediana && fipe ? ((mediana - fipe) / fipe) * 100 : null;
             return <Card key={`${item.codigo_fipe}-${item.codigo_ano}-${indice}`} style={{ padding: 17 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><Tag tone="sinal">{item.marca || resultado.veiculo?.marca || 'FIPE'}</Tag><span style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 11 }}>{item.ano || item.codigo_ano || '—'}</span></div>
               <div style={{ fontFamily: T.fontDisplay, fontWeight: 600, lineHeight: 1.4, marginTop: 12 }}>{item.modelo || resultado.veiculo?.modelo || 'Versão não informada'}</div>
               <div style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 10.5, marginTop: 5 }}>{item.codigo_fipe || 'sem código'} · {mercado?.mes_referencia || item.referencia || 'referência atual'}</div>
               <div style={{ fontFamily: T.fontDisplay, fontSize: 25, fontWeight: 650, marginTop: 16 }}>{fmtBRL(fipe)}</div>
               <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 12, marginTop: 14 }}>
-                {mercado?.anuncios_ativos > 0 ? <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12 }}><span style={{ color: T.inkMuted }}>Média no radar</span><strong>{fmtBRL(mercado.preco_medio_mercado)}</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, marginTop: 7 }}><span style={{ color: T.inkMuted }}>{fmtN(mercado.anuncios_ativos)} ofertas equivalentes</span><span style={{ color: desvio <= 0 ? T.positive : T.signal }}>{desvio == null ? '—' : `${desvio > 0 ? '+' : ''}${desvio.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% vs FIPE`}</span></div>
-                </> : <div style={{ color: T.inkMuted, fontSize: 11.5 }}>Sem ofertas equivalentes ativas no radar.</div>}
+                {mediana ? <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12 }}><span style={{ color: T.inkMuted }}>Mediana no radar</span><strong>{fmtBRL(mediana)}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, marginTop: 7 }}><span style={{ color: T.inkMuted }}>{fmtN(mercado.anuncios_comparaveis)} ofertas qualificadas · confiança {mercado.mercado_confianca}</span><span style={{ color: desvio <= 0 ? T.positive : T.signal }}>{desvio == null ? '—' : `${desvio > 0 ? '+' : ''}${desvio.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% vs FIPE`}</span></div>
+                </> : <div style={{ color: T.inkMuted, fontSize: 11.5 }}>{mercado?.anuncios_comparaveis > 0 ? `${fmtN(mercado.anuncios_comparaveis)} ofertas, ainda abaixo da amostra mínima.` : 'Sem ofertas equivalentes qualificadas no radar.'}</div>}
               </div>
             </Card>;
           })}
@@ -1696,7 +1704,7 @@ function PageFipeCatalogo() {
       <Card style={{ padding: 16 }}>
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <Search size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: T.inkMuted }} />
-          <input value={busca} onChange={e => setBusca(e.target.value)}
+          <input value={busca} onChange={e => setBusca(e.target.value)} aria-label="Buscar no catálogo FIPE"
             placeholder="Busque por modelo, marca ou código FIPE — ex: Actros 2651"
             style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', paddingLeft: 40, minHeight: 44 }} />
         </div>
@@ -1760,17 +1768,17 @@ function PageFipeCatalogo() {
                 <div style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 10.5 }}>FIPE {item.codigo_fipe} · {item.mes_referencia}</div>
                 <div style={{ fontFamily: T.fontDisplay, fontSize: 27, fontWeight: 650, marginTop: 16, color: T.ink }}>{fmtBRL(item.preco_fipe)}</div>
                 <div style={{ borderTop: `1px solid ${T.line}`, marginTop: 15, paddingTop: 13 }}>
-                  {item.anuncios_ativos > 0 ? <>
+                  {item.mercado_amostra_suficiente ? <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 9, alignItems: 'center' }}>
-                      <span style={{ color: T.inkMuted, fontSize: 12 }}>{fmtN(item.anuncios_ativos)} no radar</span>
+                      <span style={{ color: T.inkMuted, fontSize: 12 }}>{fmtN(item.anuncios_comparaveis)} qualificados · confiança {item.mercado_confianca}</span>
                       <Tag tone={tomDesvio}>{desvio > 0 ? '+' : ''}{desvio ?? '—'}% vs FIPE</Tag>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11.5 }}>
-                      <div><span style={{ color: T.inkMuted }}>média</span><br /><strong>{fmtBRL(item.preco_medio_mercado)}</strong></div>
-                      <div><span style={{ color: T.inkMuted }}>menor oferta</span><br /><strong>{fmtBRL(item.menor_anuncio)}</strong></div>
+                      <div><span style={{ color: T.inkMuted }}>mediana</span><br /><strong>{fmtBRL(item.preco_mediana_mercado)}</strong></div>
+                      <div><span style={{ color: T.inkMuted }}>faixa central</span><br /><strong>{fmtBRL(item.preco_p25_mercado)}–{fmtBRL(item.preco_p75_mercado)}</strong></div>
                     </div>
                     <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 10 }}>{item.abaixo_fipe ? `${fmtN(item.abaixo_fipe)} abaixo da FIPE` : 'nenhum abaixo da FIPE'}{item.ufs?.length ? ` · ${item.ufs.join(', ')}` : ''}</div>
-                  </> : <div style={{ color: T.inkMuted, fontSize: 12, lineHeight: 1.5 }}>Sem anúncio vinculado no radar nesta versão.</div>}
+                  </> : <div style={{ color: T.inkMuted, fontSize: 12, lineHeight: 1.5 }}>{item.anuncios_comparaveis > 0 ? `${fmtN(item.anuncios_comparaveis)} ofertas qualificadas; aguardando amostra mínima de 5.` : 'Sem anúncio qualificado no radar nesta versão.'}</div>}
                 </div>
               </Card>;
             })}
@@ -1913,6 +1921,11 @@ function PageMinhaLoja({ sessao }) {
   const [xmlAberto, setXmlAberto] = useState(false);
   const [xmlEstado, setXmlEstado] = useState({ arquivo: null, analisando: false, importando: false, analise: null, resultado: null, erro: '' });
   const [xmlOpcoes, setXmlOpcoes] = useState({ usar_comparativo: true, marcar_ausentes: false });
+  const [buscaEstoque, setBuscaEstoque] = useState('');
+  const [statusEstoque, setStatusEstoque] = useState('todos');
+  const [ordemEstoque, setOrdemEstoque] = useState('recente');
+  const [statusSalvandoId, setStatusSalvandoId] = useState(null);
+  const [ultimaAlteracao, setUltimaAlteracao] = useState(null);
 
   const carregar = async () => {
     setCarregando(true); setErro('');
@@ -1955,7 +1968,10 @@ function PageMinhaLoja({ sessao }) {
     catch (e) { setErro(e.message); }
   };
   const alterarStatus = async (item, status) => {
+    if (statusSalvandoId === item.id || status === item.status) return;
     const anterior = item.status;
+    setStatusSalvandoId(item.id);
+    setErro('');
     setItens(lista => lista.map(i => i.id === item.id ? { ...i, status } : i));
     try {
       await apiPost('minha_loja.php', {
@@ -1964,10 +1980,21 @@ function PageMinhaLoja({ sessao }) {
         preco_anunciado: item.preco_anunciado, cidade: item.cidade, uf: item.uf,
         data_entrada: item.data_entrada, status, fipe_preco_id: item.fipe_preco_id,
       }, sessao.csrf);
+      setUltimaAlteracao({ item: { ...item, status }, anterior, novo: status });
     } catch (e) {
       setItens(lista => lista.map(i => i.id === item.id ? { ...i, status: anterior } : i));
       setErro(e.message);
+    } finally {
+      setStatusSalvandoId(null);
     }
+  };
+
+  const desfazerStatus = async () => {
+    if (!ultimaAlteracao) return;
+    const alteracao = ultimaAlteracao;
+    setUltimaAlteracao(null);
+    await alterarStatus(alteracao.item, alteracao.anterior);
+    setUltimaAlteracao(null);
   };
 
   const enviarXml = async (arquivo, acao) => {
@@ -2013,13 +2040,17 @@ function PageMinhaLoja({ sessao }) {
   const valor = ativos.reduce((s, i) => s + Number(i.preco_anunciado || 0), 0);
   const mediaDias = ativos.length ? Math.round(ativos.reduce((s, i) => s + Number(i.dias_estoque || 0), 0) / ativos.length) : 0;
   const vinculados = ativos.filter(i => i.fipe_preco_id && Number(i.usar_comparativo ?? 1) === 1).length;
+  const itensVisiveis = useMemo(
+    () => filtraOrdenaEstoque(itens, buscaEstoque, statusEstoque, ordemEstoque),
+    [itens, buscaEstoque, statusEstoque, ordemEstoque],
+  );
 
   return <div>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
       <SectionTitle sub="Seu estoque publicado como base interna de comparação com FIPE e mercado">Meu estoque</SectionTitle>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => { setXmlAberto(v => !v); setFormAberto(false); }} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}><UploadCloud size={16} />{xmlAberto ? 'Fechar XML' : 'Importar XML'}</button>
-        <button onClick={() => { setFormAberto(v => !v); setXmlAberto(false); }} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}>{formAberto ? <X size={16} /> : <Plus size={16} />}{formAberto ? 'Fechar' : 'Adicionar veículo'}</button>
+        <button aria-expanded={xmlAberto} aria-controls="painel-importacao-xml" onClick={() => { setXmlAberto(v => !v); setFormAberto(false); }} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}><UploadCloud size={16} />{xmlAberto ? 'Fechar XML' : 'Importar XML'}</button>
+        <button aria-expanded={formAberto} aria-controls="form-novo-veiculo" onClick={() => { setFormAberto(v => !v); setXmlAberto(false); }} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}>{formAberto ? <X size={16} /> : <Plus size={16} />}{formAberto ? 'Fechar' : 'Adicionar veículo'}</button>
       </div>
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10 }}>
@@ -2029,7 +2060,7 @@ function PageMinhaLoja({ sessao }) {
       <Kpi label="Comparados" value={`${vinculados}/${ativos.length}`} sub="vínculo FIPE automático" tone={T.positive} />
     </div>
 
-    {xmlAberto && <Card style={{ marginTop: 16, borderColor: `${T.signal}55` }}>
+    {xmlAberto && <Card id="painel-importacao-xml" style={{ marginTop: 16, borderColor: `${T.signal}55` }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, marginBottom: 15 }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${T.signal}16`, color: T.signal, flex: '0 0 auto' }}><FileText size={19} /></div>
         <div><strong>Sincronizar estoque por XML</strong><div style={{ color: T.inkMuted, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>Primeiro analisamos o arquivo. Nada é alterado até sua confirmação. Limite de 20 MB.</div></div>
@@ -2056,17 +2087,17 @@ function PageMinhaLoja({ sessao }) {
       {xmlEstado.resultado && <div role="status" style={{ marginTop: 13, padding: 11, borderRadius: 9, background: `${T.positive}12`, border: `1px solid ${T.positive}35`, color: T.positive, fontSize: 12.5 }}><strong>Estoque sincronizado.</strong> {fmtN(xmlEstado.resultado.novos)} novos, {fmtN(xmlEstado.resultado.atualizados)} atualizados e {fmtN(xmlEstado.resultado.ausentes_marcados_vendidos)} ausentes marcados como vendidos.</div>}
     </Card>}
 
-    {formAberto && <Card style={{ marginTop: 16 }}>
+    {formAberto && <Card id="form-novo-veiculo" style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16 }}><Store size={18} color={T.signal} /><strong>Novo veículo</strong></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10 }}>
-        <input value={form.referencia_interna} onChange={e => setForm(f => ({ ...f, referencia_interna: e.target.value }))} style={inputStyle} placeholder="Referência interna" />
-        <input value={form.marca} onChange={e => { setForm(f => ({ ...f, marca: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Marca · ex: Scania" />
-        <input value={form.modelo} onChange={e => { setForm(f => ({ ...f, modelo: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Modelo · ex: R450" />
-        <input type="number" min="1950" max="2030" value={form.ano} onChange={e => { setForm(f => ({ ...f, ano: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Ano" />
-        <input type="number" min="0" step="1000" value={form.preco_anunciado} onChange={e => setForm(f => ({ ...f, preco_anunciado: e.target.value }))} style={inputStyle} placeholder="Preço anunciado" />
-        <input value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} style={inputStyle} placeholder="Cidade" />
-        <select value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={inputStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
-        <input type="date" value={form.data_entrada} onChange={e => setForm(f => ({ ...f, data_entrada: e.target.value }))} style={inputStyle} />
+        <input aria-label="Referência interna" value={form.referencia_interna} onChange={e => setForm(f => ({ ...f, referencia_interna: e.target.value }))} style={inputStyle} placeholder="Referência interna" />
+        <input aria-label="Marca do veículo" value={form.marca} onChange={e => { setForm(f => ({ ...f, marca: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Marca · ex: Scania" />
+        <input aria-label="Modelo do veículo" value={form.modelo} onChange={e => { setForm(f => ({ ...f, modelo: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Modelo · ex: R450" />
+        <input aria-label="Ano do veículo" type="number" min="1950" max="2030" value={form.ano} onChange={e => { setForm(f => ({ ...f, ano: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Ano" />
+        <input aria-label="Preço anunciado" type="number" min="0" step="1000" value={form.preco_anunciado} onChange={e => setForm(f => ({ ...f, preco_anunciado: e.target.value }))} style={inputStyle} placeholder="Preço anunciado" />
+        <input aria-label="Cidade do veículo" value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} style={inputStyle} placeholder="Cidade" />
+        <select aria-label="Estado do veículo" value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={inputStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
+        <input aria-label="Data de entrada no estoque" type="date" value={form.data_entrada} onChange={e => setForm(f => ({ ...f, data_entrada: e.target.value }))} style={inputStyle} />
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 13 }}>
         <button onClick={comparar} disabled={form.modelo.trim().length < 2} style={{ ...inputStyle, cursor: 'pointer' }}><Search size={15} style={{ verticalAlign: -3, marginRight: 6 }} />Comparar com FIPE</button>
@@ -2074,27 +2105,41 @@ function PageMinhaLoja({ sessao }) {
       </div>
       {comparacao?.carregando && <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 12 }}>Procurando a melhor referência…</div>}
       {comparacao?.vazio && <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 12 }}>Nenhuma referência segura encontrada. O veículo pode ser salvo sem vínculo.</div>}
-      {comparacao?.id && <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: `${T.positive}0F`, border: `1px solid ${T.positive}2A`, fontSize: 12.5 }}><strong style={{ color: T.positive }}>Referência encontrada:</strong> {comparacao.marca} {comparacao.modelo} · {comparacao.ano} · FIPE {fmtBRL(comparacao.preco_fipe)} · mercado {fmtBRL(comparacao.preco_medio_mercado)}</div>}
+      {comparacao?.id && <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: `${T.positive}0F`, border: `1px solid ${T.positive}2A`, fontSize: 12.5 }}><strong style={{ color: T.positive }}>Referência encontrada:</strong> {comparacao.marca} {comparacao.modelo} · {comparacao.ano} · FIPE {fmtBRL(comparacao.preco_fipe)} · mediana de mercado {comparacao.mercado_amostra_suficiente ? fmtBRL(comparacao.preco_mediana_mercado) : 'amostra insuficiente'}</div>}
     </Card>}
 
     {erro && <div role="alert" style={{ color: T.alert, fontSize: 12.5, marginTop: 12 }}>{erro}</div>}
+    {ultimaAlteracao && <div role="status" style={{ marginTop: 12, padding: 11, borderRadius: 9, color: T.positive, background: `${T.positive}12`, border: `1px solid ${T.positive}35`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <span>Status atualizado para {String(ultimaAlteracao.novo).toUpperCase()}.</span>
+      <button onClick={desfazerStatus} disabled={statusSalvandoId != null} style={{ ...inputStyle, cursor: 'pointer', padding: '6px 9px' }}><Undo2 size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Desfazer</button>
+    </div>}
     <SectionTitle sub="Preço próprio versus referência e anúncios ativos equivalentes">Comparativo da loja</SectionTitle>
+    <Card style={{ padding: 12, marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 8 }}>
+      <input aria-label="Buscar no estoque" value={buscaEstoque} onChange={e => setBuscaEstoque(e.target.value)} placeholder="Buscar marca, modelo ou referência..." style={{ ...inputStyle, width: '100%' }} />
+      <select aria-label="Filtrar estoque por status" value={statusEstoque} onChange={e => setStatusEstoque(e.target.value)} style={inputStyle}>
+        <option value="todos">Todos os status</option><option value="estoque">No estoque</option><option value="reservado">Reservados</option><option value="vendido">Vendidos</option>
+      </select>
+      <select aria-label="Ordenar estoque" value={ordemEstoque} onChange={e => setOrdemEstoque(e.target.value)} style={inputStyle}>
+        <option value="recente">Entrada mais recente</option><option value="antigo">Entrada mais antiga</option><option value="modelo">Marca e modelo</option><option value="preco_asc">Menor preço</option><option value="preco_desc">Maior preço</option>
+      </select>
+    </Card>
     {carregando ? <Card><span style={{ color: T.inkMuted }}>Carregando seu estoque…</span></Card> : itens.length === 0 ? <EmptyState icon={Store} titulo="Seu estoque começa aqui" texto="Adicione os veículos da sua loja para comparar preço, idade e posicionamento contra a FIPE e o mercado monitorado." /> :
+      itensVisiveis.length === 0 ? <EmptyState icon={Search} titulo="Nenhum veículo encontrado" texto="Remova a busca ou altere o filtro de status." /> :
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: 11 }}>
-        {itens.map(item => {
-          const mercado = Number(item.preco_medio_mercado || 0);
+        {itensVisiveis.map(item => {
+          const mercado = item.mercado_amostra_suficiente ? Number(item.preco_mediana_mercado || 0) : 0;
           const preco = Number(item.preco_anunciado || 0);
           const delta = mercado && preco ? Math.round((preco / mercado - 1) * 100) : null;
           return <Card key={item.id} style={{ padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><select aria-label="Status do veículo" value={item.status} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select>{item.origem === 'xml' && <Tag tone="sinal">XML</Tag>}</div><button aria-label="Excluir veículo" onClick={() => excluir(item.id)} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><select aria-label={`Status de ${item.marca || ''} ${item.modelo || ''}`} disabled={statusSalvandoId === item.id} value={item.status} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted, opacity: statusSalvandoId === item.id ? 0.6 : 1 }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select>{item.origem === 'xml' && <Tag tone="sinal">XML</Tag>}</div><button aria-label={`Excluir ${item.marca || ''} ${item.modelo || 'veículo'}`} onClick={() => excluir(item.id)} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
             <div style={{ fontFamily: T.fontDisplay, fontSize: 16, fontWeight: 650, marginTop: 12 }}>{[item.marca, item.modelo].filter(Boolean).join(' ')}</div>
             <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.ano || 'Ano não informado'} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias{item.quilometragem ? ` · ${fmtN(item.quilometragem)} km` : ''}</div>
             <div style={{ fontFamily: T.fontMono, fontSize: 19, fontWeight: 650, marginTop: 15 }}>{fmtBRL(item.preco_anunciado)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
               <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>FIPE</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_fipe)}</div></div>
-              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>Mercado</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_medio_mercado)}</div></div>
+              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>Mediana de mercado</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{item.mercado_amostra_suficiente ? fmtBRL(item.preco_mediana_mercado) : 'Amostra insuficiente'}</div></div>
             </div>
-            <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{Number(item.usar_comparativo ?? 1) !== 1 ? 'Fora da base comparativa' : delta == null ? 'Aguardando comparação compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da média · ${fmtN(item.anuncios_ativos)} anúncios comparáveis`}</div>
+            <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{Number(item.usar_comparativo ?? 1) !== 1 ? 'Fora da base comparativa' : delta == null ? 'Aguardando amostra mínima compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da mediana · ${fmtN(item.anuncios_ativos)} anúncios · confiança ${item.mercado_confianca}`}</div>
           </Card>;
         })}
       </div>}
@@ -2272,7 +2317,7 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
           <ShieldCheck size={18} /><strong>Leitura dos dados</strong>
         </div>
         <div style={{ color: T.inkMuted, fontSize: 12.5, lineHeight: 1.6 }}>
-          “Saída” significa que o anúncio deixou o portal após duas varreduras. É um sinal de mercado, não uma venda comprovada. O giro amadurece após 14 dias de histórico.
+          “Saída” significa que o anúncio deixou o portal após duas varreduras. É um sinal de mercado, não uma venda comprovada. A idade observada ganha contexto após 14 dias de histórico.
         </div>
       </Card>
       </div>
@@ -2398,8 +2443,8 @@ function PageAnalise() {
   };
 
   const sugestoes = [
-    'Monte um plano de ação de vendas para esta semana com base no giro dos concorrentes',
-    'Quais anúncios parados valem uma proposta agressiva de compra?',
+    'Monte um plano de ação para esta semana com base no movimento observado dos concorrentes',
+    'Quais anúncios observados há mais tempo merecem uma análise comercial?',
     'Onde está a maior oferta e o que isso diz sobre preço na região?',
   ];
 
@@ -2412,7 +2457,7 @@ function PageAnalise() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 14 }}>
           <Kpi label="FIPE vinculados" value={fmtN(ins.fipe?.vinculados || 0)} sub="ativos com preço comparável" />
           <Kpi label="Abaixo da FIPE" value={fmtN(ins.fipe?.abaixo_fipe || 0)} sub="candidatos para validação" tone={T.positive} />
-          <Kpi label="Desvio médio FIPE" value={ins.fipe?.desvio_medio_pct == null ? '—' : `${ins.fipe.desvio_medio_pct.toLocaleString('pt-BR')}%`} sub="anúncio vs referência" />
+          <Kpi label="Desvio mediano FIPE" value={(ins.fipe?.desvio_mediano_pct ?? ins.fipe?.desvio_medio_pct) == null ? '—' : `${(ins.fipe.desvio_mediano_pct ?? ins.fipe.desvio_medio_pct).toLocaleString('pt-BR')}%`} sub="amostra qualificada vs referência" />
           <Kpi label="Atualizado" value={ins.gerado_em ? new Date(ins.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'} sub="leitura calculada agora" />
         </div>
       )}
@@ -2458,9 +2503,9 @@ function PageAnalise() {
             </div>
           </Card>
           <Card>
-            <SectionTitle sub="Saídas detectadas · estoque · idade média — sinais do movimento do mercado">Giro dos concorrentes</SectionTitle>
+            <SectionTitle sub="Saídas detectadas · estoque · idade média observada — sinais do movimento do mercado">Movimento dos concorrentes</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {(ins.giro_por_revenda || []).slice(0, 8).map(g => (
+              {(ins.movimento_por_revenda || ins.giro_por_revenda || []).slice(0, 8).map(g => (
                 <div key={`${g.uf}-${g.revenda}`} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda} <small style={{ color: T.inkMuted }}>{g.uf}</small></span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>

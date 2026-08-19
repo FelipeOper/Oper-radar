@@ -7,6 +7,7 @@
  * e os anuncios locais do OPER RADAR.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_quality.php';
 $usuario = exige_autenticacao();
 
 $provedor = strtolower((string)valor_config_oper_radar('OPER_RADAR_PLACA_PROVIDER', 'webxcar'));
@@ -111,15 +112,11 @@ foreach ($fipesOrigem as $item) {
         $sql = "
             SELECT fp.id AS fipe_preco_id, fp.preco AS preco_local, fp.mes_referencia,
                    fm.marca_fipe, fm.modelo_fipe,
-                   COUNT(a.id) AS anuncios_ativos,
-                   AVG(NULLIF(a.preco,0)) AS preco_medio_mercado,
-                   MIN(NULLIF(a.preco,0)) AS menor_anuncio,
-                   MAX(NULLIF(a.preco,0)) AS maior_anuncio
+                   0 AS anuncios_ativos, NULL AS preco_medio_mercado,
+                   NULL AS menor_anuncio, NULL AS maior_anuncio
             FROM fipe_preco fp
             JOIN fipe_modelo fm ON fm.id=fp.fipe_modelo_id
-            LEFT JOIN anuncio a ON a.fipe_preco_id=fp.id AND a.status='ativo'
             WHERE fp.codigo_fipe=?" . ($codigoAno !== '' ? " AND fp.ano_codigo=?" : "") . "
-            GROUP BY fp.id, fp.preco, fp.mes_referencia, fm.marca_fipe, fm.modelo_fipe
             ORDER BY fp.referencia_codigo DESC
             LIMIT 1";
         $st = $conn->prepare($sql);
@@ -130,7 +127,7 @@ foreach ($fipesOrigem as $item) {
         $st->close();
         if (!$mercado && $anoItem > 0) {
             $anoBusca = $anoItem . '-%';
-            $st = $conn->prepare("\n                SELECT fp.id AS fipe_preco_id, fp.preco AS preco_local, fp.mes_referencia,\n                       fm.marca_fipe, fm.modelo_fipe, COUNT(a.id) AS anuncios_ativos,\n                       AVG(NULLIF(a.preco,0)) AS preco_medio_mercado,\n                       MIN(NULLIF(a.preco,0)) AS menor_anuncio, MAX(NULLIF(a.preco,0)) AS maior_anuncio\n                FROM fipe_preco fp\n                JOIN fipe_modelo fm ON fm.id=fp.fipe_modelo_id\n                LEFT JOIN anuncio a ON a.fipe_preco_id=fp.id AND a.status='ativo'\n                WHERE fp.codigo_fipe=? AND fp.ano_codigo LIKE ?\n                GROUP BY fp.id, fp.preco, fp.mes_referencia, fm.marca_fipe, fm.modelo_fipe\n                ORDER BY fp.referencia_codigo DESC LIMIT 1");
+            $st = $conn->prepare("\n                SELECT fp.id AS fipe_preco_id, fp.preco AS preco_local, fp.mes_referencia,\n                       fm.marca_fipe, fm.modelo_fipe, 0 AS anuncios_ativos,\n                       NULL AS preco_medio_mercado, NULL AS menor_anuncio,\n                       NULL AS maior_anuncio\n                FROM fipe_preco fp\n                JOIN fipe_modelo fm ON fm.id=fp.fipe_modelo_id\n                WHERE fp.codigo_fipe=? AND fp.ano_codigo LIKE ?\n                ORDER BY fp.referencia_codigo DESC LIMIT 1");
             $st->bind_param('ss', $codigo, $anoBusca);
             $st->execute();
             $mercado = $st->get_result()->fetch_assoc() ?: null;
@@ -155,6 +152,24 @@ foreach ($fipesOrigem as $item) {
         'mercado' => $mercado,
     ];
 }
+
+$idsMercado = [];
+foreach ($fipes as $itemFipe) {
+    $idMercado = (int)($itemFipe['mercado']['fipe_preco_id'] ?? 0);
+    if ($idMercado > 0) $idsMercado[] = $idMercado;
+}
+$estatisticasMercado = mercado_estatisticas_por_fipe($conn, $idsMercado);
+foreach ($fipes as &$itemFipe) {
+    if (!is_array($itemFipe['mercado'] ?? null)) continue;
+    $idMercado = (int)($itemFipe['mercado']['fipe_preco_id'] ?? 0);
+    mercado_aplica_estatisticas(
+        $itemFipe['mercado'],
+        $estatisticasMercado[$idMercado] ?? null,
+        isset($itemFipe['mercado']['preco_local']) ? (float)$itemFipe['mercado']['preco_local'] : null
+    );
+    $itemFipe['mercado']['anuncios_ativos'] = $itemFipe['mercado']['anuncios_comparaveis'];
+}
+unset($itemFipe);
 
 $resultado = [
     'placa' => $placa,
