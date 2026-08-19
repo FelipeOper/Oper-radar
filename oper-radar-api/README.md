@@ -8,6 +8,14 @@ nunca devem ser incluídas em pacotes de deploy.
 `lib/market_quality.php` centraliza a regra usada por anúncios, detalhe, FIPE, placa, Minha
 Loja e insights:
 
+- `minha_loja_detalhe.php?id=...`: detalhe pertencente ao usuário autenticado, edição pelo
+  fluxo existente e comparação nacional/estadual somente com a mesma referência FIPE;
+- a análise regional combina ofertas qualificadas, revendas, saídas observadas e tempo
+  observado. Recomendações ficam indisponíveis quando a amostra ou o histórico não sustentam
+  o nível mínimo de confiança;
+- “saída observada” é ausência confirmada no portal, não venda comprovada, e os preços são
+  anunciados, não valores de transação;
+
 - exclui preço ausente, entrada, parcela, leilão, lance, consórcio e mensalidade;
 - rejeita valores incompatíveis com a FIPE e extremos pelo intervalo interquartil;
 - calcula P25, mediana, P75 e confiança;
