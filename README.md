@@ -18,6 +18,13 @@ tests/              contratos de integração e segurança
 docs/               arquitetura, solicitações e relatórios de evolução
 ```
 
+## Taxonomia e análise regional
+
+- `docs/TAXONOMIA_MERCADO.md` define os segmentos e os filtros contextuais usados pelo
+  Mercado, Concorrentes, Minha Loja e futuros comparativos.
+- `docs/ESPECIFICACAO_INSIGHT_REGIONAL.md` define amostra, métricas, confiança e composição
+  explicável do índice de oportunidade regional.
+
 ## Estado em 19/08/2026
 
 - A coleta, a API e o app estão em produção no HostGator.

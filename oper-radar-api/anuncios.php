@@ -9,6 +9,7 @@
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
+require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/vehicle_taxonomy.php';
 $conn = conecta();
 
@@ -19,21 +20,7 @@ $REGIOES = [
     'Norte' => ['AM','PA','RO','RR','AC','AP','TO'],
 ];
 
-// Mapa categoria -> tipos do portal (espelha o TIPO_PARA_CATEGORIA do frontend)
-$CATEGORIA_TIPOS = [
-  'caminhoes'   => ['Caminhao','Motorhome'],
-  'implementos' => ['Implemento','Carroceria-sobre-chassi','Trailer'],
-  'onibus_vans' => ['Onibus','Micro-onibus','Vans','Utilitarios'],
-  'leves'       => ['Carro'],
-  'agricolas'   => ['Trator','Trator-esteira','Micro-trator','Plantadeira','Colheitadeira',
-                    'Plataforma-colheitadeira','Pulverizador','Semeadeira',
-                    'Distribuidor-autopropelido','Forragem-e-feno','Florestal'],
-  'construcao'  => ['Pa-carregadeira','Escavadeira','Retro-escavadeira','Motoniveladora',
-                    'Rolo-compactador','Guindaste','Mini-carregadeira','Auto-carregavel',
-                    'Mini-escavadeira','Empilhadeira','Plataforma-elevatoria','Maquinas','Equipamentos'],
-  'pecas'       => ['Pecas-a-venda'],
-  'outros'      => ['Moto','Imoveis','Quadriciclo','Nautico'],
-];
+$CATEGORIA_TIPOS = oper_taxonomia_tipos_por_categoria();
 
 $limit  = min(max((int)($_GET['limit'] ?? 60), 1), 200);
 $offset = max((int)($_GET['offset'] ?? 0), 0);
@@ -59,6 +46,7 @@ if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GE
 if (!empty($_GET['revenda_id'])) { $where[] = 'r.id = ?'; $params[] = (int)$_GET['revenda_id']; $types .= 'i'; }
 if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
 if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
+if (!empty($_GET['carroceria'])) { $where[] = 'TRIM(a.carroceria) = ?'; $params[] = trim($_GET['carroceria']); $types .= 's'; }
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
 if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
 $padraoTracao = oper_tracao_regexp($_GET['tracao'] ?? '');
@@ -127,7 +115,7 @@ $ordens = [
 ];
 $ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
 
-$sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo, a.tracao,
+$sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo, a.carroceria, a.tracao,
                a.ano_inicial, a.ano_final,
                a.ano_inicial AS ano_fabricacao, a.ano_final AS ano_modelo, a.cor,
                COALESCE(CONCAT(a.quilometragem_manual, ' km'), a.km_ou_horas) AS quilometragem,
