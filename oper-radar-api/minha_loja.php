@@ -1,6 +1,7 @@
 <?php
 /** Estoque próprio do membro autenticado. */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_quality.php';
 $usuario = exige_autenticacao();
 $conn = conecta();
 
@@ -40,8 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                fp.preco AS preco_fipe, fp.codigo_fipe, fp.mes_referencia,
                fm.marca_fipe, fm.modelo_fipe,
                DATEDIFF(CURDATE(), me.data_entrada) AS dias_estoque,
-               (SELECT AVG(NULLIF(a.preco,0)) FROM anuncio a WHERE a.fipe_preco_id=me.fipe_preco_id AND a.status='ativo') AS preco_medio_mercado,
-               (SELECT COUNT(*) FROM anuncio a WHERE a.fipe_preco_id=me.fipe_preco_id AND a.status='ativo') AS anuncios_ativos
+               NULL AS preco_medio_mercado, 0 AS anuncios_ativos
         FROM meu_estoque me
         LEFT JOIN fipe_preco fp ON fp.id=me.fipe_preco_id
         LEFT JOIN fipe_modelo fm ON fm.id=fp.fipe_modelo_id
@@ -62,6 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $itens[] = $row;
     }
     $st->close();
+    $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($itens, 'fipe_preco_id'));
+    foreach ($itens as &$row) {
+        $fipeId = (int)($row['fipe_preco_id'] ?? 0);
+        mercado_aplica_estatisticas($row, $estatisticas[$fipeId] ?? null, $row['preco_fipe']);
+        $row['anuncios_ativos'] = $row['anuncios_comparaveis'];
+    }
+    unset($row);
     envia_json(['itens' => $itens, 'total' => count($itens)]);
 }
 

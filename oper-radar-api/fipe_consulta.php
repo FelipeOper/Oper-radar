@@ -4,6 +4,7 @@
  * Nenhuma busca deste endpoint acessa a API externa.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_quality.php';
 $conn = conecta();
 
 $modo = $_GET['modo'] ?? 'buscar';
@@ -175,6 +176,15 @@ while ($row = $res->fetch_assoc()) {
     $itens[] = $row;
 }
 $st->close();
+
+$estatisticas = mercado_estatisticas_por_fipe($conn, array_column($itens, 'id'));
+foreach ($itens as &$item) {
+    mercado_aplica_estatisticas($item, $estatisticas[$item['id']] ?? null, $item['preco_fipe']);
+    $item['desvio_medio_pct'] = $item['preco_mediana_mercado'] > 0
+        ? round(($item['preco_mediana_mercado'] - $item['preco_fipe']) / $item['preco_fipe'] * 100, 1)
+        : null;
+}
+unset($item);
 
 envia_json([
     'total' => $total, 'retornados' => count($itens),

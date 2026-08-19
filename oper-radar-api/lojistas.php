@@ -55,9 +55,10 @@ while ($row = $res->fetch_assoc()) {
     $row['vendidos_30d'] = $row['saidas_30d'];
     $row['idade_media_estoque'] = $row['idade_media_estoque'] !== null ? (float)$row['idade_media_estoque'] : null;
     $row['dias_de_coleta'] = $row['dias_de_coleta'] !== null ? (int)$row['dias_de_coleta'] : 0;
-    // Giro só é confiavel apos 14 dias de coleta acumulada — antes disso,
-    // "primeira_vez_visto" e recente demais pra todos os anuncios.
-    $row['giro_confiavel'] = $row['dias_de_coleta'] >= 14;
+    // A idade observada só é confiável após 14 dias de coleta acumulada.
+    $row['idade_observada_confiavel'] = $row['dias_de_coleta'] >= 14;
+    // Alias temporário para clientes antigos.
+    $row['giro_confiavel'] = $row['idade_observada_confiavel'];
     $row['mix_categorias'] = [];
     $mapaId[$row['id']] = count($lojistas);
     $lojistas[] = $row;

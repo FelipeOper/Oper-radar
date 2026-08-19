@@ -82,6 +82,11 @@ def main() -> int:
 
     php = executavel("php")
     if php:
+        testes_php = sorted((RAIZ / "oper-radar-api" / "tests").glob("*_test.php"))
+        for caminho in testes_php:
+            verificacoes.append(
+                (f"Teste PHP {caminho.relative_to(RAIZ)}", [php, str(caminho)], RAIZ)
+            )
         for caminho in arquivos(".php"):
             verificacoes.append(
                 (f"PHP {caminho.relative_to(RAIZ)}", [php, "-l", str(caminho)], RAIZ)

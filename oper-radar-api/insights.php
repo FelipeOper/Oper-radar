@@ -1,6 +1,7 @@
 <?php
 /** OPER RADAR — inteligência agregada, tolerante a dados ainda incompletos. */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_quality.php';
 $conn = conecta();
 $avisos = [];
 
@@ -52,16 +53,41 @@ $faixas = consulta($conn, 'faixas_preco', "
     FROM anuncio WHERE status='ativo' AND preco IS NOT NULL AND preco>0
     GROUP BY faixa ORDER BY MIN(preco)");
 
-$fipeRow = consulta_um($conn, 'fipe', "
-    SELECT COUNT(*) vinculados,
-           SUM(CASE WHEN a.preco < f.preco THEN 1 ELSE 0 END) abaixo_fipe,
-           ROUND(AVG((a.preco-f.preco)/NULLIF(f.preco,0))*100,1) desvio_medio_pct
+$fipeLinhas = consulta($conn, 'fipe', "
+    SELECT a.id, a.fipe_preco_id, a.preco, a.titulo, a.preco_texto_bruto,
+           f.preco AS preco_fipe
     FROM anuncio a JOIN fipe_preco f ON f.id=a.fipe_preco_id
-    WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0 AND f.preco IS NOT NULL AND f.preco>0");
+    WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
+      AND f.preco IS NOT NULL AND f.preco>0");
+$estatisticasFipe = mercado_estatisticas_por_fipe(
+    $conn,
+    array_column($fipeLinhas, 'fipe_preco_id')
+);
+$abaixoFipe = 0;
+$comparaveisFipe = 0;
+$desviosFipe = [];
+foreach ($fipeLinhas as &$linhaFipe) {
+    $idFipe = (int)$linhaFipe['fipe_preco_id'];
+    mercado_aplica_estatisticas(
+        $linhaFipe,
+        $estatisticasFipe[$idFipe] ?? null,
+        (float)$linhaFipe['preco_fipe']
+    );
+    if (!$linhaFipe['mercado_amostra_suficiente'] || $linhaFipe['preco_qualidade_status'] !== 'valido') continue;
+    $comparaveisFipe++;
+    if ((float)$linhaFipe['preco'] < (float)$linhaFipe['preco_fipe']) $abaixoFipe++;
+    $desviosFipe[] = ((float)$linhaFipe['preco'] - (float)$linhaFipe['preco_fipe'])
+        / (float)$linhaFipe['preco_fipe'] * 100;
+}
+unset($linhaFipe);
+$desvioMedianoFipe = mercado_percentil($desviosFipe, 0.50);
 $fipe = [
-    'vinculados'=>(int)($fipeRow['vinculados'] ?? 0),
-    'abaixo_fipe'=>(int)($fipeRow['abaixo_fipe'] ?? 0),
-    'desvio_medio_pct'=>isset($fipeRow['desvio_medio_pct']) ? (float)$fipeRow['desvio_medio_pct'] : null,
+    'vinculados'=>count($fipeLinhas),
+    'comparaveis_qualificados'=>$comparaveisFipe,
+    'abaixo_fipe'=>$abaixoFipe,
+    'desvio_mediano_pct'=>$desvioMedianoFipe !== null ? round($desvioMedianoFipe, 1) : null,
+    // Alias temporário para clientes antigos; o valor agora é a mediana qualificada.
+    'desvio_medio_pct'=>$desvioMedianoFipe !== null ? round($desvioMedianoFipe, 1) : null,
 ];
 
 $descobertas = [];
@@ -119,7 +145,9 @@ foreach ($giroRevenda as &$item) {
 
 envia_json([
     'gerado_em'=>date(DATE_ATOM), 'por_tipo'=>$porTipo, 'por_marca'=>$porMarca,
-    'por_cidade'=>$porCidade, 'giro_por_revenda'=>$giroRevenda,
+    'por_cidade'=>$porCidade, 'movimento_por_revenda'=>$giroRevenda,
+    // Alias temporário para clientes antigos.
+    'giro_por_revenda'=>$giroRevenda,
     'faixas_preco'=>$faixas, 'fipe'=>$fipe, 'descobertas'=>$descobertas,
     'parciais_indisponiveis'=>$avisos,
 ]);

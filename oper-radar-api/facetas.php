@@ -7,6 +7,7 @@
  * nao apenas do que foi carregado na tela.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/vehicle_taxonomy.php';
 $conn = conecta();
 
 $statusFiltro = $_GET['status'] ?? 'ativo';
@@ -109,6 +110,24 @@ $r = $conn->query("SELECT r.uf, a.tipo, COUNT(*) n FROM anuncio a JOIN revenda r
                    $whereTiposUf a.tipo IS NOT NULL GROUP BY r.uf, a.tipo");
 while ($row = $r->fetch_assoc()) $tiposPorUf[$row['uf']][$row['tipo']] = (int)$row['n'];
 
+// Tração/configuração de eixos vem da coleta de detalhe. Valores como
+// "Cavalo 6X4" e "6x4" são reunidos na mesma faceta sem inferência.
+$tracoes = [];
+$tracoesPorUf = [];
+$whereTracao = $whereStatusA ? "$whereStatusA AND" : ' WHERE';
+$r = $conn->query("SELECT r.uf, a.tracao, COUNT(*) n
+                   FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+                   $whereTracao a.tipo='Caminhao' AND a.tracao IS NOT NULL AND a.tracao<>''
+                   GROUP BY r.uf, a.tracao");
+while ($row = $r->fetch_assoc()) {
+    $valor = oper_tracao_normalizada($row['tracao']);
+    if ($valor === null) continue;
+    $quantidade = (int)$row['n'];
+    $tracoes[$valor] = ($tracoes[$valor] ?? 0) + $quantidade;
+    $tracoesPorUf[$row['uf']][$valor] = ($tracoesPorUf[$row['uf']][$valor] ?? 0) + $quantidade;
+}
+uksort($tracoes, 'strnatcasecmp');
+
 // Agrega por regiao
 $regioes = [];
 foreach ($REGIOES as $nome => $ufs) {
@@ -145,6 +164,7 @@ foreach ($REGIOES as $nomeRegiao => $ufs) {
             'nome' => $NOMES_UF[$sigla], 'regiao' => $nomeRegiao,
             'anuncios' => $porUf[$sigla] ?? 0, 'revendas' => $revendasUf[$sigla] ?? 0,
             'categorias' => $categoriasUf, 'tipos' => $tiposPorUf[$sigla] ?? [],
+            'tracoes' => $tracoesPorUf[$sigla] ?? [],
             'cidades' => $cidadesPorUf[$sigla] ?? [],
             'lojistas' => $revendasPorUfLista[$sigla] ?? [],
         ];
@@ -160,6 +180,7 @@ envia_json([
     'regioes' => $regioes,
     'categorias' => $categorias,
     'subtipos' => $subtipos,
+    'tracoes' => $tracoes,
     'cidades' => $cidades,
     'revendas' => $revendas,
 ]);

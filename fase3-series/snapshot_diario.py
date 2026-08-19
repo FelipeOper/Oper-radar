@@ -12,21 +12,47 @@ from datetime import date, timedelta
 import mysql.connector
 
 
+def coluna_existe(cur, tabela, coluna):
+    cur.execute("""
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s AND COLUMN_NAME=%s
+    """, (tabela, coluna))
+    return int(cur.fetchone()[0]) > 0
+
+
 def roda(conn):
     hoje = date.today()
     ontem = hoje - timedelta(days=1)
     cur = conn.cursor()
 
     # 1) Materializa snapshot do dia
-    cur.execute("""
-        INSERT INTO anuncio_snapshot (anuncio_id, dia, preco_do_dia, status_do_dia, dias_no_ar)
-        SELECT id, %s, preco, status, DATEDIFF(%s, primeira_vez_visto)
-        FROM anuncio
-        ON DUPLICATE KEY UPDATE
-            preco_do_dia = VALUES(preco_do_dia),
-            status_do_dia = VALUES(status_do_dia),
-            dias_no_ar = VALUES(dias_no_ar)
-    """, (hoje, hoje))
+    if coluna_existe(cur, "anuncio_snapshot", "dias_observados"):
+        cur.execute("""
+            INSERT INTO anuncio_snapshot (
+                anuncio_id, dia, preco_do_dia, status_do_dia,
+                dias_no_ar, dias_observados
+            )
+            SELECT id, %s, preco, status,
+                   DATEDIFF(%s, primeira_vez_visto),
+                   DATEDIFF(%s, primeira_vez_visto)
+            FROM anuncio
+            ON DUPLICATE KEY UPDATE
+                preco_do_dia = VALUES(preco_do_dia),
+                status_do_dia = VALUES(status_do_dia),
+                dias_no_ar = VALUES(dias_no_ar),
+                dias_observados = VALUES(dias_observados)
+        """, (hoje, hoje, hoje))
+    else:
+        # Compatibilidade durante a publicação gradual da migração semântica.
+        cur.execute("""
+            INSERT INTO anuncio_snapshot (anuncio_id, dia, preco_do_dia, status_do_dia, dias_no_ar)
+            SELECT id, %s, preco, status, DATEDIFF(%s, primeira_vez_visto)
+            FROM anuncio
+            ON DUPLICATE KEY UPDATE
+                preco_do_dia = VALUES(preco_do_dia),
+                status_do_dia = VALUES(status_do_dia),
+                dias_no_ar = VALUES(dias_no_ar)
+        """, (hoje, hoje))
     print(f"Snapshot de {hoje}: {cur.rowcount} linhas materializadas.")
 
     # 2) Detecta mudanças de preço (mesmo anúncio, preço diferente vs. ontem)

@@ -6,6 +6,7 @@
  * POST: correção manual de FIPE/KM ou restauração do vínculo automático.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_quality.php';
 inicia_sessao_oper_radar();
 $usuario = exige_autenticacao();
 $conn = conecta();
@@ -26,22 +27,13 @@ function envia_detalhe_anuncio(mysqli $conn, int $id): void {
                    r.nome AS revenda, r.cidade, r.uf,
                    fp.preco AS preco_fipe, fp.codigo_fipe, fp.ano_codigo,
                    fp.mes_referencia, fm.marca_fipe, fm.modelo_fipe,
-                   mc.anuncios_comparaveis, mc.preco_medio_mercado,
-                   mc.menor_preco_mercado, mc.maior_preco_mercado,
+                   0 AS anuncios_comparaveis, NULL AS preco_medio_mercado,
+                   NULL AS menor_preco_mercado, NULL AS maior_preco_mercado,
                    u.nome AS curadoria_usuario
             FROM anuncio a
             JOIN revenda r ON r.id=a.revenda_id
             LEFT JOIN fipe_preco fp ON fp.id=a.fipe_preco_id
             LEFT JOIN fipe_modelo fm ON fm.id=fp.fipe_modelo_id
-            LEFT JOIN (
-                SELECT fipe_preco_id, COUNT(*) AS anuncios_comparaveis,
-                       AVG(NULLIF(preco,0)) AS preco_medio_mercado,
-                       MIN(NULLIF(preco,0)) AS menor_preco_mercado,
-                       MAX(NULLIF(preco,0)) AS maior_preco_mercado
-                FROM anuncio
-                WHERE status='ativo' AND fipe_preco_id IS NOT NULL AND preco>0
-                GROUP BY fipe_preco_id
-            ) mc ON mc.fipe_preco_id=a.fipe_preco_id
             LEFT JOIN usuario u ON u.id=a.curadoria_usuario_id
             WHERE a.id=? LIMIT 1";
     $st = $conn->prepare($sql);
@@ -72,17 +64,21 @@ function envia_detalhe_anuncio(mysqli $conn, int $id): void {
     $anuncio['quilometragem_origem'] = $anuncio['quilometragem_manual'] !== null
         ? 'curadoria' : ($anuncio['km_ou_horas'] ? 'coleta' : null);
     $anuncio['opcionais'] = $anuncio['opcionais'] ? (json_decode($anuncio['opcionais'], true) ?: []) : [];
+    $estatisticas = mercado_estatisticas_por_fipe($conn, [$anuncio['fipe_preco_id']]);
+    $statsFipe = $estatisticas[(int)$anuncio['fipe_preco_id']] ?? null;
+    mercado_aplica_estatisticas($anuncio, $statsFipe);
 
     $similares = [];
     if ($anuncio['fipe_preco_id']) {
-        $st = $conn->prepare("SELECT a.id, a.anuncio_portal_id, a.titulo, a.preco, a.url,
+        $st = $conn->prepare("SELECT a.id, a.anuncio_portal_id, a.titulo, a.preco,
+                                    a.preco_texto_bruto, a.url,
                                     r.nome AS revenda, r.cidade, r.uf,
                                     COALESCE(CONCAT(a.quilometragem_manual, ' km'), a.km_ou_horas) AS quilometragem
                              FROM anuncio a
                              JOIN revenda r ON r.id=a.revenda_id
                              WHERE a.status='ativo' AND a.fipe_preco_id=? AND a.id<>?
                              ORDER BY a.preco IS NULL, a.preco ASC, a.ultima_vez_ativo DESC
-                             LIMIT 8");
+                             LIMIT 40");
         $st->bind_param('ii', $anuncio['fipe_preco_id'], $id);
         $st->execute();
         $res = $st->get_result();
@@ -90,7 +86,10 @@ function envia_detalhe_anuncio(mysqli $conn, int $id): void {
             $row['id'] = (int)$row['id'];
             $row['anuncio_portal_id'] = (int)$row['anuncio_portal_id'];
             $row['preco'] = detalhe_numero($row['preco']);
+            mercado_aplica_estatisticas($row, $statsFipe, $anuncio['preco_fipe']);
+            if ($row['preco_qualidade_status'] !== 'valido') continue;
             $similares[] = $row;
+            if (count($similares) >= 8) break;
         }
         $st->close();
     }

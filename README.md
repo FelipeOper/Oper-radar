@@ -1,26 +1,50 @@
 # OPER RADAR
 
-Inteligência de mercado para caminhões, carretas e implementos no Brasil — monitoramento de revendas,
-comparação de preço anunciado vs. FIPE, e estimativa de vendas regionais a partir do ciclo de vida dos anúncios.
+Plataforma de inteligência de mercado da Agência Oper para caminhões e veículos pesados.
+Monitora anúncios, preserva o histórico observado e compara preços publicados com a FIPE
+e com ofertas equivalentes qualificadas.
 
-Sistema independente da Agência Oper (sem relação com Rvops ou seus processos de CRM).
+## Estrutura
 
-## Estrutura do repositório
-
+```text
+app/                frontend React/Vite
+oper-radar-api/     API PHP consumida pelo app
+fase1-coleta/       coleta, parser, detalhes e ciclo de vida dos anúncios
+fase2-fipe/         catálogo, matching e curadoria FIPE
+fase3-series/       snapshots diários e fundação de eventos observados
+fase4-acesso/       autenticação, usuários, Minha Loja e auditoria
+scripts/            verificações locais e rotinas auxiliares
+tests/              contratos de integração e segurança
+docs/               arquitetura, solicitações e relatórios de evolução
 ```
-app/            protótipo interativo (React) do painel — Dashboard, Anúncios, Análise, Lojistas, Configuração
-docs/           documentos de arquitetura e roteiro de implementação (Word)
-fase1-coleta/   Fase 1 do roteiro: scraper, schema do banco e lógica de detecção de venda
+
+## Estado em 19/08/2026
+
+- A coleta, a API e o app estão em produção no HostGator.
+- O detalhe dos anúncios está preparado e possui rotina própria de coleta.
+- A FIPE está ativa; casos ambíguos permanecem sem vínculo automático por segurança.
+- A taxonomia DAF já foi aplicada e reprocessada em produção.
+- Os snapshots diários estão ativos às 23h10 desde 03/08/2026.
+- A trilha de eventos, a nova proteção estatística de preços e as melhorias de UX deste
+  branch estão preparadas localmente, mas ainda não foram publicadas.
+
+## Regra de interpretação
+
+- “Saída detectada” significa ausência confirmada no portal, não venda comprovada.
+- “Dias observados” começam na primeira observação pelo Radar; não são a data original
+  de publicação do anúncio.
+- Comparativos de mercado usam apenas preços qualificados e exigem amostra mínima.
+- Um número incerto não deve ser promovido a indicador comercial.
+
+## Verificação local
+
+Na raiz do projeto:
+
+```text
+python scripts/verificar_qualidade.py
 ```
 
-## Estado atual
+O comando executa testes Python, testes do frontend, build, testes PHP e validações de
+sintaxe quando as ferramentas correspondentes estão disponíveis.
 
-- [x] Base de dados de revendas mapeada (954 lojistas em PR/SC/SP + ranking nacional de 20 estados)
-- [x] Protótipo interativo do app (5 páginas, mobile-first)
-- [x] Fase 1 — schema, parser e lógica de diff prontos e testados localmente (ver `fase1-coleta/README.md`)
-- [ ] Fase 1 — deploy real (servidor + Postgres + cron) — pendente
-- [ ] Fase 2 em diante — ver `docs/OPER_RADAR_Roteiro_de_Implementacao.docx`
-
-## Próximos passos
-
-Ver o checklist detalhado por fase em `docs/OPER_RADAR_Roteiro_de_Implementacao.docx`.
+Consulte também `CLAUDE.md` para o contexto operacional e os READMEs de cada fase.
