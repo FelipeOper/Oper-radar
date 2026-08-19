@@ -16,8 +16,13 @@ function normaliza_estoque(array $dados): array {
     $ano = isset($dados['ano']) && $dados['ano'] !== '' ? (int)$dados['ano'] : null;
     $preco = isset($dados['preco_anunciado']) && $dados['preco_anunciado'] !== '' ? (float)$dados['preco_anunciado'] : null;
     $fipe = isset($dados['fipe_preco_id']) && $dados['fipe_preco_id'] !== '' ? (int)$dados['fipe_preco_id'] : null;
+    $placa = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string)($dados['placa'] ?? '')));
+    // Aceita tanto o padrão antigo ABC1234 quanto o Mercosul ABC1D23.
+    if (!preg_match('/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/', $placa)) $placa = null;
     return [
         'referencia_interna' => mb_substr(trim((string)($dados['referencia_interna'] ?? '')), 0, 80),
+        'titulo' => mb_substr(trim((string)($dados['titulo'] ?? '')), 0, 255),
+        'placa' => $placa,
         'marca' => mb_substr(trim((string)($dados['marca'] ?? '')), 0, 80),
         'modelo' => mb_substr(trim((string)($dados['modelo'] ?? '')), 0, 180),
         'ano' => $ano && $ano >= 1950 && $ano <= ((int)date('Y') + 2) ? $ano : null,
@@ -33,7 +38,7 @@ function normaliza_estoque(array $dados): array {
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $st = $conn->prepare("
-        SELECT me.id, me.referencia_interna, me.marca, me.modelo, me.ano,
+        SELECT me.id, me.referencia_interna, me.titulo, me.marca, me.modelo, me.ano,
                me.preco_anunciado, me.cidade, me.uf, me.data_entrada, me.status,
                me.fipe_preco_id, me.origem, me.placa, me.quilometragem,
                me.url_anuncio, me.imagem_url, me.usar_comparativo,
@@ -98,11 +103,11 @@ if (mb_strlen($item['modelo']) < 2) {
 
 if ($acao === 'atualizar') {
     $id = (int)($corpo['id'] ?? 0);
-    $st = $conn->prepare('UPDATE meu_estoque SET referencia_interna=?,marca=?,modelo=?,ano=?,preco_anunciado=?,cidade=?,uf=?,data_entrada=?,status=?,fipe_preco_id=?,usar_comparativo=? WHERE id=? AND usuario_id=?');
-    $st->bind_param('sssidssssiiii', $item['referencia_interna'], $item['marca'], $item['modelo'], $item['ano'], $item['preco_anunciado'], $item['cidade'], $item['uf'], $item['data_entrada'], $item['status'], $item['fipe_preco_id'], $item['usar_comparativo'], $id, $usuario['id']);
+    $st = $conn->prepare('UPDATE meu_estoque SET referencia_interna=?,titulo=?,marca=?,modelo=?,ano=?,preco_anunciado=?,cidade=?,uf=?,data_entrada=?,status=?,placa=?,fipe_preco_id=?,usar_comparativo=? WHERE id=? AND usuario_id=?');
+    $st->bind_param('ssssidsssssiiii', $item['referencia_interna'], $item['titulo'], $item['marca'], $item['modelo'], $item['ano'], $item['preco_anunciado'], $item['cidade'], $item['uf'], $item['data_entrada'], $item['status'], $item['placa'], $item['fipe_preco_id'], $item['usar_comparativo'], $id, $usuario['id']);
 } else {
-    $st = $conn->prepare('INSERT INTO meu_estoque (usuario_id,referencia_interna,marca,modelo,ano,preco_anunciado,cidade,uf,data_entrada,status,fipe_preco_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
-    $st->bind_param('isssidssssi', $usuario['id'], $item['referencia_interna'], $item['marca'], $item['modelo'], $item['ano'], $item['preco_anunciado'], $item['cidade'], $item['uf'], $item['data_entrada'], $item['status'], $item['fipe_preco_id']);
+    $st = $conn->prepare('INSERT INTO meu_estoque (usuario_id,referencia_interna,titulo,marca,modelo,ano,preco_anunciado,cidade,uf,data_entrada,status,placa,fipe_preco_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $st->bind_param('issssidsssssi', $usuario['id'], $item['referencia_interna'], $item['titulo'], $item['marca'], $item['modelo'], $item['ano'], $item['preco_anunciado'], $item['cidade'], $item['uf'], $item['data_entrada'], $item['status'], $item['placa'], $item['fipe_preco_id']);
 }
 $st->execute();
 $id = $acao === 'atualizar' ? (int)$corpo['id'] : $st->insert_id;

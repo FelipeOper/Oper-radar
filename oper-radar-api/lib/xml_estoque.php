@@ -80,11 +80,11 @@ function xml_estoque_ano(string $valor): ?int {
     return $ano >= 1950 && $ano <= ((int)date('Y') + 2) ? $ano : null;
 }
 
-function xml_estoque_data(string $valor): string {
+function xml_estoque_data(string $valor): ?string {
     $valor = trim($valor);
     if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $valor, $m)) return "$m[1]-$m[2]-$m[3]";
     if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})/', $valor, $m)) return "$m[3]-$m[2]-$m[1]";
-    return date('Y-m-d');
+    return null;
 }
 
 function xml_estoque_status(string $valor): string {
@@ -104,10 +104,13 @@ function xml_estoque_registro(SimpleXMLElement $no, int $indice): ?array {
 
     $referencia = xml_estoque_campo($c, [
         'referenciaInterna', 'codigoEstoque', 'stockId', 'vehicleId', 'listingId',
-        'codigoVeiculo', 'referencia', 'codigo', 'idVeiculo', 'id'
+        'codigoVeiculo', 'codigoReferencia', 'referenceCode', 'numeroEstoque',
+        'stockNumber', 'inventoryId', 'codigoAnuncio', 'referencia', 'codigo',
+        'idVeiculo', 'id'
     ]);
     $placa = strtoupper(preg_replace('/[^A-Z0-9]/', '', xml_estoque_campo($c, ['placa', 'plate', 'licensePlate'])));
-    if (!preg_match('/^[A-Z]{3}[0-9A-Z][0-9]{2}[0-9A-Z]$/', $placa)) $placa = '';
+    // Aceita tanto o padrão antigo ABC1234 quanto o Mercosul ABC1D23.
+    if (!preg_match('/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/', $placa)) $placa = '';
     $anoTexto = xml_estoque_campo($c, ['anoModelo', 'modelYear', 'ano', 'year', 'fabricacao']);
     $preco = xml_estoque_numero(xml_estoque_campo($c, ['precoVenda', 'salePrice', 'preco', 'price', 'valor']));
     $km = xml_estoque_numero(xml_estoque_campo($c, ['quilometragem', 'kilometragem', 'mileage', 'odometro', 'km']));
@@ -118,10 +121,14 @@ function xml_estoque_registro(SimpleXMLElement $no, int $indice): ?array {
     $imagem = xml_estoque_campo($c, ['imagemPrincipal', 'imageUrl', 'foto', 'image', 'imagem']);
     $codigoFipe = preg_replace('/[^0-9-]/', '', xml_estoque_campo($c, ['codigoFipe', 'fipeCode', 'fipe']));
 
-    $origemBase = $referencia ?: ($placa ?: implode('|', [$marca, $modelo, $anoTexto, $indice]));
+    $identidadeOrigem = $referencia !== '' ? 'codigo_referencia'
+        : ($placa !== '' ? 'placa' : ($url !== '' ? 'url' : 'composicao'));
+    $origemBase = $referencia ?: ($placa ?: ($url ?: implode('|', [$marca, $modelo, $anoTexto])));
     return [
         'referencia_interna' => mb_substr($referencia, 0, 80),
+        'titulo' => mb_substr($titulo ?: trim($marca . ' ' . $modelo), 0, 255),
         'origem_chave' => hash('sha256', xml_estoque_chave($origemBase)),
+        'identidade_origem' => $identidadeOrigem,
         'marca' => mb_substr($marca, 0, 80),
         'modelo' => mb_substr($modelo, 0, 180),
         'ano' => xml_estoque_ano($anoTexto),
@@ -140,7 +147,7 @@ function xml_estoque_registro(SimpleXMLElement $no, int $indice): ?array {
 
 /** @return SimpleXMLElement[] */
 function xml_estoque_nos(SimpleXMLElement $xml): array {
-    $tags = ['veiculo', 'vehicle', 'anuncio', 'listing', 'produto', 'item'];
+    $tags = ['veiculo', 'vehicle', 'anuncio', 'listing', 'produto', 'item', 'ad'];
     $condicoes = array_map(function ($tag) {
         return "translate(local-name(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='$tag'";
     }, $tags);

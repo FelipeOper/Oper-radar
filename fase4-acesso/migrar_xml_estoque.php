@@ -12,6 +12,7 @@ function coluna_existe(mysqli $conn, string $tabela, string $coluna): bool {
 }
 
 $colunas = [
+    'titulo' => 'VARCHAR(255) NULL AFTER referencia_interna',
     'origem' => "VARCHAR(20) NOT NULL DEFAULT 'manual' AFTER fipe_preco_id",
     'origem_chave' => 'CHAR(64) CHARACTER SET ascii NULL AFTER origem',
     'placa' => 'VARCHAR(10) NULL AFTER origem_chave',
@@ -30,6 +31,7 @@ foreach ($colunas as $nome => $definicao) {
 }
 
 if (!$conn->query("UPDATE meu_estoque SET origem_chave=SHA2(CONCAT('manual:',id),256) WHERE origem_chave IS NULL OR origem_chave=''")) throw new RuntimeException($conn->error);
+if (!$conn->query("UPDATE meu_estoque SET titulo=TRIM(CONCAT_WS(' ',marca,modelo)) WHERE titulo IS NULL OR titulo=''")) throw new RuntimeException($conn->error);
 if (!$conn->query("CREATE TABLE IF NOT EXISTS meu_estoque_importacao (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, usuario_id INT NOT NULL,
     arquivo_nome VARCHAR(190) NOT NULL, arquivo_hash CHAR(64) CHARACTER SET ascii NOT NULL,

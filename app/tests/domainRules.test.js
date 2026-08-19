@@ -36,10 +36,13 @@ test('tração é normalizada sem inferir quando o campo está vazio', () => {
 
 test('estoque pode ser filtrado e ordenado sem alterar a lista original', () => {
   const itens = [
-    { id: 1, marca: 'DAF', modelo: 'XF 530', status: 'estoque', preco_anunciado: 500000, data_entrada: '2026-08-01' },
+    { id: 1, referencia_interna: '8451', placa: 'ABC1D23', titulo: 'Cavalo 6x4 completo', marca: 'DAF', modelo: 'XF 530', status: 'estoque', preco_anunciado: 500000, data_entrada: '2026-08-01' },
     { id: 2, marca: 'Scania', modelo: 'R450', status: 'reservado', preco_anunciado: 450000, data_entrada: '2026-08-10' },
   ];
   const resultado = filtraOrdenaEstoque(itens, 'daf', 'estoque', 'preco_asc');
   assert.deepEqual(resultado.map(item => item.id), [1]);
+  assert.deepEqual(filtraOrdenaEstoque(itens, 'ABC1D23', 'todos', 'recente').map(item => item.id), [1]);
+  assert.deepEqual(filtraOrdenaEstoque(itens, '8451', 'todos', 'recente').map(item => item.id), [1]);
+  assert.deepEqual(filtraOrdenaEstoque(itens, 'completo', 'todos', 'recente').map(item => item.id), [1]);
   assert.deepEqual(itens.map(item => item.id), [1, 2]);
 });
