@@ -51,31 +51,32 @@ def contagem_snapshot(cur, dia):
     return int(cur.fetchone()[0])
 
 
-def coleta_eventos(cur, dia, proporcao_minima=0.80):
+def coleta_eventos(cur, dia, proporcao_minima=0.80, incluir_primeira_observacao=True):
     anterior = dia - timedelta(days=1)
     eventos = []
 
-    cur.execute("""
-        SELECT a.id, a.primeira_vez_visto
-        FROM anuncio a
-        LEFT JOIN anuncio_evento e
-          ON e.anuncio_id=a.id
-         AND e.tipo_evento='primeira_observacao'
-         AND e.regra_versao=%s
-        WHERE a.primeira_vez_visto IS NOT NULL
-          AND DATE(a.primeira_vez_visto) <= %s
-          AND e.id IS NULL
-    """, (REGRA_VERSAO, dia))
-    for anuncio_id, primeira_vez in cur.fetchall():
-        ocorrido = primeira_vez if isinstance(primeira_vez, datetime) else datetime.combine(primeira_vez, datetime.min.time())
-        eventos.append({
-            "anuncio_id": int(anuncio_id),
-            "tipo_evento": "primeira_observacao",
-            "ocorrido_em": ocorrido,
-            "dia_referencia": ocorrido.date(),
-            "origem": "anuncio.primeira_vez_visto",
-            "evidencia": {"campo": "primeira_vez_visto"},
-        })
+    if incluir_primeira_observacao:
+        cur.execute("""
+            SELECT a.id, a.primeira_vez_visto
+            FROM anuncio a
+            LEFT JOIN anuncio_evento e
+              ON e.anuncio_id=a.id
+             AND e.tipo_evento='primeira_observacao'
+             AND e.regra_versao=%s
+            WHERE a.primeira_vez_visto IS NOT NULL
+              AND DATE(a.primeira_vez_visto) <= %s
+              AND e.id IS NULL
+        """, (REGRA_VERSAO, dia))
+        for anuncio_id, primeira_vez in cur.fetchall():
+            ocorrido = primeira_vez if isinstance(primeira_vez, datetime) else datetime.combine(primeira_vez, datetime.min.time())
+            eventos.append({
+                "anuncio_id": int(anuncio_id),
+                "tipo_evento": "primeira_observacao",
+                "ocorrido_em": ocorrido,
+                "dia_referencia": ocorrido.date(),
+                "origem": "anuncio.primeira_vez_visto",
+                "evidencia": {"campo": "primeira_vez_visto"},
+            })
 
     atual_total = contagem_snapshot(cur, dia)
     anterior_total = contagem_snapshot(cur, anterior)
@@ -154,10 +155,10 @@ def grava_eventos(cur, eventos):
     return inseridos
 
 
-def executar(conn, dia, aplicar=False, proporcao_minima=0.80):
+def executar(conn, dia, aplicar=False, proporcao_minima=0.80, incluir_primeira_observacao=True):
     cur = conn.cursor()
     try:
-        eventos, saude = coleta_eventos(cur, dia, proporcao_minima)
+        eventos, saude = coleta_eventos(cur, dia, proporcao_minima, incluir_primeira_observacao)
         grupos = {}
         for evento in eventos:
             grupos[evento["tipo_evento"]] = grupos.get(evento["tipo_evento"], 0) + 1
@@ -177,10 +178,27 @@ def executar(conn, dia, aplicar=False, proporcao_minima=0.80):
         cur.close()
 
 
+def dias_processamento(dia=None, inicio=None, fim=None):
+    if dia is not None and (inicio is not None or fim is not None):
+        raise ValueError("use --dia ou o intervalo --inicio/--fim, não ambos")
+    if inicio is None and fim is None:
+        return [dia or date.today()]
+    if inicio is None or fim is None:
+        raise ValueError("--inicio e --fim devem ser informados juntos")
+    if fim < inicio:
+        raise ValueError("--fim não pode ser anterior a --inicio")
+    quantidade = (fim - inicio).days + 1
+    if quantidade > 366:
+        raise ValueError("o intervalo máximo é de 366 dias")
+    return [inicio + timedelta(days=deslocamento) for deslocamento in range(quantidade)]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--aplicar", action="store_true")
-    ap.add_argument("--dia", type=date.fromisoformat, default=date.today())
+    ap.add_argument("--dia", type=date.fromisoformat)
+    ap.add_argument("--inicio", type=date.fromisoformat)
+    ap.add_argument("--fim", type=date.fromisoformat)
     ap.add_argument("--proporcao-minima", type=float, default=0.80)
     ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
     ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"))
@@ -193,9 +211,21 @@ def main():
         config = configuracao(args)
     except ValueError as erro:
         ap.error(str(erro))
+    try:
+        dias = dias_processamento(args.dia, args.inicio, args.fim)
+    except ValueError as erro:
+        ap.error(str(erro))
     conn = mysql.connector.connect(**config)
     try:
-        executar(conn, args.dia, args.aplicar, args.proporcao_minima)
+        total = 0
+        for posicao, dia_atual in enumerate(dias):
+            print(f"\n=== Eventos de {dia_atual} ===")
+            total += executar(
+                conn, dia_atual, args.aplicar, args.proporcao_minima,
+                incluir_primeira_observacao=(args.aplicar or posicao == 0),
+            )
+        if len(dias) > 1:
+            print(f"Intervalo concluído: {len(dias)} dias; eventos gravados: {total}.")
     except Exception as erro:
         print(f"Falha ao materializar eventos: {erro}", file=sys.stderr)
         return 1
