@@ -42,6 +42,12 @@ export function rotuloTempoObservado(dias, status) {
   return `OBSERVADO HÁ ${dias}D`;
 }
 
+export function normalizaTracao(valor) {
+  const texto = String(valor || '').trim();
+  const encontrado = texto.match(/(?:^|[^0-9])(\d{1,2})\s*[x×]\s*(\d{1,2})(?:[^0-9]|$)/i);
+  return encontrado ? `${Number(encontrado[1])}x${Number(encontrado[2])}` : null;
+}
+
 export function filtraOrdenaEstoque(itens, busca, status, ordem) {
   const termo = String(busca || '').trim().toLocaleLowerCase('pt-BR');
   const filtrados = (itens || []).filter(item => {

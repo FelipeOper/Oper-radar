@@ -20,7 +20,7 @@ import {
   normalizeDashboardLayout,
 } from './dashboardLayout.js';
 import {
-  classificaEmissao, filtraOrdenaEstoque, rotuloTempoObservado, textoEmissao,
+  classificaEmissao, filtraOrdenaEstoque, normalizaTracao, rotuloTempoObservado, textoEmissao,
 } from './domainRules.js';
 
 /* ============================================================
@@ -107,6 +107,8 @@ function mapeiaAnuncioReal(a) {
     marca: a.marca || '',
     modelo: a.modelo || '',
     cor: a.cor || '',
+    tracao: normalizaTracao(a.tracao),
+    tracaoBruta: a.tracao || '',
     titulo: a.titulo,
     anoFabricacao,
     anoModelo,
@@ -854,6 +856,7 @@ function PageMercado({ sessao }) {
   const [revendaId, setRevendaId] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
+  const [tracao, setTracao] = useState('todas');
   const [fipeFila, setFipeFila] = useState('todos');
   const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
@@ -890,11 +893,12 @@ function PageMercado({ sessao }) {
     if (revendaId !== 'todas') p.set('revenda_id', revendaId);
     if (precoMin) p.set('preco_min', precoMin);
     if (precoMax) p.set('preco_max', precoMax);
+    if (tracao !== 'todas') p.set('tracao', tracao);
     if (fipeFila !== 'todos') p.set('fipe_fila', fipeFila);
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, fipeFila, qDebounced, ordem]);
+  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, tracao, fipeFila, qDebounced, ordem]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
@@ -961,6 +965,14 @@ function PageMercado({ sessao }) {
   const cidades = uf === 'todas' ? [] : (facetas?.ufs?.[uf]?.cidades || []);
   const revendas = uf === 'todas' ? [] : (facetas?.ufs?.[uf]?.lojistas || []);
   const tiposContexto = useMemo(() => somaPorUfs(facetas, regiao, uf, 'tipos'), [facetas, regiao, uf]);
+  const tracoesContexto = useMemo(() => somaPorUfs(facetas, regiao, uf, 'tracoes'), [facetas, regiao, uf]);
+  const opcoesTracao = useMemo(() => Object.entries(tracoesContexto)
+    .map(([valor, n]) => ({ valor, n: Number(n) }))
+    .sort((a, b) => {
+      const [a1, a2] = a.valor.split('x').map(Number);
+      const [b1, b2] = b.valor.split('x').map(Number);
+      return a1 - b1 || a2 - b2;
+    }), [tracoesContexto]);
   const subtipos = categoria === 'todas' ? [] : Object.entries(tiposContexto)
     .filter(([nome]) => categoriaDe(nome) === categoria)
     .map(([nome, n]) => ({ tipo: nome, n }))
@@ -968,12 +980,12 @@ function PageMercado({ sessao }) {
 
   const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'ativo',
     regiao !== 'todas', uf !== 'todas', cidade !== 'todas', revendaId !== 'todas', !!precoMin, !!precoMax,
-    fipeFila !== 'todos'].filter(Boolean).length;
+    tracao !== 'todas', fipeFila !== 'todos'].filter(Boolean).length;
   const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
   const limparFiltros = () => {
     setQ(''); setCategoria('todas'); setTipo('todos'); setStatus('ativo'); setRegiao('todas');
     setUf('todas'); setCidade('todas'); setRevendaId('todas'); setPrecoMin(''); setPrecoMax('');
-    setFipeFila('todos'); setOrdem('aleatorio');
+    setTracao('todas'); setFipeFila('todos'); setOrdem('aleatorio');
   };
 
   return (
@@ -1000,7 +1012,7 @@ function PageMercado({ sessao }) {
           const ativa = categoria === cat;
           const n = cat === 'todas' ? totalGeral : (catCounts[cat] || 0);
           return (
-            <button key={cat} aria-pressed={ativa} onClick={() => { setCategoria(cat); setTipo('todos'); }} style={{
+            <button key={cat} aria-pressed={ativa} onClick={() => { setCategoria(cat); setTipo('todos'); if (cat !== 'caminhoes') setTracao('todas'); }} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px', minWidth: 0,
               background: ativa ? `${info.cor}22` : T.surface,
               border: `1px solid ${ativa ? info.cor : T.line}`,
@@ -1040,6 +1052,10 @@ function PageMercado({ sessao }) {
           <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle} disabled={categoria === 'todas'}>
             <option value="todos">{categoria === 'todas' ? 'Escolha uma categoria' : 'Todos os subtipos'}</option>
             {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{s.tipo} ({s.n})</option>)}
+          </select>
+          <select aria-label="Tração ou configuração de eixos" value={tracao} onChange={e => { const valor = e.target.value; setTracao(valor); if (valor !== 'todas') { setCategoria('caminhoes'); setTipo('todos'); } }} style={inputStyle}>
+            <option value="todas">Todas as trações</option>
+            {opcoesTracao.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
           </select>
           <select aria-label="Situação do anúncio" value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
             <option value="ativo">No mercado</option>
@@ -1085,6 +1101,7 @@ function PageMercado({ sessao }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <span style={{ fontSize: 12 }}>{cat.icone}</span>
                 <span style={{ fontFamily: T.fontMono, fontSize: 10, color: cat.cor, letterSpacing: '0.04em' }}>{cat.label.toUpperCase()}</span>
+                {a.tracao && <Tag tone="neutro">TRAÇÃO {a.tracao}</Tag>}
                 {!a.precoFipe && a.fipeSugestoes > 0 && <Tag tone="sinal">{a.fipeSugestoes} SUGESTÕES FIPE</Tag>}
               </div>
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>

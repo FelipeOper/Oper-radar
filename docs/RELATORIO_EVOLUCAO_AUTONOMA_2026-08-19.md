@@ -22,6 +22,8 @@ escrita no banco de produção.
 ### Experiência e acessibilidade
 
 - Busca principal antecipada na tela Mercado.
+- Tração/configuração de eixos coletada exibida no card e disponível como filtro dinâmico
+  (`4x2`, `6x2`, `6x4`, `8x2` e demais valores presentes no banco).
 - Filtros avançados e seletores receberam estado acessível.
 - Minha Loja ganhou busca, filtro, ordenação, estado de salvamento, rollback e desfazer.
 - Formulários principais receberam nomes acessíveis e grids móveis responsivos.

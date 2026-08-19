@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   classificaEmissao,
   filtraOrdenaEstoque,
+  normalizaTracao,
   rotuloTempoObservado,
   textoEmissao,
 } from '../src/domainRules.js';
@@ -23,6 +24,14 @@ test('tempo é descrito como observação do radar', () => {
   assert.equal(rotuloTempoObservado(31, 'ativo'), 'OBSERVADO HÁ 31D');
   assert.equal(rotuloTempoObservado(1, 'ativo'), 'NOVO NO RADAR');
   assert.equal(rotuloTempoObservado(10, 'saida_detectada'), 'SAIU DO PORTAL');
+});
+
+test('tração é normalizada sem inferir quando o campo está vazio', () => {
+  assert.equal(normalizaTracao('Cavalo 6X4'), '6x4');
+  assert.equal(normalizaTracao('Truck  8 × 2'), '8x2');
+  assert.equal(normalizaTracao('4x2'), '4x2');
+  assert.equal(normalizaTracao('Cavalo mecânico'), null);
+  assert.equal(normalizaTracao(null), null);
 });
 
 test('estoque pode ser filtrado e ordenado sem alterar a lista original', () => {

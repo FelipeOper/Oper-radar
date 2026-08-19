@@ -35,6 +35,16 @@ class EvolucaoConfiabilidadeContractTest(unittest.TestCase):
         for fragmento in ["Buscar no estoque", "Filtrar estoque por status", "Desfazer", "aria-expanded"]:
             self.assertIn(fragmento, app)
 
+    def test_tracao_aparece_no_card_e_filtra_no_banco(self):
+        app = (ROOT / "app" / "src" / "App.jsx").read_text(encoding="utf-8")
+        anuncios = (ROOT / "oper-radar-api" / "anuncios.php").read_text(encoding="utf-8")
+        facetas = (ROOT / "oper-radar-api" / "facetas.php").read_text(encoding="utf-8")
+        self.assertIn("TRAÇÃO {a.tracao}", app)
+        self.assertIn('p.set(\'tracao\', tracao)', app)
+        self.assertIn("COALESCE(a.tracao,'')", anuncios)
+        self.assertIn("oper_tracao_normalizada", facetas)
+        self.assertIn("'tracoes' => $tracoesPorUf", facetas)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,8 @@ O build final fica em `app/dist/`. O HostGator hospeda somente os arquivos está
 ## Regras de confiabilidade da interface
 
 - Busca principal do Mercado aparece antes dos filtros geográficos no celular.
+- Tração/configuração de eixos coletada aparece nos cards e pode ser filtrada por valores
+  normalizados como `4x2`, `6x2`, `6x4` e `8x2`.
 - E5/E6 só aparece em caminhão, ônibus e micro-ônibus. O ano de fabricação 2022 permanece
   como transição quando a norma não estiver explícita no anúncio.
 - Tempo no Radar é apresentado como tempo observado, nunca como data garantida de publicação.

@@ -17,6 +17,11 @@ Loja e insights:
 
 Os testes independentes estão em `tests/market_quality_test.php`.
 
+`lib/vehicle_taxonomy.php` normaliza a tração/configuração de eixos coletada e mantém o
+mesmo contrato entre as facetas e a busca por `4x2`, `6x2`, `6x4`, `8x2` e demais valores
+presentes no banco. A normalização possui teste independente em
+`tests/vehicle_taxonomy_test.php`.
+
 ## Eventos
 
 `eventos.php` exige autenticação. Sem a migração `fase3-series/migrar_eventos.py`, responde

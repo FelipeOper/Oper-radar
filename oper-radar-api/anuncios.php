@@ -9,6 +9,7 @@
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
+require_once __DIR__ . '/lib/vehicle_taxonomy.php';
 $conn = conecta();
 
 $REGIOES = [
@@ -60,6 +61,12 @@ if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GE
 if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
 if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
+$padraoTracao = oper_tracao_regexp($_GET['tracao'] ?? '');
+if ($padraoTracao !== null) {
+    $where[] = "REPLACE(UPPER(COALESCE(a.tracao,'')), '×', 'X') REGEXP ?";
+    $params[] = $padraoTracao;
+    $types .= 's';
+}
 if ($somenteAbaixoFipe) {
     $where[] = "a.preco IS NOT NULL AND f.preco IS NOT NULL
                 AND a.preco >= f.preco * " . OPER_RADAR_RAZAO_MIN_FIPE . "
@@ -88,10 +95,10 @@ if (!empty($_GET['q'])) {
     // encontra titulos com palavras intermediarias sem misturar a revenda/cidade.
     $tokens = preg_split('/\s+/u', trim($_GET['q']), -1, PREG_SPLIT_NO_EMPTY);
     foreach (array_slice($tokens ?: [], 0, 8) as $token) {
-        $where[] = "(a.titulo LIKE ? OR COALESCE(a.marca, '') LIKE ? OR COALESCE(a.modelo, '') LIKE ?)";
+        $where[] = "(a.titulo LIKE ? OR COALESCE(a.marca, '') LIKE ? OR COALESCE(a.modelo, '') LIKE ? OR COALESCE(a.tracao, '') LIKE ?)";
         $termo = '%' . $token . '%';
-        array_push($params, $termo, $termo, $termo);
-        $types .= 'sss';
+        array_push($params, $termo, $termo, $termo, $termo);
+        $types .= 'ssss';
     }
 }
 $clausula = $where ? ' WHERE ' . implode(' AND ', $where) : '';
@@ -120,7 +127,7 @@ $ordens = [
 ];
 $ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
 
-$sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo,
+$sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo, a.tracao,
                a.ano_inicial, a.ano_final,
                a.ano_inicial AS ano_fabricacao, a.ano_final AS ano_modelo, a.cor,
                COALESCE(CONCAT(a.quilometragem_manual, ' km'), a.km_ou_horas) AS quilometragem,
