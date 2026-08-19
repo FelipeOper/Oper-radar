@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS meu_estoque (
     id                 INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id         INT NOT NULL,
     referencia_interna VARCHAR(80) NULL,
+    titulo             VARCHAR(255) NULL,
     marca              VARCHAR(80) NULL,
     modelo             VARCHAR(180) NOT NULL,
     ano                SMALLINT NULL,

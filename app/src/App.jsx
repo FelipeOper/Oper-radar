@@ -194,14 +194,14 @@ function RadarPulse({ ultimaColeta }) {
   );
 }
 
-function Card({ children, style, onClick }) {
+function Card({ children, style, onClick, className = '' }) {
   const usaPaddingPadrao = style?.padding == null;
   return (
-    <div className={usaPaddingPadrao ? 'or-card or-card-density' : 'or-card'} onClick={onClick}
+    <div className={`${usaPaddingPadrao ? 'or-card or-card-density' : 'or-card'} ${className}`.trim()} onClick={onClick}
       role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); } }) : undefined}
       style={{
-      background: T.surface, border: `1px solid ${T.line}`, borderRadius: 14,
+      background: `var(--or-zebra-bg, ${T.surface})`, border: `1px solid ${T.line}`, borderRadius: 14,
       padding: 20, transition: 'border-color 160ms ease',
       cursor: onClick ? 'pointer' : 'default',
       ...style,
@@ -477,14 +477,14 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
               {!a.fipe_preco_id && <div style={{ marginBottom: 14 }}>
                 <div style={{ fontFamily: T.fontDisplay, fontSize: 13, fontWeight: 600 }}>Sugestões inteligentes</div>
                 <div style={{ color: T.inkMuted, fontSize: 10.5, lineHeight: 1.5, marginTop: 3 }}>Candidatos restritos à marca, família, modelo, ano-modelo, eixo e emissão. Uma sugestão só entra nos KPIs depois da sua confirmação.</div>
-                {(dados.sugestoes_fipe || []).length > 0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 9 }}>
+                {(dados.sugestoes_fipe || []).length > 0 ? <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 9 }}>
                   {dados.sugestoes_fipe.map(item => {
                     const escolhido = Number(fipeSelecionada?.id) === Number(item.id);
                     const tone = item.score >= 85 ? T.positive : item.score >= 65 ? T.signal : T.steel;
                     const exigeVersao = String(item.motivos || '').includes('versao a confirmar');
                     return <button key={`sugestao-${item.id}`} onClick={() => setFipeSelecionada(item)} style={{
                       textAlign: 'left', padding: 11, borderRadius: 10, cursor: 'pointer', color: T.ink,
-                      background: escolhido ? `${tone}18` : T.surface2,
+                      background: escolhido ? `${tone}18` : `var(--or-zebra-bg, ${T.surface})`,
                       border: `1px solid ${escolhido ? tone : T.line}`, fontFamily: T.fontBody,
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -506,12 +506,12 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
                 <input value={buscaFipe} onChange={e => setBuscaFipe(e.target.value)} placeholder={`Ex.: ${a.marca || ''} ${a.titulo || ''}`} style={{ ...inputStyle, width: '100%', paddingLeft: 33 }} />
               </div>
               {buscandoFipe && <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 7 }}>Buscando no catálogo local…</div>}
-              {resultadosFipe.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, maxHeight: 260, overflowY: 'auto' }}>
+              {resultadosFipe.length > 0 && <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, maxHeight: 260, overflowY: 'auto' }}>
                 {resultadosFipe.map(item => {
                   const escolhido = Number(fipeSelecionada?.id) === Number(item.id);
                   return <button key={item.id} onClick={() => setFipeSelecionada(item)} style={{
                     textAlign: 'left', padding: 10, borderRadius: 9, cursor: 'pointer', color: T.ink,
-                    background: escolhido ? `${T.signal}18` : T.surface2,
+                    background: escolhido ? `${T.signal}18` : `var(--or-zebra-bg, ${T.surface})`,
                     border: `1px solid ${escolhido ? T.signal : T.line}`, fontFamily: T.fontBody,
                   }}>
                     <strong style={{ display: 'block', fontSize: 12 }}>{item.marca} · {item.modelo}</strong>
@@ -541,8 +541,8 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
 
           <div>
             <SectionTitle sub="Ofertas ativas ligadas à mesma referência">Produtos comparáveis</SectionTitle>
-            {dados.similares.length > 0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {dados.similares.map(item => <a key={item.id} href={item.url} target="_blank" rel="noreferrer" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, padding: 11, borderRadius: 9, border: `1px solid ${T.line}`, background: T.surface, color: T.ink, textDecoration: 'none' }}>
+            {dados.similares.length > 0 ? <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {dados.similares.map(item => <a key={item.id} href={item.url} target="_blank" rel="noreferrer" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, padding: 11, borderRadius: 9, border: `1px solid ${T.line}`, background: `var(--or-zebra-bg, ${T.surface})`, color: T.ink, textDecoration: 'none' }}>
                 <span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.titulo}</strong><small style={{ color: T.inkMuted }}>{item.revenda} · {item.cidade}/{item.uf}{item.quilometragem ? ` · ${item.quilometragem}` : ''}</small></span>
                 <span style={{ fontFamily: T.fontMono, fontSize: 12 }}>{fmtBRL(item.preco)}</span>
               </a>)}
@@ -551,7 +551,7 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
 
           {dados.historico.length > 0 && <Card style={{ padding: 16 }}>
             <div style={{ fontFamily: T.fontDisplay, fontWeight: 600 }}><History size={14} style={{ verticalAlign: -2, marginRight: 6 }} />Histórico de curadoria</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 }}>
+            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 12 }}>
               {dados.historico.map(item => <div key={item.id} style={{ borderLeft: `2px solid ${T.line}`, paddingLeft: 10 }}>
                 <div style={{ fontSize: 11.5 }}>{String(item.acao).replaceAll('_', ' ')}</div>
                 <div style={{ color: T.inkMuted, fontSize: 10, marginTop: 2 }}>{item.usuario} · {new Date(item.criado_em).toLocaleString('pt-BR')}</div>
@@ -678,7 +678,7 @@ function PainelKpi({ titulo, subtitulo, dados, renderItem, style }) {
     <Card style={{ padding: 16, height: '100%', ...style }}>
       <div style={{ fontFamily: T.fontDisplay, fontSize: 13, fontWeight: 600, color: T.ink, marginBottom: 2 }}>{titulo}</div>
       {subtitulo && <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 12 }}>{subtitulo}</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {dados && dados.length > 0
           ? dados.map(renderItem)
           : <div style={{ fontSize: 12, color: T.inkMuted, fontStyle: 'italic' }}>ainda sem dados suficientes</div>}
@@ -759,12 +759,12 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
         {sinais.length === 0 ? (
           <EmptyState icon={Radar} titulo="Sem sinais ainda" texto="Aguardando o próximo ciclo do radar detectar movimento." />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
+          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
             {sinais.map((s, i) => {
               const C = config[s.tipo];
               const aberto = sinalAberto === i;
               return (
-                <div key={`${s.a.id}-${s.tipo}-${i}`} style={{ background: aberto ? T.surface2 : T.surface, border: `1px solid ${aberto ? `${T.signal}4D` : T.line}`, borderRadius: 8, overflow: 'hidden' }}>
+                <div key={`${s.a.id}-${s.tipo}-${i}`} style={{ background: aberto ? `${T.signal}12` : `var(--or-zebra-bg, ${T.surface})`, border: `1px solid ${aberto ? `${T.signal}4D` : T.line}`, borderRadius: 8, overflow: 'hidden' }}>
                   <button type="button" aria-expanded={aberto} onClick={() => setSinalAberto(aberto ? null : i)} style={{ width: '100%', display: 'flex', gap: 10, alignItems: 'center', minHeight: 40, padding: '8px 12px', border: 'none', background: 'transparent', color: T.ink, cursor: 'pointer', fontFamily: T.fontBody, textAlign: 'left' }}>
                     <C.icone size={13} style={{ color: C.cor, flexShrink: 0 }} />
                     <span style={{ fontFamily: T.fontMono, fontSize: 9.5, color: C.cor, letterSpacing: '0.05em', minWidth: 55 }}>{C.rotulo}</span>
@@ -1085,7 +1085,7 @@ function PageMercado({ sessao }) {
         {total === null ? 'CONSULTANDO O BANCO...' : `${fmtN(total)} ANÚNCIOS ENCONTRADOS · MOSTRANDO ${fmtN(anuncios.length)}`}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
+      <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 12 }}>
         {anuncios.map(a => {
           const cat = CATEGORIAS[a.categoria] || CATEGORIAS.outros;
           return (
@@ -1177,7 +1177,7 @@ function PageOportunidades({ onCriarAcao }) {
           texto={`O mais antigo foi observado pelo Radar há ${lista[0]?.dias ?? 0} dias. Isso não informa quando o anúncio foi publicado originalmente.`} />
       )}
       {maduros.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {maduros.map(a => (
             <Card key={a.id} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <Flame size={17} style={{ color: T.alert, flexShrink: 0 }} />
@@ -1206,7 +1206,7 @@ function PageOportunidades({ onCriarAcao }) {
           texto="Vínculos sem comparáveis suficientes ou com preço anormal ficam fora do ranking principal." />
       )}
       {abaixoFipe.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {abaixoFipe.map(a => (
             <Card key={a.id} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
               <TrendingDown size={17} style={{ color: T.positive, flexShrink: 0 }} />
@@ -1252,7 +1252,7 @@ function ListaConcorrente({ itens, tipo }) {
       ? 'A lista será preenchida quando uma ausência for confirmada pelo Radar.'
       : 'Amplie o segmento ou consulte o estoque completo do lojista.'} />;
 
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+  return <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
     {itens.map((item, indice) => {
       const preco = tipo === 'saida' ? (item.preco_saida ?? item.preco) : item.preco;
       return <Card key={`${item.evento_id || item.anuncio_id}-${indice}`} style={{ padding: 13 }}>
@@ -1550,7 +1550,7 @@ function PageConcorrentes() {
         {data ? `${fmtN(filtrados.length)} REVENDAS · ${uf !== 'todas' ? `${NOMES_UF[uf]} / ${regiao}` : regiao === 'todas' ? 'BRASIL' : regiao}`.toUpperCase() : erro ? 'API INDISPONÍVEL' : 'CARREGANDO...'}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
+      <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
         {filtrados.slice(0, mostrados).map((l, i) => (
           <Card key={l.id} onClick={() => setLojistaAberto(l)} style={{ padding: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -1665,7 +1665,7 @@ function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
       )}
 
       {pendentes.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+        <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
           {pendentes.map(a => (
             <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
               <Circle size={17} style={{ color: T.inkMuted, flexShrink: 0 }} />
@@ -1681,7 +1681,7 @@ function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
       {feitas.length > 0 && (
         <>
           <SectionTitle>Concluídas</SectionTitle>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {feitas.map(a => (
               <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center', opacity: 0.55 }}>
                 <CheckCircle2 size={17} style={{ color: T.positive, flexShrink: 0 }} />
@@ -1792,7 +1792,7 @@ function PageFipe() {
         </Card>
 
         <SectionTitle sub="A placa pode retornar mais de uma versão compatível; confirme configuração e ano antes de negociar">Referências encontradas</SectionTitle>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 310px), 1fr))', gap: 12 }}>
+        <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 310px), 1fr))', gap: 12 }}>
           {(resultado.fipes || []).map((item, indice) => {
             const mercado = item.mercado;
             const fipe = mercado?.preco_local ?? item.preco_fipe;
@@ -1924,7 +1924,7 @@ function PageFipeCatalogo() {
         <EmptyState icon={Search} titulo="Nenhuma referência encontrada" texto="Tente somente o número do modelo, outra marca ou remova alguns filtros." />
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: 12 }}>
+          <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: 12 }}>
             {resultado.itens.map(item => {
               const desvio = item.desvio_medio_pct;
               const tomDesvio = desvio == null ? 'neutro' : desvio <= 0 ? 'positivo' : desvio >= 20 ? 'alerta' : 'sinal';
@@ -2077,7 +2077,7 @@ function PageConta({ sessao, onSessao, onLogout }) {
   </div>;
 }
 
-const NOVO_VEICULO = { referencia_interna: '', marca: '', modelo: '', ano: '', preco_anunciado: '', cidade: '', uf: '', data_entrada: new Date().toISOString().slice(0, 10), status: 'estoque', fipe_preco_id: null };
+const NOVO_VEICULO = { referencia_interna: '', titulo: '', placa: '', marca: '', modelo: '', ano: '', preco_anunciado: '', cidade: '', uf: '', data_entrada: new Date().toISOString().slice(0, 10), status: 'estoque', fipe_preco_id: null };
 
 function CampoMeuVeiculo({ rotulo, children }) {
   return <label style={{ fontSize: 10.5, color: T.inkMuted }}>{rotulo}{children}</label>;
@@ -2092,6 +2092,8 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
   const [salvando, setSalvando] = useState(false);
   const [comparando, setComparando] = useState(false);
   const [referenciaNova, setReferenciaNova] = useState(null);
+  const [buscaFipeManual, setBuscaFipeManual] = useState('');
+  const [opcoesFipe, setOpcoesFipe] = useState([]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -2101,7 +2103,10 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
         if (!resposta.ok) throw new Error(payload.erro || 'Não foi possível carregar o veículo.');
         return payload;
       })
-      .then(payload => { setDados(payload); setRascunho({ ...payload.item }); })
+      .then(payload => {
+        setDados(payload); setRascunho({ ...payload.item });
+        setBuscaFipeManual([payload.item.marca, payload.item.modelo, payload.item.ano].filter(Boolean).join(' '));
+      })
       .catch(e => { if (e.name !== 'AbortError') setErro(e.message); });
     return () => controller.abort();
   }, [itemInicial.id]);
@@ -2113,22 +2118,26 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
 
   const alteraIdentificacao = (campo, valor) => {
     setReferenciaNova(null);
+    setOpcoesFipe([]);
     setRascunho(atual => ({ ...atual, [campo]: valor, fipe_preco_id: null }));
   };
   const compararFipe = async () => {
-    if (!rascunho?.modelo?.trim()) return;
+    const q = buscaFipeManual.trim() || [rascunho?.marca, rascunho?.modelo, rascunho?.ano].filter(Boolean).join(' ');
+    if (q.length < 2) return;
     setComparando(true); setErro(''); setAviso('');
     try {
-      const q = [rascunho.marca, rascunho.modelo, rascunho.ano].filter(Boolean).join(' ');
-      const resposta = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=1`, { credentials: 'same-origin' });
+      const resposta = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=20&ordem=modelo`, { credentials: 'same-origin' });
       const payload = await resposta.json();
-      const referencia = payload.itens?.[0];
-      if (!referencia) { setAviso('Nenhuma referência FIPE segura foi encontrada. Revise marca, modelo e ano.'); return; }
-      setReferenciaNova(referencia);
-      setRascunho(atual => ({ ...atual, fipe_preco_id: referencia.id }));
-      setAviso(`Referência selecionada: ${referencia.marca} ${referencia.modelo} · ${referencia.ano}. Salve para recalcular o mercado.`);
+      const opcoes = payload.itens || [];
+      setOpcoesFipe(opcoes);
+      if (!opcoes.length) setAviso('Nenhuma referência encontrada. Tente somente marca, número do modelo ou código FIPE.');
     } catch { setErro('Não foi possível consultar a FIPE agora.'); }
     finally { setComparando(false); }
+  };
+  const selecionarFipe = referencia => {
+    setReferenciaNova(referencia);
+    setRascunho(atual => ({ ...atual, fipe_preco_id: referencia.id }));
+    setAviso(`Referência selecionada: ${referencia.marca} ${referencia.modelo} · ${referencia.ano}. Salve para confirmar.`);
   };
   const salvar = async () => {
     if (!rascunho?.modelo?.trim()) { setErro('Informe o modelo do veículo.'); return; }
@@ -2136,7 +2145,8 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
     try {
       await apiPost('minha_loja.php', {
         acao: 'atualizar', id: rascunho.id, referencia_interna: rascunho.referencia_interna,
-        marca: rascunho.marca, modelo: rascunho.modelo, ano: rascunho.ano,
+        titulo: rascunho.titulo, placa: rascunho.placa, marca: rascunho.marca,
+        modelo: rascunho.modelo, ano: rascunho.ano,
         preco_anunciado: rascunho.preco_anunciado, cidade: rascunho.cidade, uf: rascunho.uf,
         data_entrada: rascunho.data_entrada, status: rascunho.status,
         fipe_preco_id: rascunho.fipe_preco_id, usar_comparativo: Boolean(Number(rascunho.usar_comparativo)),
@@ -2145,7 +2155,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
       const resposta = await fetch(`${API_BASE_URL}/minha_loja_detalhe.php?id=${rascunho.id}`, { credentials: 'same-origin' });
       const payload = await resposta.json().catch(() => ({}));
       if (!resposta.ok) throw new Error(payload.erro || 'O veículo foi salvo, mas a análise não pôde ser atualizada.');
-      setDados(payload); setRascunho({ ...payload.item }); setReferenciaNova(null);
+      setDados(payload); setRascunho({ ...payload.item }); setReferenciaNova(null); setOpcoesFipe([]);
       setAviso('Veículo atualizado e comparativos recalculados.');
     } catch (e) { setErro(e.message); }
     finally { setSalvando(false); }
@@ -2163,7 +2173,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
     <aside onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Análise de ${itemInicial.marca || ''} ${itemInicial.modelo || 'veículo'}`} style={{ width: 'min(760px, 100vw)', height: '100%', overflowY: 'auto', background: T.bg, borderLeft: `1px solid ${T.line}`, boxShadow: '-20px 0 60px rgba(0,0,0,.35)', color: T.ink }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 3, background: `${T.bg}F2`, backdropFilter: 'blur(12px)', borderBottom: `1px solid ${T.line}`, padding: '14px 18px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-          <div><div style={{ fontFamily: T.fontMono, fontSize: 10, color: T.signal }}>MINHA LOJA · VEÍCULO #{itemInicial.id}</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 19, display: 'block', marginTop: 4 }}>{[rascunho?.marca || itemInicial.marca, rascunho?.modelo || itemInicial.modelo].filter(Boolean).join(' ')}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>{rascunho?.ano || 'Ano não informado'} · {[rascunho?.cidade, rascunho?.uf].filter(Boolean).join('/') || 'Local não informado'}</div></div>
+          <div><div style={{ fontFamily: T.fontMono, fontSize: 10, color: T.signal }}>MINHA LOJA · {rascunho?.referencia_interna ? `ID ${rascunho.referencia_interna}` : rascunho?.placa ? `PLACA ${rascunho.placa}` : `REGISTRO ${itemInicial.id}`}</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 19, display: 'block', marginTop: 4 }}>{rascunho?.titulo || itemInicial.titulo || [rascunho?.marca || itemInicial.marca, rascunho?.modelo || itemInicial.modelo].filter(Boolean).join(' ')}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>{[rascunho?.placa, rascunho?.marca, rascunho?.modelo, rascunho?.ano].filter(Boolean).join(' · ')} · {[rascunho?.cidade, rascunho?.uf].filter(Boolean).join('/') || 'Local não informado'}</div></div>
           <button onClick={onClose} aria-label="Fechar painel do veículo" style={{ ...inputStyle, padding: 8, cursor: 'pointer' }}><X size={18} /></button>
         </div>
         <div role="tablist" aria-label="Seções do veículo" style={{ display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto' }}>{abas.map(([id, label]) => <button key={id} role="tab" aria-selected={aba === id} onClick={() => setAba(id)} style={{ ...inputStyle, cursor: 'pointer', padding: '7px 10px', whiteSpace: 'nowrap', fontSize: 11, borderColor: aba === id ? T.signal : T.line, color: aba === id ? T.signal : T.inkMuted }}>{label}</button>)}</div>
@@ -2176,7 +2186,9 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
         {dados && rascunho && aba === 'cadastro' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {rascunho.origem === 'xml' && <div role="note" style={{ padding: 11, borderRadius: 9, color: T.inkMuted, background: `${T.signal}10`, border: `1px solid ${T.signal}30`, fontSize: 11.5 }}>Este veículo veio do XML. Uma próxima sincronização pode substituir os campos também presentes no arquivo.</div>}
           <Card style={{ padding: 15 }}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 10 }}>
-            <CampoMeuVeiculo rotulo="Referência interna"><input value={rascunho.referencia_interna || ''} onChange={e => setRascunho(v => ({ ...v, referencia_interna: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Código / ID do estoque"><input value={rascunho.referencia_interna || ''} onChange={e => setRascunho(v => ({ ...v, referencia_interna: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Título do anúncio"><input value={rascunho.titulo || ''} onChange={e => setRascunho(v => ({ ...v, titulo: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Placa"><input value={rascunho.placa || ''} onChange={e => setRascunho(v => ({ ...v, placa: e.target.value.toUpperCase() }))} maxLength={8} style={{ ...campoStyle, marginTop: 5 }} placeholder="ABC1D23" /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Marca"><input value={rascunho.marca || ''} onChange={e => alteraIdentificacao('marca', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Modelo"><input value={rascunho.modelo || ''} onChange={e => alteraIdentificacao('modelo', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Ano"><input type="number" min="1950" max="2030" value={rascunho.ano || ''} onChange={e => alteraIdentificacao('ano', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
@@ -2186,7 +2198,15 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
             <CampoMeuVeiculo rotulo="Entrada no estoque"><input type="date" value={rascunho.data_entrada || ''} onChange={e => setRascunho(v => ({ ...v, data_entrada: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Status"><select value={rascunho.status} onChange={e => setRascunho(v => ({ ...v, status: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }}><option value="estoque">No estoque</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option></select></CampoMeuVeiculo>
           </div><label style={{ display: 'flex', gap: 8, marginTop: 13, fontSize: 11.5 }}><input type="checkbox" checked={Boolean(Number(rascunho.usar_comparativo))} onChange={e => setRascunho(v => ({ ...v, usar_comparativo: e.target.checked ? 1 : 0 }))} /><span><strong>Usar nos comparativos internos</strong><br /><span style={{ color: T.inkMuted }}>O preço participa somente da área autenticada.</span></span></label></Card>
-          <Card style={{ padding: 14 }}><strong style={{ fontSize: 12.5 }}>Referência FIPE</strong><div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 5 }}>{referenciaNova ? `${referenciaNova.marca} ${referenciaNova.modelo} · ${referenciaNova.ano}` : rascunho.fipe_preco_id ? `${dados.item.marca_fipe || ''} ${dados.item.modelo_fipe || ''} · ${dados.item.codigo_fipe || 'código vinculado'}` : 'Sem vínculo após a alteração. Consulte novamente antes de salvar.'}</div><button onClick={compararFipe} disabled={comparando || !rascunho.modelo?.trim()} style={{ ...inputStyle, cursor: 'pointer', marginTop: 10 }}><Search size={14} style={{ verticalAlign: -3, marginRight: 5 }} />{comparando ? 'Consultando…' : 'Recalcular FIPE'}</button></Card>
+          <Card style={{ padding: 14 }}>
+            <strong style={{ fontSize: 12.5 }}>Referência FIPE</strong>
+            <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 5 }}>{referenciaNova ? `${referenciaNova.marca} ${referenciaNova.modelo} · ${referenciaNova.ano}` : rascunho.fipe_preco_id ? `${dados.item.marca_fipe || ''} ${dados.item.modelo_fipe || ''} · ${dados.item.codigo_fipe || 'código vinculado'}` : 'Sem vínculo. Pesquise e escolha a versão correta abaixo.'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 7, marginTop: 10 }}>
+              <input aria-label="Buscar referência FIPE manualmente" value={buscaFipeManual} onChange={e => setBuscaFipeManual(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') compararFipe(); }} style={{ ...inputStyle, width: '100%' }} placeholder="Marca, modelo, ano ou código FIPE" />
+              <button onClick={compararFipe} disabled={comparando || buscaFipeManual.trim().length < 2} style={{ ...inputStyle, cursor: 'pointer' }}><Search size={14} style={{ verticalAlign: -3, marginRight: 5 }} />{comparando ? 'Buscando…' : 'Buscar'}</button>
+            </div>
+            {opcoesFipe.length > 0 && <div className="or-zebra-list" style={{ display: 'grid', gap: 6, marginTop: 10, maxHeight: 260, overflowY: 'auto' }}>{opcoesFipe.map(opcao => <button type="button" key={opcao.id} onClick={() => selecionarFipe(opcao)} style={{ padding: 10, border: `1px solid ${rascunho.fipe_preco_id === opcao.id ? T.positive : T.line}`, borderRadius: 8, background: rascunho.fipe_preco_id === opcao.id ? `${T.positive}10` : `var(--or-zebra-bg, ${T.surface})`, color: T.ink, cursor: 'pointer', textAlign: 'left' }}><strong style={{ display: 'block', fontSize: 11.5 }}>{opcao.marca} {opcao.modelo}</strong><span style={{ color: T.inkMuted, fontSize: 10.5 }}>{opcao.ano} · {opcao.codigo_fipe} · FIPE {fmtBRL(opcao.preco_fipe)}</span></button>)}</div>}
+          </Card>
           <button onClick={salvar} disabled={salvando} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer' }}><Save size={15} style={{ verticalAlign: -3, marginRight: 6 }} />{salvando ? 'Salvando…' : 'Salvar alterações'}</button>
         </div>}
 
@@ -2195,7 +2215,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
           <div role="note" style={{ color: T.inkMuted, fontSize: 11, lineHeight: 1.5 }}>{dados.nota}</div>
         </div>}
 
-        {dados && aba === 'regioes' && <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {dados && aba === 'regioes' && <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {melhor ? <Card style={{ padding: 15, borderColor: `${T.positive}55`, background: `${T.positive}0B` }}><div style={{ fontFamily: T.fontMono, fontSize: 9.5, color: T.positive }}>MELHOR REGIÃO OBSERVADA · NÃO É GARANTIA DE VENDA</div><strong style={{ display: 'block', fontSize: 18, marginTop: 6 }}>{NOMES_UF[melhor.uf] || melhor.uf} · índice {melhor.avaliacao.pontuacao}/100</strong><div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 7 }}>{melhor.texto}</div></Card> : <div role="note" style={{ padding: 12, borderRadius: 9, background: `${T.alert}10`, border: `1px solid ${T.alert}30`, color: T.inkMuted, fontSize: 11.5 }}>Ainda não há região com amostra e histórico suficientes para uma recomendação publicável.</div>}
           {regioes.length === 0 ? <EmptyState icon={MapPin} titulo="Sem recorte regional" texto="Vincule uma FIPE com ofertas equivalentes para comparar estados." /> : regioes.map(regiao => <Card key={regiao.uf} style={{ padding: 14, borderColor: regiao.uf === rascunho.uf ? `${T.signal}55` : T.line }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><strong>{NOMES_UF[regiao.uf] || regiao.uf}{regiao.uf === rascunho.uf ? ' · sua localização' : ''}</strong><div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{regiao.texto}</div></div><Tag tone={regiao.avaliacao.confianca === 'alta' ? 'positivo' : regiao.avaliacao.confianca === 'media' ? 'sinal' : 'alerta'}>{regiao.avaliacao.pontuacao}/100</Tag></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: 7, marginTop: 11 }}>{[['Ofertas', fmtN(regiao.comparaveis)], ['Revendas', fmtN(regiao.revendas)], ['Saídas 180d', fmtN(regiao.saidas_observadas)], ['Tempo mediano', regiao.mediana_dias_saida == null ? '—' : `${fmtN(regiao.mediana_dias_saida)}d`], ['Preço mediano', fmtBRL(regiao.preco_mediano)]].map(([rotulo, valor]) => <div key={rotulo} style={{ padding: 8, borderRadius: 7, background: T.surface2 }}><small style={{ color: T.inkMuted }}>{rotulo}</small><div style={{ fontFamily: T.fontMono, fontSize: 11, marginTop: 3 }}>{valor}</div></div>)}</div><div style={{ color: T.inkMuted, fontSize: 10, marginTop: 9 }}>Confiança {regiao.avaliacao.confianca}: {regiao.avaliacao.motivo_confianca}.</div></Card>)}
           <div role="note" style={{ color: T.inkMuted, fontSize: 11, lineHeight: 1.5 }}>{dados.nota} O índice pondera movimento (30%), concorrência (20%), tempo de saída (20%), preço (15%) e qualidade dos dados (15%).</div>
@@ -2212,6 +2232,7 @@ function PageMinhaLoja({ sessao }) {
   const [formAberto, setFormAberto] = useState(false);
   const [form, setForm] = useState(NOVO_VEICULO);
   const [comparacao, setComparacao] = useState(null);
+  const [opcoesFipeNovo, setOpcoesFipeNovo] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [xmlAberto, setXmlAberto] = useState(false);
   const [xmlEstado, setXmlEstado] = useState({ arquivo: null, analisando: false, importando: false, analise: null, resultado: null, erro: '' });
@@ -2240,12 +2261,13 @@ function PageMinhaLoja({ sessao }) {
     setComparacao({ carregando: true });
     try {
       const q = [form.marca, form.modelo, form.ano].filter(Boolean).join(' ');
-      const r = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=1`, { credentials: 'same-origin' });
+      const r = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=12&ordem=modelo`, { credentials: 'same-origin' });
       const d = await r.json();
-      const item = d.itens?.[0] || null;
-      setComparacao(item || { vazio: true });
-      return item;
-    } catch { setComparacao({ vazio: true }); return null; }
+      const opcoes = d.itens || [];
+      setOpcoesFipeNovo(opcoes);
+      setComparacao(opcoes.length ? { aguardando_escolha: true } : { vazio: true });
+      return opcoes;
+    } catch { setComparacao({ vazio: true }); setOpcoesFipeNovo([]); return null; }
   };
   const salvar = async () => {
     if (form.modelo.trim().length < 2) { setErro('Informe o modelo do veículo.'); return; }
@@ -2253,7 +2275,7 @@ function PageMinhaLoja({ sessao }) {
     try {
       const sugestao = comparacao && !comparacao.carregando && !comparacao.vazio ? comparacao : null;
       await apiPost('minha_loja.php', { acao: 'criar', ...form, fipe_preco_id: sugestao?.id || null }, sessao.csrf);
-      setForm(NOVO_VEICULO); setComparacao(null); setFormAberto(false);
+      setForm(NOVO_VEICULO); setComparacao(null); setOpcoesFipeNovo([]); setFormAberto(false);
       await carregar();
     } catch (e) { setErro(e.message); }
     finally { setSalvando(false); }
@@ -2272,9 +2294,10 @@ function PageMinhaLoja({ sessao }) {
     try {
       await apiPost('minha_loja.php', {
         acao: 'atualizar', id: item.id, referencia_interna: item.referencia_interna,
-        marca: item.marca, modelo: item.modelo, ano: item.ano,
+        titulo: item.titulo, placa: item.placa, marca: item.marca, modelo: item.modelo, ano: item.ano,
         preco_anunciado: item.preco_anunciado, cidade: item.cidade, uf: item.uf,
         data_entrada: item.data_entrada, status, fipe_preco_id: item.fipe_preco_id,
+        usar_comparativo: Boolean(Number(item.usar_comparativo)),
       }, sessao.csrf);
       setUltimaAlteracao({ item: { ...item, status }, anterior, novo: status });
     } catch (e) {
@@ -2371,9 +2394,10 @@ function PageMinhaLoja({ sessao }) {
       {xmlEstado.erro && <div role="alert" style={{ color: T.alert, fontSize: 12, marginTop: 12 }}>{xmlEstado.erro}</div>}
       {xmlEstado.analise && <div style={{ marginTop: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-          {[['Válidos', xmlEstado.analise.resumo.validos], ['Com preço', xmlEstado.analise.resumo.com_preco], ['Identificados', xmlEstado.analise.resumo.com_referencia], ['Ignorados', xmlEstado.analise.resumo.ignorados + xmlEstado.analise.resumo.duplicados]].map(([rotulo, valor]) => <div key={rotulo} style={{ padding: 10, borderRadius: 8, background: T.surface2 }}><small style={{ color: T.inkMuted }}>{rotulo}</small><div style={{ fontFamily: T.fontMono, fontSize: 16, marginTop: 3 }}>{fmtN(valor)}</div></div>)}
+          {[['Válidos', xmlEstado.analise.resumo.validos], ['IDs estáveis', xmlEstado.analise.resumo.com_id_estavel ?? xmlEstado.analise.resumo.com_referencia], ['Com preço', xmlEstado.analise.resumo.com_preco], ['Sem ID estável', xmlEstado.analise.resumo.sem_id_estavel ?? 0]].map(([rotulo, valor]) => <div key={rotulo} style={{ padding: 10, borderRadius: 8, background: T.surface2 }}><small style={{ color: T.inkMuted }}>{rotulo}</small><div style={{ fontFamily: T.fontMono, fontSize: 16, marginTop: 3 }}>{fmtN(valor)}</div></div>)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 7, marginTop: 12 }}>{(xmlEstado.analise.amostra || []).slice(0, 5).map((i, idx) => <div key={`${i.referencia_interna}-${idx}`} style={{ minWidth: 0, padding: 10, border: `1px solid ${T.line}`, borderRadius: 8, background: T.surface2 }}><div style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5 }}>{i.referencia_interna || i.placa || 'SEM REFERÊNCIA'}</div><strong style={{ display: 'block', fontSize: 11.5, marginTop: 4, overflowWrap: 'anywhere' }}>{[i.marca, i.modelo].filter(Boolean).join(' ')}</strong><div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{i.ano || '—'} · {fmtBRL(i.preco_anunciado)} · {[i.cidade, i.uf].filter(Boolean).join('/') || '—'}</div></div>)}</div>
+        {Number(xmlEstado.analise.resumo.sem_id_estavel || 0) > 0 && <div role="alert" style={{ marginTop: 10, padding: 10, borderRadius: 8, color: T.alert, background: `${T.alert}10`, border: `1px solid ${T.alert}35`, fontSize: 11.5, lineHeight: 1.5 }}>Há {fmtN(xmlEstado.analise.resumo.sem_id_estavel)} veículo(s) sem código/ID, placa ou URL estável. Eles serão identificados pela combinação de marca, modelo e ano; prefira incluir o ID do estoque ou a placa no XML para preservar o histórico com segurança.</div>}
+        <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 7, marginTop: 12 }}>{(xmlEstado.analise.amostra || []).slice(0, 5).map((i, idx) => <div key={`${i.referencia_interna}-${idx}`} style={{ minWidth: 0, padding: 10, border: `1px solid ${T.line}`, borderRadius: 8, background: `var(--or-zebra-bg, ${T.surface})` }}><div style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5 }}>{i.referencia_interna ? `ID ${i.referencia_interna}` : i.placa ? `PLACA ${i.placa}` : 'NÃO IDENTIFICADO'}</div><strong style={{ display: 'block', fontSize: 11.5, marginTop: 4, overflowWrap: 'anywhere' }}>{i.titulo || [i.marca, i.modelo].filter(Boolean).join(' ')}</strong><div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{[i.marca, i.modelo, i.ano].filter(Boolean).join(' · ')} · {fmtBRL(i.preco_anunciado)}</div></div>)}</div>
         <div style={{ display: 'grid', gap: 9, marginTop: 13 }}>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, color: T.ink, fontSize: 12 }}><input type="checkbox" checked={xmlOpcoes.usar_comparativo} onChange={e => setXmlOpcoes(v => ({ ...v, usar_comparativo: e.target.checked }))} /> <span><strong>Publicar no comparativo do Radar</strong><br /><span style={{ color: T.inkMuted }}>Usa preço, FIPE e mercado dentro da área autenticada; placa não é exposta.</span></span></label>
           <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, color: T.ink, fontSize: 12 }}><input type="checkbox" checked={xmlOpcoes.marcar_ausentes} onChange={e => setXmlOpcoes(v => ({ ...v, marcar_ausentes: e.target.checked }))} /> <span><strong>Marcar ausentes como vendidos</strong><br /><span style={{ color: T.inkMuted }}>Ative apenas quando o XML representar todo o estoque atual da loja.</span></span></label>
@@ -2386,10 +2410,12 @@ function PageMinhaLoja({ sessao }) {
     {formAberto && <Card id="form-novo-veiculo" style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16 }}><Store size={18} color={T.signal} /><strong>Novo veículo</strong></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 10 }}>
-        <input aria-label="Referência interna" value={form.referencia_interna} onChange={e => setForm(f => ({ ...f, referencia_interna: e.target.value }))} style={inputStyle} placeholder="Referência interna" />
-        <input aria-label="Marca do veículo" value={form.marca} onChange={e => { setForm(f => ({ ...f, marca: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Marca · ex: Scania" />
-        <input aria-label="Modelo do veículo" value={form.modelo} onChange={e => { setForm(f => ({ ...f, modelo: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Modelo · ex: R450" />
-        <input aria-label="Ano do veículo" type="number" min="1950" max="2030" value={form.ano} onChange={e => { setForm(f => ({ ...f, ano: e.target.value })); setComparacao(null); }} style={inputStyle} placeholder="Ano" />
+        <input aria-label="Código ou ID do estoque" value={form.referencia_interna} onChange={e => setForm(f => ({ ...f, referencia_interna: e.target.value }))} style={inputStyle} placeholder="Código / ID do estoque" />
+        <input aria-label="Título do anúncio" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} style={inputStyle} placeholder="Título do anúncio" />
+        <input aria-label="Placa do veículo" value={form.placa} onChange={e => setForm(f => ({ ...f, placa: e.target.value.toUpperCase() }))} maxLength={8} style={inputStyle} placeholder="Placa · ABC1D23" />
+        <input aria-label="Marca do veículo" value={form.marca} onChange={e => { setForm(f => ({ ...f, marca: e.target.value })); setComparacao(null); setOpcoesFipeNovo([]); }} style={inputStyle} placeholder="Marca · ex: Scania" />
+        <input aria-label="Modelo do veículo" value={form.modelo} onChange={e => { setForm(f => ({ ...f, modelo: e.target.value })); setComparacao(null); setOpcoesFipeNovo([]); }} style={inputStyle} placeholder="Modelo · ex: R450" />
+        <input aria-label="Ano do veículo" type="number" min="1950" max="2030" value={form.ano} onChange={e => { setForm(f => ({ ...f, ano: e.target.value })); setComparacao(null); setOpcoesFipeNovo([]); }} style={inputStyle} placeholder="Ano" />
         <input aria-label="Preço anunciado" type="number" min="0" step="1000" value={form.preco_anunciado} onChange={e => setForm(f => ({ ...f, preco_anunciado: e.target.value }))} style={inputStyle} placeholder="Preço anunciado" />
         <input aria-label="Cidade do veículo" value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} style={inputStyle} placeholder="Cidade" />
         <select aria-label="Estado do veículo" value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={inputStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
@@ -2401,6 +2427,7 @@ function PageMinhaLoja({ sessao }) {
       </div>
       {comparacao?.carregando && <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 12 }}>Procurando a melhor referência…</div>}
       {comparacao?.vazio && <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 12 }}>Nenhuma referência segura encontrada. O veículo pode ser salvo sem vínculo.</div>}
+      {opcoesFipeNovo.length > 0 && <div className="or-zebra-list" style={{ display: 'grid', gap: 6, marginTop: 12, maxHeight: 260, overflowY: 'auto' }}>{opcoesFipeNovo.map(opcao => <button type="button" key={opcao.id} onClick={() => setComparacao(opcao)} style={{ padding: 10, border: `1px solid ${comparacao?.id === opcao.id ? T.positive : T.line}`, borderRadius: 8, background: comparacao?.id === opcao.id ? `${T.positive}10` : `var(--or-zebra-bg, ${T.surface})`, color: T.ink, cursor: 'pointer', textAlign: 'left' }}><strong style={{ display: 'block', fontSize: 11.5 }}>{opcao.marca} {opcao.modelo}</strong><span style={{ color: T.inkMuted, fontSize: 10.5 }}>{opcao.ano} · {opcao.codigo_fipe} · FIPE {fmtBRL(opcao.preco_fipe)}</span></button>)}</div>}
       {comparacao?.id && <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: `${T.positive}0F`, border: `1px solid ${T.positive}2A`, fontSize: 12.5 }}><strong style={{ color: T.positive }}>Referência encontrada:</strong> {comparacao.marca} {comparacao.modelo} · {comparacao.ano} · FIPE {fmtBRL(comparacao.preco_fipe)} · mediana de mercado {comparacao.mercado_amostra_suficiente ? fmtBRL(comparacao.preco_mediana_mercado) : 'amostra insuficiente'}</div>}
     </Card>}
 
@@ -2421,15 +2448,15 @@ function PageMinhaLoja({ sessao }) {
     </Card>
     {carregando ? <Card><span style={{ color: T.inkMuted }}>Carregando seu estoque…</span></Card> : itens.length === 0 ? <EmptyState icon={Store} titulo="Seu estoque começa aqui" texto="Adicione os veículos da sua loja para comparar preço, idade e posicionamento contra a FIPE e o mercado monitorado." /> :
       itensVisiveis.length === 0 ? <EmptyState icon={Search} titulo="Nenhum veículo encontrado" texto="Remova a busca ou altere o filtro de status." /> :
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: 11 }}>
+      <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: 11 }}>
         {itensVisiveis.map(item => {
           const mercado = item.mercado_amostra_suficiente ? Number(item.preco_mediana_mercado || 0) : 0;
           const preco = Number(item.preco_anunciado || 0);
           const delta = mercado && preco ? Math.round((preco / mercado - 1) * 100) : null;
           return <Card key={item.id} onClick={() => setItemAberto(item)} style={{ padding: 16, cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><select aria-label={`Status de ${item.marca || ''} ${item.modelo || ''}`} disabled={statusSalvandoId === item.id} value={item.status} onClick={e => e.stopPropagation()} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted, opacity: statusSalvandoId === item.id ? 0.6 : 1 }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select>{item.origem === 'xml' && <Tag tone="sinal">XML</Tag>}</div><button aria-label={`Excluir ${item.marca || ''} ${item.modelo || 'veículo'}`} onClick={e => { e.stopPropagation(); excluir(item.id); }} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
-            <div style={{ fontFamily: T.fontDisplay, fontSize: 16, fontWeight: 650, marginTop: 12 }}>{[item.marca, item.modelo].filter(Boolean).join(' ')}</div>
-            <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.ano || 'Ano não informado'} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias{item.quilometragem ? ` · ${fmtN(item.quilometragem)} km` : ''}</div>
+            <div style={{ fontFamily: T.fontDisplay, fontSize: 16, fontWeight: 650, marginTop: 12 }}>{item.titulo || [item.marca, item.modelo].filter(Boolean).join(' ')}</div>
+            <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.referencia_interna ? `ID ${item.referencia_interna} · ` : ''}{item.placa ? `${item.placa} · ` : ''}{[item.marca, item.modelo, item.ano].filter(Boolean).join(' · ')} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias{item.quilometragem ? ` · ${fmtN(item.quilometragem)} km` : ''}</div>
             <div style={{ fontFamily: T.fontMono, fontSize: 19, fontWeight: 650, marginTop: 15 }}>{fmtBRL(item.preco_anunciado)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
               <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>FIPE</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_fipe)}</div></div>
@@ -2465,7 +2492,7 @@ function DashboardPreview({ layout, mode }) {
 
 function DashboardOrderRow({ label, active, index, total, onToggle, onMove, size, onSize }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: `1px solid ${active ? T.lineStrong : T.line}`, borderRadius: 9, background: active ? T.surface2 : 'transparent', opacity: active ? 1 : 0.62 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: `1px solid ${active ? T.lineStrong : T.line}`, borderRadius: 9, background: `var(--or-zebra-bg, ${active ? T.surface2 : 'transparent'})`, opacity: active ? 1 : 0.62 }}>
       <button type="button" aria-label={active ? `Ocultar ${label}` : `Mostrar ${label}`} aria-pressed={active} onClick={onToggle} style={{ minHeight: 30, minWidth: 30, padding: 4, border: 'none', borderRadius: 6, background: active ? `${T.positive}14` : T.surface2, color: active ? T.positive : T.inkMuted, cursor: 'pointer' }}>{active ? <Eye size={15} /> : <EyeOff size={15} />}</button>
       <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: active ? T.ink : T.inkMuted }}>{label}</span>
       {active && size && <button type="button" aria-label={`Alterar largura de ${label}`} onClick={onSize} style={{ minHeight: 30, padding: '4px 8px', border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, cursor: 'pointer' }}>{size === 'wide' ? 'LARGO' : '½'}</button>}
@@ -2524,7 +2551,7 @@ function DashboardLayoutEditor({ value, onSave }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 18, marginTop: 20 }}>
         <div>
           <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 8, letterSpacing: '0.06em' }}>KPIs DO TOPO</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{orderedKpis.map(id => {
+          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{orderedKpis.map(id => {
             const index = draft.kpis.indexOf(id); const active = index >= 0;
             return <DashboardOrderRow key={id} label={kpiById[id].label} active={active} index={index} total={draft.kpis.length} onToggle={() => toggleKpi(id)} onMove={direction => updateDraft({ ...draft, preset: 'personalizado', kpis: moveDashboardItem(draft.kpis, index, direction) })} />;
           })}</div>
@@ -2532,7 +2559,7 @@ function DashboardLayoutEditor({ value, onSave }) {
         </div>
         <div>
           <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 8, letterSpacing: '0.06em' }}>BLOCOS DE CONTEÚDO</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{orderedSections.map(id => {
+          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{orderedSections.map(id => {
             const index = draft.sections.findIndex(item => item.id === id); const active = index >= 0; const section = draft.sections[index];
             return <DashboardOrderRow key={id} label={sectionById[id].label} active={active} index={index} total={draft.sections.length} size={section?.size} onToggle={() => toggleSection(id)} onSize={() => updateDraft({ ...draft, preset: 'personalizado', sections: draft.sections.map(item => item.id === id ? { ...item, size: item.size === 'wide' ? 'half' : 'wide' } : item) })} onMove={direction => updateDraft({ ...draft, preset: 'personalizado', sections: moveDashboardItem(draft.sections, index, direction) })} />;
           })}</div>
@@ -2767,7 +2794,7 @@ function PageAnalise() {
       {ins && ins.descobertas && ins.descobertas.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           <SectionTitle sub="Insights cruzados calculados a partir dos dados reais desta semana">Descobertas do dia</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+          <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
             {ins.descobertas.map((d, i) => {
               const cores = { conversao: T.positive, concentracao: T.signal, movimento: T.alert, faixa: T.steel };
               const c = cores[d.tipo] || T.signal;
@@ -2786,7 +2813,7 @@ function PageAnalise() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
           <Card>
             <SectionTitle sub="Onde a oferta se concentra">Marcas com mais anúncios</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(ins.por_marca || []).slice(0, 8).map(m => (
                 <BarraH key={m.marca} rotulo={m.marca} valor={m.anuncios} max={ins.por_marca[0]?.anuncios || 1} />
               ))}
@@ -2794,7 +2821,7 @@ function PageAnalise() {
           </Card>
           <Card>
             <SectionTitle sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(ins.por_cidade || []).slice(0, 8).map(c => (
                 <BarraH key={`${c.uf}-${c.cidade}`} rotulo={`${c.cidade}/${c.uf}`} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} cor={T.positive} />
               ))}
@@ -2802,7 +2829,7 @@ function PageAnalise() {
           </Card>
           <Card>
             <SectionTitle sub="Saídas detectadas · estoque · idade média observada — sinais do movimento do mercado">Movimento dos concorrentes</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(ins.movimento_por_revenda || ins.giro_por_revenda || []).slice(0, 8).map(g => (
                 <div key={`${g.uf}-${g.revenda}`} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda} <small style={{ color: T.inkMuted }}>{g.uf}</small></span>
@@ -2815,7 +2842,7 @@ function PageAnalise() {
           </Card>
           <Card>
             <SectionTitle sub="Distribuição do estoque ativo por preço">Faixas de preço</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(ins.faixas_preco || []).map(f => (
                 <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(1, ...(ins.faixas_preco || []).map(x => x.anuncios))} cor={T.alert} />
               ))}
@@ -2831,7 +2858,7 @@ function PageAnalise() {
       ) : <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ maxHeight: 380, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {msgs.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 13, color: T.inkMuted }}>Sugestões para começar:</div>
               {sugestoes.map((s, i) => (
                 <button key={i} onClick={() => setInput(s)} style={{

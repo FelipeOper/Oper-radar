@@ -44,15 +44,19 @@ $acao = (string)($_GET['acao'] ?? $_POST['acao'] ?? 'analisar');
 
 if ($acao === 'analisar') {
     $comReferencia = count(array_filter($itens, fn($i) => $i['referencia_interna'] !== '' || $i['placa']));
+    $comIdEstavel = count(array_filter($itens, fn($i) => in_array($i['identidade_origem'], ['codigo_referencia','placa','url'], true)));
     $comPreco = count(array_filter($itens, fn($i) => $i['preco_anunciado'] !== null));
     envia_json([
         'ok' => true,
         'resumo' => [
             'validos' => count($itens), 'ignorados' => (int)$leitura['ignorados'],
-            'duplicados' => $duplicados, 'com_referencia' => $comReferencia, 'com_preco' => $comPreco,
+            'duplicados' => $duplicados, 'com_referencia' => $comReferencia,
+            'com_id_estavel' => $comIdEstavel,
+            'sem_id_estavel' => count($itens) - $comIdEstavel,
+            'com_preco' => $comPreco,
         ],
         'amostra' => array_slice(array_map(function ($i) {
-            return array_intersect_key($i, array_flip(['referencia_interna','marca','modelo','ano','preco_anunciado','cidade','uf','status','placa']));
+            return array_intersect_key($i, array_flip(['referencia_interna','titulo','marca','modelo','ano','preco_anunciado','cidade','uf','status','placa','identidade_origem']));
         }, $itens), 0, 8),
     ]);
 }
@@ -94,26 +98,29 @@ try {
     $stLog->bind_param('issii', $usuario['id'], $arquivoNome, $leitura['hash'], $total, $ignorados);
     $stLog->execute(); $importacaoId = (int)$stLog->insert_id; $stLog->close();
 
-    $busca = $conn->prepare("SELECT id,fipe_preco_id FROM meu_estoque WHERE usuario_id=? AND origem='xml' AND origem_chave=? LIMIT 1");
-    $insere = $conn->prepare("INSERT INTO meu_estoque (usuario_id,referencia_interna,marca,modelo,ano,preco_anunciado,cidade,uf,data_entrada,status,fipe_preco_id,origem,origem_chave,placa,quilometragem,url_anuncio,imagem_url,usar_comparativo,xml_importacao_id,ultima_sincronizacao) VALUES (?,?,?,?,?,?,?,?,?,?,?,'xml',?,?,?,?,?,?,?,NOW())");
-    $atualiza = $conn->prepare("UPDATE meu_estoque SET referencia_interna=?,marca=?,modelo=?,ano=?,preco_anunciado=?,cidade=?,uf=?,data_entrada=?,status=?,fipe_preco_id=?,placa=?,quilometragem=?,url_anuncio=?,imagem_url=?,usar_comparativo=?,xml_importacao_id=?,ultima_sincronizacao=NOW() WHERE id=? AND usuario_id=?");
+    $busca = $conn->prepare("SELECT id,fipe_preco_id,data_entrada FROM meu_estoque WHERE usuario_id=? AND origem='xml' AND (origem_chave=? OR (NULLIF(?,'') IS NOT NULL AND placa=?)) ORDER BY origem_chave=? DESC LIMIT 1");
+    $insere = $conn->prepare("INSERT INTO meu_estoque (usuario_id,referencia_interna,titulo,marca,modelo,ano,preco_anunciado,cidade,uf,data_entrada,status,fipe_preco_id,origem,origem_chave,placa,quilometragem,url_anuncio,imagem_url,usar_comparativo,xml_importacao_id,ultima_sincronizacao) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'xml',?,?,?,?,?,?,?,NOW())");
+    $atualiza = $conn->prepare("UPDATE meu_estoque SET referencia_interna=?,titulo=?,marca=?,modelo=?,ano=?,preco_anunciado=?,cidade=?,uf=?,data_entrada=LEAST(data_entrada,COALESCE(?,data_entrada)),status=?,fipe_preco_id=?,origem_chave=?,placa=?,quilometragem=?,url_anuncio=?,imagem_url=?,usar_comparativo=?,xml_importacao_id=?,ultima_sincronizacao=NOW() WHERE id=? AND usuario_id=?");
 
     foreach ($itens as $item) {
-        $busca->bind_param('is', $usuario['id'], $item['origem_chave']); $busca->execute();
+        $placaBusca = $item['placa'] ?: '';
+        $busca->bind_param('issss', $usuario['id'], $item['origem_chave'], $placaBusca, $placaBusca, $item['origem_chave']); $busca->execute();
         $existente = $busca->get_result()->fetch_assoc();
-        $fipeId = fipe_para_item_xml($conn, $item);
-        if (!$fipeId && $existente && $existente['fipe_preco_id']) $fipeId = (int)$existente['fipe_preco_id'];
+        $fipeId = $existente && $existente['fipe_preco_id']
+            ? (int)$existente['fipe_preco_id']
+            : fipe_para_item_xml($conn, $item);
         if ($existente) {
             $id = (int)$existente['id'];
-            $atualiza->bind_param('sssidssssisissiiii',
-                $item['referencia_interna'],$item['marca'],$item['modelo'],$item['ano'],$item['preco_anunciado'],
-                $item['cidade'],$item['uf'],$item['data_entrada'],$item['status'],$fipeId,$item['placa'],
+            $atualiza->bind_param('ssssidssssississiiii',
+                $item['referencia_interna'],$item['titulo'],$item['marca'],$item['modelo'],$item['ano'],$item['preco_anunciado'],
+                $item['cidade'],$item['uf'],$item['data_entrada'],$item['status'],$fipeId,$item['origem_chave'],$item['placa'],
                 $item['quilometragem'],$item['url_anuncio'],$item['imagem_url'],$usarComparativo,$importacaoId,$id,$usuario['id']);
             $atualiza->execute(); $atualizados++;
         } else {
-            $insere->bind_param('isssidssssississii',
-                $usuario['id'],$item['referencia_interna'],$item['marca'],$item['modelo'],$item['ano'],$item['preco_anunciado'],
-                $item['cidade'],$item['uf'],$item['data_entrada'],$item['status'],$fipeId,$item['origem_chave'],$item['placa'],
+            $dataEntrada = $item['data_entrada'] ?: date('Y-m-d');
+            $insere->bind_param('issssidssssississii',
+                $usuario['id'],$item['referencia_interna'],$item['titulo'],$item['marca'],$item['modelo'],$item['ano'],$item['preco_anunciado'],
+                $item['cidade'],$item['uf'],$dataEntrada,$item['status'],$fipeId,$item['origem_chave'],$item['placa'],
                 $item['quilometragem'],$item['url_anuncio'],$item['imagem_url'],$usarComparativo,$importacaoId);
             $insere->execute(); $novos++;
         }

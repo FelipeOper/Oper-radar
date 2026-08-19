@@ -7,8 +7,11 @@ O XML é importado em **Minha Loja > Importar XML**. O fluxo tem duas etapas:
 
 ## Comportamento da sincronização
 
-- A referência do veículo, o ID do integrador ou a placa identifica o mesmo item entre duas cargas.
-- Reimportar o XML atualiza preço, status, localização e quilometragem sem duplicar o estoque.
+- A referência do veículo ou o ID do integrador é a identidade principal; a placa reconcilia o mesmo veículo se o ID mudar entre duas cargas.
+- Reimportar o XML atualiza título, preço, status, localização e quilometragem sem duplicar o estoque.
+- A data de entrada nunca é avançada na atualização do mesmo ID: o Radar preserva a data mais antiga
+  e, portanto, o tempo acumulado em estoque.
+- Um vínculo FIPE escolhido manualmente é preservado nas próximas cargas do mesmo ID.
 - `Marcar ausentes como vendidos` vem desligado. Use somente quando o XML contiver todo o estoque atual.
 - `Publicar no comparativo` inclui o veículo na comparação interna com FIPE e anúncios equivalentes.
 - Placa e dados do feed permanecem atrás do login e não são expostos nas APIs públicas.
@@ -16,12 +19,15 @@ O XML é importado em **Minha Loja > Importar XML**. O fluxo tem duas etapas:
 
 ## Campos reconhecidos
 
-O leitor aceita tags de registro como `veiculo`, `vehicle`, `anuncio`, `listing`, `produto` e `item`.
+O leitor aceita tags de registro como `veiculo`, `vehicle`, `anuncio`, `listing`, `produto`, `item` e `ad`.
 Também reconhece equivalentes em português e inglês:
+
+O formato atual da loja (`ADS > AD`) é reconhecido diretamente, incluindo `ID`, `TITLE`, `PLATE`, `MAKE`, `MODEL`, `YEAR`, `FIPE`, `PRICE`, `MILEAGE`, localização e imagens. Placas antigas (`ABC1234`) e Mercosul (`ABC1D23`) são aceitas.
 
 | Dado | Exemplos de tags |
 |---|---|
 | Identificador | `referenciaInterna`, `codigoEstoque`, `stockId`, `vehicleId`, `id` |
+| Título | `titulo`, `title`, `descricao`, `description`, `nome` |
 | Veículo | `marca`, `fabricante`, `make`, `modelo`, `model`, `versao` |
 | Ano | `anoModelo`, `modelYear`, `ano` |
 | Preço | `precoVenda`, `salePrice`, `preco`, `price`, `valor` |

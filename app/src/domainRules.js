@@ -53,7 +53,7 @@ export function filtraOrdenaEstoque(itens, busca, status, ordem) {
   const filtrados = (itens || []).filter(item => {
     if (status !== 'todos' && item.status !== status) return false;
     if (!termo) return true;
-    const texto = [item.referencia_interna, item.marca, item.modelo, item.ano]
+    const texto = [item.referencia_interna, item.placa, item.titulo, item.marca, item.modelo, item.ano]
       .filter(Boolean)
       .join(' ')
       .toLocaleLowerCase('pt-BR');

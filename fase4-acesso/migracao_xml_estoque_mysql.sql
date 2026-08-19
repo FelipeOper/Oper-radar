@@ -2,6 +2,7 @@
 -- Para bancos existentes, execute migrar_xml_estoque.php (idempotente).
 
 ALTER TABLE meu_estoque ADD COLUMN IF NOT EXISTS origem VARCHAR(20) NOT NULL DEFAULT 'manual' AFTER fipe_preco_id;
+ALTER TABLE meu_estoque ADD COLUMN IF NOT EXISTS titulo VARCHAR(255) NULL AFTER referencia_interna;
 ALTER TABLE meu_estoque ADD COLUMN IF NOT EXISTS origem_chave CHAR(64) CHARACTER SET ascii NULL AFTER origem;
 ALTER TABLE meu_estoque ADD COLUMN IF NOT EXISTS placa VARCHAR(10) NULL AFTER origem_chave;
 ALTER TABLE meu_estoque ADD COLUMN IF NOT EXISTS quilometragem INT UNSIGNED NULL AFTER placa;
@@ -14,6 +15,10 @@ ALTER TABLE meu_estoque ADD COLUMN IF NOT EXISTS ultima_sincronizacao DATETIME N
 UPDATE meu_estoque
 SET origem_chave=SHA2(CONCAT('manual:', id), 256)
 WHERE origem_chave IS NULL OR origem_chave='';
+
+UPDATE meu_estoque
+SET titulo=TRIM(CONCAT_WS(' ', marca, modelo))
+WHERE titulo IS NULL OR titulo='';
 
 CREATE TABLE IF NOT EXISTS meu_estoque_importacao (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

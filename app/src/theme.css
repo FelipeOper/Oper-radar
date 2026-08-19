@@ -59,6 +59,30 @@ select {
   padding: var(--or-card-default-padding) !important;
 }
 
+/* Listagens com leitura de planilha: linhas/cards alternam entre os dois
+   tons de superfície do tema, sem depender de cores fixas. */
+.or-zebra-list > :nth-child(odd) {
+  --or-zebra-bg: var(--or-surface);
+}
+
+.or-zebra-list > :nth-child(even) {
+  --or-zebra-bg: var(--or-surface-2);
+}
+
+.or-zebra-list > * {
+  background-color: var(--or-zebra-bg);
+  box-shadow: inset 0 -1px 0 var(--or-line);
+}
+
+.or-zebra-list > .or-card {
+  border-color: var(--or-line-strong) !important;
+}
+
+.or-zebra-rows > * {
+  padding: 8px 10px;
+  border-radius: 7px;
+}
+
 :root[data-density='compact'] {
   --or-control-min-height: 38px;
   --or-card-default-padding: 15px;

@@ -39,7 +39,7 @@ if ($id === 0) {
     envia_json(['erro' => 'Veículo inválido.', 'codigo' => 'VEICULO_INVALIDO']);
 }
 
-$itens = loja_detalhe_linhas($conn, "SELECT me.id,me.referencia_interna,me.marca,me.modelo,me.ano,
+$itens = loja_detalhe_linhas($conn, "SELECT me.id,me.referencia_interna,me.titulo,me.marca,me.modelo,me.ano,
     me.preco_anunciado,me.cidade,me.uf,me.data_entrada,me.status,me.fipe_preco_id,
     me.origem,me.placa,me.quilometragem,me.url_anuncio,me.imagem_url,me.usar_comparativo,
     me.ultima_sincronizacao,me.criado_em,me.atualizado_em,

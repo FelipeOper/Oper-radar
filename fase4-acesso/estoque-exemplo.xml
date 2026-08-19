@@ -2,6 +2,7 @@
 <estoque>
   <veiculo>
     <codigoEstoque>OP-001</codigoEstoque>
+    <titulo>Mercedes-Benz Actros 2651 6x4</titulo>
     <marca>Mercedes-Benz</marca>
     <modelo>Actros 2651 6x4</modelo>
     <anoModelo>2022</anoModelo>
@@ -16,6 +17,7 @@
   </veiculo>
   <veiculo>
     <codigoEstoque>OP-002</codigoEstoque>
+    <titulo>Scania R450 6x2</titulo>
     <marca>Scania</marca>
     <modelo>R450</modelo>
     <anoModelo>2020</anoModelo>
