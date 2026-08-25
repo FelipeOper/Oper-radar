@@ -45,3 +45,10 @@ venda. Preços resumidos passam pelas regras de qualidade de `lib/market_quality
 Durante a publicação gradual, campos antigos como `preco_medio_mercado`,
 `giro_por_revenda` e `giro_confiavel` continuam presentes como aliases. As telas novas
 preferem mediana, `movimento_por_revenda` e `idade_observada_confiavel`.
+
+## Atualidade do estoque
+
+`kpis.php` mantém `anuncios_ativos` para compatibilidade e expõe também o total, os ativos
+revalidados e os herdados no ciclo de referência (`07h` ou `19h`). Um anúncio só conta como
+revalidado quando sua revenda possui execução bem-sucedida naquele ciclo; a interface usa
+essa parcela como número principal e declara separadamente qualquer estoque herdado.

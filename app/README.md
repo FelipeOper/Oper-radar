@@ -35,3 +35,6 @@ Publicar exige uma decisão separada: este repositório não envia o build autom
 servidor. Antes de copiar `dist/`, execute os testes, gere backup dos arquivos publicados e
 valide a API correspondente. O conteúdo deve ser enviado para
 `/home1/pro93061/agenciaoper.com.br/oper-radar/`, não para a raiz genérica de `public_html`.
+
+O KPI de estoque mostra anúncios ativos revalidados no ciclo atual. Registros herdados de
+revendas ainda não coletadas aparecem separados e nunca são apresentados como atuais.

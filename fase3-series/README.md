@@ -49,3 +49,10 @@ em falsa saída.
 8. Só então decidir se o job será agendado após o snapshot diário.
 
 Nada desta nova fundação é ativado no servidor apenas por existir no repositório.
+
+## Integridade do executor
+
+Todos os arquivos `.sh` são versionados com LF por `.gitattributes`. Antes de publicar o
+executor, valide `bash -n executar_snapshot_job.sh` no servidor. Se uma cópia externa tiver
+introduzido CRLF, normalize o arquivo, repita `bash -n` e execute o job manualmente; confirme
+então que `MAX(anuncio_snapshot.dia)` corresponde ao dia da execução.

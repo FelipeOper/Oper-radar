@@ -74,6 +74,42 @@ def fetch_revenda_page(url: str) -> str:
     return resp.text
 
 
+def carrega_revendas_conhecidas(conn, uf: str) -> dict[str, int]:
+    """Perfis com estoque ativo que precisam continuar sendo revalidados.
+
+    O indice publico do portal ocasionalmente omite lojas ainda acessiveis. A URL ja
+    conhecida no banco complementa a descoberta atual sem substitui-la.
+    """
+    cur = conn.cursor(dictionary=True)
+    cur.execute("""
+        SELECT r.id, r.url_perfil
+        FROM revenda r
+        WHERE r.uf = %s AND r.url_perfil IS NOT NULL
+          AND EXISTS (
+              SELECT 1 FROM anuncio a
+              WHERE a.revenda_id = r.id AND a.status = 'ativo'
+          )
+    """, (uf.upper(),))
+    conhecidas = {
+        row["url_perfil"].rstrip("/"): int(row["id"])
+        for row in cur.fetchall() if row.get("url_perfil")
+    }
+    cur.close()
+    return conhecidas
+
+
+def combina_urls_revendas(descobertas: list[str], conhecidas: dict[str, int]) -> list[str]:
+    """Une descoberta e historico sem duplicar e preserva a ordem da descoberta."""
+    resultado = []
+    vistas = set()
+    for url in list(descobertas) + list(conhecidas):
+        normalizada = url.rstrip("/")
+        if normalizada not in vistas:
+            vistas.add(normalizada)
+            resultado.append(normalizada)
+    return resultado
+
+
 def conecta_mysql(host: str, user: str, senha: str, database: str):
     """No cPanel da HostGator: Banco de Dados MySQL -> criar banco e usuário -> anotar
     host (geralmente 'localhost'), nome do banco e usuário costumam vir prefixados com o
@@ -205,11 +241,17 @@ def registra_execucao(conn, revenda_id, janela, qtd_ativos, hash_pag, sucesso, e
 
 
 def roda_ciclo(conn, uf: str, janela: str, pausa: float):
-    urls = discover_revenda_urls(uf)
+    descobertas = discover_revenda_urls(uf)
+    conhecidas = carrega_revendas_conhecidas(conn, uf)
+    urls = combina_urls_revendas(descobertas, conhecidas)
     if not urls:
         print(f"[{uf}] nenhuma revenda publicada no portal")
         return {"encontradas": 0, "sucessos": 0, "erros": 0}
     print(f"[{uf}] {len(urls)} revendas encontradas — pausa de {pausa}s entre cada uma")
+
+    recuperadas = len(set(urls) - {url.rstrip("/") for url in descobertas})
+    print(f"[{uf}] cobertura: {len(descobertas)} descobertas, {recuperadas} "
+          f"conhecidas omitidas pelo indice, {len(urls)} a revalidar")
 
     sucessos = 0
     erros = 0
@@ -218,7 +260,8 @@ def roda_ciclo(conn, uf: str, janela: str, pausa: float):
         try:
             html = fetch_revenda_page(url)
         except requests.RequestException as e:
-            registra_execucao(conn, None, janela, 0, "", sucesso=False, erro=str(e))
+            registra_execucao(conn, conhecidas.get(url.rstrip("/")), janela, 0, "",
+                              sucesso=False, erro=str(e))
             erros += 1
             print(f"  [{i+1}/{len(urls)}] erro ao buscar {url}: {e}")
             time.sleep(pausa)
@@ -245,7 +288,8 @@ def roda_ciclo(conn, uf: str, janela: str, pausa: float):
         if i < len(urls) - 1:
             time.sleep(pausa)
     print(f"[{uf}] resumo: {sucessos} revendas coletadas, {erros} erros")
-    return {"encontradas": len(urls), "sucessos": sucessos, "erros": erros}
+    return {"encontradas": len(urls), "descobertas": len(descobertas),
+            "recuperadas": recuperadas, "sucessos": sucessos, "erros": erros}
 
 
 if __name__ == "__main__":

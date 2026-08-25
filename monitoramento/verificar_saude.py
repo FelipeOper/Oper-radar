@@ -1,7 +1,7 @@
 """Verificacao consolidada e somente de leitura da saude do OPER RADAR."""
 import argparse
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import mysql.connector
 
@@ -65,6 +65,34 @@ def main():
         if ativos < 1000:
             alertas.append(f"volume ativo anormalmente baixo: {ativos}")
 
+        if agora.hour < 8:
+            ciclo_dia, ciclo_janela = agora.date() - timedelta(days=1), "19h"
+        elif agora.hour < 20:
+            ciclo_dia, ciclo_janela = agora.date(), "07h"
+        else:
+            ciclo_dia, ciclo_janela = agora.date(), "19h"
+        cur.execute("""
+            SELECT COUNT(*) AS total,
+                   SUM(c.revenda_id IS NOT NULL) AS revalidados,
+                   COUNT(DISTINCT c.revenda_id) AS revendas_revalidadas
+            FROM anuncio a
+            LEFT JOIN (
+                SELECT DISTINCT revenda_id
+                FROM execucao_coleta
+                WHERE sucesso=1 AND revenda_id IS NOT NULL
+                  AND DATE(timestamp)=%s AND janela=%s
+            ) c ON c.revenda_id=a.revenda_id
+            WHERE a.status='ativo'
+        """, (ciclo_dia, ciclo_janela))
+        ativos_ciclo = cur.fetchone()
+        revalidados = int(ativos_ciclo["revalidados"] or 0)
+        herdados = int(ativos_ciclo["total"] or 0) - revalidados
+        if herdados:
+            avisos.append(
+                f"{herdados} anuncios ativos ainda herdados fora do ciclo "
+                f"{ciclo_dia}/{ciclo_janela}"
+            )
+
         cur.execute("SELECT MAX(dia) AS ultimo_dia, COUNT(DISTINCT dia) AS dias FROM anuncio_snapshot")
         series = cur.fetchone()
         ultimo_dia = series["ultimo_dia"]
@@ -96,6 +124,9 @@ def main():
         print(f"agora={agora:%Y-%m-%d %H:%M:%S}")
         print(f"ultima_coleta={coleta['ultima']} idade_horas={idade_coleta:.1f}" if idade_coleta is not None else "ultima_coleta=ausente")
         print(f"anuncios_total={int(anuncios['total'])} ativos={ativos} candidatos={int(anuncios['candidatos'] or 0)}")
+        print(f"ciclo_referencia={ciclo_dia}/{ciclo_janela} "
+              f"ativos_revalidados={revalidados} ativos_herdados={herdados} "
+              f"revendas_revalidadas={int(ativos_ciclo['revendas_revalidadas'] or 0)}")
         print(f"ultimo_snapshot={ultimo_dia} dias_registrados={int(series['dias'] or 0)}")
         print(f"fipe_referencia={referencia} precos_anteriores={precos_antigos} ativos_anteriores={ativos_antigos}")
         for item in avisos:

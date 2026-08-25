@@ -58,15 +58,26 @@ class BuscaPendentesTest(unittest.TestCase):
         self.assertIn("AND status = 'ativo'", sql_normalizado)
         self.assertEqual((80,), conn.cursor_criado.params)
 
+    def test_status_prioritario_fura_backoff_e_vem_primeiro(self):
+        conn = ConexaoCaptura()
+
+        sd.busca_pendentes(conn, 135, "pagina_inesperada")
+
+        sql_normalizado = " ".join(conn.cursor_criado.sql.split())
+        self.assertIn("detalhe_status = %s OR", sql_normalizado)
+        self.assertIn("ORDER BY (detalhe_status = %s) DESC", sql_normalizado)
+        self.assertEqual(("pagina_inesperada", "pagina_inesperada", 135),
+                         conn.cursor_criado.params)
+
 
 class RodaLoteTest(unittest.TestCase):
     def setUp(self):
-        # patcha as 4 funcoes de escrita no banco e a fila, deixando roda_lote isolado de
+        # patcha as funcoes de escrita no banco e a fila, deixando roda_lote isolado de
         # qualquer conexao/HTTP real.
         self.patches = [
             patch.object(sd, "busca_pendentes"),
             patch.object(sd, "registra_tentativa"),
-            patch.object(sd, "marca_removido"),
+            patch.object(sd, "marca_indisponivel"),
             patch.object(sd, "salva_detalhe"),
             patch.object(sd, "SESSAO"),
         ]
@@ -144,6 +155,29 @@ class RodaLoteTest(unittest.TestCase):
         self.assertEqual(1, anuncio_id_chamado)
         self.assertEqual("VOLVO FH 540", campos_chamados["modelo"])
         self.assertEqual(1, r["ok"])
+        self.assertFalse(r["abortado"])
+
+    def test_404_remove_do_estoque_ativo(self):
+        self.mock_busca.return_value = pendentes(1)
+        self.mock_sessao.get.return_value = RespostaFake(404, "nao encontrado")
+
+        r = sd.roda_lote(conn=None, lote=1, pausa=0)
+
+        self.mock_removido.assert_called_once_with(None, 1, "removido_404")
+        self.mock_registra.assert_not_called()
+        self.assertEqual(1, r["removidos"])
+
+    def test_pagina_vendida_remove_do_estoque_ativo_sem_acionar_breaker(self):
+        self.mock_busca.return_value = pendentes(1)
+        self.mock_sessao.get.return_value = RespostaFake(
+            200, "<html><h1>Esse veículo já foi vendido.</h1></html>")
+
+        r = sd.roda_lote(conn=None, lote=1, pausa=0)
+
+        self.mock_removido.assert_called_once_with(None, 1, "vendido_portal")
+        self.mock_salva.assert_not_called()
+        self.mock_registra.assert_not_called()
+        self.assertEqual(1, r["vendidos_portal"])
         self.assertFalse(r["abortado"])
 
 

@@ -7,7 +7,31 @@ require_once __DIR__ . '/config.php';
 $conn = conecta();
 
 $revendas = $conn->query('SELECT COUNT(*) AS n FROM revenda')->fetch_assoc()['n'];
-$anunciosAtivos = $conn->query("SELECT COUNT(*) AS n FROM anuncio WHERE status = 'ativo'")->fetch_assoc()['n'];
+$ciclo = $conn->query("
+    SELECT
+      CASE WHEN HOUR(NOW()) < 8 THEN DATE(DATE_SUB(NOW(), INTERVAL 1 DAY)) ELSE DATE(NOW()) END AS dia,
+      CASE WHEN HOUR(NOW()) < 8 THEN '19h' WHEN HOUR(NOW()) < 20 THEN '07h' ELSE '19h' END AS janela
+")->fetch_assoc();
+$stmtAtivos = $conn->prepare("
+    SELECT COUNT(*) AS total,
+           SUM(c.revenda_id IS NOT NULL) AS revalidados,
+           COUNT(DISTINCT c.revenda_id) AS revendas_revalidadas
+    FROM anuncio a
+    LEFT JOIN (
+        SELECT DISTINCT revenda_id
+        FROM execucao_coleta
+        WHERE sucesso=1 AND revenda_id IS NOT NULL
+          AND DATE(timestamp)=? AND janela=?
+    ) c ON c.revenda_id=a.revenda_id
+    WHERE a.status='ativo'
+");
+$stmtAtivos->bind_param('ss', $ciclo['dia'], $ciclo['janela']);
+$stmtAtivos->execute();
+$ativosCiclo = $stmtAtivos->get_result()->fetch_assoc();
+$stmtAtivos->close();
+$anunciosAtivos = (int)($ativosCiclo['total'] ?? 0);
+$anunciosRevalidados = (int)($ativosCiclo['revalidados'] ?? 0);
+$anunciosHerdados = $anunciosAtivos - $anunciosRevalidados;
 $revendasComEstoque = $conn->query("SELECT COUNT(DISTINCT revenda_id) AS n FROM anuncio WHERE status='ativo'")->fetch_assoc()['n'];
 
 $movimento48h = $conn->query("
@@ -53,6 +77,14 @@ envia_json([
     'revendas_monitoradas' => (int) $revendas,
     'revendas_com_estoque' => (int) $revendasComEstoque,
     'anuncios_ativos' => (int) $anunciosAtivos,
+    'anuncios_ativos_total' => $anunciosAtivos,
+    'anuncios_ativos_revalidados' => $anunciosRevalidados,
+    'anuncios_ativos_herdados' => $anunciosHerdados,
+    'revendas_revalidadas' => (int)($ativosCiclo['revendas_revalidadas'] ?? 0),
+    'ciclo_referencia' => [
+        'dia' => $ciclo['dia'],
+        'janela' => $ciclo['janela'],
+    ],
     'entradas_48h' => (int)($movimento48h['entradas'] ?? 0),
     'saidas_48h' => (int)($movimento48h['saidas'] ?? 0),
     'saidas_detectadas_mes' => (int) $saidasDetectadasMes,

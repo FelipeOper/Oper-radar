@@ -10,6 +10,7 @@ from parser_detalhe import (
     parse_detalhe,
     parece_bloqueio_ou_pagina_invalida,
     contem_marcador_de_bloqueio,
+    pagina_vendida,
     pagina_sem_campos_esperados,
 )
 
@@ -76,6 +77,11 @@ class ParserDetalheTest(unittest.TestCase):
         self.assertTrue(pagina_sem_campos_esperados("<html>" + ("x" * 9000) + "</html>", 0))
         campos = parse_detalhe(HTML_REAL)
         self.assertFalse(pagina_sem_campos_esperados(HTML_REAL, campos["campos_encontrados"]))
+
+    def test_pagina_vendida_reconhece_mensagem_explicita_do_portal(self):
+        self.assertTrue(pagina_vendida("<h1>Esse veiculo ja foi vendido.</h1>"))
+        self.assertTrue(pagina_vendida("<h1>Esse veículo já foi vendido.</h1>"))
+        self.assertFalse(pagina_vendida(HTML_REAL))
 
     def test_campo_vazio_normaliza_para_none_nao_string_vazia(self):
         html_cor_vazia = HTML_REAL.replace(

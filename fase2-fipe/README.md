@@ -116,3 +116,15 @@ nos dias 11, 18 e 25 para que combinações novas esperem no máximo uma semana.
 - Veículos profissionais, carrocerias e acessórios podem valer muito mais que o caminhão-base.
 - A referência é nacional; o preço praticado varia por região e estado do veículo.
 - Os 128 anúncios atuais sem número identificável precisam de uma fila de revisão separada.
+
+## Auditoria depois de mudanças de regra
+
+```bash
+python3 auditar_fipe_incompativeis.py
+python3 auditar_fipe_incompativeis.py --aplicar
+python3 fipe_sync.py --modo=local --lote=5000
+```
+
+O primeiro comando é dry-run. A aplicação nunca toca vínculos manuais e preserva o vínculo
+anterior até o processamento local concluir. As regras bloqueiam conflito entre famílias
+comerciais e exigem o código IVECO composto completo (`240E25` não é `240E28`).
