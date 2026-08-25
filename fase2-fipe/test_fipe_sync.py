@@ -23,7 +23,7 @@ except ModuleNotFoundError:
     sys.modules["mysql.connector"] = connector_mod
 
 from fipe_sync import (
-    ano_modelo, avalia, cabine_daf, cambio_daf, com_referencia, eixo_do_anuncio, eixos, emissao_no_texto,
+    ano_modelo, avalia, cabine_daf, cambio_daf, codigo_modelo_iveco, com_referencia, eixo_do_anuncio, eixos, emissao_no_texto,
     emissao_preferida, escolhe, familia_comercial, identificadores_modelo, normaliza, numero_modelo,
     obtem_referencia_atual, parse_preco, palavras_chave, pontua_sugestao, potencia_daf,
     processa_anuncios,
@@ -65,6 +65,23 @@ class MatchingFipeTest(unittest.TestCase):
     def test_scania_nao_mistura_series(self):
         score, _ = avalia("SCANIA R440 2014", "G-440 A 6x4 Diesel")
         self.assertEqual(0.0, score)
+
+    def test_iveco_nao_mistura_familias(self):
+        self.assertEqual(
+            0.0, avalia("IVECO STRALIS 410 2011", "TRAKKER 410-T48 6x4 2p")[0]
+        )
+        self.assertEqual(
+            0.0, avalia("IVECO EUROTECH 450E37", "STRALIS 450-S33T 6x2")[0]
+        )
+
+    def test_iveco_codigo_composto_precisa_bater_inteiro(self):
+        self.assertEqual("240E25", codigo_modelo_iveco("TECTOR 240 E 25"))
+        self.assertEqual(
+            0.0, avalia("IVECO TECTOR 240E25", "TECTOR 240E28 6x2")[0]
+        )
+        self.assertGreaterEqual(
+            avalia("IVECO TECTOR 240E25", "TECTOR 240E25 6x2")[0], 0.5
+        )
 
     def test_detecta_eixo(self):
         self.assertEqual("6X4", eixos("DAF XF 530 cavalo 6x4"))

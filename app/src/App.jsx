@@ -746,7 +746,7 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
 
   const kpiWidgets = {
     revendas: <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={`${cobertura} · 2×/dia`} />,
-    anuncios: <Kpi label="Anúncios ativos" value={kpis ? fmtN(kpis.anuncios_ativos) : '—'} sub="no mercado agora" />,
+    anuncios: <Kpi label="Anúncios ativos revalidados" value={kpis ? fmtN(kpis.anuncios_ativos_revalidados ?? kpis.anuncios_ativos) : '—'} sub={kpis?.anuncios_ativos_herdados ? `${fmtN(kpis.anuncios_ativos_herdados)} herdados · ciclo ${kpis.ciclo_referencia?.janela || '—'}` : `estoque revalidado · ciclo ${kpis?.ciclo_referencia?.janela || '—'}`} />,
     saidas: <Kpi label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · ausência confirmada" tone={T.positive} />,
     movimento: <KpiEntradaSaida entrou={kpis?.entradas_48h ?? sinais.filter(s => s.tipo === 'novo').length} saiu={kpis?.saidas_48h ?? sinais.filter(s => s.tipo === 'saida').length} />,
   };

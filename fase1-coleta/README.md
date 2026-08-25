@@ -63,7 +63,7 @@ Passos no cPanel:
 
 Duas coisas que só dá pra confirmar direto no seu painel ou com o suporte HostGator:
 - Se **SSH** está disponível pra essa conta (facilita instalar/testar antes de depender só do cron)
-- Qual **versão de Python** está disponível (o código foi escrito pensando em Python 3.10+)
+- Qual **versão de Python** está disponível (os executores de produção suportam Python 3.9+)
 
 ## O que ainda não pode ser executado a partir daqui
 
@@ -105,3 +105,13 @@ precisa do ambiente com rede livre — ver seção abaixo).
 ## Próximo passo sugerido
 
 Rodar `discover_revenda_urls("PR")` contra o portal de verdade (fora deste chat) e comparar a contagem com as 363 revendas já mapeadas, para validar que a descoberta automática bate com o levantamento manual.
+
+## Cobertura contínua e detalhe indisponível
+
+Cada ciclo une as URLs descobertas no índice público do portal às revendas já conhecidas no
+banco que ainda possuem estoque ativo. Assim, uma loja temporariamente omitida do índice
+continua sendo consultada; falhas nessas URLs conhecidas ficam associadas à revenda.
+
+O backfill reconhece a página HTTP 200 com a mensagem explícita de veículo vendido. Nesse
+caso o anúncio sai do estoque ativo com `detalhe_status=vendido_portal`; páginas sem ficha e
+sem confirmação continuam em `pagina_inesperada` para diagnóstico seguro.

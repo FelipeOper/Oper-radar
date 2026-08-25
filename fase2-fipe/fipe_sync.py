@@ -90,6 +90,7 @@ FAMILIAS_FIPE = {
     "ACTROS": ("ACTROS",), "ATRON": ("ATRON",), "EUROCARGO": ("EUROCARGO",),
     "CARGO": ("CARGO",), "TECTOR": ("TECTOR",), "HI-WAY": ("HIWAY",),
     "S-WAY": ("SWAY",), "STRALIS": ("STRALIS",), "DAILY": ("DAILY",),
+    "EUROTECH": ("EUROTECH",), "TRAKKER": ("TRAKKER", "EUROTRAKKER"),
     "F-MAX": ("FMAX",), "XF": ("XF",), "CF": ("CF",), "LF": ("LF",),
     "FH": ("FH",), "FM": ("FM",), "VM": ("VM",), "VERTIS": ("VERTIS",),
     "TGX": ("TGX",), "TGS": ("TGS",), "TGM": ("TGM",),
@@ -178,6 +179,12 @@ def numero_modelo(s: str):
     """O numero que identifica o modelo (440, 2430, 11180), ignorando anos."""
     numeros = re.findall(r"\d{3,5}", normaliza(texto_sem_anos(s)))
     return numeros[0] if numeros else None
+
+
+def codigo_modelo_iveco(s: str):
+    """Codigo composto IVECO: 240E25 e 240E28 sao modelos diferentes."""
+    m = re.search(r"\b(\d{2,3})\s*E\s*(\d{2})\b", normaliza(texto_sem_anos(s)))
+    return f"{m.group(1)}E{m.group(2)}" if m else None
 
 
 def identificadores_modelo(s: str) -> set:
@@ -305,6 +312,12 @@ def pontua_sugestao(anuncio: dict, modelo: dict):
     pontos = 20  # modelos_da_marca ja restringiu a marca
     motivos = ["marca"]
 
+    codigo_iveco_anuncio = codigo_modelo_iveco(titulo)
+    codigo_iveco_fipe = codigo_modelo_iveco(nome_fipe)
+    if (codigo_iveco_anuncio and codigo_iveco_fipe
+            and codigo_iveco_anuncio != codigo_iveco_fipe):
+        return 0, []
+
     if normaliza(anuncio.get("marca", "")) == "DAF":
         potencia_anuncio, potencia_fipe = potencia_daf(titulo), potencia_daf(nome_fipe)
         if potencia_anuncio and potencia_fipe and potencia_anuncio != potencia_fipe:
@@ -373,12 +386,18 @@ def avalia(titulo: str, modelo_fipe: str):
     """Devolve (score, motivo). Regra: o numero do modelo TEM que bater; se ambos
     tem letra de serie, elas TEM que ser iguais (senao 'R440' casaria com 'G-440',
     que e outro caminhao e outro preco)."""
+    familia_t = familia_comercial(titulo)
+    familia_f = familia_comercial(modelo_fipe)
+    if familia_t and familia_f and familia_t != familia_f:
+        return 0.0, f"familia {familia_t}!={familia_f}"
+
+    codigo_iveco_t = codigo_modelo_iveco(titulo)
+    codigo_iveco_f = codigo_modelo_iveco(modelo_fipe)
+    if codigo_iveco_t and codigo_iveco_f and codigo_iveco_t != codigo_iveco_f:
+        return 0.0, f"codigo IVECO {codigo_iveco_t}!={codigo_iveco_f}"
+
     # Na DAF, 105 identifica a geracao XF105. A potencia e outro numero (460/510 etc.).
     if "DAF" in normaliza(titulo) or familia_comercial(titulo) in ("XF", "CF"):
-        familia_t = familia_comercial(titulo)
-        familia_f = familia_comercial(modelo_fipe)
-        if familia_t and familia_f and familia_t != familia_f:
-            return 0.0, f"familia {familia_t}!={familia_f}"
         potencia_t, potencia_f = potencia_daf(titulo), potencia_daf(modelo_fipe)
         if potencia_t and potencia_f:
             if potencia_t != potencia_f:
@@ -441,7 +460,8 @@ def anuncios_pendentes(conn, limite):
               OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano')
                   AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 30 DAY))
           )
-        ORDER BY fipe_ultima_tentativa IS NULL DESC, fipe_ultima_tentativa ASC, id
+        ORDER BY (fipe_match_status LIKE 'reprocessar_%') DESC,
+                 fipe_ultima_tentativa IS NULL DESC, fipe_ultima_tentativa ASC, id
         LIMIT %s
     """, (limite,))
     rows = cur.fetchall()

@@ -18,11 +18,15 @@ Uso: python scraper_detalhe.py --lote 200 --pausa-requisicoes 4.0
 import argparse
 import os
 import time
+from typing import Optional
 
 import requests
 
 from scraper_hostgator import cria_sessao, conecta_mysql
-from parser_detalhe import parse_detalhe, contem_marcador_de_bloqueio, pagina_sem_campos_esperados
+from parser_detalhe import (
+    parse_detalhe, contem_marcador_de_bloqueio, pagina_sem_campos_esperados,
+    pagina_vendida,
+)
 
 PAUSA_ENTRE_REQUISICOES = 4.0
 MAX_ERROS_SEGUIDOS = 5
@@ -31,14 +35,17 @@ STATUS_HTTP_BLOQUEIO = (403, 429)
 SESSAO = cria_sessao()
 
 
-def busca_pendentes(conn, lote: int) -> list[dict]:
+def busca_pendentes(conn, lote: int, priorizar_status: Optional[str] = None) -> list[dict]:
     cur = conn.cursor(dictionary=True)
-    cur.execute("""
+    condicao_prioritaria = "detalhe_status = %s OR" if priorizar_status else ""
+    ordem_prioritaria = "(detalhe_status = %s) DESC," if priorizar_status else ""
+    sql = f"""
         SELECT id, url FROM anuncio
         WHERE detalhe_coletado_em IS NULL
           AND tipo = 'Caminhao'
           AND status = 'ativo'
           AND (
+              {condicao_prioritaria}
               detalhe_ultima_tentativa IS NULL
               -- Backoff progressivo (1, 2, 4, 8... dias, teto 14): cada falha nova dobra a
               -- espera, em vez de um intervalo fixo — erros persistentes esfriam sozinhos
@@ -51,9 +58,11 @@ def busca_pendentes(conn, lote: int) -> list[dict]:
                   AND detalhe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL
                       LEAST(POW(2, GREATEST(detalhe_tentativas - 1, 0)) * 3, 30) DAY))
           )
-        ORDER BY detalhe_ultima_tentativa IS NULL DESC, id
+        ORDER BY {ordem_prioritaria} detalhe_ultima_tentativa IS NULL DESC, id
         LIMIT %s
-    """, (lote,))
+    """
+    params = (priorizar_status, priorizar_status, lote) if priorizar_status else (lote,)
+    cur.execute(sql, params)
     rows = cur.fetchall()
     cur.close()
     return rows
@@ -72,16 +81,20 @@ def registra_tentativa(conn, anuncio_id: int, status: str) -> None:
     cur.close()
 
 
-def marca_removido(conn, anuncio_id: int) -> None:
+def marca_indisponivel(conn, anuncio_id: int, detalhe_status: str) -> None:
+    """Fecha o detalhe e retira do ativo quando o próprio portal confirma indisponibilidade."""
     cur = conn.cursor()
     cur.execute("""
         UPDATE anuncio SET
-            detalhe_status = 'removido',
+            detalhe_status = %s,
             detalhe_ultima_tentativa = NOW(),
             detalhe_coletado_em = NOW(),
-            detalhe_tentativas = detalhe_tentativas + 1
+            detalhe_tentativas = detalhe_tentativas + 1,
+            status = 'removido_confirmado',
+            misses_consecutivos = GREATEST(misses_consecutivos, 2),
+            data_remocao = COALESCE(data_remocao, NOW())
         WHERE id = %s
-    """, (anuncio_id,))
+    """, (detalhe_status, anuncio_id))
     conn.commit()
     cur.close()
 
@@ -108,10 +121,10 @@ def salva_detalhe(conn, anuncio_id: int, campos: dict) -> None:
     cur.close()
 
 
-def roda_lote(conn, lote: int, pausa: float) -> dict:
-    pendentes = busca_pendentes(conn, lote)
+def roda_lote(conn, lote: int, pausa: float, priorizar_status: Optional[str] = None) -> dict:
+    pendentes = busca_pendentes(conn, lote, priorizar_status=priorizar_status)
     contagem = {"ok": 0, "removidos": 0, "erro_rede": 0, "erro_http": 0,
-                "bloqueio_confirmado": 0, "pagina_inesperada": 0}
+                "vendidos_portal": 0, "bloqueio_confirmado": 0, "pagina_inesperada": 0}
     erros_seguidos = 0
     abortado = False
     motivo_abortado = None
@@ -126,7 +139,7 @@ def roda_lote(conn, lote: int, pausa: float) -> dict:
             erros_seguidos += 1
         else:
             if resp.status_code == 404:
-                marca_removido(conn, item["id"])
+                marca_indisponivel(conn, item["id"], "removido_404")
                 contagem["removidos"] += 1
                 erros_seguidos = 0
             elif resp.status_code in STATUS_HTTP_BLOQUEIO:
@@ -143,8 +156,12 @@ def roda_lote(conn, lote: int, pausa: float) -> dict:
                 contagem["erro_http"] += 1
                 erros_seguidos += 1
             else:
-                campos = parse_detalhe(resp.text)
-                if contem_marcador_de_bloqueio(resp.text):
+                if pagina_vendida(resp.text):
+                    print(f"  - anuncio {item['id']} marcado pelo portal como vendido.")
+                    marca_indisponivel(conn, item["id"], "vendido_portal")
+                    contagem["vendidos_portal"] += 1
+                    erros_seguidos = 0
+                elif contem_marcador_de_bloqueio(resp.text):
                     print(f"  ! bloqueio confirmado (marcador textual) no anuncio {item['id']} — "
                           f"abortando imediatamente.")
                     registra_tentativa(conn, item["id"], "bloqueio_confirmado")
@@ -152,16 +169,18 @@ def roda_lote(conn, lote: int, pausa: float) -> dict:
                     abortado = True
                     motivo_abortado = "marcador textual de bloqueio/challenge encontrado na pagina"
                     break
-                elif pagina_sem_campos_esperados(resp.text, campos["campos_encontrados"]):
-                    print(f"  ! pagina inesperada no anuncio {item['id']} — sem os campos "
-                          f"esperados; pode ser bloqueio sem marcador OU o portal mudou o HTML.")
-                    registra_tentativa(conn, item["id"], "pagina_inesperada")
-                    contagem["pagina_inesperada"] += 1
-                    erros_seguidos += 1
                 else:
-                    salva_detalhe(conn, item["id"], campos)
-                    contagem["ok"] += 1
-                    erros_seguidos = 0
+                    campos = parse_detalhe(resp.text)
+                    if pagina_sem_campos_esperados(resp.text, campos["campos_encontrados"]):
+                        print(f"  ! pagina inesperada no anuncio {item['id']} — sem os campos "
+                              f"esperados; pode ser bloqueio sem marcador OU o portal mudou o HTML.")
+                        registra_tentativa(conn, item["id"], "pagina_inesperada")
+                        contagem["pagina_inesperada"] += 1
+                        erros_seguidos += 1
+                    else:
+                        salva_detalhe(conn, item["id"], campos)
+                        contagem["ok"] += 1
+                        erros_seguidos = 0
 
         if erros_seguidos >= MAX_ERROS_SEGUIDOS:
             print(f"ABORTANDO: {erros_seguidos} erros seguidos — suspeita de bloqueio pelo portal "
@@ -186,6 +205,8 @@ if __name__ == "__main__":
     ap.add_argument("--lote", type=int, default=200, help="quantos anuncios processar nesta chamada")
     ap.add_argument("--pausa-requisicoes", type=float,
                      default=float(os.getenv("OPER_RADAR_PAUSA_DETALHE", PAUSA_ENTRE_REQUISICOES)))
+    ap.add_argument("--priorizar-status", choices=("pagina_inesperada",),
+                    help="reprocessa primeiro falhas desse status, ignorando o backoff uma vez")
     ap.add_argument("--db-host", default=os.getenv("OPER_RADAR_DB_HOST", "localhost"))
     ap.add_argument("--db-user", default=os.getenv("OPER_RADAR_DB_USER"), help="usuário MySQL (ou OPER_RADAR_DB_USER)")
     ap.add_argument("--db-pass", default=os.getenv("OPER_RADAR_DB_PASS"), help="senha MySQL (ou OPER_RADAR_DB_PASS)")
@@ -206,7 +227,7 @@ if __name__ == "__main__":
 
     conn = conecta_mysql(args.db_host, args.db_user, args.db_pass, args.db_name)
     try:
-        r = roda_lote(conn, args.lote, args.pausa_requisicoes)
+        r = roda_lote(conn, args.lote, args.pausa_requisicoes, args.priorizar_status)
     finally:
         conn.close()
 
@@ -215,6 +236,7 @@ if __name__ == "__main__":
     else:
         print(f"{r['pendentes_encontrados']} pendentes encontrados — "
               f"{r['ok']} salvos, {r['removidos']} removidos (404), "
+              f"{r['vendidos_portal']} vendidos informados pelo portal, "
               f"{r['erro_rede']} erro de rede, {r['erro_http']} erro HTTP, "
               f"{r['bloqueio_confirmado']} bloqueio confirmado, "
               f"{r['pagina_inesperada']} pagina inesperada.")

@@ -27,6 +27,10 @@ DESCRICAO_RE = re.compile(
     r'<p style="font-weight:\s*400\s*!important;\s*font-size:\s*14px[^"]*">\s*(.*?)\s*</p>',
     re.DOTALL,
 )
+PAGINA_VENDIDA_RE = re.compile(
+    r"esse\s+ve[ií]culo\s+j[aá]\s+foi\s+vendido",
+    re.IGNORECASE,
+)
 
 def _limpa(texto: str) -> str:
     texto = html_lib.unescape(texto)
@@ -92,6 +96,16 @@ def contem_marcador_de_bloqueio(html: str) -> bool:
     """Evidência textual explícita de challenge/bloqueio do Cloudflare (ou serviço similar)."""
     amostra = html[:3000].lower()
     return "cloudflare" in amostra or "challenge" in amostra or "attention required" in amostra
+
+
+def pagina_vendida(html: str) -> bool:
+    """Reconhece a página 200 usada pelo portal para um anúncio já vendido.
+
+    O portal não devolve 404 nesse caso: mantém uma página grande, sem ficha técnica, e
+    exibe a mensagem explícita "Esse veículo já foi vendido". Isso é evidência de
+    indisponibilidade, não erro do parser nem bloqueio.
+    """
+    return bool(PAGINA_VENDIDA_RE.search(html or ""))
 
 
 def pagina_sem_campos_esperados(html: str, campos_encontrados: int) -> bool:
