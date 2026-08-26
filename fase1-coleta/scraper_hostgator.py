@@ -30,6 +30,13 @@ BASE_URL = "https://www.caminhoesecarretas.com.br"
 # Os links no HTML real são RELATIVOS (ex: href="curitiba/pr/loja/svd-seminovos/veiculo/20345"),
 # sem o domínio na frente e sem barra inicial — confirmado direto no servidor via curl+grep.
 LOJA_URL_RE = re.compile(r'href="([a-z0-9-]+/[a-z]{2}/loja/[a-z0-9-]+/veiculo/\d+)"')
+MARCADORES_BLOQUEIO_DESCOBERTA = (
+    "attention required",
+    "checking your browser",
+    "verify you are human",
+    "cf-chl-",
+    "/cdn-cgi/challenge-platform/",
+)
 
 # Pausa entre cada fetch de revenda. Em hospedagem compartilhada, mais importante do que
 # velocidade é não estourar o limite de CPU (25% por >=90s) nem sobrecarregar o portal.
@@ -52,6 +59,12 @@ def cria_sessao() -> requests.Session:
 SESSAO = cria_sessao()
 
 
+def contem_bloqueio_descoberta(html: str) -> bool:
+    """Detecta challenge real sem confundir o script normal de e-mail da Cloudflare."""
+    amostra = (html or "")[:8000].lower()
+    return any(marcador in amostra for marcador in MARCADORES_BLOQUEIO_DESCOBERTA)
+
+
 def discover_revenda_urls(uf: str) -> list[str]:
     resp = SESSAO.get(f"{BASE_URL}/revendas.aspx?uf={uf}", timeout=30)
     resp.raise_for_status()
@@ -62,8 +75,8 @@ def discover_revenda_urls(uf: str) -> list[str]:
         print(f"[debug] status={resp.status_code} tamanho={len(resp.text)} chars")
         print(f"[debug] primeiros 500 caracteres da resposta:\n{resp.text[:500]}")
         print(f"[debug] contém 'loja'? {'loja' in resp.text.lower()}")
-        print(f"[debug] contém 'cloudflare' ou 'challenge'? {'cloudflare' in resp.text.lower() or 'challenge' in resp.text.lower()}")
-        if 'cloudflare' in resp.text.lower() or 'challenge' in resp.text.lower():
+        print(f"[debug] contém marcador real de bloqueio? {contem_bloqueio_descoberta(resp.text)}")
+        if contem_bloqueio_descoberta(resp.text):
             raise requests.RequestException("portal devolveu pagina de bloqueio/challenge")
     return urls
 

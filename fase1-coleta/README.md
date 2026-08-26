@@ -111,6 +111,8 @@ Rodar `discover_revenda_urls("PR")` contra o portal de verdade (fora deste chat)
 Cada ciclo une as URLs descobertas no índice público do portal às revendas já conhecidas no
 banco que ainda possuem estoque ativo. Assim, uma loja temporariamente omitida do índice
 continua sendo consultada; falhas nessas URLs conhecidas ficam associadas à revenda.
+Estados sem revendas publicadas são registrados como `sem_revendas`; o script normal de
+proteção de e-mail da Cloudflare não é confundido com uma página real de challenge.
 
 O backfill reconhece a página HTTP 200 com a mensagem explícita de veículo vendido. Nesse
 caso o anúncio sai do estoque ativo com `detalhe_status=vendido_portal`; páginas sem ficha e
