@@ -130,3 +130,5 @@ anterior até o processamento local concluir. As regras bloqueiam conflito entre
 comerciais e exigem o código IVECO composto completo (`240E25` não é `240E28`).
 Na URL canônica, o matching usa somente os segmentos do veículo e ignora o slug final da
 revenda, evitando que nomes de lojas como “Cargo Modal” sejam tratados como família Ford Cargo.
+Reprocessamentos que perderam marca ou ano são encerrados com motivo explícito (`sem_match`
+ou `sem_ano`) e não permanecem indefinidamente numa fila à qual nunca seriam elegíveis.
