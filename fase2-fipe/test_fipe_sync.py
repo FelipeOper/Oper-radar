@@ -26,7 +26,7 @@ from fipe_sync import (
     ano_modelo, avalia, cabine_daf, cambio_daf, codigo_modelo_iveco, com_referencia, eixo_do_anuncio, eixos, emissao_no_texto,
     emissao_preferida, escolhe, familia_comercial, identificadores_modelo, normaliza, numero_modelo,
     obtem_referencia_atual, parse_preco, palavras_chave, pontua_sugestao, potencia_daf,
-    processa_anuncios,
+    processa_anuncios, texto_anuncio, texto_url_anuncio,
 )
 from importar_fipe_csv import codigo_pelo_nome, preco_decimal
 from reabrir_fipe_taxonomia_daf import dados_derivados
@@ -81,6 +81,21 @@ class MatchingFipeTest(unittest.TestCase):
         )
         self.assertGreaterEqual(
             avalia("IVECO TECTOR 240E25", "TECTOR 240E25 6x2")[0], 0.5
+        )
+
+    def test_nome_da_revenda_na_url_nao_vira_familia_do_caminhao(self):
+        anuncio = {
+            "titulo": "MB 2544 2020/2020",
+            "url": ("https://www.caminhoesecarretas.com.br/veiculo/apucarana/pr/caminhao/"
+                    "mercedes-benz/mb-2544/2020/truck-6x2/cavalo-mecanico/"
+                    "cargo-modal-transportes/1384232"),
+            "modelo": "MB 2544",
+            "tracao": "Truck 6x2",
+        }
+        self.assertNotIn("cargo-modal-transportes", texto_url_anuncio(anuncio["url"]))
+        self.assertGreaterEqual(
+            avalia(texto_anuncio(anuncio), "Axor 2544 S/LS 6x2 2p (diesel) (E5)")[0],
+            0.5,
         )
 
     def test_detecta_eixo(self):

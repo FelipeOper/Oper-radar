@@ -21,6 +21,7 @@ import re
 import time
 import unicodedata
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 import mysql.connector
@@ -103,10 +104,21 @@ def normaliza(s: str) -> str:
     return re.sub(r"[^A-Z0-9]+", " ", s)
 
 
+def texto_url_anuncio(url: str) -> str:
+    """Mantém os atributos do veículo na URL canônica e descarta revenda/ID finais."""
+    partes = [parte for parte in urlparse(url or "").path.split("/") if parte]
+    if len(partes) >= 11 and partes[0].lower() == "veiculo" and partes[-1].isdigit():
+        partes = partes[:9]
+    return " ".join(partes)
+
+
 def texto_anuncio(anuncio: dict) -> str:
     """Junta apenas evidencias estruturadas do portal usadas no matching automatico."""
-    return " ".join(str(anuncio.get(campo) or "") for campo in (
-        "titulo", "url", "modelo", "tracao",
+    return " ".join((
+        str(anuncio.get("titulo") or ""),
+        texto_url_anuncio(str(anuncio.get("url") or "")),
+        str(anuncio.get("modelo") or ""),
+        str(anuncio.get("tracao") or ""),
     ))
 
 
