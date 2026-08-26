@@ -1,5 +1,5 @@
-# Expansao Centro-Oeste + Nordeste + Norte, fora dos horarios do PR.
+# Cobertura nacional sem PR, fora dos horarios do coletor dedicado do PR.
 # Ajuste apenas SEUUSUARIO antes de instalar.
 
-30 7 * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" coleta_multi_uf.py --plano=expansao --janela=07h >> /home1/SEUUSUARIO/logs/coleta-expansao.log 2>&1
-30 19 * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" coleta_multi_uf.py --plano=expansao --janela=19h >> /home1/SEUUSUARIO/logs/coleta-expansao.log 2>&1
+0 8 * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" coleta_multi_uf.py --plano=nacional --janela=07h >> /home1/SEUUSUARIO/logs/coleta-expansao.log 2>&1
+0 20 * * * set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" coleta_multi_uf.py --plano=nacional --janela=19h >> /home1/SEUUSUARIO/logs/coleta-expansao.log 2>&1

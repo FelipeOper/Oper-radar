@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CATEGORIAS_MERCADO,
+  categoriasDoMercado,
   categoriaDeTipo,
   filtrosDaCategoria,
   rotuloTipo,
@@ -12,6 +13,13 @@ test('segmentos separam caminhões, motorhomes e utilitários', () => {
   assert.equal(categoriaDeTipo('Motorhome'), 'onibus_vans');
   assert.equal(categoriaDeTipo('Utilitarios'), 'leves');
   assert.equal(categoriaDeTipo('tipo ainda não mapeado'), 'outros');
+});
+
+test('mercado principal isola caminhões e implementos rodoviários', () => {
+  assert.deepEqual(categoriasDoMercado('principal'), ['caminhoes', 'implementos']);
+  assert.equal(categoriasDoMercado('outros').includes('agricolas'), true);
+  assert.equal(categoriasDoMercado('outros').includes('caminhoes'), false);
+  assert.equal(CATEGORIAS_MERCADO.implementos.label, 'Implementos rodoviários');
 });
 
 test('filtros são contextuais ao segmento', () => {

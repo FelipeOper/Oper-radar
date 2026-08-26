@@ -7,7 +7,7 @@ import {
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
-  Pencil, History, Undo2, Ruler, Check
+  Pencil, History, Undo2, Ruler, Check, Scale
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -23,7 +23,7 @@ import {
   classificaEmissao, filtraOrdenaEstoque, normalizaTracao, rotuloTempoObservado, textoEmissao,
 } from './domainRules.js';
 import {
-  CATEGORIAS_MERCADO, categoriaDeTipo, filtrosDaCategoria, rotuloTipo,
+  CATEGORIAS_MERCADO, categoriaDeTipo, categoriasDoMercado, filtrosDaCategoria, rotuloTipo,
 } from './marketTaxonomy.js';
 
 /* ============================================================
@@ -813,7 +813,148 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
    ============================================================ */
 const PAGINA = 60;
 
+const MODOS_COMPARADOR = [
+  ['marca', 'Marca inteira'],
+  ['modelo', 'Modelo, qualquer marca'],
+  ['marca_modelo', 'Marca + modelo'],
+];
+
+function seletorComparadorValido(lado) {
+  if (lado.modo === 'marca') return Boolean(lado.marca);
+  if (lado.modo === 'modelo') return Boolean(lado.modelo);
+  return Boolean(lado.marca && lado.modelo);
+}
+
+function SeletorComparador({ titulo, lado, onChange, facetas }) {
+  let modelos = (facetas?.modelos || []).filter(item => lado.modo !== 'marca_modelo' || !lado.marca || item.marca === lado.marca);
+  if (lado.modo === 'modelo') {
+    const agrupados = new Map();
+    modelos.forEach(item => {
+      const atual = agrupados.get(item.modelo) || { modelo: item.modelo, anuncios: 0, marcas: new Set() };
+      atual.anuncios += Number(item.anuncios || 0); atual.marcas.add(item.marca); agrupados.set(item.modelo, atual);
+    });
+    modelos = [...agrupados.values()].map(item => ({ ...item, marca: [...item.marcas].join('/') }));
+  }
+  const alteraModo = modo => onChange({ modo, marca: '', modelo: '' });
+  return <Card style={{ padding: 16 }}>
+    <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 650, marginBottom: 12 }}>{titulo}</div>
+    <div role="radiogroup" aria-label={`Escopo ${titulo}`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+      {MODOS_COMPARADOR.map(([id, label]) => <button key={id} role="radio" aria-checked={lado.modo === id} onClick={() => alteraModo(id)} style={{
+        ...inputStyle, cursor: 'pointer', padding: '7px 9px', fontSize: 11,
+        borderColor: lado.modo === id ? T.signal : T.line,
+        color: lado.modo === id ? T.signal : T.inkMuted,
+        background: lado.modo === id ? `${T.signal}12` : T.surface,
+      }}>{label}</button>)}
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: lado.modo === 'marca_modelo' ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 8 }}>
+      {lado.modo !== 'modelo' && <select aria-label={`Marca ${titulo}`} value={lado.marca} onChange={e => onChange({ ...lado, marca: e.target.value, modelo: lado.modo === 'marca_modelo' ? '' : lado.modelo })} style={{ ...inputStyle, width: '100%' }}>
+        <option value="">Selecione a marca</option>
+        {(facetas?.marcas || []).map(item => <option key={item.marca} value={item.marca}>{item.marca} · {fmtN(item.anuncios)}</option>)}
+      </select>}
+      {lado.modo !== 'marca' && <select aria-label={`Modelo ${titulo}`} value={lado.modelo} disabled={lado.modo === 'marca_modelo' && !lado.marca} onChange={e => onChange({ ...lado, modelo: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+        <option value="">{lado.modo === 'marca_modelo' && !lado.marca ? 'Escolha a marca primeiro' : 'Selecione o modelo'}</option>
+        {modelos.map(item => <option key={`${item.marca}-${item.modelo}`} value={item.modelo}>{item.modelo}{lado.modo === 'modelo' ? ` · ${item.marca}` : ''} · {fmtN(item.anuncios)}</option>)}
+      </select>}
+    </div>
+  </Card>;
+}
+
+function PainelComparado({ lado, destaque }) {
+  const m = lado.metricas;
+  const p = m.precos;
+  return <Card style={{ padding: 18, borderTop: `3px solid ${destaque}` }}>
+    <div style={{ fontFamily: T.fontMono, fontSize: 10, color: destaque, letterSpacing: '0.06em' }}>RECORTE</div>
+    <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 20, margin: '5px 0 15px' }}>{lado.rotulo}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+      {[
+        ['Anúncios ativos', fmtN(m.ativos)],
+        ['Revendas', fmtN(m.revendas)],
+        ['Preço mediano', fmtBRL(p.mediana)],
+        ['Preço médio', fmtBRL(p.media)],
+        ['Entradas 30 dias', fmtN(m.entradas_30d)],
+        ['Saídas 30 dias', fmtN(m.saidas_30d)],
+        ['Média observada', m.dias_observados_media == null ? '—' : `${m.dias_observados_media.toLocaleString('pt-BR')} dias`],
+        ['Estados', fmtN(m.ufs)],
+      ].map(([label, value]) => <div key={label} style={{ padding: 10, background: T.surface2, borderRadius: 9 }}>
+        <div style={{ color: T.inkMuted, fontSize: 10.5 }}>{label}</div>
+        <strong style={{ display: 'block', fontFamily: T.fontMono, fontSize: 13, marginTop: 4 }}>{value}</strong>
+      </div>)}
+    </div>
+    <div style={{ marginTop: 12, fontSize: 11, color: T.inkMuted }}>
+      {fmtN(p.amostra_qualificada)} preços qualificados · confiança {p.confianca} · faixa central {fmtBRL(p.p25)}–{fmtBRL(p.p75)}
+      {p.excluidos > 0 ? ` · ${fmtN(p.excluidos)} valores excluídos por qualidade` : ''}
+    </div>
+    {m.top_modelos?.length > 1 && <div style={{ marginTop: 14 }}>
+      <div style={rotuloFiltroStyle}>MODELOS DENTRO DO RECORTE</div>
+      <div style={{ marginTop: 7, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {m.top_modelos.slice(0, 5).map(item => <div key={item.modelo} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}><span>{item.modelo}</span><span style={{ fontFamily: T.fontMono, color: T.inkMuted }}>{fmtN(item.anuncios)}</span></div>)}
+      </div>
+    </div>}
+  </Card>;
+}
+
+function PageComparador() {
+  const { data: facetas, erro: erroFacetas } = useApi('comparador.php?facetas=1');
+  const [ladoA, setLadoA] = useState({ modo: 'marca_modelo', marca: '', modelo: '' });
+  const [ladoB, setLadoB] = useState({ modo: 'marca_modelo', marca: '', modelo: '' });
+  const [resultado, setResultado] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const comparar = async () => {
+    if (!seletorComparadorValido(ladoA) || !seletorComparadorValido(ladoB)) {
+      setErro('Complete os dois lados da comparação.'); return;
+    }
+    const p = new URLSearchParams();
+    for (const [prefixo, lado] of [['a', ladoA], ['b', ladoB]]) {
+      p.set(`${prefixo}_modo`, lado.modo);
+      if (lado.marca) p.set(`${prefixo}_marca`, lado.marca);
+      if (lado.modelo) p.set(`${prefixo}_modelo`, lado.modelo);
+    }
+    setCarregando(true); setErro('');
+    try {
+      const resposta = await fetch(`${API_BASE_URL}/comparador.php?${p}`, { credentials: 'same-origin' });
+      const dados = await resposta.json();
+      if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível comparar os recortes.');
+      setResultado(dados);
+    } catch (e) { setErro(e.message); }
+    finally { setCarregando(false); }
+  };
+
+  const pct = valor => valor == null ? 'amostra indisponível' : `${valor > 0 ? '+' : ''}${valor.toLocaleString('pt-BR')}%`;
+  return <div>
+    <Card style={{ padding: 16, marginBottom: 14, borderLeft: `3px solid ${T.signal}` }}>
+      <strong style={{ display: 'block', fontFamily: T.fontDisplay }}>Compare dois recortes reais do mercado de caminhões</strong>
+      <span style={{ display: 'block', color: T.inkMuted, fontSize: 12, marginTop: 4 }}>Cada lado pode representar uma marca inteira, um modelo em qualquer marca ou uma combinação exata de marca e modelo.</span>
+    </Card>
+    {erroFacetas && <EmptyState icon={Scale} titulo="Catálogo indisponível" texto="Não foi possível carregar marcas e modelos para comparação." />}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', gap: 12 }}>
+      <SeletorComparador titulo="Lado A" lado={ladoA} onChange={setLadoA} facetas={facetas} />
+      <SeletorComparador titulo="Lado B" lado={ladoB} onChange={setLadoB} facetas={facetas} />
+    </div>
+    <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0' }}>
+      <button onClick={comparar} disabled={carregando || !facetas} style={{ ...inputStyle, minWidth: 210, cursor: carregando ? 'wait' : 'pointer', background: T.signal, color: T.signalInk, border: 'none', fontWeight: 700 }}>
+        {carregando ? 'Calculando…' : 'Comparar mercados'}
+      </button>
+    </div>
+    {erro && <div role="alert" style={{ color: T.alert, fontSize: 12.5, textAlign: 'center', marginBottom: 12 }}>{erro}</div>}
+    {resultado && <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', gap: 12 }}>
+        <PainelComparado lado={resultado.lado_a} destaque={T.signal} />
+        <PainelComparado lado={resultado.lado_b} destaque={T.steel} />
+      </div>
+      <SectionTitle sub="Lado A em relação ao lado B">Diferenças principais</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+        <Kpi label="Preço mediano" value={pct(resultado.diferencas.preco_mediano_pct)} sub={`${resultado.lado_a.rotulo} vs ${resultado.lado_b.rotulo}`} />
+        <Kpi label="Oferta ativa" value={pct(resultado.diferencas.estoque_pct)} sub="diferença de volume anunciado" />
+        <Kpi label="Tempo observado" value={pct(resultado.diferencas.dias_observados_pct)} sub="diferença da média observada" />
+      </div>
+    </>}
+  </div>;
+}
+
 function PageMercado({ sessao }) {
+  const [universo, setUniverso] = useState('principal');
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   const [categoria, setCategoria] = useState('todas');
@@ -838,7 +979,7 @@ function PageMercado({ sessao }) {
     ativo: 'ativo', em_verificacao: 'removido_candidato',
     saida_detectada: 'removido_confirmado', todos: 'todos',
   }[status] || 'ativo';
-  const { data: facetas } = useApi(`facetas.php?status=${statusDb}&categoria=${categoria}`);
+  const { data: facetas } = useApi(`facetas.php?status=${statusDb}&categoria=${categoria}&mercado=${universo}`);
 
   const [anuncios, setAnuncios] = useState([]);
   const [total, setTotal] = useState(null);
@@ -855,6 +996,7 @@ function PageMercado({ sessao }) {
 
   const queryBase = useMemo(() => {
     const p = new URLSearchParams();
+    p.set('mercado', universo);
     if (categoria !== 'todas') p.set('categoria', categoria);
     if (uf !== 'todas') p.set('uf', uf);
     else if (regiao !== 'todas') p.set('regiao', regiao);
@@ -871,7 +1013,7 @@ function PageMercado({ sessao }) {
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, marca, carroceria, tracao, fipeFila, qDebounced, ordem]);
+  }, [universo, categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, marca, carroceria, tracao, fipeFila, qDebounced, ordem]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
@@ -963,7 +1105,12 @@ function PageMercado({ sessao }) {
   const filtrosAtivos = [categoria !== 'todas', tipo !== 'todos', status !== 'ativo',
     regiao !== 'todas', uf !== 'todas', cidade !== 'todas', revendaId !== 'todas', !!precoMin, !!precoMax,
     marca !== 'todas', carroceria !== 'todas', tracao !== 'todas', fipeFila !== 'todos'].filter(Boolean).length;
-  const chipsCategorias = ['todas', ...Object.keys(CATEGORIAS)];
+  const chipsCategorias = ['todas', ...categoriasDoMercado(universo)];
+  const selecionarUniverso = valor => {
+    setUniverso(valor);
+    setCategoria('todas'); setTipo('todos'); setMarca('todas'); setCarroceria('todas');
+    setTracao('todas'); setFipeFila('todos');
+  };
   const selecionarCategoria = cat => {
     setCategoria(cat);
     setTipo('todos');
@@ -980,6 +1127,19 @@ function PageMercado({ sessao }) {
 
   return (
     <div>
+      <div role="tablist" aria-label="Universo do mercado" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
+        {[
+          ['principal', 'Caminhões e implementos', 'Foco principal do Oper Radar'],
+          ['outros', 'Outros mercados', 'Agrícola, leves, ônibus, vans, máquinas e peças'],
+        ].map(([id, titulo, texto]) => {
+          const ativo = universo === id;
+          return <button key={id} role="tab" aria-selected={ativo} onClick={() => selecionarUniverso(id)} style={{
+            ...inputStyle, cursor: 'pointer', textAlign: 'left', minHeight: 64, padding: '10px 12px',
+            borderColor: ativo ? T.signal : T.line, background: ativo ? `${T.signal}14` : T.surface,
+          }}><strong style={{ display: 'block', color: ativo ? T.signal : T.ink, fontSize: 13 }}>{titulo}</strong>
+            <span style={{ display: 'block', color: T.inkMuted, fontSize: 10.5, marginTop: 3 }}>{texto}</span></button>;
+        })}
+      </div>
       <div style={{ marginBottom: 12 }}>
         <label htmlFor="mercado-busca" style={rotuloFiltroStyle}>BUSCA PRINCIPAL</label>
         <div style={{ position: 'relative', marginTop: 6 }}>
@@ -997,7 +1157,9 @@ function PageMercado({ sessao }) {
       <div style={rotuloFiltroStyle}>3. SEGMENTO</div>
       <div style={{ ...filtroGridSegmentoStyle, marginBottom: 14 }}>
         {chipsCategorias.map(cat => {
-          const info = cat === 'todas' ? { label: 'Todos', icone: '📊', cor: T.ink } : CATEGORIAS[cat];
+          const info = cat === 'todas'
+            ? { label: universo === 'principal' ? 'Todo o foco principal' : 'Todos os demais', icone: '📊', cor: T.ink }
+            : CATEGORIAS[cat];
           const rotulo = info.label;
           const ativa = categoria === cat;
           const n = cat === 'todas' ? totalGeral : (catCounts[cat] || 0);
@@ -2903,6 +3065,7 @@ function PageAnalise() {
 const NAV = [
   { id: 'hoje', rotulo: 'Hoje', icone: Radar },
   { id: 'mercado', rotulo: 'Mercado', icone: LayoutGrid },
+  { id: 'comparador', rotulo: 'Comparador', icone: Scale },
   { id: 'minha-loja', rotulo: 'Minha Loja', icone: Store },
   { id: 'fipe', rotulo: 'FIPE', icone: Search },
   { id: 'oportunidades', rotulo: 'Oportunidades', icone: Crosshair },
@@ -2913,7 +3076,7 @@ const NAV = [
   { id: 'conta', rotulo: 'Minha conta', icone: UserRound },
 ];
 const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'minha-loja', 'oportunidades'].includes(item.id));
-const NAV_MOBILE_MAIS = NAV.filter(item => ['fipe', 'concorrentes', 'analise', 'acoes', 'ajustes', 'conta'].includes(item.id));
+const NAV_MOBILE_MAIS = NAV.filter(item => ['comparador', 'fipe', 'concorrentes', 'analise', 'acoes', 'ajustes', 'conta'].includes(item.id));
 
 function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
   const [pagina, setPagina] = useState('hoje');
@@ -2961,6 +3124,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
     mercado: <PageMercado sessao={sessao} />,
+    comparador: <PageComparador />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,

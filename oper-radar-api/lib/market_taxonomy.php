@@ -39,6 +39,17 @@ function oper_taxonomia_tipos_por_categoria(): array {
     return $categorias;
 }
 
+function oper_taxonomia_tipos_por_mercado(): array {
+    $categorias = oper_taxonomia_tipos_por_categoria();
+    $principal = array_merge($categorias['caminhoes'], $categorias['implementos']);
+    $outros = [];
+    foreach ($categorias as $categoria => $tipos) {
+        if (in_array($categoria, ['caminhoes', 'implementos'], true)) continue;
+        $outros = array_merge($outros, $tipos);
+    }
+    return ['principal' => $principal, 'outros' => $outros];
+}
+
 function oper_taxonomia_categoria_de_tipo($tipo): string {
     return oper_taxonomia_tipo_categoria()[(string)$tipo] ?? 'outros';
 }

@@ -28,6 +28,10 @@ docs/               arquitetura, solicitações e relatórios de evolução
 ## Estado em 19/08/2026
 
 - A coleta, a API e o app estão em produção no HostGator.
+- O Mercado separa o foco principal (caminhões e implementos rodoviários) dos demais
+  segmentos e possui comparador bilateral por marca/modelo.
+- A coleta nacional usa o plano `nacional` para as 26 UFs fora do PR; o PR mantém seu
+  coletor dedicado, sem duplicação.
 - O detalhe dos anúncios está preparado e possui rotina própria de coleta.
 - A FIPE está ativa; casos ambíguos permanecem sem vínculo automático por segurança.
 - A taxonomia DAF já foi aplicada e reprocessada em produção.

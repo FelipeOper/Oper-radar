@@ -34,12 +34,12 @@ awk -v inicio="$MARCADOR_INICIO" -v fim="$MARCADOR_FIM" '
 
 {
   echo "$MARCADOR_INICIO"
-  echo "30 7 * * * set -a; . $ENV_FILE; set +a; cd $SCRIPT_DIR && \"\${OPER_RADAR_PYTHON:-python3}\" coleta_multi_uf.py --plano=expansao --janela=07h >> $LOG_DIR/coleta-expansao.log 2>&1"
-  echo "30 19 * * * set -a; . $ENV_FILE; set +a; cd $SCRIPT_DIR && \"\${OPER_RADAR_PYTHON:-python3}\" coleta_multi_uf.py --plano=expansao --janela=19h >> $LOG_DIR/coleta-expansao.log 2>&1"
+  echo "0 8 * * * set -a; . $ENV_FILE; set +a; cd $SCRIPT_DIR && \"\${OPER_RADAR_PYTHON:-python3}\" coleta_multi_uf.py --plano=nacional --janela=07h >> $LOG_DIR/coleta-expansao.log 2>&1"
+  echo "0 20 * * * set -a; . $ENV_FILE; set +a; cd $SCRIPT_DIR && \"\${OPER_RADAR_PYTHON:-python3}\" coleta_multi_uf.py --plano=nacional --janela=19h >> $LOG_DIR/coleta-expansao.log 2>&1"
   echo "$MARCADOR_FIM"
 } >> "$novo"
 
 crontab "$novo"
 echo "Expansao agendada: OK"
 echo "Backup do cron anterior: $backup"
-echo "Centro-Oeste, Nordeste e Norte: 07h30 e 19h30"
+echo "Cobertura nacional sem duplicar PR: 08h00 e 20h00"

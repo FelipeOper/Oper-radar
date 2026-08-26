@@ -1,6 +1,6 @@
 export const CATEGORIAS_MERCADO = {
   caminhoes: { label: 'Caminhões', icone: '🚛', cor: '#F5A623' },
-  implementos: { label: 'Implementos', icone: '🚚', cor: '#D9714F' },
+  implementos: { label: 'Implementos rodoviários', icone: '🚚', cor: '#D9714F' },
   onibus_vans: { label: 'Ônibus, vans e motorhomes', icone: '🚌', cor: '#5B8AA6' },
   leves: { label: 'Carros e utilitários leves', icone: '🚗', cor: '#8A94A6' },
   agricolas: { label: 'Agrícolas', icone: '🌾', cor: '#3DD68C' },
@@ -8,6 +8,15 @@ export const CATEGORIAS_MERCADO = {
   pecas: { label: 'Peças', icone: '🔧', cor: '#B98CE0' },
   outros: { label: 'Outros', icone: '🌀', cor: '#6B7280' },
 };
+
+export const CATEGORIAS_POR_MERCADO = {
+  principal: ['caminhoes', 'implementos'],
+  outros: ['onibus_vans', 'leves', 'agricolas', 'construcao', 'pecas', 'outros'],
+};
+
+export function categoriasDoMercado(mercado) {
+  return CATEGORIAS_POR_MERCADO[mercado] || CATEGORIAS_POR_MERCADO.principal;
+}
 
 export const TIPO_PARA_CATEGORIA = {
   Caminhao: 'caminhoes',

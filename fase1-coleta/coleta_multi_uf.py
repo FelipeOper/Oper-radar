@@ -31,6 +31,9 @@ REGIOES = {
 }
 PLANOS = {
     "expansao": REGIOES["centro-oeste"] + REGIOES["nordeste"] + REGIOES["norte"],
+    # PR mantem o coletor dedicado. O plano nacional cobre todo o restante sem duplicar
+    # anuncios nem concorrer com o cron historico do estado.
+    "nacional": [uf for uf in sum(REGIOES.values(), []) if uf != "PR"],
     "brasil": sum(REGIOES.values(), []),
 }
 UFS_VALIDAS = set(sum(REGIOES.values(), []))
