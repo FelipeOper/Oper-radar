@@ -128,3 +128,5 @@ python3 fipe_sync.py --modo=local --lote=5000
 O primeiro comando é dry-run. A aplicação nunca toca vínculos manuais e preserva o vínculo
 anterior até o processamento local concluir. As regras bloqueiam conflito entre famílias
 comerciais e exigem o código IVECO composto completo (`240E25` não é `240E28`).
+Na URL canônica, o matching usa somente os segmentos do veículo e ignora o slug final da
+revenda, evitando que nomes de lojas como “Cargo Modal” sejam tratados como família Ford Cargo.
