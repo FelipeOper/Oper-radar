@@ -462,8 +462,11 @@ def anuncios_pendentes(conn, limite):
         SELECT id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final FROM anuncio
         WHERE (fipe_preco_id IS NULL OR fipe_match_status LIKE 'reprocessar_%')
           AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
-          AND tipo = 'Caminhao' AND marca IS NOT NULL
-          AND COALESCE(ano_final, ano_inicial) IS NOT NULL AND status = 'ativo'
+          AND tipo = 'Caminhao' AND status = 'ativo'
+          AND (
+              (marca IS NOT NULL AND COALESCE(ano_final, ano_inicial) IS NOT NULL)
+              OR fipe_match_status LIKE 'reprocessar_%'
+          )
           AND (
               fipe_ultima_tentativa IS NULL
               OR (fipe_match_status = 'erro_api'
@@ -883,6 +886,14 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
     for a in pendentes:
         processados += 1
         try:
+            if not a.get("marca"):
+                sem_match += 1
+                registra_resultado(conn, a["id"], "sem_match", "marca ausente no anuncio")
+                continue
+            if ano_modelo(a) is None:
+                sem_ano += 1
+                registra_resultado(conn, a["id"], "sem_ano", "ano-modelo ausente no anuncio")
+                continue
             cands, info = escolhe(conn, a)
             if not cands:
                 if info.startswith("ambiguo"):

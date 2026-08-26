@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 from pathlib import Path
 import sys
 import types
@@ -287,6 +287,36 @@ class MatchingFipeTest(unittest.TestCase):
         registra.assert_not_called()
         busca_cache.assert_called_once_with(conn, candidato, 2022, None)
         self.assertEqual(1, resumo["aguardando_cache"])
+
+    def test_reprocessamento_sem_marca_fecha_com_motivo_explicito(self):
+        anuncio = {
+            "id": 1, "titulo": "CHEVROLET BOCA DE SAPO 1966/1966", "marca": None,
+            "ano_inicial": 1966, "ano_final": 1966,
+        }
+        with patch("fipe_sync.anuncios_pendentes", return_value=[anuncio]), \
+             patch("fipe_sync.escolhe") as escolhe_mock, \
+             patch("fipe_sync.registra_resultado") as registra:
+            resumo = processa_anuncios(object(), lote=1, permitir_api=False)
+        escolhe_mock.assert_not_called()
+        registra.assert_called_once_with(
+            ANY, 1, "sem_match", "marca ausente no anuncio"
+        )
+        self.assertEqual(1, resumo["sem_match"])
+
+    def test_reprocessamento_sem_ano_fecha_com_motivo_explicito(self):
+        anuncio = {
+            "id": 2, "titulo": "SCANIA R450", "marca": "SCANIA",
+            "ano_inicial": None, "ano_final": None,
+        }
+        with patch("fipe_sync.anuncios_pendentes", return_value=[anuncio]), \
+             patch("fipe_sync.escolhe") as escolhe_mock, \
+             patch("fipe_sync.registra_resultado") as registra:
+            resumo = processa_anuncios(object(), lote=1, permitir_api=False)
+        escolhe_mock.assert_not_called()
+        registra.assert_called_once_with(
+            ANY, 2, "sem_ano", "ano-modelo ausente no anuncio"
+        )
+        self.assertEqual(1, resumo["sem_ano"])
 
     def test_modo_local_nao_escolhe_primeiro_quando_dois_precos_sao_validos(self):
         anuncio = {
