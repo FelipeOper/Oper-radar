@@ -166,6 +166,13 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
     $linha['maior_preco_mercado'] = $stats['maior'];
     $linha['abaixo_fipe'] = (int)$stats['abaixo_fipe'];
 
+    // Consumidores da API tratam estes campos como parte fixa do contrato. Anuncios
+    // sem preco tambem precisam recebe-los para nao gerar warnings nem entrar em
+    // comparativos como se o valor fosse valido.
+    $linha['preco_qualidade_status'] = 'revisar';
+    $linha['preco_qualidade_motivo'] = 'preco ausente';
+    $linha['desvio_mercado_pct'] = null;
+
     $preco = isset($linha['preco']) ? (float)$linha['preco'] : null;
     $fipe = $precoFipe ?? (isset($linha['preco_fipe']) ? (float)$linha['preco_fipe'] : null);
     if ($preco !== null) {

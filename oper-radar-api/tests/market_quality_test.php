@@ -19,4 +19,10 @@ verifica(abs($stats['mediana'] - 120.0) < 0.001, 'mediana');
 verifica($stats['amostra_suficiente'] === true, 'amostra minima');
 verifica(mercado_confianca(4) === 'insuficiente' && mercado_confianca(10) === 'media', 'confianca');
 
+$semPreco = ['preco' => null, 'titulo' => 'Sem preco', 'preco_texto_bruto' => null];
+mercado_aplica_estatisticas($semPreco, null);
+verifica($semPreco['preco_qualidade_status'] === 'revisar', 'status sem preco');
+verifica($semPreco['preco_qualidade_motivo'] === 'preco ausente', 'motivo sem preco');
+verifica(array_key_exists('desvio_mercado_pct', $semPreco) && $semPreco['desvio_mercado_pct'] === null, 'desvio sem preco');
+
 echo "market_quality_test=OK\n";
