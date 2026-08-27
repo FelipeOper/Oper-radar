@@ -13,7 +13,8 @@ class ComparadorMercadoContractTest(unittest.TestCase):
         for modo in ("marca", "modelo", "marca_modelo"):
             self.assertIn(modo, helper)
         self.assertIn("mercado_calcula_estatisticas", helper)
-        self.assertIn("a_modo", api)
+        self.assertIn("comparador_seletor($_GET, 'a')", api)
+        self.assertIn("comparador_seletor($_GET, 'b')", api)
         self.assertIn("Compare dois recortes reais", app)
         self.assertIn("Comparador", app)
 
