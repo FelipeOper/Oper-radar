@@ -21,6 +21,7 @@ $REGIOES = [
 ];
 
 $CATEGORIA_TIPOS = oper_taxonomia_tipos_por_categoria();
+$MERCADO_TIPOS = oper_taxonomia_tipos_por_mercado();
 
 $limit  = min(max((int)($_GET['limit'] ?? 60), 1), 200);
 $offset = max((int)($_GET['offset'] ?? 0), 0);
@@ -28,6 +29,12 @@ $somenteAbaixoFipe = (($_GET['abaixo_fipe'] ?? '') === '1');
 
 $where = []; $params = []; $types = '';
 
+if (!empty($_GET['mercado']) && isset($MERCADO_TIPOS[$_GET['mercado']])) {
+    $tipos = $MERCADO_TIPOS['principal'];
+    $ph = implode(',', array_fill(0, count($tipos), '?'));
+    $where[] = $_GET['mercado'] === 'principal' ? "a.tipo IN ($ph)" : "COALESCE(a.tipo,'') NOT IN ($ph)";
+    foreach ($tipos as $t) { $params[] = $t; $types .= 's'; }
+}
 if (!empty($_GET['categoria']) && isset($CATEGORIA_TIPOS[$_GET['categoria']])) {
     $tipos = $CATEGORIA_TIPOS[$_GET['categoria']];
     $ph = implode(',', array_fill(0, count($tipos), '?'));

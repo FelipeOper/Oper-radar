@@ -31,10 +31,11 @@ class PythonRuntimeContractTest(unittest.TestCase):
                 self.assertIn('"$PYTHON_BIN"', wrapper)
                 self.assertIsNone(execucao_direta.search(wrapper))
 
-    def test_instalador_de_expansao_preserva_horarios_de_producao(self):
+    def test_instalador_nacional_preserva_pr_e_evitar_sobreposicao(self):
         instalador = self.texto("fase1-coleta/instalar_cron_expansao.sh")
-        self.assertIn('echo "30 7 * * *', instalador)
-        self.assertIn('echo "30 19 * * *', instalador)
+        self.assertIn('echo "0 8 * * *', instalador)
+        self.assertIn('echo "0 20 * * *', instalador)
+        self.assertEqual(instalador.count("--plano=nacional"), 2)
         self.assertNotIn('echo "0 1 * * *', instalador)
         self.assertNotIn('echo "0 13 * * *', instalador)
         self.assertEqual(instalador.count("OPER_RADAR_PYTHON:-python3"), 2)

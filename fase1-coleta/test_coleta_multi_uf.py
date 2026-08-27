@@ -21,6 +21,13 @@ class ColetaMultiUfTest(unittest.TestCase):
         for uf in ("MT", "DF", "BA", "SE", "PA", "AP"):
             self.assertIn(uf, ufs)
 
+    def test_plano_nacional_cobre_26_ufs_sem_duplicar_pr(self):
+        ufs = coleta.resolve_ufs(self.args(plano="nacional"))
+        self.assertEqual(len(ufs), 26)
+        self.assertNotIn("PR", ufs)
+        for uf in ("SC", "RS", "SP", "RJ", "MG", "ES", "AP"):
+            self.assertIn(uf, ufs)
+
     def test_regioes_remove_duplicatas(self):
         ufs = coleta.resolve_ufs(self.args(regioes="norte,norte"))
         self.assertEqual(ufs, coleta.REGIOES["norte"])

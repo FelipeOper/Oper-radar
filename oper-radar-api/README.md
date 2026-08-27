@@ -3,6 +3,11 @@
 API do painel autenticado. As credenciais permanecem no arquivo protegido do servidor e
 nunca devem ser incluídas em pacotes de deploy.
 
+`comparador.php` compara dois recortes de caminhões por marca, modelo ou marca + modelo.
+Retorna estoque, revendas, entradas/saídas em 30 dias, tempo observado e estatísticas de
+preço qualificadas. `anuncios.php` e `facetas.php` aceitam `mercado=principal|outros` para
+isolar caminhões/implementos rodoviários dos segmentos secundários.
+
 ## Comparativos de preço
 
 `lib/market_quality.php` centraliza a regra usada por anúncios, detalhe, FIPE, placa, Minha

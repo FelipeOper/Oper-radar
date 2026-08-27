@@ -3,6 +3,10 @@
 Aplicação React/Vite publicada em `agenciaoper.com.br/oper-radar/` e conectada à API PHP
 em `agenciaoper.com.br/oper-radar-api/`.
 
+O Mercado abre no universo principal de caminhões e implementos rodoviários; os demais
+segmentos ficam na aba "Outros mercados". A página Comparador cruza dois recortes de
+caminhões por marca, modelo ou marca + modelo usando métricas calculadas no servidor.
+
 ## Desenvolvimento
 
 ```text

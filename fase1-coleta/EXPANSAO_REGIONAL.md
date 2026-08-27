@@ -1,6 +1,8 @@
 # Expansao regional no HostGator
 
-O plano `expansao` coleta, em sequencia, Centro-Oeste, Nordeste e Norte. UFs sem
+O plano `nacional` coleta, em sequencia, as 26 UFs fora do PR, incluindo SC, RS e todo
+o Sudeste. O PR continua no coletor dedicado. O plano legado `expansao` permanece
+disponivel para Centro-Oeste, Nordeste e Norte. UFs sem
 revendas publicadas no portal sao registradas como `sem_revendas`. O lock impede dois
 ciclos simultaneos e o checkpoint retoma somente os estados pendentes.
 
@@ -16,14 +18,15 @@ cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta
 
 ## Agendamento recomendado
 
-Mantenha PR as 07h e 19h. Instale a expansao as 07h30 e 19h30 com:
+Mantenha PR as 07h e 19h. Instale a cobertura nacional as 08h e 20h com:
 
 ```bash
 bash instalar_cron_expansao.sh
 ```
 
 O instalador preserva as entradas existentes, faz backup do cron e pode ser executado
-novamente sem duplicar a expansao. Assim os trabalhos nao concorrem entre si.
+novamente sem duplicar o bloco. O intervalo reduz a concorrencia com o coletor do PR;
+o lock e o checkpoint impedem sobreposicao e retomam apenas UFs pendentes.
 
 Para acompanhar sem mostrar senhas:
 

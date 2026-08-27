@@ -14,11 +14,27 @@ $conn = conecta();
 $statusFiltro = $_GET['status'] ?? 'ativo';
 $statusPermitidos = ['ativo', 'removido_candidato', 'removido_confirmado', 'todos'];
 if (!in_array($statusFiltro, $statusPermitidos, true)) $statusFiltro = 'ativo';
-// O valor foi validado pela lista fechada acima.
-$whereStatus = $statusFiltro === 'todos' ? '' : " WHERE status='$statusFiltro'";
-$whereStatusA = $statusFiltro === 'todos' ? '' : " WHERE a.status='$statusFiltro'";
-
 $CATEGORIA_TIPOS = oper_taxonomia_tipos_por_categoria();
+$MERCADO_TIPOS = oper_taxonomia_tipos_por_mercado();
+$mercado = $_GET['mercado'] ?? '';
+
+// As listas sao fechadas pela taxonomia; os valores nao vem livres do cliente.
+$whereStatus = ' WHERE 1=1';
+$whereStatusA = ' WHERE 1=1';
+if ($statusFiltro !== 'todos') {
+    $whereStatus .= " AND status='$statusFiltro'";
+    $whereStatusA .= " AND a.status='$statusFiltro'";
+}
+if (isset($MERCADO_TIPOS[$mercado])) {
+    $tiposMercado = array_map(fn($tipo) => "'" . $conn->real_escape_string($tipo) . "'", $MERCADO_TIPOS['principal']);
+    $listaMercado = implode(',', $tiposMercado);
+    $operador = $mercado === 'principal' ? 'IN' : 'NOT IN';
+    $campoTipo = $mercado === 'principal' ? 'tipo' : "COALESCE(tipo,'')";
+    $campoTipoA = $mercado === 'principal' ? 'a.tipo' : "COALESCE(a.tipo,'')";
+    $whereStatus .= " AND $campoTipo $operador ($listaMercado)";
+    $whereStatusA .= " AND $campoTipoA $operador ($listaMercado)";
+}
+
 $categoriaAtributos = $_GET['categoria'] ?? 'todas';
 $condicaoCategoriaAtributos = '';
 if ($categoriaAtributos !== 'todas' && isset($CATEGORIA_TIPOS[$categoriaAtributos])) {
@@ -28,7 +44,7 @@ if ($categoriaAtributos !== 'todas' && isset($CATEGORIA_TIPOS[$categoriaAtributo
 
 // Contagem por tipo (uma consulta), depois soma nas categorias
 $porTipo = [];
-$conector = $whereStatus ? ' AND' : ' WHERE';
+$conector = ' AND';
 $r = $conn->query("SELECT tipo, COUNT(*) n FROM anuncio$whereStatus$conector tipo IS NOT NULL GROUP BY tipo");
 while ($row = $r->fetch_assoc()) $porTipo[$row['tipo']] = (int)$row['n'];
 

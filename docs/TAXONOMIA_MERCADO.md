@@ -19,6 +19,17 @@ versionada pelo código.
 | Peças | Peças à venda |
 | Outros | Tipos sem enquadramento comercial nas categorias anteriores |
 
+## Universos do produto
+
+- **Mercado principal:** caminhões e implementos rodoviários. É o recorte aberto por
+  padrão e concentra a leitura comercial do Oper Radar.
+- **Outros mercados:** ônibus, vans, leves, agrícolas, construção, peças e demais tipos.
+  Os dados continuam coletados e consultáveis, mas não se misturam ao foco principal.
+
+O comparador bilateral opera sobre caminhões e aceita três escopos independentes em cada
+lado: marca, modelo ou marca + modelo. Preços usam a mesma qualificação robusta dos demais
+comparativos; valores especiais e extremos não entram na mediana.
+
 Motorhome não é caminhão. Utilitário também não é ônibus ou van. Essas duas correções
 evitam distorcer os comparativos por segmento.
 
