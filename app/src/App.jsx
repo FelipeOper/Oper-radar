@@ -825,6 +825,11 @@ function seletorComparadorValido(lado) {
   return Boolean(lado.marca && lado.modelo);
 }
 
+function rotuloModeloComparador(modelo, marca) {
+  const prefixo = `${marca || ''} `.trimStart();
+  return prefixo && modelo.startsWith(prefixo) ? modelo.slice(prefixo.length) : modelo;
+}
+
 function SeletorComparador({ titulo, lado, onChange, facetas }) {
   let modelos = (facetas?.modelos || []).filter(item => lado.modo !== 'marca_modelo' || !lado.marca || item.marca === lado.marca);
   if (lado.modo === 'modelo') {
@@ -853,7 +858,7 @@ function SeletorComparador({ titulo, lado, onChange, facetas }) {
       </select>}
       {lado.modo !== 'marca' && <select aria-label={`Modelo ${titulo}`} value={lado.modelo} disabled={lado.modo === 'marca_modelo' && !lado.marca} onChange={e => onChange({ ...lado, modelo: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
         <option value="">{lado.modo === 'marca_modelo' && !lado.marca ? 'Escolha a marca primeiro' : 'Selecione o modelo'}</option>
-        {modelos.map(item => <option key={`${item.marca}-${item.modelo}`} value={item.modelo}>{item.modelo}{lado.modo === 'modelo' ? ` · ${item.marca}` : ''} · {fmtN(item.anuncios)}</option>)}
+        {modelos.map(item => <option key={`${item.marca}-${item.modelo}`} value={item.modelo}>{rotuloModeloComparador(item.modelo, lado.modo === 'modelo' ? item.marca.split('/')[0] : item.marca)}{lado.modo === 'modelo' ? ` · ${item.marca}` : ''} · {fmtN(item.anuncios)}</option>)}
       </select>}
     </div>
   </Card>;

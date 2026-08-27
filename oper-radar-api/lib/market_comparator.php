@@ -36,7 +36,12 @@ function comparador_condicao(array $seletor, string $alias = 'a'): array {
 }
 
 function comparador_rotulo(array $seletor): string {
-    if ($seletor['marca'] && $seletor['modelo']) return $seletor['marca'] . ' ' . $seletor['modelo'];
+    if ($seletor['marca'] && $seletor['modelo']) {
+        $prefixo = $seletor['marca'] . ' ';
+        return str_starts_with($seletor['modelo'], $prefixo)
+            ? $seletor['modelo']
+            : $seletor['marca'] . ' ' . $seletor['modelo'];
+    }
     return (string)($seletor['marca'] ?: $seletor['modelo']);
 }
 
