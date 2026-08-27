@@ -14,6 +14,8 @@ $completo = comparador_seletor(['a_modo' => 'marca_modelo', 'a_marca' => 'DAF', 
 [$where, $types, $params] = comparador_condicao($completo);
 confirma_comparador(str_contains($where, "a.tipo='Caminhao'") && $types === 'ss', 'condicao segura');
 confirma_comparador($params === ['DAF', 'XF 530'], 'parametros exatos');
+confirma_comparador(comparador_rotulo(['marca' => 'VOLVO', 'modelo' => 'VOLVO FH 540']) === 'VOLVO FH 540', 'nao duplica marca no rotulo');
+confirma_comparador(comparador_rotulo(['marca' => 'DAF', 'modelo' => 'XF 530']) === 'DAF XF 530', 'completa rotulo sem marca');
 confirma_comparador(comparador_seletor(['a_modo' => 'marca_modelo', 'a_marca' => 'DAF'], 'a') === null, 'modelo obrigatorio');
 
 $registros = [];
