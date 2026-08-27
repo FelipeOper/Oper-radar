@@ -13,8 +13,8 @@
 #   - bloqueio confirmado    -> challenge textual ou HTTP 403/429; aborta o lote
 #   - pagina inesperada      -> nenhum campo reconhecido; revisar o parser se persistir
 #
-# Job unico: lote pequeno a cada 3 horas, separado das coletas principais de 07h/19h.
+# Job unico: lote pequeno a cada 30 minutos, separado das coletas principais de 07h/19h.
 # Durante o backfill, drena a fila ativa gradualmente. Depois, processa apenas anuncios novos
 # sem detalhe e falhas cujo backoff ja venceu.
 
-15 */3 * * * flock -n /home1/SEUUSUARIO/logs/detalhe.lock -c 'set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" -u scraper_detalhe.py --lote=80 --pausa-requisicoes=4' >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1
+*/30 * * * * flock -n /home1/SEUUSUARIO/logs/detalhe.lock -c 'set -a; . /home1/SEUUSUARIO/.oper-radar.env; set +a; cd /home1/SEUUSUARIO/agenciaoper.com.br/oper-radar/fase1-coleta && "${OPER_RADAR_PYTHON:-python3}" -u scraper_detalhe.py --lote=80 --pausa-requisicoes=4' >> /home1/SEUUSUARIO/logs/detalhe.log 2>&1

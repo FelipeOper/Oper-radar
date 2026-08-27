@@ -36,7 +36,7 @@ awk -v inicio="$MARCADOR_INICIO" -v fim="$MARCADOR_FIM" '
 
 {
   echo "$MARCADOR_INICIO"
-  echo "15 */3 * * * flock -n $LOG_DIR/detalhe.lock -c 'set -a; . $ENV_FILE; set +a; cd $SCRIPT_DIR && \"\${OPER_RADAR_PYTHON:-python3}\" -u scraper_detalhe.py --lote=80 --pausa-requisicoes=4' >> $LOG_DIR/detalhe.log 2>&1"
+  echo "*/30 * * * * flock -n $LOG_DIR/detalhe.lock -c 'set -a; . $ENV_FILE; set +a; cd $SCRIPT_DIR && \"\${OPER_RADAR_PYTHON:-python3}\" -u scraper_detalhe.py --lote=80 --pausa-requisicoes=4' >> $LOG_DIR/detalhe.log 2>&1"
   echo "$MARCADOR_FIM"
 } >> "$novo"
 
@@ -45,5 +45,5 @@ crontab "$novo"
 
 echo "Cron de detalhes instalado: OK"
 echo "Backup anterior: $backup"
-echo "Coleta de detalhes ativos: a cada 3 horas, no minuto 15, lote de 80"
+echo "Coleta de detalhes ativos: a cada 30 minutos, lote de 80"
 crontab -l | grep -A2 -B1 "$MARCADOR_INICIO"

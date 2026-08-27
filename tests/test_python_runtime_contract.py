@@ -50,14 +50,14 @@ class PythonRuntimeContractTest(unittest.TestCase):
             with self.subTest(caminho=caminho):
                 self.assertIn("OPER_RADAR_PYTHON:-python3", self.texto(caminho))
 
-    def test_cron_detalhe_tem_um_unico_job_conservador(self):
+    def test_cron_detalhe_tem_um_unico_job_a_cada_30_minutos(self):
         instalador = self.texto("fase1-coleta/instalar_cron_detalhe.sh")
         exemplo = self.texto("fase1-coleta/crontab-hostgator-detalhe.example")
 
         for nome, conteudo in (("instalador", instalador), ("exemplo", exemplo)):
             with self.subTest(arquivo=nome):
                 self.assertEqual(1, conteudo.count("scraper_detalhe.py"))
-                self.assertIn("15 */3 * * *", conteudo)
+                self.assertIn("*/30 * * * *", conteudo)
                 self.assertIn("--lote=80", conteudo)
                 self.assertIn("--pausa-requisicoes=4", conteudo)
                 self.assertIn("flock -n", conteudo)
