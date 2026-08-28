@@ -11,11 +11,14 @@ function comparador_seletor(array $fonte, string $prefixo): ?array {
     if (!in_array($modo, ['marca', 'modelo', 'marca_modelo'], true)) return null;
     $marca = comparador_texto($fonte[$prefixo . '_marca'] ?? null);
     $modelo = comparador_texto($fonte[$prefixo . '_modelo'] ?? null);
+    $ano = filter_var($fonte[$prefixo . '_ano'] ?? null, FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1950, 'max_range' => ((int)date('Y') + 2)],
+    ]);
     if ($modo === 'marca') $modelo = null;
     if ($modo === 'modelo') $marca = null;
-    if (($modo === 'marca' && !$marca) || ($modo === 'modelo' && !$modelo)
+    if (!$ano || ($modo === 'marca' && !$marca) || ($modo === 'modelo' && !$modelo)
         || ($modo === 'marca_modelo' && (!$marca || !$modelo))) return null;
-    return ['modo' => $modo, 'marca' => $marca, 'modelo' => $modelo];
+    return ['modo' => $modo, 'marca' => $marca, 'modelo' => $modelo, 'ano' => (int)$ano];
 }
 
 function comparador_condicao(array $seletor, string $alias = 'a'): array {
@@ -32,17 +35,21 @@ function comparador_condicao(array $seletor, string $alias = 'a'): array {
         $params[] = $seletor['modelo'];
         $types .= 's';
     }
+    $where[] = "COALESCE($alias.ano_final,$alias.ano_inicial)=?";
+    $params[] = (int)$seletor['ano'];
+    $types .= 'i';
     return [implode(' AND ', $where), $types, $params];
 }
 
 function comparador_rotulo(array $seletor): string {
     if ($seletor['marca'] && $seletor['modelo']) {
         $prefixo = $seletor['marca'] . ' ';
-        return str_starts_with($seletor['modelo'], $prefixo)
+        $rotulo = str_starts_with($seletor['modelo'], $prefixo)
             ? $seletor['modelo']
             : $seletor['marca'] . ' ' . $seletor['modelo'];
+        return $rotulo . ' · ' . $seletor['ano'];
     }
-    return (string)($seletor['marca'] ?: $seletor['modelo']);
+    return (string)($seletor['marca'] ?: $seletor['modelo']) . ' · ' . $seletor['ano'];
 }
 
 function comparador_resumo(array $registros, int $saidas30d): array {

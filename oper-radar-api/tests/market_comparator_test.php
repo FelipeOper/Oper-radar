@@ -6,17 +6,17 @@ function confirma_comparador($condicao, string $mensagem): void {
     if (!$condicao) throw new RuntimeException($mensagem);
 }
 
-$marca = comparador_seletor(['a_modo' => 'marca', 'a_marca' => ' volvo ', 'a_modelo' => 'FH 540'], 'a');
-confirma_comparador($marca === ['modo' => 'marca', 'marca' => 'VOLVO', 'modelo' => null], 'seletor por marca');
-$modelo = comparador_seletor(['b_modo' => 'modelo', 'b_modelo' => ' xf 530 '], 'b');
+$marca = comparador_seletor(['a_modo' => 'marca', 'a_marca' => ' volvo ', 'a_modelo' => 'FH 540', 'a_ano' => '2023'], 'a');
+confirma_comparador($marca === ['modo' => 'marca', 'marca' => 'VOLVO', 'modelo' => null, 'ano' => 2023], 'seletor por marca e ano');
+$modelo = comparador_seletor(['b_modo' => 'modelo', 'b_modelo' => ' xf 530 ', 'b_ano' => '2022'], 'b');
 confirma_comparador($modelo['marca'] === null && $modelo['modelo'] === 'XF 530', 'seletor por modelo');
-$completo = comparador_seletor(['a_modo' => 'marca_modelo', 'a_marca' => 'DAF', 'a_modelo' => 'XF 530'], 'a');
+$completo = comparador_seletor(['a_modo' => 'marca_modelo', 'a_marca' => 'DAF', 'a_modelo' => 'XF 530', 'a_ano' => '2021'], 'a');
 [$where, $types, $params] = comparador_condicao($completo);
-confirma_comparador(str_contains($where, "a.tipo='Caminhao'") && $types === 'ss', 'condicao segura');
-confirma_comparador($params === ['DAF', 'XF 530'], 'parametros exatos');
-confirma_comparador(comparador_rotulo(['marca' => 'VOLVO', 'modelo' => 'VOLVO FH 540']) === 'VOLVO FH 540', 'nao duplica marca no rotulo');
-confirma_comparador(comparador_rotulo(['marca' => 'DAF', 'modelo' => 'XF 530']) === 'DAF XF 530', 'completa rotulo sem marca');
-confirma_comparador(comparador_seletor(['a_modo' => 'marca_modelo', 'a_marca' => 'DAF'], 'a') === null, 'modelo obrigatorio');
+confirma_comparador(str_contains($where, "a.tipo='Caminhao'") && str_contains($where, 'COALESCE(a.ano_final,a.ano_inicial)=?') && $types === 'ssi', 'condicao segura com ano-modelo');
+confirma_comparador($params === ['DAF', 'XF 530', 2021], 'parametros exatos');
+confirma_comparador(comparador_rotulo(['marca' => 'VOLVO', 'modelo' => 'VOLVO FH 540', 'ano' => 2023]) === 'VOLVO FH 540 · 2023', 'nao duplica marca no rotulo');
+confirma_comparador(comparador_rotulo(['marca' => 'DAF', 'modelo' => 'XF 530', 'ano' => 2021]) === 'DAF XF 530 · 2021', 'completa rotulo com ano');
+confirma_comparador(comparador_seletor(['a_modo' => 'marca_modelo', 'a_marca' => 'DAF', 'a_modelo' => 'XF 530'], 'a') === null, 'ano obrigatorio');
 
 $registros = [];
 foreach ([400000, 450000, 500000, 550000, 600000, 9999999] as $i => $preco) {

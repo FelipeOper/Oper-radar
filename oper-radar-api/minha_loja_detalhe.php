@@ -43,7 +43,7 @@ $itens = loja_detalhe_linhas($conn, "SELECT me.id,me.referencia_interna,me.titul
     me.preco_anunciado,me.cidade,me.uf,me.data_entrada,me.status,me.fipe_preco_id,
     me.origem,me.placa,me.quilometragem,me.url_anuncio,me.imagem_url,me.usar_comparativo,
     me.ultima_sincronizacao,me.criado_em,me.atualizado_em,
-    fp.preco preco_fipe,fp.codigo_fipe,fp.mes_referencia,
+    fp.preco preco_fipe,fp.codigo_fipe,fp.ano_codigo ano_fipe,fp.mes_referencia,
     fm.marca_fipe,fm.modelo_fipe,DATEDIFF(CURDATE(),me.data_entrada) dias_estoque
     FROM meu_estoque me
     LEFT JOIN fipe_preco fp ON fp.id=me.fipe_preco_id
