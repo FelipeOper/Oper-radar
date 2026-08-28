@@ -262,6 +262,9 @@ function ComparativoAnuncio({ anuncio, compacto = false }) {
   const desvioMercado = anuncio.desvioMercadoPct == null ? null : Number(anuncio.desvioMercadoPct);
   const tom = valor => valor == null ? T.inkMuted : valor < 0 ? T.positive : valor >= 20 ? T.alert : T.signal;
   const diferenca = valor => valor == null ? '—' : `${valor > 0 ? '+' : ''}${valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+  const anoFipe = String(anuncio.anoFipe || '').split('-')[0];
+  const referenciaFipe = [anuncio.marcaFipe, anuncio.modeloFipe].filter(Boolean).join(' ');
+  const identificacaoFipe = [referenciaFipe, anoFipe === '32000' ? '0 km' : anoFipe].filter(Boolean).join(' · ');
 
   if (!temFipe) {
     return <div style={{ marginTop: compacto ? 7 : 11, padding: compacto ? '7px 9px' : '9px 10px', borderRadius: 8, background: T.surface2, border: `1px solid ${T.line}`, color: T.inkMuted, fontSize: 10.5, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -273,6 +276,7 @@ function ComparativoAnuncio({ anuncio, compacto = false }) {
     <div style={{ display: 'grid', gridTemplateColumns: temMercado ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 8 }}>
       <div>
         <div style={{ color: T.inkMuted, fontSize: 9.5, letterSpacing: '0.05em', fontFamily: T.fontMono }}>TABELA FIPE{anuncio.fipeOrigem === 'manual' ? ' · VALIDADA' : ''}</div>
+        {identificacaoFipe && <div title={identificacaoFipe} style={{ color: T.inkMuted, fontSize: 9.5, lineHeight: 1.35, marginTop: 3 }}>{identificacaoFipe}</div>}
         <div style={{ color: T.ink, fontFamily: T.fontMono, fontSize: compacto ? 11 : 12, marginTop: 3 }}>{fmtBRL(anuncio.precoFipe)}</div>
         <div style={{ color: tom(desvioFipe), fontSize: 10.5, marginTop: 2 }}>{diferenca(desvioFipe)} vs anúncio</div>
       </div>
@@ -820,6 +824,7 @@ const MODOS_COMPARADOR = [
 ];
 
 function seletorComparadorValido(lado) {
+  if (!lado.ano) return false;
   if (lado.modo === 'marca') return Boolean(lado.marca);
   if (lado.modo === 'modelo') return Boolean(lado.modelo);
   return Boolean(lado.marca && lado.modelo);
@@ -840,7 +845,15 @@ function SeletorComparador({ titulo, lado, onChange, facetas }) {
     });
     modelos = [...agrupados.values()].map(item => ({ ...item, marca: [...item.marcas].join('/') }));
   }
-  const alteraModo = modo => onChange({ modo, marca: '', modelo: '' });
+  const anosAgrupados = new Map();
+  (facetas?.anos || []).filter(item => {
+    if (lado.modo === 'marca') return lado.marca && item.marca === lado.marca;
+    if (lado.modo === 'modelo') return lado.modelo && item.modelo === lado.modelo;
+    return lado.marca && lado.modelo && item.marca === lado.marca && item.modelo === lado.modelo;
+  }).forEach(item => anosAgrupados.set(Number(item.ano), (anosAgrupados.get(Number(item.ano)) || 0) + Number(item.anuncios || 0)));
+  const anos = [...anosAgrupados.entries()].sort((a, b) => b[0] - a[0]);
+  const recortePronto = lado.modo === 'marca' ? Boolean(lado.marca) : lado.modo === 'modelo' ? Boolean(lado.modelo) : Boolean(lado.marca && lado.modelo);
+  const alteraModo = modo => onChange({ modo, marca: '', modelo: '', ano: '' });
   return <Card style={{ padding: 16 }}>
     <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 650, marginBottom: 12 }}>{titulo}</div>
     <div role="radiogroup" aria-label={`Escopo ${titulo}`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -851,15 +864,19 @@ function SeletorComparador({ titulo, lado, onChange, facetas }) {
         background: lado.modo === id ? `${T.signal}12` : T.surface,
       }}>{label}</button>)}
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: lado.modo === 'marca_modelo' ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 8 }}>
-      {lado.modo !== 'modelo' && <select aria-label={`Marca ${titulo}`} value={lado.marca} onChange={e => onChange({ ...lado, marca: e.target.value, modelo: lado.modo === 'marca_modelo' ? '' : lado.modelo })} style={{ ...inputStyle, width: '100%' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8 }}>
+      {lado.modo !== 'modelo' && <select aria-label={`Marca ${titulo}`} value={lado.marca} onChange={e => onChange({ ...lado, marca: e.target.value, modelo: lado.modo === 'marca_modelo' ? '' : lado.modelo, ano: '' })} style={{ ...inputStyle, width: '100%' }}>
         <option value="">Selecione a marca</option>
         {(facetas?.marcas || []).map(item => <option key={item.marca} value={item.marca}>{item.marca} · {fmtN(item.anuncios)}</option>)}
       </select>}
-      {lado.modo !== 'marca' && <select aria-label={`Modelo ${titulo}`} value={lado.modelo} disabled={lado.modo === 'marca_modelo' && !lado.marca} onChange={e => onChange({ ...lado, modelo: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+      {lado.modo !== 'marca' && <select aria-label={`Modelo ${titulo}`} value={lado.modelo} disabled={lado.modo === 'marca_modelo' && !lado.marca} onChange={e => onChange({ ...lado, modelo: e.target.value, ano: '' })} style={{ ...inputStyle, width: '100%' }}>
         <option value="">{lado.modo === 'marca_modelo' && !lado.marca ? 'Escolha a marca primeiro' : 'Selecione o modelo'}</option>
         {modelos.map(item => <option key={`${item.marca}-${item.modelo}`} value={item.modelo}>{rotuloModeloComparador(item.modelo, lado.modo === 'modelo' ? item.marca.split('/')[0] : item.marca)}{lado.modo === 'modelo' ? ` · ${item.marca}` : ''} · {fmtN(item.anuncios)}</option>)}
       </select>}
+      <select aria-label={`Ano-modelo ${titulo}`} value={lado.ano} disabled={!recortePronto} onChange={e => onChange({ ...lado, ano: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+        <option value="">{recortePronto ? 'Selecione o ano-modelo' : 'Defina o recorte primeiro'}</option>
+        {anos.map(([ano, anuncios]) => <option key={ano} value={ano}>{ano} · {fmtN(anuncios)} anúncios</option>)}
+      </select>
     </div>
   </Card>;
 }
@@ -900,21 +917,22 @@ function PainelComparado({ lado, destaque }) {
 
 function PageComparador() {
   const { data: facetas, erro: erroFacetas } = useApi('comparador.php?facetas=1');
-  const [ladoA, setLadoA] = useState({ modo: 'marca_modelo', marca: '', modelo: '' });
-  const [ladoB, setLadoB] = useState({ modo: 'marca_modelo', marca: '', modelo: '' });
+  const [ladoA, setLadoA] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
+  const [ladoB, setLadoB] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
   const [resultado, setResultado] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
   const comparar = async () => {
     if (!seletorComparadorValido(ladoA) || !seletorComparadorValido(ladoB)) {
-      setErro('Complete os dois lados da comparação.'); return;
+      setErro('Complete os dois lados da comparação, incluindo o ano-modelo.'); return;
     }
     const p = new URLSearchParams();
     for (const [prefixo, lado] of [['a', ladoA], ['b', ladoB]]) {
       p.set(`${prefixo}_modo`, lado.modo);
       if (lado.marca) p.set(`${prefixo}_marca`, lado.marca);
       if (lado.modelo) p.set(`${prefixo}_modelo`, lado.modelo);
+      p.set(`${prefixo}_ano`, lado.ano);
     }
     setCarregando(true); setErro('');
     try {
@@ -930,7 +948,7 @@ function PageComparador() {
   return <div>
     <Card style={{ padding: 16, marginBottom: 14, borderLeft: `3px solid ${T.signal}` }}>
       <strong style={{ display: 'block', fontFamily: T.fontDisplay }}>Compare dois recortes reais do mercado de caminhões</strong>
-      <span style={{ display: 'block', color: T.inkMuted, fontSize: 12, marginTop: 4 }}>Cada lado pode representar uma marca inteira, um modelo em qualquer marca ou uma combinação exata de marca e modelo.</span>
+      <span style={{ display: 'block', color: T.inkMuted, fontSize: 12, marginTop: 4 }}>Cada lado combina marca, modelo ou marca + modelo com seu próprio ano-modelo, evitando misturar gerações e faixas de preço diferentes.</span>
     </Card>
     {erroFacetas && <EmptyState icon={Scale} titulo="Catálogo indisponível" texto="Não foi possível carregar marcas e modelos para comparação." />}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', gap: 12 }}>
@@ -1271,6 +1289,7 @@ function PageMercado({ sessao }) {
               </div>
               <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, lineHeight: 1.35, marginBottom: 4 }}>{a.titulo}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: T.inkMuted, fontSize: 10.5, marginBottom: 7 }}>
+                {a.modelo && <span title="Modelo identificado">{a.modelo}</span>}
                 {a.ano && <span title="Fabricação / modelo">Fab/Mod {a.ano}</span>}
                 {a.emissao?.norma && <span title={a.emissao.origem === 'informado' ? 'Norma informada no anúncio' : 'Inferência pelo ano de fabricação'}>{textoEmissao(a.emissao)}</span>}
                 {a.quilometragem && <span><Ruler size={10} style={{ verticalAlign: -1 }} /> {a.quilometragem}{a.quilometragemOrigem === 'curadoria' ? ' · validado' : ''}</span>}
@@ -2626,7 +2645,7 @@ function PageMinhaLoja({ sessao }) {
             <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.referencia_interna ? `ID ${item.referencia_interna} · ` : ''}{item.placa ? `${item.placa} · ` : ''}{[item.marca, item.modelo, item.ano].filter(Boolean).join(' · ')} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias{item.quilometragem ? ` · ${fmtN(item.quilometragem)} km` : ''}</div>
             <div style={{ fontFamily: T.fontMono, fontSize: 19, fontWeight: 650, marginTop: 15 }}>{fmtBRL(item.preco_anunciado)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>FIPE</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_fipe)}</div></div>
+              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>FIPE</small>{item.modelo_fipe && <div style={{ color: T.inkMuted, fontSize: 9.5, lineHeight: 1.35, marginTop: 3 }}>{[item.marca_fipe, item.modelo_fipe, String(item.ano_fipe || '').split('-')[0]].filter(Boolean).join(' · ')}</div>}<div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_fipe)}</div></div>
               <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>Mediana de mercado</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{item.mercado_amostra_suficiente ? fmtBRL(item.preco_mediana_mercado) : 'Amostra insuficiente'}</div></div>
             </div>
             <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{Number(item.usar_comparativo ?? 1) !== 1 ? 'Fora da base comparativa' : delta == null ? 'Aguardando amostra mínima compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da mediana · ${fmtN(item.anuncios_ativos)} anúncios · confiança ${item.mercado_confianca}`}</div>

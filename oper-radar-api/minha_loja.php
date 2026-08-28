@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                me.fipe_preco_id, me.origem, me.placa, me.quilometragem,
                me.url_anuncio, me.imagem_url, me.usar_comparativo,
                me.ultima_sincronizacao, me.criado_em, me.atualizado_em,
-               fp.preco AS preco_fipe, fp.codigo_fipe, fp.mes_referencia,
+               fp.preco AS preco_fipe, fp.codigo_fipe, fp.ano_codigo AS ano_fipe, fp.mes_referencia,
                fm.marca_fipe, fm.modelo_fipe,
                DATEDIFF(CURDATE(), me.data_entrada) AS dias_estoque,
                NULL AS preco_medio_mercado, 0 AS anuncios_ativos

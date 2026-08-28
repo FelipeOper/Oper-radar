@@ -1,7 +1,7 @@
 <?php
 /**
  * Comparador bilateral do mercado de caminhões.
- * Aceita marca, modelo ou marca+modelo independentemente em cada lado.
+ * Aceita marca, modelo ou marca+modelo e ano-modelo independentemente em cada lado.
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
@@ -9,32 +9,42 @@ require_once __DIR__ . '/lib/market_comparator.php';
 $conn = conecta();
 
 if (($_GET['facetas'] ?? '') === '1') {
-    $res = $conn->query("SELECT UPPER(TRIM(marca)) marca, UPPER(TRIM(modelo)) modelo, COUNT(*) n
+    $res = $conn->query("SELECT UPPER(TRIM(marca)) marca, UPPER(TRIM(modelo)) modelo,
+                                COALESCE(ano_final,ano_inicial) ano, COUNT(*) n
                          FROM anuncio
                          WHERE status='ativo' AND tipo='Caminhao'
                            AND marca IS NOT NULL AND TRIM(marca)<>''
                            AND modelo IS NOT NULL AND TRIM(modelo)<>''
-                         GROUP BY UPPER(TRIM(marca)), UPPER(TRIM(modelo))
-                         ORDER BY marca, modelo");
+                           AND COALESCE(ano_final,ano_inicial) BETWEEN 1950 AND YEAR(CURDATE())+2
+                         GROUP BY UPPER(TRIM(marca)), UPPER(TRIM(modelo)), COALESCE(ano_final,ano_inicial)
+                         ORDER BY marca, modelo, ano DESC");
     $marcas = [];
     $modelos = [];
+    $anos = [];
     while ($row = $res->fetch_assoc()) {
         $marca = $row['marca'];
+        $modelo = $row['modelo'];
+        $ano = (int)$row['ano'];
         $n = (int)$row['n'];
         $marcas[$marca] = ($marcas[$marca] ?? 0) + $n;
-        $modelos[] = ['marca' => $marca, 'modelo' => $row['modelo'], 'anuncios' => $n];
+        $chaveModelo = $marca . "\0" . $modelo;
+        if (!isset($modelos[$chaveModelo])) {
+            $modelos[$chaveModelo] = ['marca' => $marca, 'modelo' => $modelo, 'anuncios' => 0];
+        }
+        $modelos[$chaveModelo]['anuncios'] += $n;
+        $anos[] = ['marca' => $marca, 'modelo' => $modelo, 'ano' => $ano, 'anuncios' => $n];
     }
     arsort($marcas);
     $listaMarcas = [];
     foreach ($marcas as $marca => $n) $listaMarcas[] = ['marca' => $marca, 'anuncios' => $n];
-    envia_json(['marcas' => $listaMarcas, 'modelos' => $modelos]);
+    envia_json(['marcas' => $listaMarcas, 'modelos' => array_values($modelos), 'anos' => $anos]);
 }
 
 $ladoA = comparador_seletor($_GET, 'a');
 $ladoB = comparador_seletor($_GET, 'b');
 if (!$ladoA || !$ladoB) {
     http_response_code(422);
-    envia_json(['erro' => 'Selecione marca, modelo ou marca e modelo nos dois lados.']);
+    envia_json(['erro' => 'Selecione o recorte e o ano-modelo nos dois lados.']);
 }
 
 function comparador_busca_lado(mysqli $conn, array $seletor): array {

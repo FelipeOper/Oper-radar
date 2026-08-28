@@ -15,6 +15,9 @@ class ComparadorMercadoContractTest(unittest.TestCase):
         self.assertIn("mercado_calcula_estatisticas", helper)
         self.assertIn("comparador_seletor($_GET, 'a')", api)
         self.assertIn("comparador_seletor($_GET, 'b')", api)
+        self.assertIn("COALESCE(ano_final,ano_inicial)", api)
+        self.assertIn("${prefixo}_ano", app)
+        self.assertIn("Ano-modelo", app)
         self.assertIn("Compare dois recortes reais", app)
         self.assertIn("Comparador", app)
 
@@ -26,6 +29,11 @@ class ComparadorMercadoContractTest(unittest.TestCase):
         self.assertIn("oper_taxonomia_tipos_por_mercado", facetas)
         self.assertIn("p.set('mercado', universo)", app)
         self.assertIn("Outros mercados", app)
+
+    def test_busca_fipe_nao_confunde_potencia_daf_com_prefixo_do_codigo(self):
+        api = (ROOT / "oper-radar-api" / "fipe_consulta.php").read_text(encoding="utf-8")
+        self.assertIn("strlen($digitos) >= 6", api)
+        self.assertIn("Números curtos como 530", api)
 
 
 if __name__ == "__main__":

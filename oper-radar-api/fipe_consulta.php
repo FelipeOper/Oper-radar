@@ -105,10 +105,19 @@ if (!empty($_GET['ano']) && ctype_digit((string)$_GET['ano'])) {
 if (!empty($_GET['q'])) {
     $tokens = preg_split('/\s+/u', trim($_GET['q']), -1, PREG_SPLIT_NO_EMPTY);
     foreach (array_slice($tokens ?: [], 0, 8) as $token) {
-        $where[] = '(fm.marca_fipe LIKE ? OR fm.modelo_fipe LIKE ? OR fp.codigo_fipe LIKE ? OR fp.ano_codigo LIKE ?)';
         $termo = '%' . $token . '%';
-        array_push($params, $termo, $termo, $termo, $termo);
-        $types .= 'ssss';
+        $digitos = preg_replace('/\D/', '', $token);
+        if (strlen($digitos) >= 6) {
+            // Códigos FIPE têm 7 dígitos. Números curtos como 530 são potência/modelo,
+            // e não podem casar com o prefixo 530 presente em todos os códigos DAF.
+            $where[] = '(fp.codigo_fipe LIKE ? OR REPLACE(fp.codigo_fipe,\'-\',\'\') LIKE ?)';
+            array_push($params, $termo, '%' . $digitos . '%');
+            $types .= 'ss';
+        } else {
+            $where[] = '(fm.marca_fipe LIKE ? OR fm.modelo_fipe LIKE ? OR fp.ano_codigo LIKE ?)';
+            array_push($params, $termo, $termo, $termo);
+            $types .= 'sss';
+        }
     }
 }
 $clausula = ' WHERE ' . implode(' AND ', $where);
