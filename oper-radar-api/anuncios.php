@@ -11,6 +11,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/vehicle_taxonomy.php';
+require_once __DIR__ . '/lib/query_contract.php';
 $conn = conecta();
 
 $REGIOES = [
@@ -112,15 +113,59 @@ $stc->close();
 // 'aleatorio' usa RAND() com semente estavel por dia, pra paginacao nao repetir/pular itens
 $semente = (int)date('Ymd');
 $ordens = [
-    'aleatorio'  => "RAND($semente)",
-    'recente'    => 'a.ultima_vez_ativo DESC',
-    'preco_asc'  => 'a.preco IS NULL, a.preco ASC',
-    'preco_desc' => 'a.preco IS NULL, a.preco DESC',
-    'mais_tempo' => 'a.primeira_vez_visto ASC',
-    'movimento'  => 'COALESCE(a.data_remocao, a.ultima_vez_ativo, a.primeira_vez_visto) DESC',
-    'desvio_fipe' => 'a.preco / NULLIF(f.preco, 0) ASC, a.preco ASC',
+    'aleatorio'  => "RAND($semente), a.id ASC",
+    'recente'    => "COALESCE(a.ultima_vez_ativo, a.primeira_vez_visto, '1970-01-01 00:00:00') DESC, a.id DESC",
+    'preco_asc'  => 'a.preco IS NULL, a.preco ASC, a.id ASC',
+    'preco_desc' => 'a.preco IS NULL, a.preco DESC, a.id DESC',
+    'mais_tempo' => "COALESCE(a.primeira_vez_visto, a.ultima_vez_ativo, '1970-01-01 00:00:00') ASC, a.id ASC",
+    'movimento'  => "COALESCE(a.data_remocao, a.ultima_vez_ativo, a.primeira_vez_visto, '1970-01-01 00:00:00') DESC, a.id DESC",
+    'desvio_fipe' => 'a.preco / NULLIF(f.preco, 0) ASC, a.preco ASC, a.id ASC',
 ];
-$ordem = $ordens[$_GET['ordem'] ?? 'aleatorio'] ?? $ordens['aleatorio'];
+$ordemChave = isset($ordens[$_GET['ordem'] ?? '']) ? (string)$_GET['ordem'] : 'aleatorio';
+$ordem = $ordens[$ordemChave];
+$cursorSpecs = [
+    'recente' => [
+        'expressao' => "COALESCE(a.ultima_vez_ativo, a.primeira_vez_visto, '1970-01-01 00:00:00')",
+        'direcao' => 'DESC',
+    ],
+    'mais_tempo' => [
+        'expressao' => "COALESCE(a.primeira_vez_visto, a.ultima_vez_ativo, '1970-01-01 00:00:00')",
+        'direcao' => 'ASC',
+    ],
+    'movimento' => [
+        'expressao' => "COALESCE(a.data_remocao, a.ultima_vez_ativo, a.primeira_vez_visto, '1970-01-01 00:00:00')",
+        'direcao' => 'DESC',
+    ],
+];
+$cursorSuportado = isset($cursorSpecs[$ordemChave]) && !$somenteAbaixoFipe;
+$fingerprint = oper_query_fingerprint($_GET);
+$cursorRecebido = trim((string)($_GET['cursor'] ?? ''));
+$cursorDados = null;
+if ($cursorRecebido !== '') {
+    if (!$cursorSuportado) {
+        http_response_code(422);
+        envia_json(['erro' => 'Cursor nao suportado para esta ordenacao.', 'codigo' => 'CURSOR_NAO_SUPORTADO']);
+    }
+    $cursorDados = oper_cursor_decode($cursorRecebido, $fingerprint, $ordemChave);
+    if ($cursorDados === null) {
+        http_response_code(422);
+        envia_json(['erro' => 'Cursor invalido ou incompatível com os filtros.', 'codigo' => 'CURSOR_INVALIDO']);
+    }
+}
+
+$wherePagina = $where;
+$paramsPagina = $params;
+$typesPagina = $types;
+$cursorExpressao = $cursorSuportado ? $cursorSpecs[$ordemChave]['expressao'] : 'NULL';
+if ($cursorDados !== null) {
+    $comparador = $cursorSpecs[$ordemChave]['direcao'] === 'DESC' ? '<' : '>';
+    $wherePagina[] = "($cursorExpressao $comparador ? OR ($cursorExpressao = ? AND a.id $comparador ?))";
+    $paramsPagina[] = $cursorDados['valor'];
+    $paramsPagina[] = $cursorDados['valor'];
+    $paramsPagina[] = $cursorDados['id'];
+    $typesPagina .= 'ssi';
+}
+$clausulaPagina = $wherePagina ? ' WHERE ' . implode(' AND ', $wherePagina) : '';
 
 $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo, a.carroceria, a.tracao,
                a.ano_inicial, a.ano_final,
@@ -139,7 +184,8 @@ $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo,
                0 AS anuncios_comparaveis, NULL AS preco_medio_mercado,
                NULL AS menor_preco_mercado, NULL AS maior_preco_mercado,
                NULL AS desvio_mercado_pct,
-               r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf
+               r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf,
+               $cursorExpressao AS cursor_ordem_valor
         FROM anuncio a
         JOIN revenda r ON r.id = a.revenda_id
         LEFT JOIN fipe_preco f ON f.id = a.fipe_preco_id
@@ -148,14 +194,14 @@ $sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo,
             SELECT anuncio_id, COUNT(*) AS total
             FROM anuncio_fipe_sugestao GROUP BY anuncio_id
         ) fs ON fs.anuncio_id=a.id
-        $clausula
+        $clausulaPagina
         ORDER BY $ordem
         LIMIT ? OFFSET ?";
-$paramsPag = $params; $typesPag = $types;
+$paramsPag = $paramsPagina; $typesPag = $typesPagina;
 // O filtro estatístico é aplicado após a consulta. Buscamos candidatos suficientes
 // para que um preço inválido no início não esconda oportunidades válidas posteriores.
-$limiteSql = $somenteAbaixoFipe ? 1000 : $limit;
-$offsetSql = $somenteAbaixoFipe ? 0 : $offset;
+$limiteSql = $somenteAbaixoFipe ? 1000 : ($cursorSuportado ? $limit + 1 : $limit);
+$offsetSql = ($somenteAbaixoFipe || $cursorDados !== null) ? 0 : $offset;
 $paramsPag[] = $limiteSql;  $typesPag .= 'i';
 $paramsPag[] = $offsetSql; $typesPag .= 'i';
 
@@ -165,7 +211,10 @@ $stmt->execute();
 $res = $stmt->get_result();
 
 $anuncios = [];
+$cursoresPagina = [];
 while ($row = $res->fetch_assoc()) {
+    $cursorValor = $row['cursor_ordem_valor'] !== null ? (string)$row['cursor_ordem_valor'] : null;
+    unset($row['cursor_ordem_valor']);
     $row['anuncio_id'] = (int)$row['anuncio_id'];
     $row['anuncio_portal_id'] = (int)$row['anuncio_portal_id'];
     foreach (['ano_inicial', 'ano_final', 'ano_fabricacao', 'ano_modelo'] as $campo) {
@@ -181,8 +230,16 @@ while ($row = $res->fetch_assoc()) {
     $row['anuncios_comparaveis'] = (int)($row['anuncios_comparaveis'] ?? 0);
     $row['fipe_sugestoes'] = (int)($row['fipe_sugestoes'] ?? 0);
     $row['revenda_id'] = (int)$row['revenda_id'];
+    $cursoresPagina[] = ['valor' => $cursorValor, 'id' => $row['anuncio_id']];
     $anuncios[] = $row;
 }
+
+$temExcedente = $cursorSuportado && count($anuncios) > $limit;
+if ($temExcedente) {
+    $anuncios = array_slice($anuncios, 0, $limit);
+    $cursoresPagina = array_slice($cursoresPagina, 0, $limit);
+}
+$ultimoCursor = $cursoresPagina ? $cursoresPagina[count($cursoresPagina) - 1] : null;
 
 $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($anuncios, 'fipe_preco_id'));
 foreach ($anuncios as &$row) {
@@ -202,11 +259,23 @@ if ($somenteAbaixoFipe) {
     $anuncios = array_slice($anuncios, $offset, $limit);
 }
 
+$retornados = count($anuncios);
+$temMais = $cursorSuportado
+    ? $temExcedente
+    : ($offset + $retornados < $total);
+$proximoCursor = ($cursorSuportado && $temMais)
+    ? oper_cursor_encode($fingerprint, $ordemChave, $ultimoCursor['valor'], $ultimoCursor['id'])
+    : null;
+
 envia_json([
     'total' => $total,               // total no banco com os filtros aplicados
     'total_bruto' => $totalBruto ?? $total,
-    'retornados' => count($anuncios),
+    'retornados' => $retornados,
     'offset' => $offset,
     'limit' => $limit,
+    'pagination_mode' => $cursorSuportado ? 'cursor' : 'offset',
+    'cursor_supported' => $cursorSuportado,
+    'proximo_cursor' => $proximoCursor,
+    'has_more' => $temMais,
     'anuncios' => $anuncios,
 ]);

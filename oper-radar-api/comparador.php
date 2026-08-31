@@ -6,7 +6,9 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_comparator.php';
+require_once __DIR__ . '/lib/query_contract.php';
 $conn = conecta();
+$periodo = oper_periodo_contrato($_GET['periodo'] ?? null);
 
 if (($_GET['facetas'] ?? '') === '1') {
     $res = $conn->query("SELECT UPPER(TRIM(marca)) marca, UPPER(TRIM(modelo)) modelo,
@@ -37,7 +39,16 @@ if (($_GET['facetas'] ?? '') === '1') {
     arsort($marcas);
     $listaMarcas = [];
     foreach ($marcas as $marca => $n) $listaMarcas[] = ['marca' => $marca, 'anuncios' => $n];
-    envia_json(['marcas' => $listaMarcas, 'modelos' => array_values($modelos), 'anos' => $anos]);
+    $periodos = [];
+    foreach (oper_periodos_suportados() as $codigo => $item) {
+        $periodos[] = ['codigo' => $codigo] + $item;
+    }
+    envia_json([
+        'marcas' => $listaMarcas,
+        'modelos' => array_values($modelos),
+        'anos' => $anos,
+        'periodos' => $periodos,
+    ]);
 }
 
 $ladoA = comparador_seletor($_GET, 'a');
@@ -47,12 +58,13 @@ if (!$ladoA || !$ladoB) {
     envia_json(['erro' => 'Selecione o recorte e o ano-modelo nos dois lados.']);
 }
 
-function comparador_busca_lado(mysqli $conn, array $seletor): array {
+function comparador_busca_lado(mysqli $conn, array $seletor, array $periodo): array {
     [$condicao, $types, $params] = comparador_condicao($seletor);
+    $dias = (int)$periodo['dias'];
     $sql = "SELECT a.preco, a.preco_texto_bruto, a.titulo, a.modelo,
                    f.preco AS preco_fipe, r.id AS revenda_id, r.uf,
                    DATEDIFF(CURDATE(), a.primeira_vez_visto) AS dias_observados,
-                   (a.primeira_vez_visto>=DATE_SUB(NOW(), INTERVAL 30 DAY)) AS entrada_30d
+                   (a.primeira_vez_visto>=DATE_SUB(NOW(), INTERVAL $dias DAY)) AS entrada_periodo
             FROM anuncio a
             JOIN revenda r ON r.id=a.revenda_id
             LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
@@ -67,7 +79,7 @@ function comparador_busca_lado(mysqli $conn, array $seletor): array {
 
     $sqlSaidas = "SELECT COUNT(*) n FROM anuncio a
                   WHERE a.status='removido_confirmado'
-                    AND a.data_remocao>=DATE_SUB(NOW(), INTERVAL 30 DAY)
+                    AND a.data_remocao>=DATE_SUB(NOW(), INTERVAL $dias DAY)
                     AND $condicao";
     $st = $conn->prepare($sqlSaidas);
     if ($params) $st->bind_param($types, ...$params);
@@ -75,14 +87,15 @@ function comparador_busca_lado(mysqli $conn, array $seletor): array {
     $saidas = (int)$st->get_result()->fetch_assoc()['n'];
     $st->close();
 
-    return comparador_resumo($registros, $saidas);
+    return comparador_resumo($registros, $saidas, $periodo);
 }
 
-$resumoA = comparador_busca_lado($conn, $ladoA);
-$resumoB = comparador_busca_lado($conn, $ladoB);
+$resumoA = comparador_busca_lado($conn, $ladoA, $periodo);
+$resumoB = comparador_busca_lado($conn, $ladoB, $periodo);
 $conn->close();
 
 envia_json([
+    'periodo' => $periodo,
     'lado_a' => ['seletor' => $ladoA, 'rotulo' => comparador_rotulo($ladoA), 'metricas' => $resumoA],
     'lado_b' => ['seletor' => $ladoB, 'rotulo' => comparador_rotulo($ladoB), 'metricas' => $resumoB],
     'diferencas' => [

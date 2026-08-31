@@ -28,6 +28,11 @@ $resumo = comparador_resumo($registros, 3);
 confirma_comparador($resumo['ativos'] === 6 && $resumo['revendas'] === 2 && $resumo['ufs'] === 2, 'volume');
 confirma_comparador($resumo['precos']['amostra_qualificada'] === 5, 'remove extremo');
 confirma_comparador($resumo['entradas_30d'] === 2 && $resumo['saidas_30d'] === 3, 'movimento');
+$resumo90d = comparador_resumo([
+    ['preco' => 500000, 'titulo' => '', 'preco_texto_bruto' => '', 'entrada_periodo' => 1],
+], 4, ['codigo' => '90d', 'dias' => 90, 'rotulo' => '90 dias']);
+confirma_comparador($resumo90d['periodo']['codigo'] === '90d', 'preserva periodo consultado');
+confirma_comparador($resumo90d['entradas_periodo'] === 1 && $resumo90d['saidas_periodo'] === 4, 'movimento acompanha periodo');
 confirma_comparador(comparador_diferenca(550000, 500000) === 10.0, 'diferenca percentual');
 
 echo "market_comparator_test=OK\n";

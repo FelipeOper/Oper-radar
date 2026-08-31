@@ -28,13 +28,12 @@ import {
 import { breadcrumbsFor, normalizeAppContext } from './navigation.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
+import { API_BASE_URL, apiGet } from './apiClient.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
    (ver docs/OPER_RADAR_Estrategia_e_Design.md)
    ============================================================ */
-const API_BASE_URL = 'https://agenciaoper.com.br/oper-radar-api';
-
 /* ---------- dados de referência ---------- */
 const REGIOES_UFS = {
   Sul: ['PR', 'SC', 'RS'],
@@ -138,8 +137,7 @@ function useApi(path) {
     const controller = new AbortController();
     setErro(false);
     setStatus('loading');
-    fetch(`${API_BASE_URL}/${path}`, { signal: controller.signal, credentials: 'same-origin' })
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+    apiGet(path, { signal: controller.signal, ttlMs: 15000 })
       .then(payload => {
         setData(payload);
         setMeta(payload?._meta || null);
@@ -905,6 +903,7 @@ function SeletorComparador({ titulo, lado, onChange, facetas }) {
 function PainelComparado({ lado, destaque }) {
   const m = lado.metricas;
   const p = m.precos;
+  const janela = m.periodo?.rotulo || '30 dias';
   return <Card style={{ padding: 18, borderTop: `3px solid ${destaque}` }}>
     <div style={{ fontFamily: T.fontMono, fontSize: 10, color: destaque, letterSpacing: '0.06em' }}>RECORTE</div>
     <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 20, margin: '5px 0 15px' }}>{lado.rotulo}</div>
@@ -914,8 +913,8 @@ function PainelComparado({ lado, destaque }) {
         ['Revendas', fmtN(m.revendas)],
         ['Preço mediano', fmtBRL(p.mediana)],
         ['Preço médio', fmtBRL(p.media)],
-        ['Entradas 30 dias', fmtN(m.entradas_30d)],
-        ['Saídas 30 dias', fmtN(m.saidas_30d)],
+        [`Entradas ${janela}`, fmtN(m.entradas_periodo ?? m.entradas_30d)],
+        [`Saídas ${janela}`, fmtN(m.saidas_periodo ?? m.saidas_30d)],
         ['Média observada', m.dias_observados_media == null ? '—' : `${m.dias_observados_media.toLocaleString('pt-BR')} dias`],
         ['Estados', fmtN(m.ufs)],
       ].map(([label, value]) => <div key={label} style={{ padding: 10, background: T.surface2, borderRadius: 9 }}>
@@ -936,19 +935,29 @@ function PainelComparado({ lado, destaque }) {
   </Card>;
 }
 
-function PageComparador() {
+function PageComparador({ contexto, onContexto }) {
   const { data: facetas, erro: erroFacetas } = useApi('comparador.php?facetas=1');
+  const [periodo, setPeriodo] = useState(contexto?.periodo || '30d');
   const [ladoA, setLadoA] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
   const [ladoB, setLadoB] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
   const [resultado, setResultado] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
+  useEffect(() => setPeriodo(contexto?.periodo || '30d'), [contexto?.periodo]);
+
+  const alteraPeriodo = valor => {
+    setPeriodo(valor);
+    setResultado(null);
+    onContexto?.({ ...contexto, periodo: valor }, { replace: true, preserveScroll: true });
+  };
+
   const comparar = async () => {
     if (!seletorComparadorValido(ladoA) || !seletorComparadorValido(ladoB)) {
       setErro('Complete os dois lados da comparação, incluindo o ano-modelo.'); return;
     }
     const p = new URLSearchParams();
+    p.set('periodo', periodo);
     for (const [prefixo, lado] of [['a', ladoA], ['b', ladoB]]) {
       p.set(`${prefixo}_modo`, lado.modo);
       if (lado.marca) p.set(`${prefixo}_marca`, lado.marca);
@@ -957,9 +966,7 @@ function PageComparador() {
     }
     setCarregando(true); setErro('');
     try {
-      const resposta = await fetch(`${API_BASE_URL}/comparador.php?${p}`, { credentials: 'same-origin' });
-      const dados = await resposta.json();
-      if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível comparar os recortes.');
+      const dados = await apiGet(`comparador.php?${p}`, { ttlMs: 0, useCache: false });
       setResultado(dados);
     } catch (e) { setErro(e.message); }
     finally { setCarregando(false); }
@@ -970,6 +977,16 @@ function PageComparador() {
     <Card style={{ padding: 16, marginBottom: 14, borderLeft: `3px solid ${T.signal}` }}>
       <strong style={{ display: 'block', fontFamily: T.fontDisplay }}>Compare dois recortes reais do mercado de caminhões</strong>
       <span style={{ display: 'block', color: T.inkMuted, fontSize: 12, marginTop: 4 }}>Cada lado combina marca, modelo ou marca + modelo com seu próprio ano-modelo, evitando misturar gerações e faixas de preço diferentes.</span>
+      <label style={{ display: 'block', marginTop: 12, maxWidth: 220 }}>
+        <span style={rotuloFiltroStyle}>JANELA DE MOVIMENTO</span>
+        <select aria-label="Janela de movimento" value={periodo} onChange={e => alteraPeriodo(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 5 }}>
+          {(facetas?.periodos || [
+            { codigo: '7d', rotulo: '7 dias' }, { codigo: '30d', rotulo: '30 dias' },
+            { codigo: '90d', rotulo: '90 dias' }, { codigo: '180d', rotulo: '180 dias' },
+            { codigo: '12m', rotulo: '12 meses' },
+          ]).map(item => <option key={item.codigo} value={item.codigo}>{item.rotulo}</option>)}
+        </select>
+      </label>
     </Card>
     {erroFacetas && <EmptyState icon={Scale} titulo="Catálogo indisponível" texto="Não foi possível carregar marcas e modelos para comparação." />}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', gap: 12 }}>
@@ -1070,8 +1087,12 @@ function PageMercado({ sessao, contexto, onContexto }) {
   const [total, setTotal] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [fim, setFim] = useState(false);
+  const [proximoCursor, setProximoCursor] = useState(null);
+  const [cursorSuportado, setCursorSuportado] = useState(false);
   const carregandoRef = useRef(false);
   const sentinelaRef = useRef(null);
+  const consultaVersaoRef = useRef(0);
+  const paginaControllerRef = useRef(null);
 
   // Debounce da busca — evita disparar uma requisicao por tecla digitada
   useEffect(() => {
@@ -1102,44 +1123,76 @@ function PageMercado({ sessao, contexto, onContexto }) {
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
-    let cancelado = false;
+    const versao = ++consultaVersaoRef.current;
+    paginaControllerRef.current?.abort();
+    const controller = new AbortController();
     carregandoRef.current = true;
     setCarregando(true); setFim(false);
+    setProximoCursor(null); setCursorSuportado(false);
     document.getElementById('app-scroll-container')?.scrollTo({ top: 0 });
-    fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=0`)
-      .then(r => r.json())
+    apiGet(`anuncios.php?${queryBase}&limit=${PAGINA}&offset=0`, {
+      signal: controller.signal, ttlMs: 0, useCache: false,
+    })
       .then(d => {
-        if (cancelado) return;
-        setAnuncios((d.anuncios || []).map(mapeiaAnuncioReal));
+        if (consultaVersaoRef.current !== versao) return;
+        const recebidos = (d.anuncios || []).map(mapeiaAnuncioReal);
+        setAnuncios(recebidos);
         setTotal(d.total ?? 0);
-        setFim((d.anuncios || []).length >= (d.total ?? 0));
+        setCursorSuportado(Boolean(d.cursor_supported));
+        setProximoCursor(d.proximo_cursor || null);
+        setFim(d.has_more === false || recebidos.length >= (d.total ?? 0));
       })
-      .catch(() => { if (!cancelado) { setAnuncios([]); setTotal(0); } })
+      .catch(error => {
+        if (consultaVersaoRef.current === versao && error.name !== 'AbortError') {
+          setAnuncios([]); setTotal(0); setFim(true);
+        }
+      })
       .finally(() => {
-        carregandoRef.current = false;
-        if (!cancelado) setCarregando(false);
+        if (consultaVersaoRef.current === versao) {
+          carregandoRef.current = false;
+          if (!controller.signal.aborted) setCarregando(false);
+        }
       });
-    return () => { cancelado = true; };
+    return () => {
+      controller.abort();
+      paginaControllerRef.current?.abort();
+    };
   }, [queryBase, versaoDados]);
 
   const carregaMais = () => {
     if (carregandoRef.current || fim) return;
+    const versao = consultaVersaoRef.current;
+    const controller = new AbortController();
+    paginaControllerRef.current = controller;
     carregandoRef.current = true;
     setCarregando(true);
-    fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=${anuncios.length}`)
-      .then(r => r.json())
+    const paginacao = cursorSuportado && proximoCursor
+      ? `cursor=${encodeURIComponent(proximoCursor)}`
+      : `offset=${anuncios.length}`;
+    apiGet(`anuncios.php?${queryBase}&limit=${PAGINA}&${paginacao}`, {
+      signal: controller.signal, ttlMs: 0, useCache: false,
+    })
       .then(d => {
+        if (consultaVersaoRef.current !== versao) return;
         const novos = (d.anuncios || []).map(mapeiaAnuncioReal);
+        setCursorSuportado(Boolean(d.cursor_supported));
+        setProximoCursor(d.proximo_cursor || null);
         setAnuncios(prev => {
-          const juntos = [...prev, ...novos];
-          if (novos.length === 0 || juntos.length >= (d.total ?? 0)) setFim(true);
+          const ids = new Set(prev.map(item => item.dbId));
+          const juntos = [...prev, ...novos.filter(item => !ids.has(item.dbId))];
+          if (d.has_more === false || novos.length === 0 || juntos.length >= (d.total ?? 0)) setFim(true);
           return juntos;
         });
       })
-      .catch(() => setFim(true))
+      .catch(error => {
+        if (consultaVersaoRef.current === versao && error.name !== 'AbortError') setFim(true);
+      })
       .finally(() => {
-        carregandoRef.current = false;
-        setCarregando(false);
+        if (paginaControllerRef.current === controller) paginaControllerRef.current = null;
+        if (consultaVersaoRef.current === versao) {
+          carregandoRef.current = false;
+          setCarregando(false);
+        }
       });
   };
 
@@ -3212,7 +3265,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
     mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
-    comparador: <PageComparador />,
+    comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
