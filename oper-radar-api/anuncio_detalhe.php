@@ -156,10 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     envia_json(['erro' => 'Método não permitido.']);
 }
 
-if (!in_array($usuario['papel'], ['admin', 'gestor'], true)) {
-    http_response_code(403);
-    envia_json(['erro' => 'Somente Admin ou Gestor pode alterar a curadoria.']);
-}
+$usuario = exige_papel(['admin', 'gestor']);
 exige_csrf();
 $dados = json_decode(file_get_contents('php://input'), true);
 $dados = is_array($dados) ? $dados : [];

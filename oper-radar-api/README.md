@@ -8,6 +8,11 @@ Retorna estoque, revendas, entradas/saídas em 30 dias, tempo observado e estat�
 preço qualificadas. `anuncios.php` e `facetas.php` aceitam `mercado=principal|outros` para
 isolar caminhões/implementos rodoviários dos segmentos secundários.
 
+Todas as respostas produzidas por `envia_json()` preservam os campos legados e acrescentam
+`_meta.request_id`, `_meta.api_version` e `_meta.generated_at`. O `request_id` também é
+devolvido no header `X-Request-ID`. Operações restritas devem usar `exige_papel()` em vez de
+repetir comparações de papel em cada endpoint.
+
 ## Comparativos de preço
 
 `lib/market_quality.php` centraliza a regra usada por anúncios, detalhe, FIPE, placa, Minha

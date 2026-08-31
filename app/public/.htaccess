@@ -1,7 +1,5 @@
-# OPER RADAR — SPA fallback + cache (Apache/HostGator)
-# Publicado em agenciaoper.com.br/oper-radar/
-# RewriteBase precisa ser /oper-radar/ (nunca /): a raiz do dominio hospeda
-# o site institucional em WordPress/Elementor, separado deste app.
+# OPER RADAR — rotas reais da SPA em /oper-radar/
+# A raiz do domínio hospeda outro site; nunca ampliar o RewriteBase para /.
 
 <IfModule mod_rewrite.c>
   RewriteEngine On

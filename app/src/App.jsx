@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Radar, LayoutGrid, Crosshair, Building2, Settings, ListChecks,
   MapPin, ExternalLink, Search,
@@ -7,7 +7,7 @@ import {
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
-  Pencil, History, Undo2, Ruler, Check, Scale
+  Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -25,6 +25,9 @@ import {
 import {
   CATEGORIAS_MERCADO, categoriaDeTipo, categoriasDoMercado, filtrosDaCategoria, rotuloTipo,
 } from './marketTaxonomy.js';
+import { breadcrumbsFor, normalizeAppContext } from './navigation.js';
+import { useBrowserRoute } from './useBrowserRoute.js';
+import { resolveDataState } from './dataState.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
@@ -129,16 +132,28 @@ const fmtN = v => v == null ? '—' : v.toLocaleString('pt-BR');
 function useApi(path) {
   const [data, setData] = useState(null);
   const [erro, setErro] = useState(false);
+  const [status, setStatus] = useState('loading');
+  const [meta, setMeta] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
     setErro(false);
+    setStatus('loading');
     fetch(`${API_BASE_URL}/${path}`, { signal: controller.signal, credentials: 'same-origin' })
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(setData)
-      .catch(e => { if (e.name !== 'AbortError') setErro(true); });
+      .then(payload => {
+        setData(payload);
+        setMeta(payload?._meta || null);
+        setStatus('ready');
+      })
+      .catch(e => {
+        if (e.name !== 'AbortError') {
+          setErro(true);
+          setStatus(resolveDataState({ error: true, offline: typeof navigator !== 'undefined' && navigator.onLine === false }));
+        }
+      });
     return () => controller.abort();
   }, [path]);
-  return { data, erro };
+  return { data, erro, status, meta };
 }
 
 async function apiPost(path, dados, csrf) {
@@ -569,12 +584,18 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
   </div>;
 }
 
-function EmptyState({ icon: Icon, titulo, texto }) {
+function EmptyState({ icon: Icon, titulo, texto, status = 'empty', fonte = null, amostra = null, confianca = null }) {
+  const role = status === 'error' || status === 'offline' || status === 'forbidden' ? 'alert' : 'status';
   return (
     <Card style={{ textAlign: 'center', padding: '40px 24px' }}>
+      <div role={role} aria-live={role === 'alert' ? 'assertive' : 'polite'}>
       <Icon size={26} style={{ color: T.inkMuted, marginBottom: 12 }} />
       <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, marginBottom: 6, color: T.ink }}>{titulo}</div>
       <div style={{ fontSize: 13, color: T.inkMuted, maxWidth: 420, margin: '0 auto', lineHeight: 1.6 }}>{texto}</div>
+      {(fonte || amostra != null || confianca) && <div style={{ marginTop: 12, fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>
+        {[fonte && `Fonte: ${fonte}`, amostra != null && `Amostra: ${fmtN(amostra)}`, confianca && `Confiança: ${confianca}`].filter(Boolean).join(' · ')}
+      </div>}
+      </div>
     </Card>
   );
 }
@@ -976,20 +997,21 @@ function PageComparador() {
   </div>;
 }
 
-function PageMercado({ sessao }) {
-  const [universo, setUniverso] = useState('principal');
-  const [q, setQ] = useState('');
-  const [qDebounced, setQDebounced] = useState('');
-  const [categoria, setCategoria] = useState('todas');
+function PageMercado({ sessao, contexto, onContexto }) {
+  const contextoInicial = useRef(normalizeAppContext(contexto));
+  const [universo, setUniverso] = useState(contextoInicial.current.mercado);
+  const [q, setQ] = useState(contextoInicial.current.busca || '');
+  const [qDebounced, setQDebounced] = useState(contextoInicial.current.busca || '');
+  const [categoria, setCategoria] = useState(contextoInicial.current.segmento);
   const [tipo, setTipo] = useState('todos');
   const [status, setStatus] = useState('ativo');
-  const [regiao, setRegiao] = useState('todas');
-  const [uf, setUf] = useState('todas');
-  const [cidade, setCidade] = useState('todas');
+  const [regiao, setRegiao] = useState(contextoInicial.current.regiao);
+  const [uf, setUf] = useState(contextoInicial.current.uf);
+  const [cidade, setCidade] = useState(contextoInicial.current.cidade);
   const [revendaId, setRevendaId] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
-  const [marca, setMarca] = useState('todas');
+  const [marca, setMarca] = useState(contextoInicial.current.marca || 'todas');
   const [carroceria, setCarroceria] = useState('todas');
   const [tracao, setTracao] = useState('todas');
   const [fipeFila, setFipeFila] = useState('todos');
@@ -997,6 +1019,46 @@ function PageMercado({ sessao }) {
   const [maisFiltros, setMaisFiltros] = useState(false);
   const [anuncioAberto, setAnuncioAberto] = useState(null);
   const [versaoDados, setVersaoDados] = useState(0);
+  const contextoEmitidoRef = useRef('');
+
+  const contextoMercado = useMemo(() => normalizeAppContext({
+    periodo: contexto?.periodo,
+    grupo: contexto?.grupo,
+    modelo: contexto?.modelo,
+    ano: contexto?.ano,
+    comparacao: contexto?.comparacao,
+    mercado: universo,
+    regiao,
+    uf,
+    cidade,
+    segmento: categoria,
+    marca: marca === 'todas' ? null : marca,
+    busca: qDebounced || null,
+  }), [contexto?.periodo, contexto?.grupo, contexto?.modelo, contexto?.ano, contexto?.comparacao,
+    universo, regiao, uf, cidade, categoria, marca, qDebounced]);
+  const chaveContextoMercado = JSON.stringify(contextoMercado);
+
+  useEffect(() => {
+    const recebido = normalizeAppContext(contexto);
+    const chaveRecebida = JSON.stringify(recebido);
+    if (chaveRecebida === contextoEmitidoRef.current) {
+      contextoEmitidoRef.current = '';
+      return;
+    }
+    setUniverso(recebido.mercado);
+    setRegiao(recebido.regiao);
+    setUf(recebido.uf);
+    setCidade(recebido.cidade);
+    setCategoria(recebido.segmento);
+    setMarca(recebido.marca || 'todas');
+    setQ(recebido.busca || '');
+    setQDebounced(recebido.busca || '');
+  }, [contexto]);
+
+  useEffect(() => {
+    contextoEmitidoRef.current = chaveContextoMercado;
+    onContexto?.(contextoMercado, { replace: true, preserveScroll: true });
+  }, [chaveContextoMercado, onContexto]);
 
   const statusDb = {
     ativo: 'ativo', em_verificacao: 'removido_candidato',
@@ -3103,12 +3165,14 @@ const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'minha-loja'
 const NAV_MOBILE_MAIS = NAV.filter(item => ['comparador', 'fipe', 'concorrentes', 'analise', 'acoes', 'ajustes', 'conta'].includes(item.id));
 
 function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
-  const [pagina, setPagina] = useState('hoje');
+  const { page: pagina, context: contexto, navigate, updateContext, goBack } = useBrowserRoute(import.meta.env.BASE_URL);
+  const setPagina = useCallback(page => navigate(page), [navigate]);
   const [menuAberto, setMenuAberto] = useState(false);
   const [acoes, setAcoes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('oper-radar-acoes') || '[]'); } catch { return []; }
   });
   const [mobile, setMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 760);
+  const tituloRef = useRef(null);
 
   const { data: kpis } = useApi('kpis.php');
   const { data: anunciosData } = useApi('anuncios.php?ordem=movimento&limit=200');
@@ -3126,7 +3190,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   }, [acoes]);
 
   useEffect(() => {
-    document.getElementById('app-scroll-container')?.scrollTo({ top: 0 });
+    tituloRef.current?.focus({ preventScroll: true });
   }, [pagina]);
 
   const adicionarAcao = async (texto, origem = 'oportunidade') => {
@@ -3147,7 +3211,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
 
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
-    mercado: <PageMercado sessao={sessao} />,
+    mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
     comparador: <PageComparador />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
@@ -3161,6 +3225,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
 
   const tituloPagina = NAV.find(n => n.id === pagina)?.rotulo || '';
   const acoesPendentes = acoes.filter(a => !a.feita).length;
+  const breadcrumbs = breadcrumbsFor(pagina, contexto);
 
   return (
     <div style={{ display: 'flex', height: '100%', background: T.bg, color: T.ink, fontFamily: T.fontBody, overflow: 'hidden' }}>
@@ -3177,7 +3242,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
             {NAV.map(item => {
               const ativo = pagina === item.id;
               return (
-                <button key={item.id} onClick={() => setPagina(item.id)} style={{
+                <button key={item.id} onClick={() => setPagina(item.id)} aria-current={ativo ? 'page' : undefined} style={{
                   display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px',
                   background: ativo ? `${T.signal}1A` : 'transparent',
                   border: 'none', borderRadius: 9, cursor: 'pointer',
@@ -3210,7 +3275,25 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
             <RadarPulse ultimaColeta={kpis?.ultima_coleta} />
           </div>
         )}
-        <h1 style={{ fontFamily: T.fontDisplay, fontSize: mobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px' }}>{tituloPagina}</h1>
+        {pagina !== 'hoje' && (
+          <div className="or-route-tools">
+            <button type="button" onClick={goBack} className="or-back-button"><ArrowLeft size={14} /> Voltar</button>
+            <nav aria-label="Breadcrumb">
+              <ol className="or-breadcrumb-list">
+                {breadcrumbs.map((item, index) => {
+                  const atual = index === breadcrumbs.length - 1;
+                  return <li key={`${item.label}-${index}`}>
+                    {index > 0 && <ChevronRight size={12} aria-hidden="true" />}
+                    {!atual && item.page
+                      ? <button type="button" onClick={() => setPagina(item.page)}>{item.label}</button>
+                      : <span aria-current={atual ? 'page' : undefined}>{item.label}</span>}
+                  </li>;
+                })}
+              </ol>
+            </nav>
+          </div>
+        )}
+        <h1 ref={tituloRef} tabIndex={-1} style={{ fontFamily: T.fontDisplay, fontSize: mobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px', outline: 'none' }}>{tituloPagina}</h1>
         <div style={{ height: 2, width: 34, background: T.signal, borderRadius: 1, marginBottom: 22 }} />
         {paginas[pagina]}
       </main>
@@ -3236,7 +3319,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
           {NAV_MOBILE_PRINCIPAL.map(item => {
             const ativo = pagina === item.id;
             return (
-              <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} style={{
+              <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} aria-current={ativo ? 'page' : undefined} style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 background: 'none', border: 'none', cursor: 'pointer', minHeight: 46, justifyContent: 'center',
                 color: ativo ? T.signal : T.inkMuted, fontSize: 9.5, fontFamily: T.fontBody,

@@ -40,6 +40,32 @@ function valor_config_oper_radar(string $chave, $padrao = null) {
 // publico. Deixe ausente/vazia no .env para desativar o Analista.
 define('ANTHROPIC_API_KEY', (string) valor_config_oper_radar('ANTHROPIC_API_KEY', ''));
 
+/** Identificador curto e seguro para correlacionar resposta, log e suporte. */
+function oper_request_id(): string {
+    static $requestId = null;
+    if ($requestId !== null) return $requestId;
+
+    $recebido = trim((string)($_SERVER['HTTP_X_REQUEST_ID'] ?? ''));
+    if ($recebido !== '' && preg_match('/^[A-Za-z0-9._:-]{8,80}$/', $recebido)) {
+        $requestId = $recebido;
+    } else {
+        try {
+            $requestId = bin2hex(random_bytes(12));
+        } catch (Throwable $e) {
+            $requestId = str_replace('.', '', uniqid('or-', true));
+        }
+    }
+    return $requestId;
+}
+
+function oper_api_meta(array $adicional = []): array {
+    return array_merge([
+        'request_id' => oper_request_id(),
+        'api_version' => '2026-08-31',
+        'generated_at' => gmdate('c'),
+    ], $adicional);
+}
+
 function carrega_config_db(): array {
     $config = [
         'host' => valor_config_oper_radar('OPER_RADAR_DB_HOST', 'localhost'),
@@ -56,17 +82,13 @@ function conecta(): mysqli {
         $config = carrega_config_db();
     } catch (RuntimeException $e) {
         http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode(['erro' => 'Configuracao do banco indisponivel']);
-        exit;
+        envia_json(['erro' => 'Configuracao do banco indisponivel', 'codigo' => 'DB_CONFIG_INDISPONIVEL']);
     }
 
     $conn = new mysqli($config['host'], $config['user'], $config['pass'], $config['name']);
     if ($conn->connect_error) {
         http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode(['erro' => 'Falha de conexao com o banco']);
-        exit;
+        envia_json(['erro' => 'Falha de conexao com o banco', 'codigo' => 'DB_CONEXAO_INDISPONIVEL']);
     }
     $conn->set_charset('utf8mb4');
     return $conn;
@@ -74,9 +96,13 @@ function conecta(): mysqli {
 
 /** Resposta JSON privada, sem cache no navegador ou em proxies. */
 function envia_json(array $dados): void {
+    $metaExistente = isset($dados['_meta']) && is_array($dados['_meta']) ? $dados['_meta'] : [];
+    $dados['_meta'] = oper_api_meta($metaExistente);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-    echo json_encode($dados, JSON_UNESCAPED_UNICODE);
+    header('X-Request-ID: ' . oper_request_id());
+    header('X-OPER-RADAR-API: 1');
+    echo json_encode($dados, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 
@@ -124,6 +150,23 @@ function exige_autenticacao(): array {
     if ($usuario) return $usuario;
     http_response_code(401);
     envia_json(['erro' => 'Autenticacao necessaria', 'codigo' => 'NAO_AUTENTICADO']);
+}
+
+function papel_tem_acesso(string $papel, array $permitidos): bool {
+    $normalizado = strtolower(trim($papel));
+    $lista = array_map(fn($item) => strtolower(trim((string)$item)), $permitidos);
+    return in_array($normalizado, $lista, true);
+}
+
+/** Centraliza a autorização por papel para endpoints administrativos. */
+function exige_papel(array $permitidos): array {
+    $usuario = exige_autenticacao();
+    if (papel_tem_acesso((string)($usuario['papel'] ?? ''), $permitidos)) return $usuario;
+    http_response_code(403);
+    envia_json([
+        'erro' => 'Seu perfil nao possui permissao para esta operacao.',
+        'codigo' => 'SEM_PERMISSAO',
+    ]);
 }
 
 function exige_csrf(): void {
