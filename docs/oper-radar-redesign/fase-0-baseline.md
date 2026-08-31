@@ -13,20 +13,24 @@ Data: 31/08/2026 (America/Sao_Paulo)
 
 Decisão: toda implementação do redesign parte desta branch e deste worktree. A raiz antiga serve apenas como fonte preservada de documentos e artefatos ainda não versionados.
 
-## Estado de produção conhecido
+## Estado de produção verificado
 
-Última evidência versionada em `docs/PRODUCAO.md`, de 27/08/2026:
+Verificação direta no cPanel e na aplicação autenticada em 31/08/2026:
 
-- repositório no servidor: `3e074f9`;
-- frontend público: `assets/index-D5T4Tlda.js`;
-- API pública: separação de mercados e comparador publicados em 27/08/2026;
-- coleta PR: 07h/19h;
-- coleta nacional: 08h/20h;
-- detalhe de caminhões: a cada 30 minutos;
-- FIPE local: 12h45/23h45;
-- séries temporais: 23h10.
+- repositório no servidor: branch `main`, commit `1e9b7a1ed0987573dc12f6b3f30b41c980252baa`, igual ao baseline de desenvolvimento;
+- frontend público: `assets/index-BwVttcZm.js`;
+- SHA-256 do `index.html`: `386f61055793339dd1178dd10de7976a347dc3ec1e1ca924a12cf2aff0f57955`;
+- SHA-256 do bundle principal: `af6eaa03ea94160ba2295a9a00976032f45dcf1317c374c98ffb6a3d78f792ab`;
+- API pública: 21 PHPs principais; manifesto agregado SHA-256 `35cc7c58631864eb0bb7820196419754448a3835ac0baa38e693dd016938d6b3`;
+- coleta nacional: cron ao vivo às 08h/20h; log atualizado às 08h57;
+- detalhe de caminhões: cron ao vivo a cada 30 minutos, lote 80, pausa 4s e `flock`; log atualizado às 09h00;
+- FIPE local: log atualizado às 23h47; último debug documentado 16/20, ou 80%;
+- séries temporais: snapshot às 23h10 e eventos às 23h35, ambos com logs atualizados na noite anterior;
+- total ativo: 30.395, conciliado exatamente entre 12.275 do mercado principal e 18.120 dos demais mercados;
+- DAF XF 530: presente no catálogo, nos cards e no comparador; a pendência passou a ser a ambiguidade/qualidade do vínculo automático;
+- inconsistência encontrada: ano zero-km `32000` em resultados do catálogo FIPE.
 
-O commit publicado está atrás do baseline de desenvolvimento. Antes do próximo deploy, os hashes reais do `index.html`, bundle principal e PHPs públicos devem ser coletados no cPanel e registrados no formato definido em `docs/PRODUCAO.md`.
+O servidor está no commit correto, porém com 2 arquivos rastreados modificados e 72 itens não rastreados. Esse estado é risco de reprodutibilidade e deve ser inventariado antes de qualquer limpeza ou deploy. A leitura das últimas linhas dos logs foi interrompida pela conexão do navegador; os horários confirmam execução, mas a ausência de erros no conteúdo continua pendente.
 
 ## Decisões de produto já confirmadas
 
@@ -58,7 +62,7 @@ Os três arquivos da pasta `Atualização` continuam preservados na raiz antiga 
 
 ### Bloqueadores reais
 
-1. Versão efetivamente publicada: hashes do frontend e PHPs no cPanel.
+1. Inventário e decisão sobre os 2 arquivos modificados e 72 itens não rastreados no servidor.
 2. Contrato versionado de grupo equivalente para caminhões e implementos.
 3. Dicionário único de status, freshness, amostra e confiança.
 4. Origem e recorte geográfico de cada KPI e mediana.
@@ -88,4 +92,4 @@ A Fase 1 pode começar quando:
 - os seis bloqueadores reais tiverem dono e tratamento explícito;
 - qualquer decisão ainda não aprovada permanecer marcada como `PROPOSTA`.
 
-O baseline Git e as decisões já confirmadas estão resolvidos neste documento. A verificação dos hashes de produção pode ocorrer em paralelo à fundação, mas deve terminar antes de qualquer publicação.
+O baseline Git, os hashes de produção e as decisões já confirmadas estão resolvidos neste documento. Antes de qualquer publicação, ainda é obrigatório inventariar o estado sujo do servidor e reler o conteúdo recente dos logs para excluir erros silenciosos.
