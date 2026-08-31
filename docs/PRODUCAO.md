@@ -3,6 +3,30 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release de 31/08/2026 às 17h36
+
+- Origem: branch `redesign-oper-radar-20260831`, commit local `21cdc68`.
+- Backup anterior: `/home1/pro93061/backups/oper-radar-20260831-173618`.
+- Frontend publicado com bundle `index-BQgXZzch.js`.
+- API publicada: `anuncios.php`, `comparador.php`, `lib/market_comparator.php`,
+  `lib/query_contract.php` e `lib/equivalent_group.php`.
+- Migrações de banco: nenhuma.
+- Cron e credenciais: não alterados.
+- Smoke test externo: início HTTP 200, rota `/comparador` HTTP 200, bundle HTTP 200
+  com 197.529 bytes e API HTTP 401 sem sessão, como esperado para endpoint privado.
+- Validação PHP no staging e após a cópia: sem erros de sintaxe.
+- Teste visual autenticado: pendente de confirmação pelo usuário.
+
+| Artefato | SHA-256 |
+|---|---|
+| `index.html` | `4F2FF834165341CC514670D0DC9BD999C5D281808CA7D476B9AAD1ED8B05D9B1` |
+| `assets/index-BQgXZzch.js` | `E09DE2F2167C46ED0358306BA7101A05FEB47BD50E37743C5B9B611B3ED4920E` |
+| `anuncios.php` | `06041BB337ACEC1145601F9163DEC7AE4799279DCC22EC2A8627EAA006307205` |
+| `comparador.php` | `57573D25AE0391AD01752C50ED2F8D491A2E70B76CD68EDA929E1B3D5B8E35E5` |
+| `lib/market_comparator.php` | `1F590696553C7F53E293524F4BEC5D53BFF803D1814B522C3C031D3018C82FC0` |
+| `lib/query_contract.php` | `506C2E04984998144CBD27D5605E558672545100287FB7C821C7590728F3C580` |
+| `lib/equivalent_group.php` | `09E43E146B2F3249B99904DB3BBFB5E4A1FFE5FB1A75C8144279DC2E591A3778` |
+
 ## Última verificação
 
 - Data: 31/08/2026, entre 09h00 e 09h15 (America/Sao_Paulo)
