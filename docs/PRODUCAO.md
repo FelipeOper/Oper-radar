@@ -3,6 +3,31 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release de 01/09/2026 às 07h35
+
+- Origem funcional: branch `redesign-oper-radar-20260831`, commit `165333b`.
+- Transporte do build: branch técnica `deploy/redesign-oper-radar-20260901`, commit `fbed7ec`.
+- Backup anterior: `/home1/pro93061/backups/oper-radar-20260901-073526`.
+- Frontend publicado com bundle principal `index-De1rp-Rm.js`.
+- API publicada: `mercado_painel.php`.
+- Migrações de banco: nenhuma.
+- Cron e credenciais: não alterados.
+- O repositório operacional sujo do servidor não foi alterado; a publicação partiu do worktree
+  isolado `/home1/pro93061/agenciaoper.com.br/oper-radar-redesign-painel`.
+- O terminal do cPanel não dispõe de `node` ou `npm`. O build foi gerado localmente depois de
+  33 testes aprovados e transferido pela branch técnica de artefato.
+- Validação PHP antes da cópia: sem erros de sintaxe.
+- Smoke test autenticado: painel carregado com dados reais; recortes de 30 e 7 dias; Brasil,
+  Minas Gerais e retorno a Brasil; seleção de modelo e abertura do navegador de anúncios.
+- Inspeção visual desktop: aprovada. A revisão específica em viewport de 320 px permanece
+  recomendada porque o controle remoto do Chrome não oferece emulação de viewport.
+
+| Artefato | SHA-256 |
+|---|---|
+| `index.html` | `0626C91472A7F62AD8F0BF1482276EB0FD4F19FFD67CDF711F0531332C89F9D5` |
+| `assets/index-De1rp-Rm.js` | `2CE75955D4D699CF2DBA0F9D882738DED695E126FBB3249399D3BFD1ED98906E` |
+| `mercado_painel.php` | `7958CD09D7F1A7CF9B80595227314DF5CB239B606C2302F024D9A500B3D2F300` |
+
 ## Release de 31/08/2026 às 17h36
 
 - Origem: branch `redesign-oper-radar-20260831`, commit local `21cdc68`.
