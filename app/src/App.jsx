@@ -1023,7 +1023,7 @@ function LinhaMiniSerie({ valores, cor = T.signal, rotulo }) {
   </div>;
 }
 
-function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
+function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mobile }) {
   const periodo = contexto?.periodo || '30d';
   const parametros = useMemo(() => {
     const p = new URLSearchParams({ periodo, segmento: contexto?.segmento || 'todas' });
@@ -1097,12 +1097,30 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
       </Card>
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '18px 20px 10px', display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>Mercado comparável por modelo · {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Recorte factual: marca, modelo e ano exatos.</div></div><SlidersHorizontal size={17} color={T.inkMuted} /></div>
-        <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 620 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', padding: '8px 20px', color: T.inkMuted, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em' }}><span>Modelo</span><span>Anúncios</span><span>Lojistas</span><span>Mediana</span><span>Faixa</span><span>Movimento</span></div>
-          <div className="or-zebra-list">{(data.modelos || []).map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', alignItems: 'center', gap: 5, padding: '11px 20px', fontSize: 11.5 }}>
-            <span><strong style={{ fontWeight: 600 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span><span>{fmtN(modelo.anuncios)}</span><span>{fmtN(modelo.lojistas)}</span><span>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(modelo.precos?.mediana)}</span><span>{modelo.precos?.p25 == null ? '—' : `${fmtBRL(modelo.precos.p25)}–${fmtBRL(modelo.precos.p75)}`}</span><span style={{ color: modelo.movimento_pct > 0 ? T.positive : modelo.movimento_pct < 0 ? T.alert : T.inkMuted }}>{modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}</span>
-          </button>)}</div>
-        </div></div>
+        {mobile ? (
+          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '2px 14px 16px' }}>
+            {(data.modelos || []).map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', textAlign: 'left', border: `1px solid ${modelo.id === selecionado?.id ? T.signal : T.line}`, borderRadius: 10, background: modelo.id === selecionado?.id ? `${T.signal}12` : T.surface, color: T.ink, fontFamily: T.fontBody, cursor: 'pointer', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 10 }}>
+                <span><strong style={{ fontWeight: 600, fontSize: 13 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span>
+                <span style={{ fontFamily: T.fontMono, fontSize: 13, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(modelo.precos?.mediana)}</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 12px', fontSize: 11, color: T.inkMuted }}>
+                <span>{fmtN(modelo.anuncios)} anúncios · {fmtN(modelo.lojistas)} lojistas</span>
+                {modelo.precos?.p25 != null && <span>Faixa: {fmtBRL(modelo.precos.p25)}–{fmtBRL(modelo.precos.p75)}</span>}
+              </div>
+              <span title="Movimento de estoque: entradas menos saídas sobre o estoque ativo no período. Não é variação de preço." style={{ alignSelf: 'flex-start', fontFamily: T.fontMono, fontSize: 10.5, fontWeight: 600, color: T.steel, background: `${T.steel}18`, borderRadius: 999, padding: '2px 8px' }}>
+                ↕ Estoque {modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}
+              </span>
+            </button>)}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 620 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', padding: '8px 20px', color: T.inkMuted, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em' }}><span>Modelo</span><span>Anúncios</span><span>Lojistas</span><span>Mediana</span><span>Faixa</span><span title="Entradas menos saídas sobre o estoque ativo no período — não é variação de preço.">Estoque (30d)</span></div>
+            <div className="or-zebra-list">{(data.modelos || []).map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', alignItems: 'center', gap: 5, padding: '11px 20px', fontSize: 11.5 }}>
+              <span><strong style={{ fontWeight: 600 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span><span>{fmtN(modelo.anuncios)}</span><span>{fmtN(modelo.lojistas)}</span><span>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(modelo.precos?.mediana)}</span><span>{modelo.precos?.p25 == null ? '—' : `${fmtBRL(modelo.precos.p25)}–${fmtBRL(modelo.precos.p75)}`}</span><span title="Movimento de estoque, não variação de preço." style={{ color: T.steel }}>{modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}</span>
+            </button>)}</div>
+          </div></div>
+        )}
       </Card>
     </div>
 
@@ -1117,7 +1135,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
   </section>;
 }
 
-function PageMercado({ sessao, contexto, onContexto }) {
+function PageMercado({ sessao, contexto, onContexto, mobile }) {
   const contextoInicial = useRef(normalizeAppContext(contexto));
   const [universo, setUniverso] = useState(contextoInicial.current.mercado);
   const [q, setQ] = useState(contextoInicial.current.busca || '');
@@ -1370,7 +1388,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
   return (
     <div>
       {universo === 'principal' && <PainelMercadoAnalitico contexto={contextoMercado}
-        onContexto={onContexto} visivel={painelAnalitico} onAlternar={() => setPainelAnalitico(valor => !valor)} />}
+        onContexto={onContexto} visivel={painelAnalitico} onAlternar={() => setPainelAnalitico(valor => !valor)} mobile={mobile} />}
       <SectionTitle sub="Explore os anúncios que sustentam os indicadores do painel.">Navegador de anúncios</SectionTitle>
       <div role="tablist" aria-label="Universo do mercado" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
         {[
@@ -3371,7 +3389,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
 
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
-    mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
+    mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} mobile={mobile} />,
     comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
