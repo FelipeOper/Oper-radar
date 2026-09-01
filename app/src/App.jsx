@@ -1045,6 +1045,13 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
   // sem nenhum clique do usuário, então o botão de limpar tem que olhar o contexto real, não a
   // resposta da API — senão aparece sempre e o clique não muda nada quando não havia seleção.
   const temModeloSelecionado = Boolean(contexto?.marca && contexto?.modelo && contexto?.ano);
+  // Item 5 do checklist: o ranking busca até 30 grupos (mercado_painel.php) mas mostra só 10 por
+  // padrão; "Ver mais" expande sem nova consulta. Reseta ao trocar o recorte (UF/cidade/período)
+  // pra não deixar o usuário "perdido" numa lista expandida de um filtro anterior.
+  const [rankingExpandido, setRankingExpandido] = useState(false);
+  useEffect(() => { setRankingExpandido(false); }, [parametros]);
+  const modelosVisiveis = rankingExpandido ? (data.modelos || []) : (data.modelos || []).slice(0, 10);
+  const temMaisModelos = (data.modelos || []).length > 10;
   const atualiza = patch => onContexto?.(normalizeAppContext({ ...contexto, ...patch }), { replace: true, preserveScroll: true });
   const selecionaUf = event => atualiza({ uf: event.target.value, cidade: 'todas' });
   const selecionaPeriodo = event => atualiza({ periodo: event.target.value });
@@ -1112,8 +1119,9 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '18px 20px 10px', display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>Mercado comparável por modelo · {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Recorte factual: marca, modelo e ano exatos.</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>{temModeloSelecionado && <button onClick={() => atualiza({ grupo: null, marca: null, modelo: null, ano: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.signal, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontFamily: T.fontBody, padding: '4px 2px', whiteSpace: 'nowrap' }}><ArrowLeft size={13} /> Limpar seleção</button>}<SlidersHorizontal size={17} color={T.inkMuted} /></div></div>
         {mobile ? (
+          <>
           <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '2px 14px 16px' }}>
-            {(data.modelos || []).map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', textAlign: 'left', border: `1px solid ${modelo.id === selecionado?.id ? T.signal : T.line}`, borderRadius: 10, background: modelo.id === selecionado?.id ? `${T.signal}12` : T.surface, color: T.ink, fontFamily: T.fontBody, cursor: 'pointer', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {modelosVisiveis.map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', textAlign: 'left', border: `1px solid ${modelo.id === selecionado?.id ? T.signal : T.line}`, borderRadius: 10, background: modelo.id === selecionado?.id ? `${T.signal}12` : T.surface, color: T.ink, fontFamily: T.fontBody, cursor: 'pointer', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 10 }}>
                 <span><strong style={{ fontWeight: 600, fontSize: 13 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span>
                 <span style={{ fontFamily: T.fontMono, fontSize: 13, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(modelo.precos?.mediana)}</span>
@@ -1127,13 +1135,18 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
               </span>
             </button>)}
           </div>
+          {temMaisModelos && <button onClick={() => setRankingExpandido(v => !v)} style={{ width: '100%', textAlign: 'center', border: 0, borderTop: `1px solid ${T.line}`, background: 'none', color: T.signal, cursor: 'pointer', fontFamily: T.fontBody, fontSize: 11.5, padding: '10px 14px' }}>{rankingExpandido ? 'Ver menos' : `Ver mais (${(data.modelos || []).length - 10})`}</button>}
+          </>
         ) : (
+          <>
           <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 620 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', padding: '8px 20px', color: T.inkMuted, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em' }}><span>Modelo</span><span>Anúncios</span><span>Lojistas</span><span>Mediana</span><span>Faixa</span><span title="Entradas menos saídas sobre o estoque ativo no período — não é variação de preço.">Estoque (30d)</span></div>
-            <div className="or-zebra-list">{(data.modelos || []).map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', alignItems: 'center', gap: 5, padding: '11px 20px', fontSize: 11.5 }}>
+            <div className="or-zebra-list">{modelosVisiveis.map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', alignItems: 'center', gap: 5, padding: '11px 20px', fontSize: 11.5 }}>
               <span><strong style={{ fontWeight: 600 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span><span>{fmtN(modelo.anuncios)}</span><span>{fmtN(modelo.lojistas)}</span><span>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(modelo.precos?.mediana)}</span><span>{modelo.precos?.p25 == null ? '—' : `${fmtBRL(modelo.precos.p25)}–${fmtBRL(modelo.precos.p75)}`}</span><span title="Movimento de estoque, não variação de preço." style={{ color: T.steel }}>{modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}</span>
             </button>)}</div>
           </div></div>
+          {temMaisModelos && <button onClick={() => setRankingExpandido(v => !v)} style={{ width: '100%', textAlign: 'center', border: 0, borderTop: `1px solid ${T.line}`, background: 'none', color: T.signal, cursor: 'pointer', fontFamily: T.fontBody, fontSize: 11.5, padding: '10px 14px' }}>{rankingExpandido ? 'Ver menos' : `Ver mais (${(data.modelos || []).length - 10})`}</button>}
+          </>
         )}
       </Card>
     </div>

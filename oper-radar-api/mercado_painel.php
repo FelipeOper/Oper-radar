@@ -188,8 +188,12 @@ foreach ($saidaRows as $row) {
     $saidasPorGrupo[painel_chave_grupo($row['marca'], $row['modelo'], (int)$row['ano'])] = (int)$row['saidas'];
 }
 
+// Limite ampliado de 10 para 30 (decisão registrada no CLAUDE.md, item 5): o agrupamento por
+// marca+modelo+ano (item 4) satura o top-10 com variações de ano do mesmo modelo, então o
+// frontend busca mais e mostra as 10 primeiras com um "Ver mais" para expandir sem nova consulta.
+$LIMITE_MODELOS = 30;
 $modelos = [];
-foreach (array_slice($grupos, 0, 10, true) as $chave => $grupo) {
+foreach (array_slice($grupos, 0, $LIMITE_MODELOS, true) as $chave => $grupo) {
     $modelos[] = painel_resumo_grupo($grupo, $saidasPorGrupo[$chave] ?? 0, $periodo);
 }
 
@@ -290,6 +294,7 @@ envia_json([
     ],
     'geografia' => ['ufs' => $ufsGeo, 'cidades' => $cidades],
     'modelos' => $modelos,
+    'modelos_total' => count($grupos),
     'selecionado' => $selecionado ? $selecionado + [
         'serie' => $serie, 'regioes' => $regioesSelecionado, 'lojistas_destaque' => $lojistasSelecionado,
     ] : null,
