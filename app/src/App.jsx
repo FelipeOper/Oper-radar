@@ -8,7 +8,7 @@ import {
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
   Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
-  Globe2, Map, Users, Building, CalendarDays, SlidersHorizontal, BarChart3
+  Globe2, Map as MapIcon, Users, Building, CalendarDays, SlidersHorizontal, BarChart3
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -1084,7 +1084,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
         {[
           [FileText, 'Anúncios ativos', fmtN(resumo.anuncios)], [Users, 'Lojistas', fmtN(resumo.lojistas)],
-          [Building, noEstado ? 'Cidades' : 'Cidades cobertas', fmtN(resumo.cidades)], [Map, 'UFs', fmtN(resumo.ufs)],
+          [Building, noEstado ? 'Cidades' : 'Cidades cobertas', fmtN(resumo.cidades)], [MapIcon, 'UFs', fmtN(resumo.ufs)],
           [Gauge, 'Ticket mediano', fmtBRL(resumo.ticket_mediano)],
         ].map(([Icone, label, valor], index) => <div key={label} style={{ minHeight: 108, padding: '18px 20px', borderRight: index < 4 ? `1px solid ${T.line}` : 'none', display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${index === 4 ? T.signal : T.steel}15`, color: index === 4 ? T.signal : T.steel }}><Icone size={18} /></span>
