@@ -7,7 +7,8 @@ import {
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
-  Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight
+  Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
+  Globe2, Map, Users, Building, CalendarDays, SlidersHorizontal, BarChart3
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -1014,6 +1015,108 @@ function PageComparador({ contexto, onContexto }) {
   </div>;
 }
 
+function LinhaMiniSerie({ valores, cor = T.signal, rotulo }) {
+  const numeros = valores.map(item => Number(item || 0));
+  const maior = Math.max(...numeros, 1);
+  return <div aria-label={rotulo} title={rotulo} style={{ height: 86, display: 'flex', alignItems: 'end', gap: 3, padding: '8px 0 0', borderBottom: `1px solid ${T.line}` }}>
+    {numeros.map((valor, index) => <span key={index} style={{ flex: 1, minWidth: 3, height: `${Math.max(5, valor / maior * 100)}%`, borderRadius: '3px 3px 0 0', background: index === numeros.length - 1 ? cor : `${cor}66` }} />)}
+  </div>;
+}
+
+function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
+  const periodo = contexto?.periodo || '30d';
+  const parametros = useMemo(() => {
+    const p = new URLSearchParams({ periodo, segmento: contexto?.segmento || 'todas' });
+    if (contexto?.regiao && contexto.regiao !== 'todas') p.set('regiao', contexto.regiao);
+    if (contexto?.uf && contexto.uf !== 'todas') p.set('uf', contexto.uf);
+    if (contexto?.cidade && contexto.cidade !== 'todas') p.set('cidade', contexto.cidade);
+    if (contexto?.marca) p.set('marca', contexto.marca);
+    if (contexto?.modelo) p.set('modelo', contexto.modelo);
+    if (contexto?.ano) p.set('ano', contexto.ano);
+    return p.toString();
+  }, [periodo, contexto?.segmento, contexto?.regiao, contexto?.uf, contexto?.cidade, contexto?.marca, contexto?.modelo, contexto?.ano]);
+  const { data, erro, status } = useApi(`mercado_painel.php?${parametros}`);
+  const escopo = data?.escopo || {};
+  const resumo = data?.resumo || {};
+  const selecionado = data?.selecionado;
+  const noEstado = escopo.uf && escopo.uf !== 'todas';
+  const atualiza = patch => onContexto?.(normalizeAppContext({ ...contexto, ...patch }), { replace: true, preserveScroll: true });
+  const selecionaUf = event => atualiza({ uf: event.target.value, cidade: 'todas' });
+  const selecionaPeriodo = event => atualiza({ periodo: event.target.value });
+  const abrirModelo = modelo => atualiza({ grupo: modelo.id, marca: modelo.marca, modelo: modelo.modelo, ano: modelo.ano });
+
+  if (!visivel) return <button onClick={onAlternar} style={{ ...inputStyle, width: '100%', cursor: 'pointer', marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><BarChart3 size={15} /> Abrir painel analítico do mercado</button>;
+  if (erro) return <Card style={{ marginBottom: 18, padding: 16 }}><div style={{ color: T.inkMuted, fontSize: 12.5 }}>O painel analítico estará disponível após publicar a API desta versão. A navegação de anúncios continua abaixo.</div></Card>;
+  if (status === 'loading' || !data) return <Card style={{ marginBottom: 18, padding: 22 }}><div style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 11 }}>CARREGANDO LEITURA DO MERCADO…</div></Card>;
+
+  const serie = selecionado?.serie || [];
+  const maxUf = Math.max(1, ...(data.geografia?.ufs || []).map(item => item.anuncios));
+  const maxRegiao = Math.max(1, ...(selecionado?.regioes || []).map(item => item.anuncios));
+  const contextoRotulo = noEstado ? `${NOMES_UF[escopo.uf] || escopo.uf}` : escopo.regiao !== 'todas' ? escopo.regiao : 'Brasil';
+  const intervalo = `${periodo === '7d' ? '7 dias' : periodo === '30d' ? '30 dias' : periodo === '90d' ? '90 dias' : periodo === '180d' ? '180 dias' : '12 meses'} monitorados`;
+  return <section aria-label="Painel analítico do mercado" style={{ marginBottom: 28 }}>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+      <select aria-label="Período da análise" value={periodo} onChange={selecionaPeriodo} style={{ ...inputStyle, flex: '1 1 135px' }}>
+        <option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="180d">Últimos 180 dias</option><option value="12m">Últimos 12 meses</option>
+      </select>
+      <select aria-label="Estado da análise" value={escopo.uf || 'todas'} onChange={selecionaUf} style={{ ...inputStyle, flex: '1 1 155px' }}>
+        <option value="todas">Todos os estados</option>
+        {(data.geografia?.ufs || []).map(item => <option key={item.uf} value={item.uf}>{NOMES_UF[item.uf] || item.uf} · {fmtN(item.anuncios)}</option>)}
+      </select>
+      {noEstado && <button onClick={() => atualiza({ uf: 'todas', cidade: 'todas' })} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><ArrowLeft size={14} /> Brasil</button>}
+      <button onClick={onAlternar} style={{ ...inputStyle, cursor: 'pointer', marginLeft: 'auto' }}>Ocultar painel</button>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: T.inkMuted, fontSize: 11.5, margin: '4px 0 12px' }}><CalendarDays size={14} /> {intervalo} · {contextoRotulo} · preços anunciados</div>
+
+    <Card style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+        {[
+          [FileText, 'Anúncios ativos', fmtN(resumo.anuncios)], [Users, 'Lojistas', fmtN(resumo.lojistas)],
+          [Building, noEstado ? 'Cidades' : 'Cidades cobertas', fmtN(resumo.cidades)], [Map, 'UFs', fmtN(resumo.ufs)],
+          [Gauge, 'Ticket mediano', fmtBRL(resumo.ticket_mediano)],
+        ].map(([Icone, label, valor], index) => <div key={label} style={{ minHeight: 108, padding: '18px 20px', borderRight: index < 4 ? `1px solid ${T.line}` : 'none', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${index === 4 ? T.signal : T.steel}15`, color: index === 4 ? T.signal : T.steel }}><Icone size={18} /></span>
+          <span><strong style={{ display: 'block', fontFamily: T.fontDisplay, fontSize: 22, lineHeight: 1.1 }}>{valor}</strong><small style={{ color: T.inkMuted, fontSize: 11 }}>{label}</small></span>
+        </div>)}
+      </div>
+      <div style={{ padding: '9px 18px', borderTop: `1px solid ${T.line}`, fontSize: 10.5, color: T.inkMuted }}><BadgeInfo size={12} style={{ verticalAlign: -2, marginRight: 5 }} />Preço por modelo exige amostra qualificada; FIPE e mediana do mercado são referências distintas.</div>
+    </Card>
+
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, .82fr) minmax(420px, 1.18fr)', gap: 14, marginBottom: 14 }} className="or-mercado-grid">
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>{noEstado ? contextoRotulo : 'Mapa do mercado'}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Volume observado por estado</div></div><Globe2 size={18} color={T.signal} /></div>
+        <div className="or-zebra-list or-zebra-rows" style={{ marginTop: 15, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {(noEstado ? data.geografia?.cidades : data.geografia?.ufs)?.slice(0, 8).map((item, index) => {
+            const nome = noEstado ? item.cidade : `${NOMES_UF[item.uf] || item.uf} · ${item.uf}`;
+            const volume = Number(item.anuncios || 0);
+            return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })} style={{ border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(80px, 1fr) 82px 48px', alignItems: 'center', gap: 8 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{nome}</span><span style={{ height: 5, background: T.surface3, borderRadius: 99, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / (noEstado ? Math.max(1, ...(data.geografia?.cidades || []).map(x => x.anuncios)) : maxUf) * 100}%`, background: T.signal, borderRadius: 99 }} /></span><strong style={{ fontFamily: T.fontMono, fontSize: 10.5, textAlign: 'right' }}>{fmtN(volume)}</strong>
+            </button>;
+          })}
+        </div>
+      </Card>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '18px 20px 10px', display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>Mercado comparável por modelo · {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Recorte factual: marca, modelo e ano exatos.</div></div><SlidersHorizontal size={17} color={T.inkMuted} /></div>
+        <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 620 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', padding: '8px 20px', color: T.inkMuted, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em' }}><span>Modelo</span><span>Anúncios</span><span>Lojistas</span><span>Mediana</span><span>Faixa</span><span>Movimento</span></div>
+          <div className="or-zebra-list">{(data.modelos || []).map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', alignItems: 'center', gap: 5, padding: '11px 20px', fontSize: 11.5 }}>
+            <span><strong style={{ fontWeight: 600 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span><span>{fmtN(modelo.anuncios)}</span><span>{fmtN(modelo.lojistas)}</span><span>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(modelo.precos?.mediana)}</span><span>{modelo.precos?.p25 == null ? '—' : `${fmtBRL(modelo.precos.p25)}–${fmtBRL(modelo.precos.p75)}`}</span><span style={{ color: modelo.movimento_pct > 0 ? T.positive : modelo.movimento_pct < 0 ? T.alert : T.inkMuted }}>{modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}</span>
+          </button>)}</div>
+        </div></div>
+      </Card>
+    </div>
+
+    {selecionado && <Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 17 }}>{selecionado.rotulo} em {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 4 }}>Indicadores observados; saída detectada não comprova venda.</div></div><button onClick={() => atualiza({ busca: selecionado.modelo, marca: selecionado.marca, modelo: selecionado.modelo, ano: selecionado.ano })} style={{ ...inputStyle, cursor: 'pointer', color: T.signal }}>Ver anúncios equivalentes</button></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(200px, 1fr) minmax(230px, 1fr)', gap: 20, marginTop: 16 }} className="or-mercado-grid">
+        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase' }}>Mediana anunciada</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 24 }}>{selecionado.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(selecionado.precos?.mediana)}</strong><LinhaMiniSerie valores={serie.map(item => item.preco_medio)} cor={T.signal} rotulo="Variação do preço médio observado" /></div>
+        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase' }}>Oferta ativa</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 24, color: T.steel }}>{fmtN(selecionado.anuncios)} anúncios</strong><LinhaMiniSerie valores={serie.map(item => item.ofertas)} cor={T.steel} rotulo="Variação das ofertas ativas" /></div>
+        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase', marginBottom: 8 }}>Distribuição regional</div>{(selecionado.regioes || []).map(item => <div key={item.regiao} style={{ display: 'grid', gridTemplateColumns: '86px 1fr 40px', gap: 7, alignItems: 'center', margin: '8px 0', fontSize: 11 }}><span>{item.regiao}</span><span style={{ height: 5, borderRadius: 5, background: T.surface3, overflow: 'hidden' }}><span style={{ display: 'block', width: `${item.anuncios / maxRegiao * 100}%`, height: '100%', background: T.steel }} /></span><strong style={{ fontFamily: T.fontMono, textAlign: 'right', fontSize: 10 }}>{fmtN(item.anuncios)}</strong></div>)}<div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 10 }}>{selecionado.precos?.amostra_qualificada || 0} preços qualificados · confiança {selecionado.precos?.confianca || 'insuficiente'}</div></div>
+      </div>
+    </Card>}
+  </section>;
+}
+
 function PageMercado({ sessao, contexto, onContexto }) {
   const contextoInicial = useRef(normalizeAppContext(contexto));
   const [universo, setUniverso] = useState(contextoInicial.current.mercado);
@@ -1034,6 +1137,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
   const [fipeFila, setFipeFila] = useState('todos');
   const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
+  const [painelAnalitico, setPainelAnalitico] = useState(true);
   const [anuncioAberto, setAnuncioAberto] = useState(null);
   const [versaoDados, setVersaoDados] = useState(0);
   const contextoEmitidoRef = useRef('');
@@ -1265,6 +1369,9 @@ function PageMercado({ sessao, contexto, onContexto }) {
 
   return (
     <div>
+      {universo === 'principal' && <PainelMercadoAnalitico contexto={contextoMercado}
+        onContexto={onContexto} visivel={painelAnalitico} onAlternar={() => setPainelAnalitico(valor => !valor)} />}
+      <SectionTitle sub="Explore os anúncios que sustentam os indicadores do painel.">Navegador de anúncios</SectionTitle>
       <div role="tablist" aria-label="Universo do mercado" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
         {[
           ['principal', 'Caminhões e implementos', 'Foco principal do Oper Radar'],

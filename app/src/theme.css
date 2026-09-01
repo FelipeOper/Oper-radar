@@ -141,6 +141,12 @@ select {
   border-radius: 7px;
 }
 
+@media (max-width: 980px) {
+  .or-mercado-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 :root[data-density='compact'] {
   --or-control-min-height: 38px;
   --or-card-default-padding: 15px;

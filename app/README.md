@@ -23,6 +23,11 @@ rotas reais; o contexto de período, mercado e filtros geográficos é sanitizad
 na URL por `src/navigation.js`. `src/useBrowserRoute.js` integra refresh, compartilhamento,
 Voltar/Avançar e restauração da rolagem sem adicionar uma dependência de roteamento.
 
+No mercado principal, o painel analítico usa `mercado_painel.php` para apresentar o resumo
+nacional ou estadual, ranking geográfico, modelos por recorte factual (marca + modelo + ano)
+e série observada. O navegador de anúncios abaixo dele continua sendo a evidência navegável;
+não são inferidos grupos equivalentes comerciais nem recomendações de preço.
+
 ## Regras de confiabilidade da interface
 
 - Busca principal do Mercado aparece antes dos filtros geográficos no celular.

@@ -25,7 +25,7 @@ docs/               arquitetura, solicitações e relatórios de evolução
 - `docs/ESPECIFICACAO_INSIGHT_REGIONAL.md` define amostra, métricas, confiança e composição
   explicável do índice de oportunidade regional.
 
-## Estado em 19/08/2026
+## Estado em 31/08/2026
 
 - A coleta, a API e o app estão em produção no HostGator.
 - O Mercado separa o foco principal (caminhões e implementos rodoviários) dos demais
@@ -38,6 +38,10 @@ docs/               arquitetura, solicitações e relatórios de evolução
 - Os snapshots diários estão ativos às 23h10 desde 03/08/2026.
 - A trilha de eventos, a nova proteção estatística de preços e as melhorias de UX deste
   branch estão preparadas localmente, mas ainda não foram publicadas.
+- O redesign está sendo desenvolvido na branch `redesign-oper-radar-20260831`, a partir do
+  baseline verificado de produção. A fundação de rotas, contexto e contratos analíticos está
+  pronta; o painel geográfico de Mercado permanece local até a sua API e o frontend serem
+  publicados juntos.
 
 ## Regra de interpretação
 
