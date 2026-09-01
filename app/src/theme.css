@@ -59,6 +59,64 @@ select {
   padding: var(--or-card-default-padding) !important;
 }
 
+.or-route-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  margin-bottom: 10px;
+  color: var(--or-ink-muted);
+  font-size: 11px;
+}
+
+.or-back-button,
+.or-breadcrumb-list button {
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.or-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--or-ink);
+}
+
+.or-back-button:hover,
+.or-breadcrumb-list button:hover {
+  background: var(--or-surface-2);
+  color: var(--or-signal);
+}
+
+.or-breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.or-breadcrumb-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.or-breadcrumb-list span {
+  overflow: hidden;
+  max-width: 180px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Listagens com leitura de planilha: linhas/cards alternam entre os dois
    tons de superfície do tema, sem depender de cores fixas. */
 .or-zebra-list > :nth-child(odd) {
@@ -81,6 +139,12 @@ select {
 .or-zebra-rows > * {
   padding: 8px 10px;
   border-radius: 7px;
+}
+
+@media (max-width: 980px) {
+  .or-mercado-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 :root[data-density='compact'] {
@@ -133,5 +197,14 @@ select {
   ::-webkit-scrollbar {
     width: 4px;
     height: 4px;
+  }
+
+  .or-route-tools {
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .or-breadcrumb-list span {
+    max-width: 96px;
   }
 }

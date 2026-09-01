@@ -91,8 +91,8 @@ export const DEFAULT_UI_PREFERENCES = {
 };
 
 const FONT_TOKENS = {
-  fontDisplay: "'Space Grotesk', sans-serif",
-  fontBody: "'Inter', sans-serif",
+  fontDisplay: "'Noto Sans', sans-serif",
+  fontBody: "'Noto Sans', sans-serif",
   fontMono: "'JetBrains Mono', monospace",
 };
 

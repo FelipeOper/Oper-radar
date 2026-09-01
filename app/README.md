@@ -18,6 +18,16 @@ npm run build
 O build final fica em `app/dist/`. O HostGator hospeda somente os arquivos estáticos; não
 é necessário executar Node.js no servidor.
 
+O Vite usa `base: /oper-radar/` e publica `public/.htaccess` no build. As áreas possuem
+rotas reais; o contexto de período, mercado e filtros geográficos é sanitizado e serializado
+na URL por `src/navigation.js`. `src/useBrowserRoute.js` integra refresh, compartilhamento,
+Voltar/Avançar e restauração da rolagem sem adicionar uma dependência de roteamento.
+
+No mercado principal, o painel analítico usa `mercado_painel.php` para apresentar o resumo
+nacional ou estadual, ranking geográfico, modelos por recorte factual (marca + modelo + ano)
+e série observada. O navegador de anúncios abaixo dele continua sendo a evidência navegável;
+não são inferidos grupos equivalentes comerciais nem recomendações de preço.
+
 ## Regras de confiabilidade da interface
 
 - Busca principal do Mercado aparece antes dos filtros geográficos no celular.
@@ -31,7 +41,8 @@ O build final fica em `app/dist/`. O HostGator hospeda somente os arquivos está
 - Minha Loja possui busca, filtro, ordenação, salvamento otimista com reversão em erro e
   ação de desfazer a última mudança de status.
 
-As regras puras ficam em `src/domainRules.js` e têm testes em `tests/domainRules.test.js`.
+As regras puras ficam em `src/domainRules.js`, `src/dataState.js` e `src/navigation.js`, com
+testes independentes na pasta `tests/`.
 
 ## Publicação
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Radar, LayoutGrid, Crosshair, Building2, Settings, ListChecks,
   MapPin, ExternalLink, Search,
@@ -7,7 +7,8 @@ import {
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
-  Pencil, History, Undo2, Ruler, Check, Scale
+  Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
+  Globe2, Map, Users, Building, CalendarDays, SlidersHorizontal, BarChart3
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -25,13 +26,15 @@ import {
 import {
   CATEGORIAS_MERCADO, categoriaDeTipo, categoriasDoMercado, filtrosDaCategoria, rotuloTipo,
 } from './marketTaxonomy.js';
+import { breadcrumbsFor, normalizeAppContext } from './navigation.js';
+import { useBrowserRoute } from './useBrowserRoute.js';
+import { resolveDataState } from './dataState.js';
+import { API_BASE_URL, apiGet } from './apiClient.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
    (ver docs/OPER_RADAR_Estrategia_e_Design.md)
    ============================================================ */
-const API_BASE_URL = 'https://agenciaoper.com.br/oper-radar-api';
-
 /* ---------- dados de referência ---------- */
 const REGIOES_UFS = {
   Sul: ['PR', 'SC', 'RS'],
@@ -129,16 +132,27 @@ const fmtN = v => v == null ? '—' : v.toLocaleString('pt-BR');
 function useApi(path) {
   const [data, setData] = useState(null);
   const [erro, setErro] = useState(false);
+  const [status, setStatus] = useState('loading');
+  const [meta, setMeta] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
     setErro(false);
-    fetch(`${API_BASE_URL}/${path}`, { signal: controller.signal, credentials: 'same-origin' })
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(setData)
-      .catch(e => { if (e.name !== 'AbortError') setErro(true); });
+    setStatus('loading');
+    apiGet(path, { signal: controller.signal, ttlMs: 15000 })
+      .then(payload => {
+        setData(payload);
+        setMeta(payload?._meta || null);
+        setStatus('ready');
+      })
+      .catch(e => {
+        if (e.name !== 'AbortError') {
+          setErro(true);
+          setStatus(resolveDataState({ error: true, offline: typeof navigator !== 'undefined' && navigator.onLine === false }));
+        }
+      });
     return () => controller.abort();
   }, [path]);
-  return { data, erro };
+  return { data, erro, status, meta };
 }
 
 async function apiPost(path, dados, csrf) {
@@ -569,12 +583,18 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
   </div>;
 }
 
-function EmptyState({ icon: Icon, titulo, texto }) {
+function EmptyState({ icon: Icon, titulo, texto, status = 'empty', fonte = null, amostra = null, confianca = null }) {
+  const role = status === 'error' || status === 'offline' || status === 'forbidden' ? 'alert' : 'status';
   return (
     <Card style={{ textAlign: 'center', padding: '40px 24px' }}>
+      <div role={role} aria-live={role === 'alert' ? 'assertive' : 'polite'}>
       <Icon size={26} style={{ color: T.inkMuted, marginBottom: 12 }} />
       <div style={{ fontFamily: T.fontDisplay, fontSize: 15, fontWeight: 600, marginBottom: 6, color: T.ink }}>{titulo}</div>
       <div style={{ fontSize: 13, color: T.inkMuted, maxWidth: 420, margin: '0 auto', lineHeight: 1.6 }}>{texto}</div>
+      {(fonte || amostra != null || confianca) && <div style={{ marginTop: 12, fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted }}>
+        {[fonte && `Fonte: ${fonte}`, amostra != null && `Amostra: ${fmtN(amostra)}`, confianca && `Confiança: ${confianca}`].filter(Boolean).join(' · ')}
+      </div>}
+      </div>
     </Card>
   );
 }
@@ -884,6 +904,7 @@ function SeletorComparador({ titulo, lado, onChange, facetas }) {
 function PainelComparado({ lado, destaque }) {
   const m = lado.metricas;
   const p = m.precos;
+  const janela = m.periodo?.rotulo || '30 dias';
   return <Card style={{ padding: 18, borderTop: `3px solid ${destaque}` }}>
     <div style={{ fontFamily: T.fontMono, fontSize: 10, color: destaque, letterSpacing: '0.06em' }}>RECORTE</div>
     <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 20, margin: '5px 0 15px' }}>{lado.rotulo}</div>
@@ -893,8 +914,8 @@ function PainelComparado({ lado, destaque }) {
         ['Revendas', fmtN(m.revendas)],
         ['Preço mediano', fmtBRL(p.mediana)],
         ['Preço médio', fmtBRL(p.media)],
-        ['Entradas 30 dias', fmtN(m.entradas_30d)],
-        ['Saídas 30 dias', fmtN(m.saidas_30d)],
+        [`Entradas ${janela}`, fmtN(m.entradas_periodo ?? m.entradas_30d)],
+        [`Saídas ${janela}`, fmtN(m.saidas_periodo ?? m.saidas_30d)],
         ['Média observada', m.dias_observados_media == null ? '—' : `${m.dias_observados_media.toLocaleString('pt-BR')} dias`],
         ['Estados', fmtN(m.ufs)],
       ].map(([label, value]) => <div key={label} style={{ padding: 10, background: T.surface2, borderRadius: 9 }}>
@@ -915,19 +936,29 @@ function PainelComparado({ lado, destaque }) {
   </Card>;
 }
 
-function PageComparador() {
+function PageComparador({ contexto, onContexto }) {
   const { data: facetas, erro: erroFacetas } = useApi('comparador.php?facetas=1');
+  const [periodo, setPeriodo] = useState(contexto?.periodo || '30d');
   const [ladoA, setLadoA] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
   const [ladoB, setLadoB] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
   const [resultado, setResultado] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
+  useEffect(() => setPeriodo(contexto?.periodo || '30d'), [contexto?.periodo]);
+
+  const alteraPeriodo = valor => {
+    setPeriodo(valor);
+    setResultado(null);
+    onContexto?.({ ...contexto, periodo: valor }, { replace: true, preserveScroll: true });
+  };
+
   const comparar = async () => {
     if (!seletorComparadorValido(ladoA) || !seletorComparadorValido(ladoB)) {
       setErro('Complete os dois lados da comparação, incluindo o ano-modelo.'); return;
     }
     const p = new URLSearchParams();
+    p.set('periodo', periodo);
     for (const [prefixo, lado] of [['a', ladoA], ['b', ladoB]]) {
       p.set(`${prefixo}_modo`, lado.modo);
       if (lado.marca) p.set(`${prefixo}_marca`, lado.marca);
@@ -936,9 +967,7 @@ function PageComparador() {
     }
     setCarregando(true); setErro('');
     try {
-      const resposta = await fetch(`${API_BASE_URL}/comparador.php?${p}`, { credentials: 'same-origin' });
-      const dados = await resposta.json();
-      if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível comparar os recortes.');
+      const dados = await apiGet(`comparador.php?${p}`, { ttlMs: 0, useCache: false });
       setResultado(dados);
     } catch (e) { setErro(e.message); }
     finally { setCarregando(false); }
@@ -949,6 +978,16 @@ function PageComparador() {
     <Card style={{ padding: 16, marginBottom: 14, borderLeft: `3px solid ${T.signal}` }}>
       <strong style={{ display: 'block', fontFamily: T.fontDisplay }}>Compare dois recortes reais do mercado de caminhões</strong>
       <span style={{ display: 'block', color: T.inkMuted, fontSize: 12, marginTop: 4 }}>Cada lado combina marca, modelo ou marca + modelo com seu próprio ano-modelo, evitando misturar gerações e faixas de preço diferentes.</span>
+      <label style={{ display: 'block', marginTop: 12, maxWidth: 220 }}>
+        <span style={rotuloFiltroStyle}>JANELA DE MOVIMENTO</span>
+        <select aria-label="Janela de movimento" value={periodo} onChange={e => alteraPeriodo(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 5 }}>
+          {(facetas?.periodos || [
+            { codigo: '7d', rotulo: '7 dias' }, { codigo: '30d', rotulo: '30 dias' },
+            { codigo: '90d', rotulo: '90 dias' }, { codigo: '180d', rotulo: '180 dias' },
+            { codigo: '12m', rotulo: '12 meses' },
+          ]).map(item => <option key={item.codigo} value={item.codigo}>{item.rotulo}</option>)}
+        </select>
+      </label>
     </Card>
     {erroFacetas && <EmptyState icon={Scale} titulo="Catálogo indisponível" texto="Não foi possível carregar marcas e modelos para comparação." />}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', gap: 12 }}>
@@ -976,27 +1015,171 @@ function PageComparador() {
   </div>;
 }
 
-function PageMercado({ sessao }) {
-  const [universo, setUniverso] = useState('principal');
-  const [q, setQ] = useState('');
-  const [qDebounced, setQDebounced] = useState('');
-  const [categoria, setCategoria] = useState('todas');
+function LinhaMiniSerie({ valores, cor = T.signal, rotulo }) {
+  const numeros = valores.map(item => Number(item || 0));
+  const maior = Math.max(...numeros, 1);
+  return <div aria-label={rotulo} title={rotulo} style={{ height: 86, display: 'flex', alignItems: 'end', gap: 3, padding: '8px 0 0', borderBottom: `1px solid ${T.line}` }}>
+    {numeros.map((valor, index) => <span key={index} style={{ flex: 1, minWidth: 3, height: `${Math.max(5, valor / maior * 100)}%`, borderRadius: '3px 3px 0 0', background: index === numeros.length - 1 ? cor : `${cor}66` }} />)}
+  </div>;
+}
+
+function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
+  const periodo = contexto?.periodo || '30d';
+  const parametros = useMemo(() => {
+    const p = new URLSearchParams({ periodo, segmento: contexto?.segmento || 'todas' });
+    if (contexto?.regiao && contexto.regiao !== 'todas') p.set('regiao', contexto.regiao);
+    if (contexto?.uf && contexto.uf !== 'todas') p.set('uf', contexto.uf);
+    if (contexto?.cidade && contexto.cidade !== 'todas') p.set('cidade', contexto.cidade);
+    if (contexto?.marca) p.set('marca', contexto.marca);
+    if (contexto?.modelo) p.set('modelo', contexto.modelo);
+    if (contexto?.ano) p.set('ano', contexto.ano);
+    return p.toString();
+  }, [periodo, contexto?.segmento, contexto?.regiao, contexto?.uf, contexto?.cidade, contexto?.marca, contexto?.modelo, contexto?.ano]);
+  const { data, erro, status } = useApi(`mercado_painel.php?${parametros}`);
+  const escopo = data?.escopo || {};
+  const resumo = data?.resumo || {};
+  const selecionado = data?.selecionado;
+  const noEstado = escopo.uf && escopo.uf !== 'todas';
+  const atualiza = patch => onContexto?.(normalizeAppContext({ ...contexto, ...patch }), { replace: true, preserveScroll: true });
+  const selecionaUf = event => atualiza({ uf: event.target.value, cidade: 'todas' });
+  const selecionaPeriodo = event => atualiza({ periodo: event.target.value });
+  const abrirModelo = modelo => atualiza({ grupo: modelo.id, marca: modelo.marca, modelo: modelo.modelo, ano: modelo.ano });
+
+  if (!visivel) return <button onClick={onAlternar} style={{ ...inputStyle, width: '100%', cursor: 'pointer', marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><BarChart3 size={15} /> Abrir painel analítico do mercado</button>;
+  if (erro) return <Card style={{ marginBottom: 18, padding: 16 }}><div style={{ color: T.inkMuted, fontSize: 12.5 }}>O painel analítico estará disponível após publicar a API desta versão. A navegação de anúncios continua abaixo.</div></Card>;
+  if (status === 'loading' || !data) return <Card style={{ marginBottom: 18, padding: 22 }}><div style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 11 }}>CARREGANDO LEITURA DO MERCADO…</div></Card>;
+
+  const serie = selecionado?.serie || [];
+  const maxUf = Math.max(1, ...(data.geografia?.ufs || []).map(item => item.anuncios));
+  const maxRegiao = Math.max(1, ...(selecionado?.regioes || []).map(item => item.anuncios));
+  const contextoRotulo = noEstado ? `${NOMES_UF[escopo.uf] || escopo.uf}` : escopo.regiao !== 'todas' ? escopo.regiao : 'Brasil';
+  const intervalo = `${periodo === '7d' ? '7 dias' : periodo === '30d' ? '30 dias' : periodo === '90d' ? '90 dias' : periodo === '180d' ? '180 dias' : '12 meses'} monitorados`;
+  return <section aria-label="Painel analítico do mercado" style={{ marginBottom: 28 }}>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+      <select aria-label="Período da análise" value={periodo} onChange={selecionaPeriodo} style={{ ...inputStyle, flex: '1 1 135px' }}>
+        <option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="180d">Últimos 180 dias</option><option value="12m">Últimos 12 meses</option>
+      </select>
+      <select aria-label="Estado da análise" value={escopo.uf || 'todas'} onChange={selecionaUf} style={{ ...inputStyle, flex: '1 1 155px' }}>
+        <option value="todas">Todos os estados</option>
+        {(data.geografia?.ufs || []).map(item => <option key={item.uf} value={item.uf}>{NOMES_UF[item.uf] || item.uf} · {fmtN(item.anuncios)}</option>)}
+      </select>
+      {noEstado && <button onClick={() => atualiza({ uf: 'todas', cidade: 'todas' })} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><ArrowLeft size={14} /> Brasil</button>}
+      <button onClick={onAlternar} style={{ ...inputStyle, cursor: 'pointer', marginLeft: 'auto' }}>Ocultar painel</button>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: T.inkMuted, fontSize: 11.5, margin: '4px 0 12px' }}><CalendarDays size={14} /> {intervalo} · {contextoRotulo} · preços anunciados</div>
+
+    <Card style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+        {[
+          [FileText, 'Anúncios ativos', fmtN(resumo.anuncios)], [Users, 'Lojistas', fmtN(resumo.lojistas)],
+          [Building, noEstado ? 'Cidades' : 'Cidades cobertas', fmtN(resumo.cidades)], [Map, 'UFs', fmtN(resumo.ufs)],
+          [Gauge, 'Ticket mediano', fmtBRL(resumo.ticket_mediano)],
+        ].map(([Icone, label, valor], index) => <div key={label} style={{ minHeight: 108, padding: '18px 20px', borderRight: index < 4 ? `1px solid ${T.line}` : 'none', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${index === 4 ? T.signal : T.steel}15`, color: index === 4 ? T.signal : T.steel }}><Icone size={18} /></span>
+          <span><strong style={{ display: 'block', fontFamily: T.fontDisplay, fontSize: 22, lineHeight: 1.1 }}>{valor}</strong><small style={{ color: T.inkMuted, fontSize: 11 }}>{label}</small></span>
+        </div>)}
+      </div>
+      <div style={{ padding: '9px 18px', borderTop: `1px solid ${T.line}`, fontSize: 10.5, color: T.inkMuted }}><BadgeInfo size={12} style={{ verticalAlign: -2, marginRight: 5 }} />Preço por modelo exige amostra qualificada; FIPE e mediana do mercado são referências distintas.</div>
+    </Card>
+
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, .82fr) minmax(420px, 1.18fr)', gap: 14, marginBottom: 14 }} className="or-mercado-grid">
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>{noEstado ? contextoRotulo : 'Mapa do mercado'}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Volume observado por estado</div></div><Globe2 size={18} color={T.signal} /></div>
+        <div className="or-zebra-list or-zebra-rows" style={{ marginTop: 15, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {(noEstado ? data.geografia?.cidades : data.geografia?.ufs)?.slice(0, 8).map((item, index) => {
+            const nome = noEstado ? item.cidade : `${NOMES_UF[item.uf] || item.uf} · ${item.uf}`;
+            const volume = Number(item.anuncios || 0);
+            return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })} style={{ border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(80px, 1fr) 82px 48px', alignItems: 'center', gap: 8 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{nome}</span><span style={{ height: 5, background: T.surface3, borderRadius: 99, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / (noEstado ? Math.max(1, ...(data.geografia?.cidades || []).map(x => x.anuncios)) : maxUf) * 100}%`, background: T.signal, borderRadius: 99 }} /></span><strong style={{ fontFamily: T.fontMono, fontSize: 10.5, textAlign: 'right' }}>{fmtN(volume)}</strong>
+            </button>;
+          })}
+        </div>
+      </Card>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '18px 20px 10px', display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>Mercado comparável por modelo · {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Recorte factual: marca, modelo e ano exatos.</div></div><SlidersHorizontal size={17} color={T.inkMuted} /></div>
+        <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 620 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', padding: '8px 20px', color: T.inkMuted, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em' }}><span>Modelo</span><span>Anúncios</span><span>Lojistas</span><span>Mediana</span><span>Faixa</span><span>Movimento</span></div>
+          <div className="or-zebra-list">{(data.modelos || []).map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', alignItems: 'center', gap: 5, padding: '11px 20px', fontSize: 11.5 }}>
+            <span><strong style={{ fontWeight: 600 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span><span>{fmtN(modelo.anuncios)}</span><span>{fmtN(modelo.lojistas)}</span><span>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(modelo.precos?.mediana)}</span><span>{modelo.precos?.p25 == null ? '—' : `${fmtBRL(modelo.precos.p25)}–${fmtBRL(modelo.precos.p75)}`}</span><span style={{ color: modelo.movimento_pct > 0 ? T.positive : modelo.movimento_pct < 0 ? T.alert : T.inkMuted }}>{modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}</span>
+          </button>)}</div>
+        </div></div>
+      </Card>
+    </div>
+
+    {selecionado && <Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 17 }}>{selecionado.rotulo} em {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 4 }}>Indicadores observados; saída detectada não comprova venda.</div></div><button onClick={() => atualiza({ busca: selecionado.modelo, marca: selecionado.marca, modelo: selecionado.modelo, ano: selecionado.ano })} style={{ ...inputStyle, cursor: 'pointer', color: T.signal }}>Ver anúncios equivalentes</button></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(200px, 1fr) minmax(230px, 1fr)', gap: 20, marginTop: 16 }} className="or-mercado-grid">
+        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase' }}>Mediana anunciada</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 24 }}>{selecionado.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(selecionado.precos?.mediana)}</strong><LinhaMiniSerie valores={serie.map(item => item.preco_medio)} cor={T.signal} rotulo="Variação do preço médio observado" /></div>
+        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase' }}>Oferta ativa</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 24, color: T.steel }}>{fmtN(selecionado.anuncios)} anúncios</strong><LinhaMiniSerie valores={serie.map(item => item.ofertas)} cor={T.steel} rotulo="Variação das ofertas ativas" /></div>
+        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase', marginBottom: 8 }}>Distribuição regional</div>{(selecionado.regioes || []).map(item => <div key={item.regiao} style={{ display: 'grid', gridTemplateColumns: '86px 1fr 40px', gap: 7, alignItems: 'center', margin: '8px 0', fontSize: 11 }}><span>{item.regiao}</span><span style={{ height: 5, borderRadius: 5, background: T.surface3, overflow: 'hidden' }}><span style={{ display: 'block', width: `${item.anuncios / maxRegiao * 100}%`, height: '100%', background: T.steel }} /></span><strong style={{ fontFamily: T.fontMono, textAlign: 'right', fontSize: 10 }}>{fmtN(item.anuncios)}</strong></div>)}<div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 10 }}>{selecionado.precos?.amostra_qualificada || 0} preços qualificados · confiança {selecionado.precos?.confianca || 'insuficiente'}</div></div>
+      </div>
+    </Card>}
+  </section>;
+}
+
+function PageMercado({ sessao, contexto, onContexto }) {
+  const contextoInicial = useRef(normalizeAppContext(contexto));
+  const [universo, setUniverso] = useState(contextoInicial.current.mercado);
+  const [q, setQ] = useState(contextoInicial.current.busca || '');
+  const [qDebounced, setQDebounced] = useState(contextoInicial.current.busca || '');
+  const [categoria, setCategoria] = useState(contextoInicial.current.segmento);
   const [tipo, setTipo] = useState('todos');
   const [status, setStatus] = useState('ativo');
-  const [regiao, setRegiao] = useState('todas');
-  const [uf, setUf] = useState('todas');
-  const [cidade, setCidade] = useState('todas');
+  const [regiao, setRegiao] = useState(contextoInicial.current.regiao);
+  const [uf, setUf] = useState(contextoInicial.current.uf);
+  const [cidade, setCidade] = useState(contextoInicial.current.cidade);
   const [revendaId, setRevendaId] = useState('todas');
   const [precoMin, setPrecoMin] = useState('');
   const [precoMax, setPrecoMax] = useState('');
-  const [marca, setMarca] = useState('todas');
+  const [marca, setMarca] = useState(contextoInicial.current.marca || 'todas');
   const [carroceria, setCarroceria] = useState('todas');
   const [tracao, setTracao] = useState('todas');
   const [fipeFila, setFipeFila] = useState('todos');
   const [ordem, setOrdem] = useState('aleatorio');
   const [maisFiltros, setMaisFiltros] = useState(false);
+  const [painelAnalitico, setPainelAnalitico] = useState(true);
   const [anuncioAberto, setAnuncioAberto] = useState(null);
   const [versaoDados, setVersaoDados] = useState(0);
+  const contextoEmitidoRef = useRef('');
+
+  const contextoMercado = useMemo(() => normalizeAppContext({
+    periodo: contexto?.periodo,
+    grupo: contexto?.grupo,
+    modelo: contexto?.modelo,
+    ano: contexto?.ano,
+    comparacao: contexto?.comparacao,
+    mercado: universo,
+    regiao,
+    uf,
+    cidade,
+    segmento: categoria,
+    marca: marca === 'todas' ? null : marca,
+    busca: qDebounced || null,
+  }), [contexto?.periodo, contexto?.grupo, contexto?.modelo, contexto?.ano, contexto?.comparacao,
+    universo, regiao, uf, cidade, categoria, marca, qDebounced]);
+  const chaveContextoMercado = JSON.stringify(contextoMercado);
+
+  useEffect(() => {
+    const recebido = normalizeAppContext(contexto);
+    const chaveRecebida = JSON.stringify(recebido);
+    if (chaveRecebida === contextoEmitidoRef.current) {
+      contextoEmitidoRef.current = '';
+      return;
+    }
+    setUniverso(recebido.mercado);
+    setRegiao(recebido.regiao);
+    setUf(recebido.uf);
+    setCidade(recebido.cidade);
+    setCategoria(recebido.segmento);
+    setMarca(recebido.marca || 'todas');
+    setQ(recebido.busca || '');
+    setQDebounced(recebido.busca || '');
+  }, [contexto]);
+
+  useEffect(() => {
+    contextoEmitidoRef.current = chaveContextoMercado;
+    onContexto?.(contextoMercado, { replace: true, preserveScroll: true });
+  }, [chaveContextoMercado, onContexto]);
 
   const statusDb = {
     ativo: 'ativo', em_verificacao: 'removido_candidato',
@@ -1008,8 +1191,12 @@ function PageMercado({ sessao }) {
   const [total, setTotal] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [fim, setFim] = useState(false);
+  const [proximoCursor, setProximoCursor] = useState(null);
+  const [cursorSuportado, setCursorSuportado] = useState(false);
   const carregandoRef = useRef(false);
   const sentinelaRef = useRef(null);
+  const consultaVersaoRef = useRef(0);
+  const paginaControllerRef = useRef(null);
 
   // Debounce da busca — evita disparar uma requisicao por tecla digitada
   useEffect(() => {
@@ -1040,44 +1227,76 @@ function PageMercado({ sessao }) {
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {
-    let cancelado = false;
+    const versao = ++consultaVersaoRef.current;
+    paginaControllerRef.current?.abort();
+    const controller = new AbortController();
     carregandoRef.current = true;
     setCarregando(true); setFim(false);
+    setProximoCursor(null); setCursorSuportado(false);
     document.getElementById('app-scroll-container')?.scrollTo({ top: 0 });
-    fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=0`)
-      .then(r => r.json())
+    apiGet(`anuncios.php?${queryBase}&limit=${PAGINA}&offset=0`, {
+      signal: controller.signal, ttlMs: 0, useCache: false,
+    })
       .then(d => {
-        if (cancelado) return;
-        setAnuncios((d.anuncios || []).map(mapeiaAnuncioReal));
+        if (consultaVersaoRef.current !== versao) return;
+        const recebidos = (d.anuncios || []).map(mapeiaAnuncioReal);
+        setAnuncios(recebidos);
         setTotal(d.total ?? 0);
-        setFim((d.anuncios || []).length >= (d.total ?? 0));
+        setCursorSuportado(Boolean(d.cursor_supported));
+        setProximoCursor(d.proximo_cursor || null);
+        setFim(d.has_more === false || recebidos.length >= (d.total ?? 0));
       })
-      .catch(() => { if (!cancelado) { setAnuncios([]); setTotal(0); } })
+      .catch(error => {
+        if (consultaVersaoRef.current === versao && error.name !== 'AbortError') {
+          setAnuncios([]); setTotal(0); setFim(true);
+        }
+      })
       .finally(() => {
-        carregandoRef.current = false;
-        if (!cancelado) setCarregando(false);
+        if (consultaVersaoRef.current === versao) {
+          carregandoRef.current = false;
+          if (!controller.signal.aborted) setCarregando(false);
+        }
       });
-    return () => { cancelado = true; };
+    return () => {
+      controller.abort();
+      paginaControllerRef.current?.abort();
+    };
   }, [queryBase, versaoDados]);
 
   const carregaMais = () => {
     if (carregandoRef.current || fim) return;
+    const versao = consultaVersaoRef.current;
+    const controller = new AbortController();
+    paginaControllerRef.current = controller;
     carregandoRef.current = true;
     setCarregando(true);
-    fetch(`${API_BASE_URL}/anuncios.php?${queryBase}&limit=${PAGINA}&offset=${anuncios.length}`)
-      .then(r => r.json())
+    const paginacao = cursorSuportado && proximoCursor
+      ? `cursor=${encodeURIComponent(proximoCursor)}`
+      : `offset=${anuncios.length}`;
+    apiGet(`anuncios.php?${queryBase}&limit=${PAGINA}&${paginacao}`, {
+      signal: controller.signal, ttlMs: 0, useCache: false,
+    })
       .then(d => {
+        if (consultaVersaoRef.current !== versao) return;
         const novos = (d.anuncios || []).map(mapeiaAnuncioReal);
+        setCursorSuportado(Boolean(d.cursor_supported));
+        setProximoCursor(d.proximo_cursor || null);
         setAnuncios(prev => {
-          const juntos = [...prev, ...novos];
-          if (novos.length === 0 || juntos.length >= (d.total ?? 0)) setFim(true);
+          const ids = new Set(prev.map(item => item.dbId));
+          const juntos = [...prev, ...novos.filter(item => !ids.has(item.dbId))];
+          if (d.has_more === false || novos.length === 0 || juntos.length >= (d.total ?? 0)) setFim(true);
           return juntos;
         });
       })
-      .catch(() => setFim(true))
+      .catch(error => {
+        if (consultaVersaoRef.current === versao && error.name !== 'AbortError') setFim(true);
+      })
       .finally(() => {
-        carregandoRef.current = false;
-        setCarregando(false);
+        if (paginaControllerRef.current === controller) paginaControllerRef.current = null;
+        if (consultaVersaoRef.current === versao) {
+          carregandoRef.current = false;
+          setCarregando(false);
+        }
       });
   };
 
@@ -1150,6 +1369,9 @@ function PageMercado({ sessao }) {
 
   return (
     <div>
+      {universo === 'principal' && <PainelMercadoAnalitico contexto={contextoMercado}
+        onContexto={onContexto} visivel={painelAnalitico} onAlternar={() => setPainelAnalitico(valor => !valor)} />}
+      <SectionTitle sub="Explore os anúncios que sustentam os indicadores do painel.">Navegador de anúncios</SectionTitle>
       <div role="tablist" aria-label="Universo do mercado" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
         {[
           ['principal', 'Caminhões e implementos', 'Foco principal do Oper Radar'],
@@ -3103,12 +3325,14 @@ const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'minha-loja'
 const NAV_MOBILE_MAIS = NAV.filter(item => ['comparador', 'fipe', 'concorrentes', 'analise', 'acoes', 'ajustes', 'conta'].includes(item.id));
 
 function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
-  const [pagina, setPagina] = useState('hoje');
+  const { page: pagina, context: contexto, navigate, updateContext, goBack } = useBrowserRoute(import.meta.env.BASE_URL);
+  const setPagina = useCallback(page => navigate(page), [navigate]);
   const [menuAberto, setMenuAberto] = useState(false);
   const [acoes, setAcoes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('oper-radar-acoes') || '[]'); } catch { return []; }
   });
   const [mobile, setMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 760);
+  const tituloRef = useRef(null);
 
   const { data: kpis } = useApi('kpis.php');
   const { data: anunciosData } = useApi('anuncios.php?ordem=movimento&limit=200');
@@ -3126,7 +3350,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   }, [acoes]);
 
   useEffect(() => {
-    document.getElementById('app-scroll-container')?.scrollTo({ top: 0 });
+    tituloRef.current?.focus({ preventScroll: true });
   }, [pagina]);
 
   const adicionarAcao = async (texto, origem = 'oportunidade') => {
@@ -3147,8 +3371,8 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
 
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
-    mercado: <PageMercado sessao={sessao} />,
-    comparador: <PageComparador />,
+    mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
+    comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
@@ -3161,6 +3385,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
 
   const tituloPagina = NAV.find(n => n.id === pagina)?.rotulo || '';
   const acoesPendentes = acoes.filter(a => !a.feita).length;
+  const breadcrumbs = breadcrumbsFor(pagina, contexto);
 
   return (
     <div style={{ display: 'flex', height: '100%', background: T.bg, color: T.ink, fontFamily: T.fontBody, overflow: 'hidden' }}>
@@ -3177,7 +3402,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
             {NAV.map(item => {
               const ativo = pagina === item.id;
               return (
-                <button key={item.id} onClick={() => setPagina(item.id)} style={{
+                <button key={item.id} onClick={() => setPagina(item.id)} aria-current={ativo ? 'page' : undefined} style={{
                   display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px',
                   background: ativo ? `${T.signal}1A` : 'transparent',
                   border: 'none', borderRadius: 9, cursor: 'pointer',
@@ -3210,7 +3435,25 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
             <RadarPulse ultimaColeta={kpis?.ultima_coleta} />
           </div>
         )}
-        <h1 style={{ fontFamily: T.fontDisplay, fontSize: mobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px' }}>{tituloPagina}</h1>
+        {pagina !== 'hoje' && (
+          <div className="or-route-tools">
+            <button type="button" onClick={goBack} className="or-back-button"><ArrowLeft size={14} /> Voltar</button>
+            <nav aria-label="Breadcrumb">
+              <ol className="or-breadcrumb-list">
+                {breadcrumbs.map((item, index) => {
+                  const atual = index === breadcrumbs.length - 1;
+                  return <li key={`${item.label}-${index}`}>
+                    {index > 0 && <ChevronRight size={12} aria-hidden="true" />}
+                    {!atual && item.page
+                      ? <button type="button" onClick={() => setPagina(item.page)}>{item.label}</button>
+                      : <span aria-current={atual ? 'page' : undefined}>{item.label}</span>}
+                  </li>;
+                })}
+              </ol>
+            </nav>
+          </div>
+        )}
+        <h1 ref={tituloRef} tabIndex={-1} style={{ fontFamily: T.fontDisplay, fontSize: mobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px', outline: 'none' }}>{tituloPagina}</h1>
         <div style={{ height: 2, width: 34, background: T.signal, borderRadius: 1, marginBottom: 22 }} />
         {paginas[pagina]}
       </main>
@@ -3236,7 +3479,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
           {NAV_MOBILE_PRINCIPAL.map(item => {
             const ativo = pagina === item.id;
             return (
-              <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} style={{
+              <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} aria-current={ativo ? 'page' : undefined} style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 background: 'none', border: 'none', cursor: 'pointer', minHeight: 46, justifyContent: 'center',
                 color: ativo ? T.signal : T.inkMuted, fontSize: 9.5, fontFamily: T.fontBody,

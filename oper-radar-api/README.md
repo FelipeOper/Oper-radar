@@ -8,6 +8,17 @@ Retorna estoque, revendas, entradas/saídas em 30 dias, tempo observado e estat�
 preço qualificadas. `anuncios.php` e `facetas.php` aceitam `mercado=principal|outros` para
 isolar caminhões/implementos rodoviários dos segmentos secundários.
 
+Todas as respostas produzidas por `envia_json()` preservam os campos legados e acrescentam
+`_meta.request_id`, `_meta.api_version` e `_meta.generated_at`. O `request_id` também é
+devolvido no header `X-Request-ID`. Operações restritas devem usar `exige_papel()` em vez de
+repetir comparações de papel em cada endpoint.
+
+`mercado_painel.php` é a API do painel analítico do Mercado. Aceita `periodo`, `regiao`,
+`uf`, `cidade`, `segmento`, `marca`, `modelo` e `ano`; devolve resumo, geografia, grupos de
+modelo e uma série por modelo selecionado. Nesta versão, um grupo é estritamente factual:
+marca + modelo + ano-modelo exatos. O endpoint declara isso em `tipo_recorte` e nunca infere
+equivalência comercial nem publica recomendação numérica com confiança insuficiente.
+
 ## Comparativos de preço
 
 `lib/market_quality.php` centraliza a regra usada por anúncios, detalhe, FIPE, placa, Minha

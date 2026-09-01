@@ -52,7 +52,9 @@ function comparador_rotulo(array $seletor): string {
     return (string)($seletor['marca'] ?: $seletor['modelo']) . ' · ' . $seletor['ano'];
 }
 
-function comparador_resumo(array $registros, int $saidas30d): array {
+function comparador_resumo(array $registros, int $saidasPeriodo, array $periodo = [
+    'codigo' => '30d', 'dias' => 30, 'rotulo' => '30 dias',
+]): array {
     $stats = mercado_calcula_estatisticas($registros);
     $revendas = [];
     $ufs = [];
@@ -63,7 +65,7 @@ function comparador_resumo(array $registros, int $saidas30d): array {
         if (!empty($item['revenda_id'])) $revendas[(int)$item['revenda_id']] = true;
         if (!empty($item['uf'])) $ufs[(string)$item['uf']] = true;
         if (isset($item['dias_observados'])) $dias[] = (int)$item['dias_observados'];
-        if (!empty($item['entrada_30d'])) $entradas++;
+        if (!empty($item['entrada_periodo']) || !empty($item['entrada_30d'])) $entradas++;
         $modelo = trim((string)($item['modelo'] ?? ''));
         if ($modelo !== '') $modelos[$modelo] = ($modelos[$modelo] ?? 0) + 1;
     }
@@ -73,11 +75,15 @@ function comparador_resumo(array $registros, int $saidas30d): array {
         $topModelos[] = ['modelo' => $modelo, 'anuncios' => $n];
     }
     return [
+        'periodo' => $periodo,
         'ativos' => count($registros),
         'revendas' => count($revendas),
         'ufs' => count($ufs),
+        'entradas_periodo' => $entradas,
+        'saidas_periodo' => $saidasPeriodo,
+        // Compatibilidade: no contrato original estes campos representavam a janela padrao de 30 dias.
         'entradas_30d' => $entradas,
-        'saidas_30d' => $saidas30d,
+        'saidas_30d' => $saidasPeriodo,
         'dias_observados_media' => $dias ? round(array_sum($dias) / count($dias), 1) : null,
         'precos' => [
             'amostra_total' => $stats['amostra_total'],
