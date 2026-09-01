@@ -1050,8 +1050,8 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
   // pra não deixar o usuário "perdido" numa lista expandida de um filtro anterior.
   const [rankingExpandido, setRankingExpandido] = useState(false);
   useEffect(() => { setRankingExpandido(false); }, [parametros]);
-  const modelosVisiveis = rankingExpandido ? (data.modelos || []) : (data.modelos || []).slice(0, 10);
-  const temMaisModelos = (data.modelos || []).length > 10;
+  const modelosVisiveis = rankingExpandido ? (data?.modelos || []) : (data?.modelos || []).slice(0, 10);
+  const temMaisModelos = (data?.modelos || []).length > 10;
   const atualiza = patch => onContexto?.(normalizeAppContext({ ...contexto, ...patch }), { replace: true, preserveScroll: true });
   const selecionaUf = event => atualiza({ uf: event.target.value, cidade: 'todas' });
   const selecionaPeriodo = event => atualiza({ periodo: event.target.value });
