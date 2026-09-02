@@ -8,7 +8,7 @@ import {
   Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
   Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
-  Globe2, Map as MapIcon, Users, Building, CalendarDays, SlidersHorizontal, BarChart3
+  SlidersHorizontal, BarChart3
 } from 'lucide-react';
 import {
   T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
@@ -1015,12 +1015,148 @@ function PageComparador({ contexto, onContexto }) {
   </div>;
 }
 
-function LinhaMiniSerie({ valores, cor = T.signal, rotulo }) {
-  const numeros = valores.map(item => Number(item || 0));
-  const maior = Math.max(...numeros, 1);
-  return <div aria-label={rotulo} title={rotulo} style={{ height: 86, display: 'flex', alignItems: 'end', gap: 3, padding: '8px 0 0', borderBottom: `1px solid ${T.line}` }}>
-    {numeros.map((valor, index) => <span key={index} style={{ flex: 1, minWidth: 3, height: `${Math.max(5, valor / maior * 100)}%`, borderRadius: '3px 3px 0 0', background: index === numeros.length - 1 ? cor : `${cor}66` }} />)}
-  </div>;
+const PERIODO_ROTULOS = { '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', '90d': 'Últimos 90 dias', '180d': 'Últimos 180 dias', '12m': 'Últimos 12 meses' };
+
+function fmtDiaCurto(iso) {
+  if (!iso) return '';
+  const partes = String(iso).split('-');
+  return partes.length === 3 ? `${partes[2]}/${partes[1]}` : String(iso);
+}
+
+function fmtPctAssinado(v) {
+  if (v == null) return '—';
+  const num = Number(v);
+  const sinal = num > 0 ? '+' : '';
+  return `${sinal}${num.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+}
+
+function FiltroChip({ children, onRemover, aria }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: T.surface3, border: `1px solid ${T.line}`, borderRadius: 999, padding: onRemover ? '5px 6px 5px 12px' : '5px 12px', fontSize: 12.5, color: T.ink, fontFamily: T.fontBody }}>
+      {children}
+      {onRemover && <button type="button" onClick={onRemover} aria-label={aria} style={{ position: 'relative', background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+        <span aria-hidden="true" style={{ position: 'absolute', inset: -12 }} />
+        <X size={12} />
+      </button>}
+    </span>
+  );
+}
+
+function HelpTip({ titulo, children }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!aberto) return undefined;
+    const fechar = event => { if (ref.current && !ref.current.contains(event.target)) setAberto(false); };
+    const fecharEsc = event => { if (event.key === 'Escape') setAberto(false); };
+    document.addEventListener('click', fechar);
+    document.addEventListener('keydown', fecharEsc);
+    return () => { document.removeEventListener('click', fechar); document.removeEventListener('keydown', fecharEsc); };
+  }, [aberto]);
+  return (
+    <span ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button type="button" aria-expanded={aberto} aria-label={`O que é ${titulo}`} onClick={e => { e.stopPropagation(); setAberto(v => !v); }}
+        style={{ position: 'relative', width: 18, height: 18, borderRadius: '50%', border: `1px solid ${aberto ? T.signal : T.inkMuted}`, background: 'none', color: aberto ? T.signal : T.inkMuted, fontSize: 11, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, fontFamily: T.fontMono }}>
+        <span aria-hidden="true" style={{ position: 'absolute', inset: -13 }} />?
+      </button>
+      {aberto && <span role="tooltip" style={{ position: 'absolute', top: 26, left: 0, zIndex: 20, width: 250, maxWidth: '70vw', background: T.surface3, border: `1px solid ${T.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 12, lineHeight: 1.5, color: T.inkMuted, boxShadow: '0 8px 24px rgba(0,0,0,.4)', fontFamily: T.fontBody }}>{children}</span>}
+    </span>
+  );
+}
+
+function SecaoCabecalho({ titulo, ajuda, extra }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <strong style={{ fontFamily: T.fontDisplay, fontSize: 15 }}>{titulo}</strong>
+        {ajuda && <HelpTip titulo={titulo}>{ajuda}</HelpTip>}
+      </div>
+      {extra}
+    </div>
+  );
+}
+
+function GraficoTendencia({ serie }) {
+  const [ativo, setAtivo] = useState(null);
+  const validos = (serie || []).filter(p => p.preco_medio != null);
+  if (validos.length === 0) return <div style={{ fontSize: 11.5, color: T.inkMuted, padding: '10px 0' }}>Sem preço médio observado neste período.</div>;
+  const precos = validos.map(p => p.preco_medio);
+  const min = Math.min(...precos);
+  const max = Math.max(...precos);
+  const largura = 300, altura = 72;
+  const passo = validos.length > 1 ? largura / (validos.length - 1) : 0;
+  const pontos = validos.map((p, i) => ({
+    ...p, x: validos.length > 1 ? i * passo : largura / 2,
+    y: max === min ? altura / 2 : altura - ((p.preco_medio - min) / (max - min)) * (altura - 8) - 4,
+  }));
+  const linha = pontos.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const primeiro = pontos[0];
+  const ultimo = pontos[pontos.length - 1];
+  const pontoAtivo = ativo != null ? pontos[ativo] : null;
+  return (
+    <div style={{ position: 'relative', marginTop: 10 }}>
+      <svg viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none" style={{ width: '100%', height: 72, display: 'block', overflow: 'visible' }}
+        role="img" aria-label={`Preço médio anunciado de ${fmtBRL(primeiro.preco_medio)} em ${fmtDiaCurto(primeiro.dia)} a ${fmtBRL(ultimo.preco_medio)} em ${fmtDiaCurto(ultimo.dia)}`}>
+        <polyline points={linha} fill="none" stroke={T.signal} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+        {pontos.map((p, i) => <circle key={`${p.dia}-${i}`} tabIndex={0} role="img" aria-label={`${fmtDiaCurto(p.dia)}: ${fmtBRL(p.preco_medio)}`} cx={p.x} cy={p.y} r={i === ativo ? 5 : 3.5} fill={T.signal} style={{ cursor: 'pointer' }}
+          onMouseEnter={() => setAtivo(i)} onFocus={() => setAtivo(i)} onMouseLeave={() => setAtivo(null)} onBlur={() => setAtivo(null)} />)}
+      </svg>
+      {pontoAtivo && <div style={{ position: 'absolute', left: `${(pontoAtivo.x / largura) * 100}%`, top: 0, transform: 'translate(-50%, -100%)', background: T.surface3, border: `1px solid ${T.signal}`, borderRadius: 8, padding: '7px 10px', fontSize: 11.5, color: T.ink, whiteSpace: 'nowrap', boxShadow: '0 8px 20px rgba(0,0,0,.35)', pointerEvents: 'none', zIndex: 5 }}>
+        <strong style={{ color: T.signal, fontFamily: T.fontMono }}>{fmtBRL(pontoAtivo.preco_medio)}</strong><br />{fmtDiaCurto(pontoAtivo.dia)}
+      </div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: T.inkMuted, marginTop: 4 }}>
+        <span>{fmtDiaCurto(primeiro.dia)}</span><span>{fmtDiaCurto(ultimo.dia)} · hoje</span>
+      </div>
+    </div>
+  );
+}
+
+function DistribuicaoPreco({ precos }) {
+  const [ativo, setAtivo] = useState(null);
+  const { menor, p25, mediana, p75, maior } = precos || {};
+  if (menor == null || maior == null || maior <= menor) return <div style={{ fontSize: 11.5, color: T.inkMuted, padding: '10px 0' }}>Amostra insuficiente para distribuição de preço.</div>;
+  const posicao = valor => valor == null ? null : ((valor - menor) / (maior - menor)) * 100;
+  const marcadores = [
+    { chave: 'menor', valor: menor, rotulo: 'Menor anúncio ativo', borda: true },
+    { chave: 'p25', valor: p25, rotulo: 'Percentil 25' },
+    { chave: 'mediana', valor: mediana, rotulo: 'Mediana', destaque: true },
+    { chave: 'p75', valor: p75, rotulo: 'Percentil 75' },
+    { chave: 'maior', valor: maior, rotulo: 'Maior anúncio ativo', borda: true },
+  ].filter(m => m.valor != null);
+  const p25pos = posicao(p25), p75pos = posicao(p75);
+  const marcadorAtivo = marcadores.find(m => m.chave === ativo);
+  return (
+    <div style={{ marginTop: 14, padding: '0 6px' }}>
+      <div style={{ position: 'relative', height: 6, background: T.surface3, borderRadius: 999 }}>
+        {p25pos != null && p75pos != null && <span style={{ position: 'absolute', top: 0, height: '100%', left: `${p25pos}%`, width: `${p75pos - p25pos}%`, background: `${T.signal}26`, borderRadius: 999 }} />}
+        {marcadores.map(m => <span key={m.chave} tabIndex={0} role="img" aria-label={`${m.rotulo}: ${fmtBRL(m.valor)}`} onMouseEnter={() => setAtivo(m.chave)} onFocus={() => setAtivo(m.chave)} onMouseLeave={() => setAtivo(null)} onBlur={() => setAtivo(null)}
+          style={{ position: 'absolute', top: '50%', left: `${posicao(m.valor)}%`, transform: 'translate(-50%,-50%)', width: m.borda ? 8 : 11, height: m.borda ? 8 : 11, borderRadius: '50%', cursor: 'pointer', border: `2px solid ${T.surface}`, background: m.borda ? T.inkMuted : T.signal }} />)}
+        {marcadorAtivo && <div style={{ position: 'absolute', left: `${posicao(marcadorAtivo.valor)}%`, top: -8, transform: 'translate(-50%,-100%)', background: T.surface3, border: `1px solid ${T.signal}`, borderRadius: 8, padding: '7px 10px', fontSize: 11.5, color: T.ink, whiteSpace: 'nowrap', boxShadow: '0 8px 20px rgba(0,0,0,.35)', pointerEvents: 'none', zIndex: 5 }}>
+          <strong style={{ color: T.signal, fontFamily: T.fontMono }}>{fmtBRL(marcadorAtivo.valor)}</strong><br />{marcadorAtivo.rotulo}
+        </div>}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: T.inkMuted, marginTop: 10 }}>
+        <span>{fmtBRL(menor)} · menor</span><span>{fmtBRL(mediana)} · mediana</span><span>{fmtBRL(maior)} · maior</span>
+      </div>
+    </div>
+  );
+}
+
+function ModeloCard({ modelo, ativo, onSelecionar, periodo }) {
+  return (
+    <button onClick={() => onSelecionar(modelo)} style={{ textAlign: 'left', width: '100%', background: ativo ? `${T.signal}12` : T.surface, border: `1px solid ${ativo ? T.signal : T.line}`, borderRadius: 14, padding: '12px 14px', cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, transition: 'border-color 160ms ease' }}>
+      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{modelo.rotulo}</div>
+      <div style={{ fontSize: 11.5, color: T.inkMuted, marginTop: 2 }}>{fmtN(modelo.anuncios)} anúncios · {fmtN(modelo.lojistas)} lojistas</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, gap: 8 }}>
+        <span style={{ fontFamily: T.fontMono, fontSize: 15, fontWeight: 700 }}>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(modelo.precos?.mediana)}</span>
+        <span title={`Movimento de estoque (${periodo}): ${modelo.entradas_periodo ?? 0} entraram, ${modelo.saidas_periodo ?? 0} saíram — saldo líquido de ${fmtPctAssinado(modelo.movimento_pct)} sobre o estoque ativo. Não é variação de preço.`}
+          aria-label={`Movimento de estoque em ${periodo}: ${modelo.entradas_periodo ?? 0} entraram, ${modelo.saidas_periodo ?? 0} saíram, saldo líquido de ${fmtPctAssinado(modelo.movimento_pct)} sobre o estoque ativo. Não é variação de preço.`}
+          style={{ fontFamily: T.fontMono, fontSize: 11, fontWeight: 600, color: T.steel, background: `${T.steel}18`, borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+          ↕ Estoque {fmtPctAssinado(modelo.movimento_pct)}
+        </span>
+      </div>
+    </button>
+  );
 }
 
 function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mobile }) {
@@ -1039,23 +1175,25 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
   const escopo = data?.escopo || {};
   const resumo = data?.resumo || {};
   const selecionado = data?.selecionado;
-  const noEstado = escopo.uf && escopo.uf !== 'todas';
+  // Drill-down de cidade só faz sentido com exatamente uma UF selecionada — com 2+ UFs o
+  // backend ignora a cidade (ver painel_regiao_unica/mercado_painel.php), então a UI precisa
+  // da mesma regra pra não sugerir uma navegação que o servidor não aplica.
+  const noEstado = (escopo.ufs?.length === 1) && escopo.uf && escopo.uf !== 'todas';
   const temCidade = noEstado && escopo.cidade && escopo.cidade !== 'todas';
-  // Distinto de `selecionado`: a API sempre retorna um modelo em destaque (top do ranking) mesmo
-  // sem nenhum clique do usuário, então o botão de limpar tem que olhar o contexto real, não a
-  // resposta da API — senão aparece sempre e o clique não muda nada quando não havia seleção.
   const temModeloSelecionado = Boolean(contexto?.marca && contexto?.modelo && contexto?.ano);
-  // Item 5 do checklist: o ranking busca até 30 grupos (mercado_painel.php) mas mostra só 10 por
-  // padrão; "Ver mais" expande sem nova consulta. Reseta ao trocar o recorte (UF/cidade/período)
-  // pra não deixar o usuário "perdido" numa lista expandida de um filtro anterior.
   const [rankingExpandido, setRankingExpandido] = useState(false);
   useEffect(() => { setRankingExpandido(false); }, [parametros]);
   const modelosVisiveis = rankingExpandido ? (data?.modelos || []) : (data?.modelos || []).slice(0, 10);
   const temMaisModelos = (data?.modelos || []).length > 10;
+  const [refinarAberto, setRefinarAberto] = useState(false);
   const atualiza = patch => onContexto?.(normalizeAppContext({ ...contexto, ...patch }), { replace: true, preserveScroll: true });
-  const selecionaUf = event => atualiza({ uf: event.target.value, cidade: 'todas' });
   const selecionaPeriodo = event => atualiza({ periodo: event.target.value });
   const abrirModelo = modelo => atualiza({ grupo: modelo.id, marca: modelo.marca, modelo: modelo.modelo, ano: modelo.ano });
+  const ufsAtuais = contexto?.uf && contexto.uf !== 'todas' ? contexto.uf.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const alternarUf = sigla => {
+    const novo = ufsAtuais.includes(sigla) ? ufsAtuais.filter(u => u !== sigla) : [...ufsAtuais, sigla];
+    atualiza({ uf: novo.length ? novo.join(',') : 'todas', cidade: 'todas' });
+  };
 
   if (!visivel) return <button onClick={onAlternar} style={{ ...inputStyle, width: '100%', cursor: 'pointer', marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><BarChart3 size={15} /> Abrir painel analítico do mercado</button>;
   if (erro) return <Card style={{ marginBottom: 18, padding: 16 }}><div style={{ color: T.inkMuted, fontSize: 12.5 }}>O painel analítico estará disponível após publicar a API desta versão. A navegação de anúncios continua abaixo.</div></Card>;
@@ -1063,102 +1201,159 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
 
   const serie = selecionado?.serie || [];
   const maxUf = Math.max(1, ...(data.geografia?.ufs || []).map(item => item.anuncios));
-  const maxRegiao = Math.max(1, ...(selecionado?.regioes || []).map(item => item.anuncios));
-  const contextoRotulo = noEstado ? `${NOMES_UF[escopo.uf] || escopo.uf}` : escopo.regiao !== 'todas' ? escopo.regiao : 'Brasil';
-  const intervalo = `${periodo === '7d' ? '7 dias' : periodo === '30d' ? '30 dias' : periodo === '90d' ? '90 dias' : periodo === '180d' ? '180 dias' : '12 meses'} monitorados`;
+  const segmentoRotulo = contexto?.segmento && contexto.segmento !== 'todas' ? (CATEGORIAS_MERCADO[contexto.segmento]?.label || contexto.segmento) : 'Caminhões e implementos';
+  const listaOfertas = noEstado ? (data.geografia?.cidades || []) : (data.geografia?.ufs || []);
+  const maiorOferta = noEstado ? Math.max(1, ...(data.geografia?.cidades || []).map(item => item.anuncios)) : maxUf;
+
   return <section aria-label="Painel analítico do mercado" style={{ marginBottom: 28 }}>
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-      <select aria-label="Período da análise" value={periodo} onChange={selecionaPeriodo} style={{ ...inputStyle, flex: '1 1 135px' }}>
-        <option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="180d">Últimos 180 dias</option><option value="12m">Últimos 12 meses</option>
-      </select>
-      <select aria-label="Estado da análise" value={escopo.uf || 'todas'} onChange={selecionaUf} style={{ ...inputStyle, flex: '1 1 155px' }}>
-        <option value="todas">Todos os estados</option>
-        {(data.geografia?.ufs || []).map(item => <option key={item.uf} value={item.uf}>{NOMES_UF[item.uf] || item.uf} · {fmtN(item.anuncios)}</option>)}
-      </select>
-      {noEstado && <button onClick={() => atualiza({ uf: 'todas', cidade: 'todas' })} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><ArrowLeft size={14} /> Brasil</button>}
-      <button onClick={onAlternar} style={{ ...inputStyle, cursor: 'pointer', marginLeft: 'auto' }}>Ocultar painel</button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 14, padding: '12px 14px', marginBottom: 6 }}>
+      <span style={{ fontSize: 11.5, color: T.inkMuted, fontFamily: T.fontMono }}>Analisando:</span>
+      <FiltroChip aria="remover filtro de tipo" onRemover={contexto?.segmento && contexto.segmento !== 'todas' ? () => atualiza({ segmento: 'todas' }) : undefined}>{segmentoRotulo}</FiltroChip>
+      {ufsAtuais.map(sigla => <FiltroChip key={sigla} aria={`remover filtro de estado ${NOMES_UF[sigla] || sigla}`} onRemover={() => alternarUf(sigla)}>{NOMES_UF[sigla] || sigla}</FiltroChip>)}
+      {temCidade && <FiltroChip aria="remover filtro de cidade" onRemover={() => atualiza({ cidade: 'todas' })}>{escopo.cidade}</FiltroChip>}
+      <FiltroChip aria="voltar ao período padrão" onRemover={periodo !== '30d' ? () => atualiza({ periodo: '30d' }) : undefined}>{PERIODO_ROTULOS[periodo] || periodo}</FiltroChip>
+      <button type="button" onClick={() => setRefinarAberto(v => !v)} aria-expanded={refinarAberto} aria-controls="or-refinar-painel" className="or-refine-btn" style={{ fontSize: 13, fontWeight: 600, color: T.signalInk, background: T.signal, border: 'none', borderRadius: 999, padding: '8px 16px', cursor: 'pointer' }}>Refinar resultados</button>
+      <button onClick={onAlternar} style={{ ...inputStyle, cursor: 'pointer', background: 'none' }}>Ocultar painel</button>
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: T.inkMuted, fontSize: 11.5, margin: '4px 0 12px' }}><CalendarDays size={14} /> {intervalo} · {contextoRotulo} · preços anunciados</div>
 
-    <Card style={{ padding: 0, marginBottom: 14, overflow: 'hidden' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-        {[
-          [FileText, 'Anúncios ativos', fmtN(resumo.anuncios)], [Users, 'Lojistas', fmtN(resumo.lojistas)],
-          [Building, noEstado ? 'Cidades' : 'Cidades cobertas', fmtN(resumo.cidades)], [MapIcon, 'UFs', fmtN(resumo.ufs)],
-          [Gauge, 'Ticket mediano', fmtBRL(resumo.ticket_mediano)],
-        ].map(([Icone, label, valor], index) => <div key={label} style={{ minHeight: 108, padding: '18px 20px', borderRight: index < 4 ? `1px solid ${T.line}` : 'none', display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: `${index === 4 ? T.signal : T.steel}15`, color: index === 4 ? T.signal : T.steel }}><Icone size={18} /></span>
-          <span><strong style={{ display: 'block', fontFamily: T.fontDisplay, fontSize: 22, lineHeight: 1.1 }}>{valor}</strong><small style={{ color: T.inkMuted, fontSize: 11 }}>{label}</small></span>
-        </div>)}
+    {refinarAberto && <Card id="or-refinar-painel" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+        <label>
+          <div style={rotuloFiltroStyle}>SEGMENTO</div>
+          <select value={contexto?.segmento || 'todas'} onChange={e => atualiza({ segmento: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+            <option value="todas">Caminhões e implementos</option>
+            {categoriasDoMercado('principal').map(cat => <option key={cat} value={cat}>{CATEGORIAS_MERCADO[cat]?.label || cat}</option>)}
+          </select>
+        </label>
+        <label>
+          <div style={rotuloFiltroStyle}>PERÍODO</div>
+          <select value={periodo} onChange={selecionaPeriodo} style={{ ...inputStyle, width: '100%' }}>
+            <option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="180d">Últimos 180 dias</option><option value="12m">Últimos 12 meses</option>
+          </select>
+        </label>
       </div>
-      <div style={{ padding: '9px 18px', borderTop: `1px solid ${T.line}`, fontSize: 10.5, color: T.inkMuted }}><BadgeInfo size={12} style={{ verticalAlign: -2, marginRight: 5 }} />Preço por modelo exige amostra qualificada; FIPE e mediana do mercado são referências distintas.</div>
-    </Card>
-
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, .82fr) minmax(420px, 1.18fr)', gap: 14, marginBottom: 14 }} className="or-mercado-grid">
-      <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-          <div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>{noEstado ? contextoRotulo : 'Mapa do mercado'}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Volume observado por estado</div></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {noEstado && <button onClick={() => temCidade ? atualiza({ cidade: 'todas' }) : atualiza({ uf: 'todas', cidade: 'todas' })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.signal, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontFamily: T.fontBody, padding: '4px 2px', whiteSpace: 'nowrap' }}>
-              <ArrowLeft size={13} /> {temCidade ? `Voltar para ${NOMES_UF[escopo.uf] || escopo.uf}` : 'Brasil'}
-            </button>}
-            <Globe2 size={18} color={T.signal} />
-          </div>
-        </div>
-        <div className="or-zebra-list or-zebra-rows" style={{ marginTop: 15, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {(noEstado ? data.geografia?.cidades : data.geografia?.ufs)?.slice(0, 8).map((item, index) => {
-            const nome = noEstado ? item.cidade : `${NOMES_UF[item.uf] || item.uf} · ${item.uf}`;
-            const volume = Number(item.anuncios || 0);
-            const ativo = temCidade && item.cidade === escopo.cidade;
-            return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })} style={{ border: 0, cursor: 'pointer', color: ativo ? T.signal : T.ink, background: ativo ? `${T.signal}14` : 'transparent', borderRadius: 6, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(80px, 1fr) 82px 48px', alignItems: 'center', gap: 8 }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{nome}{ativo && <small style={{ display: 'block', color: T.signal, fontSize: 9.5 }}>Selecionado</small>}</span><span style={{ height: 5, background: T.surface3, borderRadius: 99, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / (noEstado ? Math.max(1, ...(data.geografia?.cidades || []).map(x => x.anuncios)) : maxUf) * 100}%`, background: T.signal, borderRadius: 99 }} /></span><strong style={{ fontFamily: T.fontMono, fontSize: 10.5, textAlign: 'right' }}>{fmtN(volume)}</strong>
+      <div>
+        <div style={rotuloFiltroStyle}>ESTADOS (selecione um ou mais)</div>
+        <div style={filtroGridUfStyle}>
+          {(data.geografia?.ufs || []).map(item => {
+            const marcado = ufsAtuais.includes(item.uf);
+            return <button key={item.uf} type="button" onClick={() => alternarUf(item.uf)} aria-pressed={marcado}
+              style={{ ...inputStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, borderColor: marcado ? T.signal : T.line, color: marcado ? T.signal : T.ink, background: marcado ? `${T.signal}12` : T.surface2 }}>
+              {marcado ? <CheckCircle2 size={14} /> : <Circle size={14} />} {item.uf}
             </button>;
           })}
         </div>
-      </Card>
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '18px 20px 10px', display: 'flex', justifyContent: 'space-between', gap: 10 }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 16 }}>Mercado comparável por modelo · {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 3 }}>Recorte factual: marca, modelo e ano exatos.</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>{temModeloSelecionado && <button onClick={() => atualiza({ grupo: null, marca: null, modelo: null, ano: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.signal, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontFamily: T.fontBody, padding: '4px 2px', whiteSpace: 'nowrap' }}><ArrowLeft size={13} /> Limpar seleção</button>}<SlidersHorizontal size={17} color={T.inkMuted} /></div></div>
-        {mobile ? (
-          <>
-          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '2px 14px 16px' }}>
-            {modelosVisiveis.map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', textAlign: 'left', border: `1px solid ${modelo.id === selecionado?.id ? T.signal : T.line}`, borderRadius: 10, background: modelo.id === selecionado?.id ? `${T.signal}12` : T.surface, color: T.ink, fontFamily: T.fontBody, cursor: 'pointer', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 10 }}>
-                <span><strong style={{ fontWeight: 600, fontSize: 13 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span>
-                <span style={{ fontFamily: T.fontMono, fontSize: 13, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(modelo.precos?.mediana)}</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 12px', fontSize: 11, color: T.inkMuted }}>
-                <span>{fmtN(modelo.anuncios)} anúncios · {fmtN(modelo.lojistas)} lojistas</span>
-                {modelo.precos?.p25 != null && <span>Faixa: {fmtBRL(modelo.precos.p25)}–{fmtBRL(modelo.precos.p75)}</span>}
-              </div>
-              <span title="Movimento de estoque: entradas menos saídas sobre o estoque ativo no período. Não é variação de preço." style={{ alignSelf: 'flex-start', fontFamily: T.fontMono, fontSize: 10.5, fontWeight: 600, color: T.steel, background: `${T.steel}18`, borderRadius: 999, padding: '2px 8px' }}>
-                ↕ Estoque {modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}
-              </span>
-            </button>)}
-          </div>
-          {temMaisModelos && <button onClick={() => setRankingExpandido(v => !v)} style={{ width: '100%', textAlign: 'center', border: 0, borderTop: `1px solid ${T.line}`, background: 'none', color: T.signal, cursor: 'pointer', fontFamily: T.fontBody, fontSize: 11.5, padding: '10px 14px' }}>{rankingExpandido ? 'Ver menos' : `Ver mais (${(data.modelos || []).length - 10})`}</button>}
-          </>
-        ) : (
-          <>
-          <div style={{ overflowX: 'auto' }}><div style={{ minWidth: 620 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', padding: '8px 20px', color: T.inkMuted, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.04em' }}><span>Modelo</span><span>Anúncios</span><span>Lojistas</span><span>Mediana</span><span>Faixa</span><span title="Entradas menos saídas sobre o estoque ativo no período — não é variação de preço.">Estoque (30d)</span></div>
-            <div className="or-zebra-list">{modelosVisiveis.map(modelo => <button key={modelo.id} onClick={() => abrirModelo(modelo)} style={{ width: '100%', border: 0, cursor: 'pointer', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(170px, 2fr) .55fr .55fr 1fr .7fr .7fr', alignItems: 'center', gap: 5, padding: '11px 20px', fontSize: 11.5 }}>
-              <span><strong style={{ fontWeight: 600 }}>{modelo.rotulo}</strong>{modelo.id === selecionado?.id && <small style={{ display: 'block', color: T.signal, marginTop: 2 }}>Selecionado</small>}</span><span>{fmtN(modelo.anuncios)}</span><span>{fmtN(modelo.lojistas)}</span><span>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(modelo.precos?.mediana)}</span><span>{modelo.precos?.p25 == null ? '—' : `${fmtBRL(modelo.precos.p25)}–${fmtBRL(modelo.precos.p75)}`}</span><span title="Movimento de estoque, não variação de preço." style={{ color: T.steel }}>{modelo.movimento_pct == null ? '—' : `${modelo.movimento_pct > 0 ? '+' : ''}${modelo.movimento_pct}%`}</span>
-            </button>)}</div>
-          </div></div>
-          {temMaisModelos && <button onClick={() => setRankingExpandido(v => !v)} style={{ width: '100%', textAlign: 'center', border: 0, borderTop: `1px solid ${T.line}`, background: 'none', color: T.signal, cursor: 'pointer', fontFamily: T.fontBody, fontSize: 11.5, padding: '10px 14px' }}>{rankingExpandido ? 'Ver menos' : `Ver mais (${(data.modelos || []).length - 10})`}</button>}
-          </>
-        )}
-      </Card>
-    </div>
-
-    {selecionado && <Card>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}><div><strong style={{ fontFamily: T.fontDisplay, fontSize: 17 }}>{selecionado.rotulo} em {contextoRotulo}</strong><div style={{ color: T.inkMuted, fontSize: 11, marginTop: 4 }}>Indicadores observados; saída detectada não comprova venda.</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><button onClick={() => atualiza({ busca: selecionado.modelo, marca: selecionado.marca, modelo: selecionado.modelo, ano: selecionado.ano })} style={{ ...inputStyle, cursor: 'pointer', color: T.signal }}>Ver anúncios equivalentes</button>{temModeloSelecionado && <button onClick={() => atualiza({ grupo: null, marca: null, modelo: null, ano: null })} title="Limpar seleção" style={{ background: 'none', border: `1px solid ${T.line}`, borderRadius: 8, cursor: 'pointer', color: T.inkMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0 }}><X size={15} /></button>}</div></div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(200px, 1fr) minmax(230px, 1fr)', gap: 20, marginTop: 16 }} className="or-mercado-grid">
-        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase' }}>Mediana anunciada</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 24 }}>{selecionado.precos?.confianca === 'insuficiente' ? 'Amostra insuficiente' : fmtBRL(selecionado.precos?.mediana)}</strong><LinhaMiniSerie valores={serie.map(item => item.preco_medio)} cor={T.signal} rotulo="Variação do preço médio observado" /></div>
-        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase' }}>Oferta ativa</div><strong style={{ fontFamily: T.fontDisplay, fontSize: 24, color: T.steel }}>{fmtN(selecionado.anuncios)} anúncios</strong><LinhaMiniSerie valores={serie.map(item => item.ofertas)} cor={T.steel} rotulo="Variação das ofertas ativas" /></div>
-        <div><div style={{ color: T.inkMuted, fontSize: 10.5, textTransform: 'uppercase', marginBottom: 8 }}>Distribuição regional</div>{(selecionado.regioes || []).map(item => <div key={item.regiao} style={{ display: 'grid', gridTemplateColumns: '86px 1fr 40px', gap: 7, alignItems: 'center', margin: '8px 0', fontSize: 11 }}><span>{item.regiao}</span><span style={{ height: 5, borderRadius: 5, background: T.surface3, overflow: 'hidden' }}><span style={{ display: 'block', width: `${item.anuncios / maxRegiao * 100}%`, height: '100%', background: T.steel }} /></span><strong style={{ fontFamily: T.fontMono, textAlign: 'right', fontSize: 10 }}>{fmtN(item.anuncios)}</strong></div>)}<div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 10 }}>{selecionado.precos?.amostra_qualificada || 0} preços qualificados · confiança {selecionado.precos?.confianca || 'insuficiente'}</div></div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => atualiza({ segmento: 'todas', periodo: '30d', uf: 'todas', cidade: 'todas' })} style={{ background: 'none', border: 'none', color: T.inkMuted, cursor: 'pointer', fontSize: 12, fontFamily: T.fontBody, padding: '4px 2px' }}>Limpar filtros</button>
+        <button type="button" onClick={() => setRefinarAberto(false)} style={{ ...inputStyle, cursor: 'pointer', color: T.signal }}>Concluir</button>
       </div>
     </Card>}
+
+    <div style={{ fontSize: 11, color: T.inkMuted, margin: '2px 0 14px' }}>Preços são anunciados, não confirmados em venda. Saída detectada não comprova venda.</div>
+
+    {(resumo.anuncios ?? 0) === 0 ? (
+      <EmptyState icon={PackageOpen} titulo="Nenhum anúncio ativo neste recorte" texto="Ajuste os filtros na barra de contexto acima (tipo, estado ou período) para ver dados do mercado." />
+    ) : <>
+      <section style={{ marginBottom: 14 }}>
+        <SecaoCabecalho titulo="Panorama do mercado" ajuda={<>Resumo do estoque ativo nas UFs e período selecionados. "Entraram/saíram" é contagem de anúncios (não preço). "Desvio médio da FIPE" compara o preço anunciado dos ativos com a referência FIPE — positivo é acima da FIPE.</>} />
+        <Card style={{ padding: 0, overflow: 'hidden', maxWidth: 760 }}>
+          <div className="or-panorama-grid">
+            <div className="or-kpi">
+              <div style={{ fontSize: 11, color: T.inkMuted }}>Anúncios ativos</div>
+              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{fmtN(resumo.anuncios)}</div>
+              <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
+                <span style={{ color: T.positive }}>▲ {fmtN(resumo.entradas_periodo)} entraram</span><br />
+                <span style={{ color: T.alert }}>▼ {fmtN(resumo.saidas_periodo)} saíram</span> <span style={{ color: T.inkMuted }}>({periodo})</span>
+              </div>
+            </div>
+            <div className="or-kpi">
+              <div style={{ fontSize: 11, color: T.inkMuted }}>Lojistas no radar</div>
+              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{fmtN(resumo.lojistas)}</div>
+              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>em {fmtN(resumo.cidades)} cidades · {fmtN(resumo.ufs)} UFs</div>
+            </div>
+            <div className="or-kpi">
+              <div style={{ fontSize: 11, color: T.inkMuted }}>Ticket mediano</div>
+              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{resumo.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(resumo.ticket_mediano)}</div>
+              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>{fmtN(resumo.amostra_qualificada || 0)} preços qualificados</div>
+            </div>
+            <div className="or-kpi">
+              <div style={{ fontSize: 11, color: T.inkMuted }}>Desvio médio da FIPE</div>
+              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{resumo.desvio_fipe_medio_pct == null ? '—' : fmtPctAssinado(resumo.desvio_fipe_medio_pct)}</div>
+              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>anúncios ativos vs. referência FIPE</div>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      <section style={{ marginBottom: 14 }}>
+        <SecaoCabecalho titulo="Onde há mais ofertas" ajuda="Volume de anúncios ativos por estado (ou por cidade, ao selecionar um estado), dentro do tipo de veículo, UF e período escolhidos na barra de contexto acima." />
+        <Card style={{ padding: 0, overflow: 'hidden', maxWidth: 640 }}>
+          {listaOfertas.length === 0 ? <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12.5, color: T.inkMuted }}>Nenhuma oferta encontrada neste recorte.</div> : (
+            <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column' }}>
+              {listaOfertas.slice(0, 8).map((item, index) => {
+                const nome = noEstado ? item.cidade : `${NOMES_UF[item.uf] || item.uf} · ${item.uf}`;
+                const volume = Number(item.anuncios || 0);
+                return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })}
+                  style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(110px, 1fr) minmax(60px, 2fr) 56px', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
+                  <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: T.signal, borderRadius: 999 }} /></span>
+                  <span style={{ fontFamily: T.fontMono, fontSize: 12.5, textAlign: 'right', color: T.inkMuted }}>{fmtN(volume)}</span>
+                </button>;
+              })}
+            </div>
+          )}
+        </Card>
+      </section>
+
+      <section style={{ marginBottom: 14 }}>
+        <SecaoCabecalho titulo="Modelos em destaque" ajuda="Grupo exato: marca + modelo + ano-modelo, no recorte selecionado. Ordenado por quantidade de anúncios ativos — não é ranking de marca."
+          extra={temModeloSelecionado && <button onClick={() => atualiza({ grupo: null, marca: null, modelo: null, ano: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.signal, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontFamily: T.fontBody, padding: '4px 2px', whiteSpace: 'nowrap' }}><ArrowLeft size={13} /> Limpar seleção</button>} />
+        {modelosVisiveis.length === 0 ? <EmptyState icon={SlidersHorizontal} titulo="Nenhum modelo comparável neste recorte" texto="Amplie o período ou remova filtros de estado/segmento na barra de contexto acima." /> : <>
+          <div className="or-models-grid" style={{ maxWidth: 640 }}>
+            {modelosVisiveis.map(modelo => <ModeloCard key={modelo.id} modelo={modelo} ativo={modelo.id === selecionado?.id} onSelecionar={abrirModelo} periodo={periodo} />)}
+          </div>
+          {temMaisModelos && <button onClick={() => setRankingExpandido(v => !v)} style={{ width: '100%', textAlign: 'center', border: 0, borderTop: `1px solid ${T.line}`, background: 'none', color: T.signal, cursor: 'pointer', fontFamily: T.fontBody, fontSize: 11.5, padding: '10px 14px', marginTop: 6 }}>{rankingExpandido ? 'Ver menos' : `Ver mais (${(data.modelos || []).length - 10})`}</button>}
+        </>}
+      </section>
+
+      {selecionado && <section>
+        <SecaoCabecalho titulo="Detalhes do modelo"
+          ajuda="Três blocos separados, cada um com uma métrica diferente: tendência de preço médio anunciado por dia, distribuição de preço dos anúncios ativos hoje, e movimento de estoque. Nenhum é derivado do outro."
+          extra={<span style={{ fontSize: 12, color: T.inkMuted }}>{selecionado.rotulo} · {fmtN(selecionado.anuncios)} anúncios · {fmtN(selecionado.lojistas)} lojistas</span>} />
+        <Card style={{ borderColor: T.signal, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760 }}>
+          <div>
+            <h3 style={{ fontSize: 12.5, fontWeight: 700, color: T.ink, margin: 0 }}>Tendência de preço médio anunciado — {(PERIODO_ROTULOS[periodo] || periodo).toLowerCase()}</h3>
+            <p style={{ fontSize: 11.5, color: T.inkMuted, marginTop: 2 }}>Média diária dos anúncios ativos do grupo, não o preço de uma venda. Toque ou passe o mouse em cada ponto para ver o valor exato do dia.</p>
+            <GraficoTendencia serie={serie} />
+          </div>
+          <div style={{ paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
+            <h3 style={{ fontSize: 12.5, fontWeight: 700, color: T.ink, margin: 0 }}>Distribuição de preço hoje — anúncios ativos</h3>
+            <p style={{ fontSize: 11.5, color: T.inkMuted, marginTop: 2 }}>Do menor ao maior anúncio ativo agora; mediana é o valor do meio, diferente da média usada no gráfico acima.</p>
+            <DistribuicaoPreco precos={selecionado.precos} />
+          </div>
+          <div style={{ paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
+            <h3 style={{ fontSize: 12.5, fontWeight: 700, color: T.ink, margin: 0 }}>Movimento de estoque ({periodo}) — não é variação de preço</h3>
+            <p style={{ fontSize: 11.5, color: T.inkMuted, marginTop: 2 }}>Quantidade de anúncios que entraram e saíram do grupo. Saída detectada não comprova venda.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12.5 }}>
+              <span style={{ color: T.positive }}>▲ <strong style={{ fontFamily: T.fontMono }}>{fmtN(selecionado.entradas_periodo)}</strong> entraram</span>
+              <span style={{ color: T.alert }}>▼ <strong style={{ fontFamily: T.fontMono }}>{fmtN(selecionado.saidas_periodo)}</strong> saíram</span>
+              <span style={{ color: T.ink }}><strong style={{ fontFamily: T.fontMono, color: T.steel }}>{fmtPctAssinado(selecionado.movimento_pct)}</strong> saldo sobre o estoque ativo</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11, color: T.inkMuted, maxWidth: 420 }}>
+              <BadgeInfo size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>Preços são anunciados, não confirmados em venda. Atualizado {fmtDataObservada(data.fonte?.atualizado_em)}.</span>
+            </div>
+            <button onClick={() => atualiza({ busca: selecionado.modelo, marca: selecionado.marca, modelo: selecionado.modelo, ano: selecionado.ano })}
+              style={{ background: T.signal, color: T.signalInk, border: 'none', borderRadius: 10, padding: '11px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              Ver {fmtN(selecionado.anuncios)} ofertas disponíveis <ChevronRight size={15} />
+            </button>
+          </div>
+        </Card>
+      </section>}
+    </>}
   </section>;
 }
 

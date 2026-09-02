@@ -6,6 +6,7 @@
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
+require_once __DIR__ . '/lib/market_scope.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/query_contract.php';
 
@@ -91,14 +92,22 @@ $baseParams = array_values($tipos);
 $baseTypes = str_repeat('s', count($tipos));
 
 $regiao = trim((string)($_GET['regiao'] ?? 'todas'));
-$uf = strtoupper(trim((string)($_GET['uf'] ?? 'todas')));
+// Multisseleção de UF (item 3/redesign): aceita "uf=PR,SC" (várias) ou "uf=PR" (uma só,
+// compatível com o formato anterior). "ufs" no retorno é a lista real; "uf" continua sendo a
+// primeira UF (ou 'todas') só para não quebrar quem já lia esse campo como string única
+// (ex.: o drill-down de cidade, que só faz sentido com exatamente uma UF selecionada).
+$ufParametro = (string)($_GET['uf'] ?? 'todas');
+$ufsSelecionadas = painel_normaliza_ufs($ufParametro, $UF_REGIAO);
 $cidade = trim((string)($_GET['cidade'] ?? 'todas'));
 $scopeWhere = $baseWhere;
 $scopeParams = $baseParams;
 $scopeTypes = $baseTypes;
-if ($uf !== 'TODAS' && isset($UF_REGIAO[$uf])) {
-    $scopeWhere[] = 'r.uf=?'; $scopeParams[] = $uf; $scopeTypes .= 's';
-    $regiao = $UF_REGIAO[$uf];
+if ($ufsSelecionadas) {
+    $scopeWhere[] = 'r.uf IN (' . painel_placeholders($ufsSelecionadas) . ')';
+    foreach ($ufsSelecionadas as $sigla) { $scopeParams[] = $sigla; $scopeTypes .= 's'; }
+    $regiao = painel_regiao_unica($ufsSelecionadas, $UF_REGIAO);
+    $uf = $ufsSelecionadas[0];
+    if (count($ufsSelecionadas) > 1) $cidade = 'todas'; // drill-down de cidade exige UF única
 } elseif ($regiao !== 'todas' && isset($REGIOES[$regiao])) {
     $scopeWhere[] = 'r.uf IN (' . painel_placeholders($REGIOES[$regiao]) . ')';
     foreach ($REGIOES[$regiao] as $sigla) { $scopeParams[] = $sigla; $scopeTypes .= 's'; }
@@ -119,12 +128,25 @@ $ativos = painel_rows($conn, "SELECT a.preco, a.preco_texto_bruto, a.titulo, f.p
     LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE a.status='ativo' AND $scopeSql", $scopeTypes, $scopeParams);
 $statsGeral = mercado_calcula_estatisticas($ativos);
+$desvioFipeMedioPct = mercado_desvio_fipe_medio_pct($ativos);
 $lojistasSet = []; $cidadesSet = []; $ufsSet = [];
 foreach ($ativos as $item) {
     $lojistasSet[(int)$item['revenda_id']] = true;
     $cidadesSet[$item['uf'] . "\0" . $item['cidade']] = true;
     $ufsSet[$item['uf']] = true;
 }
+
+// Movimento do recorte inteiro (Panorama do redesign) — não confundir com o movimento por
+// modelo (grupos abaixo): aqui é a contagem total de anúncios que entraram/saíram no recorte
+// selecionado (segmento + UF/cidade), no mesmo período já escolhido pelo usuário no topo.
+$entradasPeriodoGeral = (int)(painel_rows($conn, "SELECT COUNT(*) n FROM anuncio a
+    JOIN revenda r ON r.id=a.revenda_id
+    WHERE a.status='ativo' AND $scopeSql
+      AND a.primeira_vez_visto>=DATE_SUB(NOW(), INTERVAL $dias DAY)", $scopeTypes, $scopeParams)[0]['n'] ?? 0);
+$saidasPeriodoGeral = (int)(painel_rows($conn, "SELECT COUNT(*) n FROM anuncio a
+    JOIN revenda r ON r.id=a.revenda_id
+    WHERE a.status='removido_confirmado' AND a.data_remocao>=DATE_SUB(NOW(), INTERVAL $dias DAY)
+      AND $scopeSql", $scopeTypes, $scopeParams)[0]['n'] ?? 0);
 
 $geoWhere = implode(' AND ', $baseWhere);
 $geografia = painel_rows($conn, "SELECT r.uf, COUNT(*) anuncios, COUNT(DISTINCT r.id) lojistas,
@@ -285,12 +307,18 @@ $ultima = painel_rows($conn, "SELECT MAX(a.ultima_vez_ativo) atualizado_em FROM 
 
 envia_json([
     'periodo' => $periodo,
-    'escopo' => ['regiao' => $regiao, 'uf' => $uf, 'cidade' => $cidade, 'segmento' => $segmento],
+    'escopo' => [
+        'regiao' => $regiao, 'uf' => $uf, 'ufs' => $ufsSelecionadas, 'cidade' => $cidade,
+        'segmento' => $segmento,
+    ],
     'resumo' => [
         'anuncios' => count($ativos), 'lojistas' => count($lojistasSet),
         'cidades' => count($cidadesSet), 'ufs' => count($ufsSet),
         'ticket_mediano' => $statsGeral['mediana'], 'amostra_qualificada' => $statsGeral['amostra_qualificada'],
         'confianca' => $statsGeral['confianca'],
+        'desvio_fipe_medio_pct' => $desvioFipeMedioPct,
+        'entradas_periodo' => $entradasPeriodoGeral, 'saidas_periodo' => $saidasPeriodoGeral,
+        'saldo_periodo' => $entradasPeriodoGeral - $saidasPeriodoGeral,
     ],
     'geografia' => ['ufs' => $ufsGeo, 'cidades' => $cidades],
     'modelos' => $modelos,

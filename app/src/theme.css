@@ -51,6 +51,14 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* Pontos de grafico/distribuicao (Painel Mercado) sao focaveis via tabIndex mas nao
+   sao button/input/select/a, entao precisam entrar explicitamente na regra de foco. */
+[tabindex]:focus-visible,
+circle:focus-visible {
+  outline: 2px solid var(--or-signal);
+  outline-offset: 2px;
+}
+
 select {
   max-width: 100%;
 }
@@ -144,6 +152,60 @@ select {
 @media (max-width: 980px) {
   .or-mercado-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* Painel Mercado (redesign) - grades responsivas por CSS, sem depender de um
+   booleano "mobile" calculado em JS. Ver docs/OPER_RADAR_Estrategia_e_Design.md. */
+.or-panorama-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+.or-panorama-grid .or-kpi {
+  padding: 14px 16px;
+  border-right: 1px solid var(--or-line);
+}
+.or-panorama-grid .or-kpi:last-child {
+  border-right: none;
+}
+@media (max-width: 620px) {
+  .or-panorama-grid .or-kpi {
+    border-bottom: 1px solid var(--or-line);
+  }
+  .or-panorama-grid .or-kpi:nth-child(2n) {
+    border-right: none;
+  }
+}
+@media (max-width: 620px) {
+  .or-panorama-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.or-models-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 980px) {
+  .or-models-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .or-models-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.or-refine-btn {
+  margin-left: auto;
+}
+@media (max-width: 560px) {
+  .or-refine-btn {
+    margin-left: 0;
+    width: 100%;
   }
 }
 
