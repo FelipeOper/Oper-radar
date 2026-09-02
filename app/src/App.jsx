@@ -1261,7 +1261,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
           <div className="or-panorama-grid">
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Anúncios ativos</div>
-              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{fmtN(resumo.anuncios)}</div>
+              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{fmtN(resumo.anuncios)}</div>
               <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
                 <span style={{ color: T.positive }}>▲ {fmtN(resumo.entradas_periodo)} entraram</span><br />
                 <span style={{ color: T.alert }}>▼ {fmtN(resumo.saidas_periodo)} saíram</span> <span style={{ color: T.inkMuted }}>({periodo})</span>
@@ -1269,17 +1269,17 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
             </div>
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Lojistas no radar</div>
-              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{fmtN(resumo.lojistas)}</div>
+              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{fmtN(resumo.lojistas)}</div>
               <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>em {fmtN(resumo.cidades)} cidades · {fmtN(resumo.ufs)} UFs</div>
             </div>
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Ticket mediano</div>
-              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{resumo.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(resumo.ticket_mediano)}</div>
+              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{resumo.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(resumo.ticket_mediano)}</div>
               <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>{fmtN(resumo.amostra_qualificada || 0)} preços qualificados</div>
             </div>
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Desvio médio da FIPE</div>
-              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 2, fontFamily: T.fontMono }}>{resumo.desvio_fipe_medio_pct == null ? '—' : fmtPctAssinado(resumo.desvio_fipe_medio_pct)}</div>
+              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{resumo.desvio_fipe_medio_pct == null ? '—' : fmtPctAssinado(resumo.desvio_fipe_medio_pct)}</div>
               <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>anúncios ativos vs. referência FIPE</div>
             </div>
           </div>
@@ -1295,7 +1295,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
                 const nome = noEstado ? item.cidade : `${NOMES_UF[item.uf] || item.uf} · ${item.uf}`;
                 const volume = Number(item.anuncios || 0);
                 return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })}
-                  style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(110px, 1fr) minmax(60px, 2fr) 56px', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
+                  style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(140px, 220px) 1fr 56px', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
                   <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: T.signal, borderRadius: 999 }} /></span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 12.5, textAlign: 'right', color: T.inkMuted }}>{fmtN(volume)}</span>
