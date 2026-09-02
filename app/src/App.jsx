@@ -1067,7 +1067,10 @@ function HelpTip({ titulo, children }) {
 function SecaoCabecalho({ titulo, ajuda, extra }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {/* gap 16 (nao 6): a area de toque invisivel do HelpTip se estende 13px alem do
+          botao de 18px (ver HelpTip abaixo) - com menos que isso ela cobre as ultimas
+          letras do titulo e o hover/clique no texto abre o tooltip por engano. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <strong style={{ fontFamily: T.fontDisplay, fontSize: 15 }}>{titulo}</strong>
         {ajuda && <HelpTip titulo={titulo}>{ajuda}</HelpTip>}
       </div>
@@ -1078,8 +1081,20 @@ function SecaoCabecalho({ titulo, ajuda, extra }) {
 
 function GraficoTendencia({ serie }) {
   const [ativo, setAtivo] = useState(null);
-  const validos = (serie || []).filter(p => p.preco_medio != null);
-  if (validos.length === 0) return <div style={{ fontSize: 11.5, color: T.inkMuted, padding: '10px 0' }}>Sem preço médio observado neste período.</div>;
+  const todosValidos = (serie || []).filter(p => p.preco_medio != null);
+  if (todosValidos.length === 0) return <div style={{ fontSize: 11.5, color: T.inkMuted, padding: '10px 0' }}>Sem preço médio observado neste período.</div>;
+  // Corta o início da série quando a cobertura de ofertas está bem abaixo do dia mais
+  // recente: o snapshot diário (anuncio_snapshot) teve um problema de cobertura parcial
+  // até 26/08/2026 (capturava só uma fração dos anúncios ativos de cada grupo), o que cria
+  // um patamar plano artificial no início do gráfico — não é o preço caindo, é a amostra
+  // mudando de tamanho. Ver CLAUDE.md (pendência: investigar snapshot_diario.py) — este
+  // recorte é uma proteção de exibição, não a correção da causa raiz, e vira um no-op
+  // sozinho assim que a cobertura ficar estável no dia mais antigo também.
+  const coberturaAlvo = todosValidos[todosValidos.length - 1].ofertas || 0;
+  const limiteCobertura = coberturaAlvo * 0.6;
+  const primeiraConfiavel = coberturaAlvo ? todosValidos.findIndex(p => (p.ofertas || 0) >= limiteCobertura) : 0;
+  const validos = primeiraConfiavel > 0 ? todosValidos.slice(primeiraConfiavel) : todosValidos;
+  const recortado = validos.length < todosValidos.length;
   const precos = validos.map(p => p.preco_medio);
   const min = Math.min(...precos);
   const max = Math.max(...precos);
@@ -1107,6 +1122,7 @@ function GraficoTendencia({ serie }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: T.inkMuted, marginTop: 4 }}>
         <span>{fmtDiaCurto(primeiro.dia)}</span><span>{fmtDiaCurto(ultimo.dia)} · hoje</span>
       </div>
+      {recortado && <div style={{ fontSize: 10.5, color: T.inkMuted, marginTop: 6 }}>Exibindo só os dias com cobertura completa de anúncios do grupo.</div>}
     </div>
   );
 }
