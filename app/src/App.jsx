@@ -1257,7 +1257,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
     ) : <>
       <section style={{ marginBottom: 14 }}>
         <SecaoCabecalho titulo="Panorama do mercado" ajuda={<>Resumo do estoque ativo nas UFs e período selecionados. "Entraram/saíram" é contagem de anúncios (não preço). "Desvio médio da FIPE" compara o preço anunciado dos ativos com a referência FIPE — positivo é acima da FIPE.</>} />
-        <Card style={{ padding: 0, overflow: 'hidden', maxWidth: 760 }}>
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
           <div className="or-panorama-grid">
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Anúncios ativos</div>
@@ -1288,7 +1288,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
 
       <section style={{ marginBottom: 14 }}>
         <SecaoCabecalho titulo="Onde há mais ofertas" ajuda="Volume de anúncios ativos por estado (ou por cidade, ao selecionar um estado), dentro do tipo de veículo, UF e período escolhidos na barra de contexto acima." />
-        <Card style={{ padding: 0, overflow: 'hidden', maxWidth: 640 }}>
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
           {listaOfertas.length === 0 ? <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12.5, color: T.inkMuted }}>Nenhuma oferta encontrada neste recorte.</div> : (
             <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column' }}>
               {listaOfertas.slice(0, 8).map((item, index) => {
@@ -1310,7 +1310,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
         <SecaoCabecalho titulo="Modelos em destaque" ajuda="Grupo exato: marca + modelo + ano-modelo, no recorte selecionado. Ordenado por quantidade de anúncios ativos — não é ranking de marca."
           extra={temModeloSelecionado && <button onClick={() => atualiza({ grupo: null, marca: null, modelo: null, ano: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.signal, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontFamily: T.fontBody, padding: '4px 2px', whiteSpace: 'nowrap' }}><ArrowLeft size={13} /> Limpar seleção</button>} />
         {modelosVisiveis.length === 0 ? <EmptyState icon={SlidersHorizontal} titulo="Nenhum modelo comparável neste recorte" texto="Amplie o período ou remova filtros de estado/segmento na barra de contexto acima." /> : <>
-          <div className="or-models-grid" style={{ maxWidth: 640 }}>
+          <div className="or-models-grid">
             {modelosVisiveis.map(modelo => <ModeloCard key={modelo.id} modelo={modelo} ativo={modelo.id === selecionado?.id} onSelecionar={abrirModelo} periodo={periodo} />)}
           </div>
           {temMaisModelos && <button onClick={() => setRankingExpandido(v => !v)} style={{ width: '100%', textAlign: 'center', border: 0, borderTop: `1px solid ${T.line}`, background: 'none', color: T.signal, cursor: 'pointer', fontFamily: T.fontBody, fontSize: 11.5, padding: '10px 14px', marginTop: 6 }}>{rankingExpandido ? 'Ver menos' : `Ver mais (${(data.modelos || []).length - 10})`}</button>}
@@ -1321,7 +1321,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
         <SecaoCabecalho titulo="Detalhes do modelo"
           ajuda="Três blocos separados, cada um com uma métrica diferente: tendência de preço médio anunciado por dia, distribuição de preço dos anúncios ativos hoje, e movimento de estoque. Nenhum é derivado do outro."
           extra={<span style={{ fontSize: 12, color: T.inkMuted }}>{selecionado.rotulo} · {fmtN(selecionado.anuncios)} anúncios · {fmtN(selecionado.lojistas)} lojistas</span>} />
-        <Card style={{ borderColor: T.signal, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760 }}>
+        <Card style={{ borderColor: T.signal, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <h3 style={{ fontSize: 12.5, fontWeight: 700, color: T.ink, margin: 0 }}>Tendência de preço médio anunciado — {(PERIODO_ROTULOS[periodo] || periodo).toLowerCase()}</h3>
             <p style={{ fontSize: 11.5, color: T.inkMuted, marginTop: 2 }}>Média diária dos anúncios ativos do grupo, não o preço de uma venda. Toque ou passe o mouse em cada ponto para ver o valor exato do dia.</p>

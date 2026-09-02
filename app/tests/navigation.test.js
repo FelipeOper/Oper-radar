@@ -52,3 +52,15 @@ test('rota desconhecida cai em Hoje e breadcrumb expõe o recorte geográfico', 
     ['OPER RADAR', 'Mercado', 'PR', 'Curitiba'],
   );
 });
+
+test('multisseleção de UF é preservada (não colapsa pra "todas" com 2+ estados)', () => {
+  const normalized = normalizeAppContext({ uf: 'go, sp, go' });
+  assert.equal(normalized.uf, 'GO,SP');
+  assert.equal(serializeContext(normalized), 'uf=GO%2CSP');
+  assert.equal(parseContext('?uf=GO%2CSP').uf, 'GO,SP');
+  assert.deepEqual(
+    breadcrumbsFor('mercado', { uf: 'GO,SP' }).map(item => item.label),
+    ['OPER RADAR', 'Mercado', 'GO, SP'],
+  );
+  assert.equal(normalizeAppContext({ uf: 'go,,  pr ,xx1' }).uf, 'GO,PR');
+});

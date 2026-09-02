@@ -37,6 +37,16 @@ const PERIODOS = new Set(['7d', '30d', '90d', '180d', '12m']);
 const MERCADOS = new Set(['principal', 'outros']);
 const TODAS = new Set(['', 'todas', 'todos']);
 
+// Aceita uma UF única ('SC') ou uma lista separada por vírgula ('SC,PR') — o painel
+// Mercado permite multisseleção de UF (item 3 do redesign). Formato inválido cai em 'todas',
+// siglas duplicadas são unificadas; a validação de sigla real (existe/não existe) é feita no
+// backend (painel_normaliza_ufs em lib/market_scope.php), aqui só garante o formato XX,YY,...
+function normalizeUfList(ufRaw) {
+  if (!ufRaw || TODAS.has(ufRaw.toLowerCase())) return 'todas';
+  const siglas = [...new Set(ufRaw.split(',').map(parte => parte.trim()).filter(parte => /^[A-Z]{2}$/.test(parte)))];
+  return siglas.length ? siglas.join(',') : 'todas';
+}
+
 function cleanText(value, maxLength = 120) {
   if (value == null) return null;
   const text = String(value).trim().replace(/\s+/g, ' ');
@@ -62,7 +72,7 @@ export function normalizeAppContext(input = {}) {
   const periodo = PERIODOS.has(input.periodo) ? input.periodo : DEFAULT_APP_CONTEXT.periodo;
   const mercado = MERCADOS.has(input.mercado) ? input.mercado : DEFAULT_APP_CONTEXT.mercado;
   const regiaoRaw = cleanText(input.regiao, 40);
-  const ufRaw = cleanText(input.uf, 10)?.toUpperCase();
+  const ufRaw = cleanText(input.uf, 120)?.toUpperCase();
   const cidadeRaw = cleanText(input.cidade, 80);
   const segmentoRaw = cleanText(input.segmento, 60);
   const anoNumero = Number.parseInt(input.ano, 10);
@@ -74,7 +84,7 @@ export function normalizeAppContext(input = {}) {
     periodo,
     mercado,
     regiao: !regiaoRaw || TODAS.has(regiaoRaw.toLowerCase()) ? 'todas' : regiaoRaw,
-    uf: !ufRaw || TODAS.has(ufRaw.toLowerCase()) || !/^[A-Z]{2}$/.test(ufRaw) ? 'todas' : ufRaw,
+    uf: normalizeUfList(ufRaw),
     cidade: !cidadeRaw || TODAS.has(cidadeRaw.toLowerCase()) ? 'todas' : cidadeRaw,
     segmento: !segmentoRaw || TODAS.has(segmentoRaw.toLowerCase()) ? 'todas' : segmentoRaw,
     grupo: cleanText(input.grupo, 120),
@@ -144,7 +154,7 @@ export function breadcrumbsFor(page, context = DEFAULT_APP_CONTEXT) {
   if (route.page !== 'hoje') items.push({ label: route.title, page: route.page });
   if (route.page === 'mercado') {
     const normalized = normalizeAppContext(context);
-    if (normalized.uf !== 'todas') items.push({ label: normalized.uf });
+    if (normalized.uf !== 'todas') items.push({ label: normalized.uf.split(',').join(', ') });
     if (normalized.cidade !== 'todas') items.push({ label: normalized.cidade });
   }
   return items;
