@@ -4,6 +4,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/regional_insight.php';
 require_once __DIR__ . '/lib/store_market.php';
+require_once __DIR__ . '/lib/fipe_compat.php';
 $usuario = exige_autenticacao();
 $conn = conecta();
 
@@ -62,16 +63,31 @@ foreach (['preco_anunciado','preco_fipe'] as $campo) {
 }
 
 $fipeId = (int)($item['fipe_preco_id'] ?? 0);
-if ($fipeId === 0 || (int)($item['usar_comparativo'] ?? 1) !== 1) {
+
+// DAT01: um vínculo FIPE incompatível com o item (ano-modelo ou, na DAF, potência
+// divergentes) é isolado aqui — mesmo já gravado, ele não pode sustentar a comparação
+// nacional/regional. O vínculo em si não é alterado; só a análise é bloqueada.
+$fipeIncompativel = null;
+if ($fipeId !== 0 && $item['modelo_fipe'] !== null) {
+    $avaliacaoVinculo = oper_fipe_vinculo_compativel($item, $item['ano_fipe'] ?? null, $item['marca_fipe'] ?? null, $item['modelo_fipe']);
+    if (!$avaliacaoVinculo['compativel']) {
+        $fipeIncompativel = implode('; ', $avaliacaoVinculo['motivos']);
+    }
+}
+
+if ($fipeId === 0 || $fipeIncompativel !== null || (int)($item['usar_comparativo'] ?? 1) !== 1) {
     envia_json([
         'item' => $item,
         'mercado_nacional' => null,
         'regioes' => [],
         'melhor_regiao_observada' => null,
         'historico_eventos' => ['disponivel' => loja_detalhe_tabela_existe($conn, 'anuncio_evento'), 'cobertura_dias' => 0],
-        'nota' => $fipeId === 0
-            ? 'Vincule uma referência FIPE para habilitar comparáveis equivalentes.'
-            : 'Este veículo está fora da base comparativa por opção da loja.',
+        'fipe_vinculo_status' => $fipeIncompativel !== null ? 'incompativel' : ($fipeId === 0 ? 'sem_vinculo' : 'compativel'),
+        'nota' => $fipeIncompativel !== null
+            ? "Referência FIPE vinculada é incompatível com este veículo ({$fipeIncompativel}); comparação suspensa até revisão."
+            : ($fipeId === 0
+                ? 'Vincule uma referência FIPE para habilitar comparáveis equivalentes.'
+                : 'Este veículo está fora da base comparativa por opção da loja.'),
     ]);
 }
 

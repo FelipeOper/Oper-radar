@@ -2,8 +2,24 @@
 /** Estoque próprio do membro autenticado. */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
+require_once __DIR__ . '/lib/fipe_compat.php';
 $usuario = exige_autenticacao();
 $conn = conecta();
+
+/**
+ * Busca marca/modelo/ano_codigo do vínculo FIPE informado. Devolve null se o id não
+ * existir (evita FK órfã silenciosa virar "compatível" por ausência de dado).
+ */
+function loja_busca_fipe_vinculo(mysqli $conn, int $fipeId): ?array {
+    if ($fipeId <= 0) return null;
+    $st = $conn->prepare('SELECT fp.ano_codigo, fm.marca_fipe, fm.modelo_fipe
+        FROM fipe_preco fp JOIN fipe_modelo fm ON fm.id = fp.fipe_modelo_id WHERE fp.id = ?');
+    $st->bind_param('i', $fipeId);
+    $st->execute();
+    $linha = $st->get_result()->fetch_assoc();
+    $st->close();
+    return $linha ?: null;
+}
 
 function le_corpo_estoque(): array {
     $dados = json_decode(file_get_contents('php://input'), true);
@@ -67,9 +83,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $itens[] = $row;
     }
     $st->close();
-    $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($itens, 'fipe_preco_id'));
+    // DAT01: um vínculo FIPE incompatível (marca/potência/ano divergentes do item) não
+    // pode alimentar comparativos. O vínculo continua gravado; apenas os campos
+    // derivados da FIPE saem do ar até revisão. Ver lib/fipe_compat.php.
     foreach ($itens as &$row) {
         $fipeId = (int)($row['fipe_preco_id'] ?? 0);
+        if ($fipeId > 0 && $row['modelo_fipe'] !== null) {
+            $avaliacao = oper_fipe_vinculo_compativel($row, $row['ano_fipe'], $row['marca_fipe'], $row['modelo_fipe']);
+            if (!$avaliacao['compativel']) {
+                $row['fipe_vinculo_status'] = 'incompativel';
+                $row['fipe_vinculo_motivo'] = implode('; ', $avaliacao['motivos']);
+                $row['preco_fipe'] = null;
+                $row['codigo_fipe'] = null;
+                $fipeId = 0; // isolado das estatisticas de mercado abaixo
+            } else {
+                $row['fipe_vinculo_status'] = 'compativel';
+                $row['fipe_vinculo_motivo'] = null;
+            }
+        } else {
+            $row['fipe_vinculo_status'] = $fipeId > 0 ? 'referencia_nao_encontrada' : 'sem_vinculo';
+            $row['fipe_vinculo_motivo'] = null;
+        }
+        $row['_fipe_id_valido'] = $fipeId;
+    }
+    unset($row);
+
+    $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($itens, '_fipe_id_valido'));
+    foreach ($itens as &$row) {
+        $fipeId = (int)$row['_fipe_id_valido'];
+        unset($row['_fipe_id_valido']);
         mercado_aplica_estatisticas($row, $estatisticas[$fipeId] ?? null, $row['preco_fipe']);
         $row['anuncios_ativos'] = $row['anuncios_comparaveis'];
     }
@@ -99,6 +141,26 @@ $item = normaliza_estoque($corpo);
 if (mb_strlen($item['modelo']) < 2) {
     http_response_code(422);
     envia_json(['erro' => 'Informe o modelo do veículo.']);
+}
+
+// DAT01: bloqueia na origem um vínculo FIPE que já nasce incompatível com o item
+// (ano-modelo ou, na DAF, número de potência divergentes). Isso não impede cadastrar
+// o veículo — só exige uma referência FIPE coerente, ou nenhuma.
+if ($item['fipe_preco_id']) {
+    $vinculo = loja_busca_fipe_vinculo($conn, $item['fipe_preco_id']);
+    if ($vinculo === null) {
+        http_response_code(422);
+        envia_json(['erro' => 'Referência FIPE não encontrada.', 'codigo' => 'FIPE_REFERENCIA_INEXISTENTE']);
+    }
+    $avaliacao = oper_fipe_vinculo_compativel($item, $vinculo['ano_codigo'], $vinculo['marca_fipe'], $vinculo['modelo_fipe']);
+    if (!$avaliacao['compativel']) {
+        http_response_code(422);
+        envia_json([
+            'erro' => 'Referência FIPE incompatível com este veículo: ' . implode('; ', $avaliacao['motivos']) . '.',
+            'codigo' => 'FIPE_VINCULO_INCOMPATIVEL',
+            'motivos' => $avaliacao['motivos'],
+        ]);
+    }
 }
 
 if ($acao === 'atualizar') {
