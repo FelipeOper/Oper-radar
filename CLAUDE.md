@@ -4,7 +4,14 @@
 > Atualizar ao final de cada bloco importante. Nunca registrar senhas, tokens, cookies ou
 > conteúdo de `.oper-radar.env`.
 
-Última atualização: 01/09/2026
+Última atualização: 08/09/2026
+
+> ⚠️ As seções abaixo ("Estado atual" em diante) datam de 01/09/2026 e estão desatualizadas —
+> preservadas como histórico, não como estado corrente. Ver "08/09/2026 — retomada do Plano
+> Mestre" no Registro de atualizações para o estado real conhecido nesta data e suas
+> limitações. Auditoria completa em 07/09, consolidada em 08/09; Plano Mestre de Evolução v1.0
+> também de 08/09 — ambos versionados no projeto Claude "OPER RADAR - PROJETO"
+> (`oper-radar-auditoria-20260907.md`, `oper-radar-plano-mestre-v1.md`).
 
 ## Estado atual
 
@@ -89,3 +96,79 @@ Próximo passo:
 - Painel autenticado validado em desktop.
 - Auditoria de design independente concluída.
 - Documento de continuidade consolidado neste `CLAUDE.md`.
+
+### 08/09/2026 — retomada do Plano Mestre e Pacote 1 (baseline + DAT01 + DAT03)
+
+**Agente:** Claude (Cowork), a pedido de Felipe Hilario.
+**Bloco:** M0 (retomada) + início do M1, itens 1–3 do "Pacote 1" do Plano Mestre v1.0.
+
+**Baseline git observado nesta retomada (GOV01, parcial — ver limitação abaixo):**
+- `main` remoto real: `89952e3` (não `1038b4f` como o texto acima ainda registra; a
+  diferença é só o commit de docs `8ae664e`, sem mudança de código).
+- Branch `redesign-oper-radar-20260831` @ `57bbe6e` — é a branch citada na auditoria de
+  07/09 como "branch de redesign inspecionada"; contém o painel de Mercado com
+  multisseleção de UF (`lib/market_scope.php`) que NÃO existe em `main`.
+- Branch `deploy/painel-mercado-redesign-20260902` @ `97dd2a4` descende de `57bbe6e` e é,
+  pelas datas e pelo conteúdo, a candidata mais provável ao que está de fato publicado —
+  mas isso **não foi confirmado no cPanel** (ver limitação).
+- `docs/PRODUCAO.md` (em `main` e na branch acima) já registra que "o estado publicado
+  não é reproduzível apenas pelo commit Git" (arquivos não rastreados/modificados
+  direto no servidor). Ou seja, mesmo achando o commit certo, isso não substitui uma
+  leitura direta do cPanel.
+
+**⚠️ Limitação conhecida desta retomada:** este agente não tem acesso a SSH nem ao
+cPanel/HostGator (sem link com o computador do usuário nesta sessão) — só ao GitHub.
+Portanto GOV01 (baseline de produção) e OPS01 (ambiente de teste/rollback em produção)
+**não foram concluídos**, só o lado Git. Confirmar no cPanel qual commit/bundle está
+realmente publicado, testar restauração de backup e só então liberar merge/deploy desta
+branch é uma etapa que depende de Felipe ou de uma sessão com acesso ao servidor.
+
+**Branch de trabalho:** `fix/pacote1-fipe-multiuf-baseline`, criada a partir de `main`
+(`89952e3`), trazendo `lib/market_scope.php` + `tests/market_scope_test.php` de
+`redesign-oper-radar-20260831` (arquivo autocontido, sem dependência do resto do
+redesign visual).
+
+**DAT01 · Casos #8252633 e #8318650 (FIPE incompatível) — isolados com motivo, não
+"corrigidos" no banco (sem acesso a produção para isso):**
+- Causa exata de como esses dois vínculos específicos foram gravados **não foi
+  determinada** (a própria auditoria já registrava isso como pendente). O que se
+  confirmou lendo o código: `minha_loja.php` aceitava qualquer `fipe_preco_id` enviado
+  pelo cliente, sem validar contra marca/modelo/ano do item — diferente do algoritmo
+  cuidadoso de `fase2-fipe/fipe_sync.py`, que nunca produziria um vínculo com ano e
+  potência divergentes ao mesmo tempo.
+- Criado `oper-radar-api/lib/fipe_compat.php`: valida ano-modelo do item vs.
+  `fipe_preco.ano_codigo`, e (para DAF) o número de potência extraído do texto vs. o
+  nome do modelo FIPE — mesma regra de `fipe_sync.py:potencia_daf`, reimplementada em
+  PHP só para esta checagem pontual.
+- `minha_loja.php` (POST criar/atualizar): agora **bloqueia** gravar um `fipe_preco_id`
+  incompatível (HTTP 422 com o motivo). `minha_loja.php` (GET) e
+  `minha_loja_detalhe.php`: vínculo já gravado que reprova a checagem tem os campos
+  derivados da FIPE zerados e `fipe_vinculo_status=incompativel` com o motivo — sem
+  apagar nem alterar o vínculo em si.
+- Teste `oper-radar-api/tests/fipe_compat_test.php` reproduz os dois casos da auditoria
+  como fixtures e confirma reprovação; `php oper-radar-api/tests/fipe_compat_test.php`
+  → `fipe_compat_test=OK`.
+- **Pendente:** isso impede o vínculo ruim de continuar contaminando a análise, mas não
+  identifica nem corrige os registros já existentes no banco (não tenho acesso à
+  produção). Sugestão de próximo passo: rodar uma consulta de auditoria (usando esta
+  mesma função) sobre `meu_estoque` em produção para listar todos os vínculos
+  incompatíveis, não só os dois já conhecidos.
+
+**DAT03 · PR+SC retornando zero ofertas — corrigido:**
+- Causa confirmada: `mercado_painel.php` (na branch de redesign) já aceita
+  `uf=PR,SC` via `lib/market_scope.php`; `anuncios.php` e `lojistas.php` só entendiam
+  uma UF (`r.uf = ?`), então `uf=PR,SC` virava uma comparação literal contra a string
+  inteira e não batia com nenhuma linha.
+- `anuncios.php` e `lojistas.php` agora usam a mesma `painel_normaliza_ufs()` de
+  `market_scope.php` — os três endpoints enxergam o mesmo universo de UFs para o mesmo
+  parâmetro `uf`. Compatível com `uf=PR` (uma UF só, formato antigo).
+- Todos os 12 testes PHP de `oper-radar-api/tests/*_test.php` passam, incluindo os dois
+  novos (`fipe_compat_test`, `market_scope_test` trazido da branch de redesign); `php -l`
+  limpo em todos os `.php` do repositório.
+
+**Evidência:** commits na branch `fix/pacote1-fipe-multiuf-baseline` (ver `git log`).
+**Decisão do gestor:** pendente — nada foi mesclado em `main` nem publicado; aguardando
+revisão de Felipe antes de merge/deploy.
+**Próximo passo:** Felipe revisar o diff, confirmar baseline real de produção no cPanel
+(GOV01/OPS01) e decidir merge + plano de deploy manual (sem SSH). Documentos completos
+(auditoria + Plano Mestre v1.0) salvos no projeto Claude para continuidade entre sessões.

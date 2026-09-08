@@ -6,6 +6,7 @@
  * artificialmente — bug real detectado em 09/jul quando toda revenda mostrava "1d").
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_scope.php';
 $conn = conecta();
 
 $REGIOES = [
@@ -14,9 +15,14 @@ $REGIOES = [
     'Nordeste' => ['BA','PE','CE','MA','PB','RN','AL','PI','SE'],
     'Norte' => ['AM','PA','RO','RR','AC','AP','TO'],
 ];
+$UF_REGIAO = [];
+foreach ($REGIOES as $nomeRegiao => $ufsDaRegiao) foreach ($ufsDaRegiao as $sigla) $UF_REGIAO[$sigla] = $nomeRegiao;
 $uf = $_GET['uf'] ?? null;
 $regiao = $_GET['regiao'] ?? null;
 $ufsRegiao = ($regiao && isset($REGIOES[$regiao])) ? $REGIOES[$regiao] : null;
+// DAT03: mesma normalizacao de anuncios.php/mercado_painel.php, pra "uf=PR,SC" nao
+// virar uma comparacao literal contra uma unica sigla (ver market_scope.php).
+$ufsSelecionadas = $ufsRegiao ? null : painel_normaliza_ufs((string)($uf ?? ''), $UF_REGIAO);
 
 $sql = "SELECT r.id, r.nome, r.cidade, r.uf, r.url_perfil, r.telefone, r.ativa_desde,
                COUNT(a.id) AS total_historico,
@@ -34,8 +40,10 @@ if ($ufsRegiao) {
     $ph = implode(',', array_fill(0, count($ufsRegiao), '?'));
     $sql .= " WHERE r.uf IN ($ph)";
     foreach ($ufsRegiao as $u) { $params[] = $u; $types .= 's'; }
-} elseif ($uf) {
-    $sql .= ' WHERE r.uf = ?'; $params[] = strtoupper($uf); $types .= 's';
+} elseif ($ufsSelecionadas) {
+    $ph = implode(',', array_fill(0, count($ufsSelecionadas), '?'));
+    $sql .= " WHERE r.uf IN ($ph)";
+    foreach ($ufsSelecionadas as $u) { $params[] = $u; $types .= 's'; }
 }
 $sql .= ' GROUP BY r.id ORDER BY ativos DESC, saidas_detectadas DESC';
 

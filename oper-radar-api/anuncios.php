@@ -12,6 +12,7 @@ require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/vehicle_taxonomy.php';
 require_once __DIR__ . '/lib/query_contract.php';
+require_once __DIR__ . '/lib/market_scope.php';
 $conn = conecta();
 
 $REGIOES = [
@@ -20,6 +21,8 @@ $REGIOES = [
     'Nordeste' => ['BA','PE','CE','MA','PB','RN','AL','PI','SE'],
     'Norte' => ['AM','PA','RO','RR','AC','AP','TO'],
 ];
+$UF_REGIAO = [];
+foreach ($REGIOES as $nomeRegiao => $ufsDaRegiao) foreach ($ufsDaRegiao as $sigla) $UF_REGIAO[$sigla] = $nomeRegiao;
 
 $CATEGORIA_TIPOS = oper_taxonomia_tipos_por_categoria();
 $MERCADO_TIPOS = oper_taxonomia_tipos_por_mercado();
@@ -49,7 +52,20 @@ if (!empty($_GET['regiao']) && isset($REGIOES[$_GET['regiao']])) {
     $ph = implode(',', array_fill(0, count($ufsR), '?'));
     $where[] = "r.uf IN ($ph)";
     foreach ($ufsR as $u) { $params[] = $u; $types .= 's'; }
-} elseif (!empty($_GET['uf'])) { $where[] = 'r.uf = ?'; $params[] = strtoupper($_GET['uf']); $types .= 's'; }
+} else {
+    // DAT03 (auditoria 07/09, achado D02): o painel de Mercado aceita multisseleção de
+    // UF ("uf=PR,SC"), mas este endpoint só entendia uma única sigla — a comparação
+    // literal "r.uf = 'PR,SC'" não batia com nada e devolvia zero ofertas mesmo com o
+    // painel mostrando milhares de anúncios no mesmo recorte. Usa a mesma normalização
+    // de oper-radar-api/lib/market_scope.php (já testada em market_scope_test.php) para
+    // que os dois endpoints enxerguem exatamente o mesmo universo de UFs.
+    $ufsSelecionadas = painel_normaliza_ufs((string)($_GET['uf'] ?? ''), $UF_REGIAO);
+    if ($ufsSelecionadas) {
+        $ph = implode(',', array_fill(0, count($ufsSelecionadas), '?'));
+        $where[] = "r.uf IN ($ph)";
+        foreach ($ufsSelecionadas as $u) { $params[] = $u; $types .= 's'; }
+    }
+}
 if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GET['revenda']; $types .= 's'; }
 if (!empty($_GET['revenda_id'])) { $where[] = 'r.id = ?'; $params[] = (int)$_GET['revenda_id']; $types .= 'i'; }
 if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
