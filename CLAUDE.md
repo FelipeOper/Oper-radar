@@ -171,8 +171,50 @@ redesign visual).
   limpo em todos os `.php` do repositório.
 
 **Evidência:** commits na branch `fix/pacote1-fipe-multiuf-baseline` (ver `git log`).
-**Decisão do gestor:** pendente — nada foi mesclado em `main` nem publicado; aguardando
-revisão de Felipe antes de merge/deploy.
-**Próximo passo:** Felipe revisar o diff, confirmar baseline real de produção no cPanel
-(GOV01/OPS01) e decidir merge + plano de deploy manual (sem SSH). Documentos completos
-(auditoria + Plano Mestre v1.0) salvos no projeto Claude para continuidade entre sessões.
+**Decisão do gestor:** Felipe revisou o PR #53 e aprovou o merge em 08/09/2026 —
+`main` remoto passou a `6f39e4e` (merge commit sobre `d96d430`). **Ainda não publicado em
+produção** (cPanel) — deploy manual segue como decisão separada.
+**Próximo passo:** confirmar no cPanel qual commit/bundle está de fato publicado (GOV01/
+OPS01, ainda pendente) e decidir o plano de deploy manual (sem SSH) para `d96d430`.
+Documentos completos (auditoria + Plano Mestre v1.0) salvos no projeto Claude para
+continuidade entre sessões.
+
+### 08/09/2026 — Pacote 1, item 4: saídas de lojista reconciliadas (DAT04)
+
+**Agente:** Claude (Cowork), a pedido de Felipe Hilario.
+**Bloco:** M1, item 4 do "Pacote 1" do Plano Mestre v1.0 (GOV03 parcial + DAT04).
+
+**DAT04 · Achado D03 da auditoria de 07/09 — saídas diferentes na mesma revenda
+(caso Lelo Caminhões: cartão mostrava 56 saídas/30d e 128 total; detalhe mostrava
+35/30d e 47) — corrigido:**
+- Causa confirmada: `lojistas.php` (cartão da lista) contava "saídas" pelo status atual
+  do anúncio (`removido_confirmado`), enquanto `lojista_detalhe.php` já usava o
+  histórico de eventos (`saida_detectada`) — duas definições diferentes para o mesmo
+  rótulo. Além disso, `lojista_detalhe.php` tratava "a tabela `anuncio_evento` existe no
+  schema" como equivalente a "esta revenda tem eventos registrados", então às vezes
+  reportava 0 saídas por eventos vazios como se fosse histórico completo, em vez de cair
+  no status atual.
+- Novas funções em `oper-radar-api/lib/competitor_history.php`:
+  `oper_concorrente_tabela_eventos_disponivel()` e `oper_concorrente_saidas_por_revenda()`
+  (agregação em lote por revenda, mesma definição de janela de 30 dias e cobertura usada
+  no detalhe).
+- `lojistas.php` e `lojista_detalhe.php` agora decidem pela mesma fonte de dados (eventos
+  quando há cobertura registrada para a revenda/recorte; status atual como base quando
+  não há) e expõem o mesmo campo `saidas_fonte` (`eventos` | `status_atual`). A lista
+  ganhou também `cobertura_inicio/fim`, `cobertura_dias` e `saidas_confianca` por lojista
+  — lacuna de histórico agora é explícita (cobertura zero), não um "zero saídas" implícito.
+- 13 testes PHP de `oper-radar-api/tests/*_test.php` passam; `php -l` limpo em todos os
+  `.php` do repositório. As duas novas funções de agregação dependem de `mysqli` e não
+  têm teste unitário dedicado — mesma convenção já usada em outras funções de banco do
+  projeto (ex.: `loja_busca_fipe_vinculo`).
+- **Pendente:** GOV03 completo (mapear todo KPI → regra → API → tabela → evidência) seguem
+  em aberto; este bloco só cobriu o KPI de "saídas do concorrente". Frontend
+  (`app/src/App.jsx`) não foi alterado — os novos campos são aditivos e não quebram o
+  que já é consumido.
+
+**Evidência:** commits na branch `fix/pacote1-dat04-saidas-lojista` (ver `git log`).
+**Decisão do gestor:** pendente — PR #54 aberta, aguardando revisão de Felipe antes de
+merge/deploy.
+**Próximo passo:** Felipe revisar o diff da PR #54 e decidir merge. Itens 5–6 do Pacote 1
+(DAT02+DAT05+DAT06 — equivalência/confiança/período; GOV02+UX01–03 — fundação visual)
+seguem não iniciados.
