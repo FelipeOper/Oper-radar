@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+import AppRoutes from './components/AppRoutes.jsx';
 import {
   Radar, LayoutGrid, Crosshair, Building2, Settings, ListChecks,
   MapPin, ExternalLink, Search,
@@ -2546,7 +2548,10 @@ const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'minha-loja'
 const NAV_MOBILE_MAIS = NAV.filter(item => ['fipe', 'concorrentes', 'analise', 'acoes', 'ajustes', 'conta'].includes(item.id));
 
 function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
-  const [pagina, setPagina] = useState('hoje');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pagina = NAV.find(item => `/${item.id}` === location.pathname)?.id || 'hoje';
+  const setPagina = id => navigate(`/${id}${location.search}`);
   const [menuAberto, setMenuAberto] = useState(false);
   const [acoes, setAcoes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('oper-radar-acoes') || '[]'); } catch { return []; }
@@ -2654,7 +2659,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
         )}
         <h1 style={{ fontFamily: T.fontDisplay, fontSize: mobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px' }}>{tituloPagina}</h1>
         <div style={{ height: 2, width: 34, background: T.signal, borderRadius: 1, marginBottom: 22 }} />
-        {paginas[pagina]}
+        <AppRoutes pages={paginas} />
       </main>
 
       {/* bottom nav mobile */}

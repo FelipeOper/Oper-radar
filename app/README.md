@@ -36,3 +36,18 @@ O app já está preparado pra buscar dados reais da API PHP (`oper-radar-api/`) 
 e Anúncios tentam buscar de lá primeiro, e só usam os dados de exemplo se a API não
 responder. Ou seja: assim que você publicar a API e ajustar o `API_BASE_URL`, os dados
 reais aparecem automaticamente, sem precisar mexer em mais nada no app.
+
+
+## Infraestrutura de navegação e filtros
+
+O frontend usa React Router em modo hash (`#/hoje`, `#/mercado` etc.). Isso permite links diretos
+e Voltar no navegador em hospedagem estática ou subdiretório sem depender de fallback no servidor.
+As páginas atuais continuam em `src/App.jsx`; `src/components/AppRoutes.jsx` apenas associa os IDs
+existentes às rotas. Rotas desconhecidas voltam a `#/hoje`.
+
+`src/AppContext.jsx` fornece `AppProvider` e `useAppContext()` para filtros compartilhados:
+`periodo`, `comparacao`, `segmento`, `regiao`, `uf` (multiseleção), `marca`, `modelo` e `ano`.
+`setFilters(patch)` atualiza a consulta da URL e aceita opção `{ replace: true }`; `resetFilters()`
+restaura os valores padrão. A navegação entre páginas preserva a consulta. Os filtros locais das
+páginas existentes ainda não foram migrados para esse contexto; a ligação será feita quando cada
+tela for aprovada. Nenhuma tela nova foi criada nesta etapa.
