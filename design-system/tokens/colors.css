@@ -1,0 +1,88 @@
+/* Oper Radar — color tokens. Dark ("cockpit") is the default theme; light via [data-theme="light"]. */
+:root{
+/* Radar green — sampled from the logo (#46F84B neon on dark, #00922A wordmark on light) */
+--radar-50:#EDFFEE;--radar-100:#D2FED3;--radar-200:#A8FCAA;--radar-300:#7FFB82;--radar-400:#62F966;--radar-500:#46F84B;--radar-600:#22DB2A;--radar-700:#00922A;--radar-800:#007A22;--radar-900:#0A4A1B;--radar-950:#07210D;
+/* Navy — logo "Oper" ink */
+--navy-50:#EAF0F8;--navy-100:#C9D6E8;--navy-300:#6D8DB8;--navy-500:#1E4F8C;--navy-700:#0B3A75;--navy-900:#00285A;
+/* Blip orange — logo radar blips; used for warnings / attention */
+--blip-100:#FFE9CF;--blip-400:#FF9A2E;--blip-500:#F88000;--blip-700:#B35C00;
+/* Signal red / info blue */
+--red-100:#FFE1E1;--red-400:#FF6B6B;--red-500:#F04438;--red-700:#C62828;
+--blue-100:#DCEBFF;--blue-400:#5AA9FF;--blue-600:#1F6FD1;
+/* Neutrals — Pilo-derived black/charcoal/mid-gray ramp */
+--black-1000:#000000;--black-950:#0A0A0A;--black-900:#0F0F0F;--black-850:#141414;--black-800:#1A1A1A;--black-750:#202020;--black-700:#262626;--charcoal:#2E2E2E;--gray-650:#3A3A3A;--gray-600:#4A4A4A;--gray-500:#808080;--gray-400:#A3A3A3;--gray-300:#C4C4C4;--gray-200:#E2E2E2;--gray-150:#ECECEC;--gray-100:#F2F2F2;--gray-50:#F8F8F8;--white:#FFFFFF;
+
+/* ——— Semantic (dark / cockpit, default) ——— */
+--bg-app:var(--black-950);
+--bg-sunken:var(--black-1000);
+--surface-1:var(--black-850);
+--surface-2:var(--black-800);
+--surface-3:var(--black-700);
+--surface-hover:var(--black-750);
+--surface-inverse:var(--white);
+--surface-overlay:rgba(0,0,0,.64);
+--surface-glass:rgba(20,20,20,.72);
+
+--border-subtle:rgba(255,255,255,.06);
+--border-default:rgba(255,255,255,.10);
+--border-strong:rgba(255,255,255,.22);
+--border-focus:var(--radar-500);
+
+--text-primary:var(--white);
+--text-secondary:var(--gray-400);
+--text-tertiary:var(--gray-500);
+--text-disabled:var(--gray-600);
+--text-inverse:var(--black-900);
+--text-on-accent:var(--black-950);
+--text-accent:var(--radar-500);
+--text-link:var(--radar-400);
+
+--accent:var(--radar-500);
+--accent-hover:var(--radar-400);
+--accent-press:var(--radar-600);
+--accent-soft:rgba(70,248,75,.12);
+--accent-soft-strong:rgba(70,248,75,.20);
+
+--success:var(--radar-500);--success-soft:rgba(70,248,75,.12);--success-text:var(--radar-400);
+--warning:var(--blip-500);--warning-soft:rgba(248,128,0,.14);--warning-text:var(--blip-400);
+--danger:var(--red-500);--danger-soft:rgba(240,68,56,.14);--danger-text:var(--red-400);
+--info:var(--blue-400);--info-soft:rgba(90,169,255,.14);--info-text:var(--blue-400);
+
+/* Chart series — ordered; first is always radar green */
+--chart-1:var(--radar-500);--chart-2:var(--white);--chart-3:var(--gray-500);--chart-4:var(--blip-500);--chart-5:var(--blue-400);
+--chart-grid:rgba(255,255,255,.06);--chart-axis:var(--gray-500);
+}
+[data-theme="light"]{
+--bg-app:var(--gray-100);
+--bg-sunken:var(--gray-150);
+--surface-1:var(--white);
+--surface-2:var(--gray-100);
+--surface-3:var(--gray-150);
+--surface-hover:var(--gray-50);
+--surface-inverse:var(--black-900);
+--surface-overlay:rgba(15,15,15,.40);
+--surface-glass:rgba(255,255,255,.78);
+--border-subtle:rgba(15,15,15,.06);
+--border-default:rgba(15,15,15,.10);
+--border-strong:rgba(15,15,15,.24);
+--border-focus:var(--radar-700);
+--text-primary:var(--black-900);
+--text-secondary:#555555;
+--text-tertiary:#6B6B6B;
+--text-disabled:var(--gray-300);
+--text-inverse:var(--white);
+--text-on-accent:var(--black-950);
+--text-accent:var(--radar-800);
+--text-link:var(--radar-800);
+--accent:var(--radar-500);
+--accent-hover:var(--radar-400);
+--accent-press:var(--radar-600);
+--accent-soft:rgba(0,146,42,.10);
+--accent-soft-strong:rgba(0,146,42,.18);
+--success:var(--radar-700);--success-soft:rgba(0,146,42,.10);--success-text:var(--radar-800);
+--warning:var(--blip-500);--warning-soft:rgba(248,128,0,.12);--warning-text:var(--blip-700);
+--danger:var(--red-500);--danger-soft:rgba(240,68,56,.10);--danger-text:var(--red-700);
+--info:var(--blue-600);--info-soft:rgba(31,111,209,.10);--info-text:var(--blue-600);
+--chart-1:var(--radar-700);--chart-2:var(--black-900);--chart-3:var(--gray-400);--chart-4:var(--blip-500);--chart-5:var(--blue-600);
+--chart-grid:rgba(15,15,15,.07);--chart-axis:#6B6B6B;
+}
