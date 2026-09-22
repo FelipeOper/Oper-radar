@@ -8,6 +8,7 @@ e com ofertas equivalentes qualificadas.
 
 ```text
 app/                frontend React/Vite
+design-system/      tokens, componentes, guidelines e referências visuais do design system (ver design-system/README.md)
 oper-radar-api/     API PHP consumida pelo app
 fase1-coleta/       coleta, parser, detalhes e ciclo de vida dos anúncios
 fase2-fipe/         catálogo, matching e curadoria FIPE

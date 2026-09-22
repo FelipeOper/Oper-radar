@@ -1,0 +1,5 @@
+/* Webfonts — self-hosted (latin subset, sourced from Google Fonts) */
+@font-face{font-family:"Manjari";font-style:normal;font-weight:100;font-display:swap;src:url("../fonts/Manjari-100.woff2") format("woff2");}
+@font-face{font-family:"Manjari";font-style:normal;font-weight:400;font-display:swap;src:url("../fonts/Manjari-400.woff2") format("woff2");}
+@font-face{font-family:"Manjari";font-style:normal;font-weight:700;font-display:swap;src:url("../fonts/Manjari-700.woff2") format("woff2");}
+@font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url("../fonts/Inter-Variable.woff2") format("woff2");}

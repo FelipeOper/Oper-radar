@@ -1,0 +1,36 @@
+:root{
+--font-display:"Manjari","Inter",system-ui,sans-serif;
+--font-sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+--font-mono:ui-monospace,monospace;
+
+--fw-thin:100; /* @kind font */
+--fw-regular:400; /* @kind font */
+--fw-medium:500; /* @kind font */
+--fw-semibold:600; /* @kind font */
+--fw-bold:700; /* @kind font */
+
+/* Display (Manjari) — page titles, hero statements, dialog titles */
+--fs-display-xl:64px;--fs-display-lg:48px;--fs-display-md:36px;--fs-display-sm:28px;
+/* UI (Inter) */
+--fs-h1:24px;--fs-h2:20px;--fs-h3:16px;--fs-lg:16px;--fs-body:14px;--fs-sm:13px;--fs-xs:12px;--fs-2xs:11px;
+/* KPI numerals (Inter, tabular) */
+--fs-kpi-lg:40px;--fs-kpi:32px;--fs-kpi-sm:24px;
+
+--lh-tight:1.05; /* @kind font */
+--lh-snug:1.2; /* @kind font */
+--lh-normal:1.45; /* @kind font */
+--lh-relaxed:1.6; /* @kind font */
+--ls-display:-0.025em; /* @kind font */
+--ls-tight:-0.01em; /* @kind font */
+--ls-normal:0; /* @kind font */
+--ls-eyebrow:0.06em; /* @kind font */
+
+/* Semantic shorthands (use with `font:`) */
+--type-page-title:var(--fw-bold) var(--fs-display-md)/var(--lh-tight) var(--font-display); /* @kind font */
+--type-section-title:var(--fw-semibold) var(--fs-h2)/var(--lh-snug) var(--font-sans); /* @kind font */
+--type-card-title:var(--fw-semibold) var(--fs-h3)/var(--lh-snug) var(--font-sans); /* @kind font */
+--type-body:var(--fw-regular) var(--fs-body)/var(--lh-normal) var(--font-sans); /* @kind font */
+--type-caption:var(--fw-regular) var(--fs-xs)/var(--lh-normal) var(--font-sans); /* @kind font */
+--type-eyebrow:var(--fw-medium) var(--fs-2xs)/1 var(--font-sans); /* @kind font */
+--type-kpi:var(--fw-bold) var(--fs-kpi)/1 var(--font-sans); /* @kind font */
+}
