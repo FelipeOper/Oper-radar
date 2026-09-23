@@ -50,11 +50,24 @@ function mercado_percentil(array $valores, float $percentil): ?float {
     return (float)$valores[$inferior] + ((float)$valores[$superior] - (float)$valores[$inferior]) * $peso;
 }
 
-function mercado_confianca(int $amostra): string {
+function mercado_nivel_confianca(int $amostra): string {
     if ($amostra < OPER_RADAR_AMOSTRA_MINIMA) return 'insuficiente';
     if ($amostra < 10) return 'baixa';
     if ($amostra < 20) return 'media';
     return 'alta';
+}
+
+function mercado_confianca_preco(int $amostraQualificada): string {
+    return mercado_nivel_confianca($amostraQualificada);
+}
+
+function mercado_confianca_volume(int $observacoes): string {
+    return mercado_nivel_confianca($observacoes);
+}
+
+/** Compatibilidade: a confianca historica sempre representou a amostra de preco. */
+function mercado_confianca(int $amostra): string {
+    return mercado_confianca_preco($amostra);
 }
 
 function mercado_calcula_estatisticas(array $registros): array {
@@ -111,7 +124,9 @@ function mercado_calcula_estatisticas(array $registros): array {
         'amostra_qualificada' => $amostra,
         'amostra_suficiente' => $amostra >= OPER_RADAR_AMOSTRA_MINIMA,
         'excluidos' => $rejeitadosIniciais + count($precos) - $amostra,
-        'confianca' => mercado_confianca($amostra),
+        'confianca' => mercado_confianca_preco($amostra),
+        'confianca_preco' => mercado_confianca_preco($amostra),
+        'confianca_volume' => mercado_confianca_volume(count($registros)),
         'menor' => $amostra ? (float)min($robustos) : null,
         'p25' => mercado_percentil($robustos, 0.25),
         'mediana' => mercado_percentil($robustos, 0.50),
@@ -133,8 +148,7 @@ function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds): array {
                                 fp.preco AS preco_fipe
                          FROM anuncio a
                          JOIN fipe_preco fp ON fp.id=a.fipe_preco_id
-                         WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
-                           AND a.fipe_preco_id IN ($marcadores)");
+                         WHERE a.status='ativo' AND a.fipe_preco_id IN ($marcadores)");
     $tipos = str_repeat('i', count($ids));
     $st->bind_param($tipos, ...$ids);
     $st->execute();
@@ -157,6 +171,8 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
     $linha['mercado_excluidos'] = (int)$stats['excluidos'];
     $linha['mercado_amostra_suficiente'] = (bool)$stats['amostra_suficiente'];
     $linha['mercado_confianca'] = $stats['confianca'];
+    $linha['mercado_confianca_preco'] = $stats['confianca_preco'];
+    $linha['mercado_confianca_volume'] = $stats['confianca_volume'];
     $linha['mercado_escopo'] = 'Brasil';
     $linha['preco_medio_mercado'] = $stats['media'];
     $linha['preco_mediana_mercado'] = $stats['mediana'];

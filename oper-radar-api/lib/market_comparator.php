@@ -89,6 +89,8 @@ function comparador_resumo(array $registros, int $saidasPeriodo, array $periodo 
             'amostra_total' => $stats['amostra_total'],
             'amostra_qualificada' => $stats['amostra_qualificada'],
             'confianca' => $stats['confianca'],
+            'confianca_preco' => $stats['confianca_preco'],
+            'confianca_volume' => $stats['confianca_volume'],
             'media' => $stats['media'], 'mediana' => $stats['mediana'],
             'p25' => $stats['p25'], 'p75' => $stats['p75'],
             'menor' => $stats['menor'], 'maior' => $stats['maior'],

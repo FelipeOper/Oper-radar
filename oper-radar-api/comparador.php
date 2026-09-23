@@ -7,8 +7,9 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_comparator.php';
 require_once __DIR__ . '/lib/query_contract.php';
+require_once __DIR__ . '/lib/market_period.php';
 $conn = conecta();
-$periodo = oper_periodo_contrato($_GET['periodo'] ?? null);
+$periodo = mercado_periodo($_GET['periodo'] ?? null);
 
 if (($_GET['facetas'] ?? '') === '1') {
     $res = $conn->query("SELECT UPPER(TRIM(marca)) marca, UPPER(TRIM(modelo)) modelo,
@@ -40,7 +41,7 @@ if (($_GET['facetas'] ?? '') === '1') {
     $listaMarcas = [];
     foreach ($marcas as $marca => $n) $listaMarcas[] = ['marca' => $marca, 'anuncios' => $n];
     $periodos = [];
-    foreach (oper_periodos_suportados() as $codigo => $item) {
+    foreach (mercado_periodos_suportados() as $codigo => $item) {
         $periodos[] = ['codigo' => $codigo] + $item;
     }
     envia_json([

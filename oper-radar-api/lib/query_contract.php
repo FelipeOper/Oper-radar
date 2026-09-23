@@ -1,22 +1,7 @@
 <?php
 /** Contratos puros de período e paginação da API analítica. */
 
-function oper_periodos_suportados(): array {
-    return [
-        '7d' => ['dias' => 7, 'rotulo' => '7 dias'],
-        '30d' => ['dias' => 30, 'rotulo' => '30 dias'],
-        '90d' => ['dias' => 90, 'rotulo' => '90 dias'],
-        '180d' => ['dias' => 180, 'rotulo' => '180 dias'],
-        '12m' => ['dias' => 365, 'rotulo' => '12 meses'],
-    ];
-}
-
-function oper_periodo_contrato($valor, string $padrao = '30d'): array {
-    $periodos = oper_periodos_suportados();
-    $chave = strtolower(trim((string)$valor));
-    if (!isset($periodos[$chave])) $chave = isset($periodos[$padrao]) ? $padrao : '30d';
-    return ['codigo' => $chave] + $periodos[$chave];
-}
+require_once __DIR__ . '/market_period.php';
 
 function oper_query_fingerprint(array $fonte, array $ignorar = ['cursor', 'offset', 'limit']): string {
     foreach ($ignorar as $chave) unset($fonte[$chave]);
