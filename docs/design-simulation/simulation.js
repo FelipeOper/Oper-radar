@@ -48,7 +48,7 @@
       ${card('Ligações de contexto','Da oferta para o concorrente, estoque e ação',row('Perfil do lojista','3 saídas observadas · venda não comprovada','lojista.html')+row('Meu veículo equivalente','Volvo FH 540 2021 · AAA0A00','veiculo.html')+row('Registrar decisão','Revisar preço próprio com evidências','plano-de-acao.html'))}`],
     'inteligencia.html': ['Inteligência','Sinais para investigar', `
       ${note('Insights aqui são curadoria visual sobre mocks. insights.php e analista.php ainda não recebem o recorte da tela.')}
-      ${evidence('Diferença entre preço e referência','30 dias · Curitiba/PR · Volvo FH 540 2021','−1,6%','Mediana qualificada R$ 498.000 vs oferta R$ 489.900','11 ofertas · 9 válidas','Média','Atualizado em 22/09/2026 · cobertura PR','Preço abaixo da mediana é indício para análise, não recomendação automática.',['comparador.html','Ver evidências'])}
+      ${evidence('Diferença entre preço e referência','30 dias · Curitiba/PR · Volvo FH 540 2021','1,6%','Mediana qualificada R$ 498.000 vs oferta R$ 489.900','11 ofertas · 9 válidas','Média','Atualizado em 22/09/2026 · cobertura PR','Preço abaixo da mediana é indício para análise, não recomendação automática.',['comparador.html','Ver evidências'])}
       ${card('Sinais de eventos','Exemplos locais; sem consumidor direto de eventos.php',row('Preço caiu · EX-001','R$ 499.900 → R$ 489.900 · 21/09','anuncio.html')+row('Saída observada · EX-002','Scania R 450 · venda não comprovada','lojista.html'))}
       ${card('Analista IA','Painel acessível em todas as telas',`<p>Abra o Analista IA no topo. A conversa mostrada é estática e não consulta serviços.</p><button class="or-btn or-btn--primary" type="button" data-analyst>Ver Analista IA</button>`)}`],
     'plano-de-acao.html': ['Plano de ação','Transformar evidência em decisão', `
@@ -86,7 +86,7 @@
     ];
     main.querySelectorAll('.kpis .stat').forEach((element, index) => {
       const [scope, period, base, sample, confidence, update, explanation, href, action] = metadata[index] || metadata[0];
-      const value = element.querySelector('strong')?.textContent?.trim() || '—';
+      const value = element.querySelector('strong')?.textContent?.trim() || '';
       element.insertAdjacentHTML('beforeend', `<p class="or-card__sub"><strong>Recorte:</strong> ${scope}<br><strong>Período:</strong> ${period}<br><strong>Valor:</strong> ${value}<br><strong>Base comparativa:</strong> ${base}<br><strong>Amostra:</strong> ${sample}<br><strong>Confiança:</strong> ${confidence}<br><strong>Atualização/cobertura:</strong> ${update}<br><strong>Explicação:</strong> ${explanation}<br><strong>Ação:</strong> <a href="${href}">${action} →</a></p>`);
     });
     const kpis = main.querySelector('.kpis');
@@ -106,19 +106,19 @@
     main.querySelectorAll('.split').forEach((element) => { element.style.display = 'grid'; element.style.gridTemplateColumns = 'minmax(0,.82fr) minmax(0,1.18fr)'; element.style.gap = 'var(--space-4)'; });
     main.querySelectorAll('.detail').forEach((element) => { element.style.display = 'grid'; element.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))'; element.style.gap = 'var(--space-4)'; });
     if (current === 'mercado.html') main.querySelectorAll('.detail article').forEach((element, index) => {
-      const value = element.querySelector('strong')?.textContent?.trim() || '—';
+      const value = element.querySelector('strong')?.textContent?.trim() || '';
       const detail = [['31 preços válidos','31 anúncios','Mediana anunciada, não média bruta.'],['18 lojistas','42 anúncios','Oferta ativa no grupo exato.'],['1 referência FIPE fictícia','1 vínculo ilustrativo','FIPE separada do preço anunciado.']][index];
       if (!detail) return;
       element.insertAdjacentHTML('beforeend', `<p class="or-card__sub"><strong>Recorte:</strong> Volvo FH 540 2021 · Paraná<br><strong>Período:</strong> 30 dias<br><strong>Valor:</strong> ${value}<br><strong>Base comparativa:</strong> ${detail[0]}<br><strong>Amostra:</strong> ${detail[1]}<br><strong>Confiança:</strong> Baixa<br><strong>Atualização/cobertura:</strong> 22/09/2026 · PR<br><strong>Explicação:</strong> ${detail[2]}<br><strong>Ação:</strong> <a href="comparador.html">Comparar →</a></p>`);
     });
   };
-  const shell = (title, subtitle, body) => `<div style="display:flex;min-height:100vh;overflow-x:hidden">${sidebar()}<div style="flex:1;min-width:0"><header class="or-topbar"><div class="or-topbar__title"><span class="or-topbar__crumb">OPER RADAR / SIMULAÇÃO BETA</span><h1 class="or-topbar__h">${title}</h1></div><div class="or-topbar__actions"><button class="or-btn or-btn--secondary" type="button" data-analyst>Analista IA</button></div></header><main class="main" style="max-width:1440px;margin:auto;padding:32px var(--gutter) 80px"><section class="or-card"><span class="or-sectiontag or-sectiontag--accent">PROPOSTA VISUAL BETA</span><h2>${subtitle}</h2><p>Dados inteiramente fictícios · nenhuma conexão com produção.</p><p>${link('index.html','Mapa de telas')} ${link('configuracoes.html','Configurações')} ${link('conta.html','Conta')}</p></section>${body}${limits}</main></div></div>${mobileNav()}`;
+  const shell = (title, subtitle, body, includeIntro = true) => `<div style="display:flex;min-height:100vh;overflow-x:hidden">${sidebar()}<div style="flex:1;min-width:0"><header class="or-topbar"><div class="or-topbar__title"><span class="or-topbar__crumb">OPER RADAR / SIMULAÇÃO BETA</span><h1 class="or-topbar__h">${title}</h1></div><div class="or-topbar__actions"><button class="or-btn or-btn--secondary" type="button" data-analyst>Analista IA</button></div></header><main class="main" style="max-width:1440px;margin:auto;padding:32px var(--gutter) 80px">${includeIntro ? `<section class="or-card simulation-intro"><span class="or-sectiontag or-sectiontag--accent">PROPOSTA VISUAL BETA</span><h2>${subtitle}</h2><p>Dados inteiramente fictícios · nenhuma conexão com produção.</p><p>${link('index.html','Mapa de telas')} ${link('configuracoes.html','Configurações')} ${link('conta.html','Conta')}</p></section>` : ''}${body}${limits}</main></div></div>${mobileNav()}`;
   if (common[here]) {
     const [title, subtitle, body] = common[here];
     document.getElementById('root').innerHTML = shell(title, subtitle, body);
   } else if (preservedTitles[here]) {
     const source = document.querySelector('[data-preserved-content]');
-    document.getElementById('root').innerHTML = shell(preservedTitles[here], preservedTitles[here], source?.innerHTML || '');
+    document.getElementById('root').innerHTML = shell(preservedTitles[here], preservedTitles[here], source?.innerHTML || '', false);
     enhancePreserved();
   }
   const side = document.querySelector('.or-sidebar');
@@ -135,6 +135,8 @@
     bottom.style.zIndex = compact ? 'var(--z-topbar)' : '';
     const main = document.querySelector('#root main');
     if (main) main.style.paddingBottom = compact ? 'calc(var(--gutter-mobile) + var(--bottomnav-h))' : '80px';
+    const introCard = document.querySelector('#root main .simulation-intro');
+    if (introCard) { introCard.style.padding = compact ? 'var(--space-3)' : ''; const links = introCard.querySelector('p:last-child'); if (links) links.style.display = compact ? 'none' : ''; }
     const kpis = document.querySelector('#root main .kpis');
     if (kpis) kpis.style.gridTemplateColumns = compact ? (window.innerWidth < 590 ? '1fr' : 'repeat(2,minmax(0,1fr))') : 'repeat(4,minmax(0,1fr))';
     document.querySelectorAll('#root main .grid').forEach((element) => { element.style.gridTemplateColumns = compact ? '1fr' : 'minmax(0,1.35fr) minmax(0,.9fr)'; });
