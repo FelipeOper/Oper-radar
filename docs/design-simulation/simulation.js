@@ -8,9 +8,8 @@
   ];
   const here = location.pathname.split('/').pop() || 'index.html';
   const icon = name => `<i class="ph ph-${name}" aria-hidden="true"></i>`;
-  const sidebar = () => `<aside class="side"><a class="brand" href="index.html"><img src="../../design-system/assets/mark-dark.png" alt=""><strong>OPER RADAR</strong></a><span class="side-label">INTELIGÊNCIA</span>${nav.map(([label, href, iconName]) => `<a class="or-navitem ${here === href ? 'or-navitem--active' : ''}" href="${href}" ${here === href ? 'aria-current="page"' : ''}>${icon(iconName)}<span class="or-navitem__label">${label}</span></a>`).join('')}<span class="side-label">PREFERÊNCIAS</span><a class="or-navitem" href="configuracoes.html">${icon('gear')}<span class="or-navitem__label">Configurações</span></a><a class="or-navitem" href="conta.html">${icon('user-circle')}<span class="or-navitem__label">Conta</span></a><span class="sidefoot">Proposta visual BETA · dados fictícios</span></aside>`;
-  const mobileNav = () => `<nav class="bottom" aria-label="Navegação móvel"><a class="${here === 'hoje.html' ? 'active' : ''}" href="hoje.html"><i class="ph ${here === 'hoje.html' ? 'ph-fill' : 'ph'}-radar"></i>Hoje</a><a class="${here === 'mercado.html' ? 'active' : ''}" href="mercado.html"><i class="ph ${here === 'mercado.html' ? 'ph-fill' : 'ph'}-chart-bar"></i>Mercado</a><a href="index.html"><i class="ph ph-squares-four"></i>Telas</a><a class="${here === 'inteligencia.html' ? 'active' : ''}" href="inteligencia.html"><i class="ph ${here === 'inteligencia.html' ? 'ph-fill' : 'ph'}-brain"></i>Inteligência</a></nav>`;
-  const legacyShellStyle = `<style>body{overflow-x:hidden}.shell{min-height:100vh;display:flex}.side{width:248px;flex:none;background:var(--bg-sunken);border-right:1px solid var(--border-subtle);padding:24px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}.brand{display:flex;align-items:center;gap:9px;padding:0 12px 20px}.brand img{width:32px;height:32px;object-fit:contain}.brand strong{font-size:13px;letter-spacing:.06em}.side-label{font-size:11px;letter-spacing:.06em;color:var(--text-tertiary);padding:22px 14px 8px}.sidefoot{margin-top:auto;border-top:1px solid var(--border-subtle);padding:17px 12px 0;color:var(--text-tertiary);font-size:12px}.content{flex:1;min-width:0}.main{max-width:1440px;margin:auto;padding:32px 30px 60px}.mobile-brand{display:none}.top{height:68px;position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 30px;background:var(--surface-glass);backdrop-filter:blur(16px);border-bottom:1px solid var(--border-subtle)}.top small{color:var(--text-tertiary)}.bottom{display:none}@media(max-width:899px){.side{display:none}.top{padding:0 16px}.main{padding:25px 16px 110px}.bottom{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:3;justify-content:space-around;padding:9px 5px calc(9px + env(safe-area-inset-bottom));background:var(--surface-glass);backdrop-filter:blur(16px);border-top:1px solid var(--border-default)}.bottom a{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--text-secondary);font-size:10px;min-width:60px}.bottom a i{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;font-size:21px}.bottom a.active i{background:var(--accent);color:var(--text-on-accent)}.bottom a.active{color:var(--text-primary)}}@media(max-width:590px){.or-card{padding:16px}}</style>`;
+  const sidebar = () => `<nav class="or-sidebar" aria-label="Principal"><div class="or-sidebar__brand"><img class="mark" src="../../design-system/assets/mark-dark.png" alt=""><strong>OPER RADAR</strong></div><div class="or-sidebar__section">Inteligência</div>${nav.map(([label, href, iconName]) => `<a class="or-navitem ${here === href ? 'or-navitem--active' : ''}" href="${href}" ${here === href ? 'aria-current="page"' : ''}>${icon(iconName)}<span class="or-navitem__label">${label}</span></a>`).join('')}<div class="or-sidebar__section">Preferências</div><a class="or-navitem" href="configuracoes.html">${icon('gear')}<span class="or-navitem__label">Configurações</span></a><a class="or-navitem" href="conta.html">${icon('user-circle')}<span class="or-navitem__label">Conta</span></a><div class="or-sidebar__foot"><span class="or-badge or-badge--neutral">Simulação BETA</span><small>Dados fictícios · sem produção</small></div></nav>`;
+  const mobileNav = () => `<nav class="or-bottomnav" aria-label="Principal"><a class="or-bottomnav__item ${here === 'hoje.html' ? 'or-bottomnav__item--active' : ''}" href="hoje.html" aria-current="${here === 'hoje.html' ? 'page' : 'false'}"><span class="or-bottomnav__ic">${icon('radar')}</span><span>Hoje</span></a><a class="or-bottomnav__item ${here === 'mercado.html' ? 'or-bottomnav__item--active' : ''}" href="mercado.html" aria-current="${here === 'mercado.html' ? 'page' : 'false'}"><span class="or-bottomnav__ic">${icon('chart-bar')}</span><span>Mercado</span></a><a class="or-bottomnav__item" href="index.html"><span class="or-bottomnav__ic">${icon('squares-four')}</span><span>Telas</span></a><a class="or-bottomnav__item ${here === 'inteligencia.html' ? 'or-bottomnav__item--active' : ''}" href="inteligencia.html" aria-current="${here === 'inteligencia.html' ? 'page' : 'false'}"><span class="or-bottomnav__ic">${icon('brain')}</span><span>Inteligência</span></a></nav>`;
   const link = (href, label, kind='secondary') => `<a class="or-btn or-btn--${kind}" href="${href}">${label} ${icon('arrow-right')}</a>`;
   const card = (title, sub, body) => `<section class="or-card"><div class="or-card__head"><div><h2 class="or-card__title">${title}</h2><p class="or-card__sub">${sub}</p></div></div>${body}</section>`;
   const row = (title, sub, href) => `<a class="or-listrow" href="${href}"><span class="or-listrow__body"><span class="or-listrow__t">${title}</span><span class="or-listrow__s">${sub}</span></span><span class="or-listrow__trail">${icon('arrow-right')}</span></a>`;
@@ -67,9 +66,53 @@
       ${card('Conta de exemplo','Nenhuma credencial real ou sessão ativa',`<p>Usuário: Pessoa Exemplo · papel: demonstração · e-mail: exemplo@invalid.example.</p><span class="or-badge or-badge--neutral">Mock local</span>`)}
       ${row('Configurações','Voltar às preferências','configuracoes.html')}`]
   };
-  const shell = (title, subtitle, body) => `${legacyShellStyle}<div class="shell">${sidebar()}<div class="content"><header class="top"><div class="mobile-brand"><img src="../../design-system/assets/mark-dark.png" alt=""><b>OPER RADAR</b></div><small>OPER RADAR / ${title.toUpperCase()}</small><button class="or-btn or-btn--secondary" type="button" data-analyst>Analista IA</button></header><main class="main"><section class="or-card"><span class="or-sectiontag or-sectiontag--accent">PROPOSTA VISUAL BETA</span><h2>${subtitle}</h2><p>Dados inteiramente fictícios · nenhuma conexão com produção.</p><p>${link('index.html','Mapa de telas')} ${link('configuracoes.html','Configurações')} ${link('conta.html','Conta')}</p></section>${body}${limits}</main></div></div>${mobileNav()}`;
+  const preservedTitles = { 'hoje.html': 'Hoje', 'mercado.html': 'Mercado' };
+  const enhancePreserved = () => {
+    const current = here;
+    const pages = nav;
+    const main = document.querySelector('.main');
+    if (!main) return;
+    main.insertAdjacentHTML('beforeend', `<section class="or-card"><h2 class="or-card__title">Explorar no mesmo recorte</h2><p>Visões contextuais da proposta BETA: ofertas, comparador, lojistas e oportunidades regionais.</p><nav class="or-tabs" aria-label="Visões contextuais"><a class="or-tab" href="comparador.html">Comparador</a><a class="or-tab" href="anuncio.html">Oferta</a><a class="or-tab" href="lojista.html">Lojista</a><a class="or-tab" href="minha-loja.html">Oportunidade regional</a></nav><p>Score regional preliminar só em Minha Loja; eventos.php sem consumidor; queda de preço em Oportunidades placeholder; insights.php e analista.php sem contexto de tela; equivalent_group.php ainda não calculável.</p></section>`);
+    const metadata = current === 'hoje.html' ? [
+      ['5 UFs · caminhões pesados','30 dias','48 revendas observadas','48 revendas','Baixa','22/09/2026 · 5 UFs','Cobertura fictícia de revendas.','concorrencia.html','Ver concorrência'],
+      ['5 UFs · caminhões pesados','30 dias','48 revendas observadas','1.284 anúncios','Baixa','22/09/2026 · 5 UFs','Estoque revalidado no cenário ilustrativo.','mercado.html','Ver mercado'],
+      ['5 UFs · caminhões pesados','Mês corrente ilustrativo','1.284 anúncios ativos','37 saídas observadas','Baixa','22/09/2026 · 5 UFs','Anúncio ausente não comprova venda.','inteligencia.html','Ver sinais'],
+      ['5 UFs · caminhões pesados','48 h','Estoque anterior ilustrativo','85 eventos','Baixa','22/09/2026 · 5 UFs','Entradas e saídas são sinais observados.','inteligencia.html','Investigar']
+    ] : [
+      ['Paraná · caminhões e implementos','30 dias','48 lojistas fictícios','1.284 anúncios','Baixa','22/09/2026 · PR','Volume ativo do recorte demonstrativo.','comparador.html','Comparar'],
+      ['Paraná · caminhões e implementos','30 dias','1.284 anúncios fictícios','48 lojistas','Baixa','22/09/2026 · PR','Revendas observadas no cenário.','concorrencia.html','Ver lojistas'],
+      ['Paraná · caminhões e implementos','30 dias','48 lojistas fictícios','22 cidades','Baixa','22/09/2026 · PR','Cidades com ofertas no cenário.','dados-e-fipe.html','Ver cobertura'],
+      ['Paraná · caminhões e implementos','30 dias','Preços anunciados, não FIPE','31 preços do grupo selecionado','Baixa','22/09/2026 · PR','Mediana ilustrativa; não é média bruta.','comparador.html','Ver preços']
+    ];
+    main.querySelectorAll('.kpis .stat').forEach((element, index) => {
+      const [scope, period, base, sample, confidence, update, explanation, href, action] = metadata[index] || metadata[0];
+      const value = element.querySelector('strong')?.textContent?.trim() || '—';
+      element.insertAdjacentHTML('beforeend', `<p class="or-card__sub"><strong>Recorte:</strong> ${scope}<br><strong>Período:</strong> ${period}<br><strong>Valor:</strong> ${value}<br><strong>Base comparativa:</strong> ${base}<br><strong>Amostra:</strong> ${sample}<br><strong>Confiança:</strong> ${confidence}<br><strong>Atualização/cobertura:</strong> ${update}<br><strong>Explicação:</strong> ${explanation}<br><strong>Ação:</strong> <a href="${href}">${action} →</a></p>`);
+    });
+    if (current === 'mercado.html') main.querySelectorAll('.detail article').forEach((element, index) => {
+      const value = element.querySelector('strong')?.textContent?.trim() || '—';
+      const detail = [['31 preços válidos','31 anúncios','Mediana anunciada, não média bruta.'],['18 lojistas','42 anúncios','Oferta ativa no grupo exato.'],['1 referência FIPE fictícia','1 vínculo ilustrativo','FIPE separada do preço anunciado.']][index];
+      if (!detail) return;
+      element.insertAdjacentHTML('beforeend', `<p class="or-card__sub"><strong>Recorte:</strong> Volvo FH 540 2021 · Paraná<br><strong>Período:</strong> 30 dias<br><strong>Valor:</strong> ${value}<br><strong>Base comparativa:</strong> ${detail[0]}<br><strong>Amostra:</strong> ${detail[1]}<br><strong>Confiança:</strong> Baixa<br><strong>Atualização/cobertura:</strong> 22/09/2026 · PR<br><strong>Explicação:</strong> ${detail[2]}<br><strong>Ação:</strong> <a href="comparador.html">Comparar →</a></p>`);
+    });
+  };
+  const shell = (title, subtitle, body) => `<div style="display:flex;min-height:100vh;overflow-x:hidden">${sidebar()}<div style="flex:1;min-width:0"><header class="or-topbar"><div class="or-topbar__title"><span class="or-topbar__crumb">OPER RADAR / SIMULAÇÃO BETA</span><h1 class="or-topbar__h">${title}</h1></div><div class="or-topbar__actions"><button class="or-btn or-btn--secondary" type="button" data-analyst>Analista IA</button></div></header><main style="max-width:1440px;margin:auto;padding:32px var(--gutter) 80px"><section class="or-card"><span class="or-sectiontag or-sectiontag--accent">PROPOSTA VISUAL BETA</span><h2>${subtitle}</h2><p>Dados inteiramente fictícios · nenhuma conexão com produção.</p><p>${link('index.html','Mapa de telas')} ${link('configuracoes.html','Configurações')} ${link('conta.html','Conta')}</p></section>${body}${limits}</main></div></div>${mobileNav()}`;
   if (common[here]) {
     const [title, subtitle, body] = common[here];
     document.getElementById('root').innerHTML = shell(title, subtitle, body);
+  } else if (preservedTitles[here]) {
+    const source = document.querySelector('[data-preserved-content]');
+    document.getElementById('root').innerHTML = shell(preservedTitles[here], preservedTitles[here], source?.innerHTML || '');
+    enhancePreserved();
   }
+  const side = document.querySelector('.or-sidebar');
+  const bottom = document.querySelector('.or-bottomnav');
+  const adaptOfficialNavigation = () => {
+    if (!side || !bottom) return;
+    const compact = window.matchMedia('(max-width: 899px)').matches;
+    side.style.display = compact ? 'none' : '';
+    bottom.style.display = compact ? '' : 'none';
+  };
+  adaptOfficialNavigation();
+  window.addEventListener('resize', adaptOfficialNavigation, { passive: true });
 })();
