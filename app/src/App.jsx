@@ -29,7 +29,8 @@ import {
 import { breadcrumbsFor, normalizeAppContext } from './navigation.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
-import { API_BASE_URL, apiGet } from './apiClient.js';
+import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
+import { DEMO_SESSION } from './demoFixtures.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
@@ -153,25 +154,6 @@ function useApi(path) {
     return () => controller.abort();
   }, [path]);
   return { data, erro, status, meta };
-}
-
-async function apiPost(path, dados, csrf) {
-  const resposta = await fetch(`${API_BASE_URL}/${path}`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
-    },
-    body: JSON.stringify(dados),
-  });
-  const payload = await resposta.json().catch(() => ({}));
-  if (!resposta.ok) {
-    const erro = new Error(payload.erro || 'Não foi possível concluir a operação.');
-    erro.codigo = payload.codigo;
-    throw erro;
-  }
-  return payload;
 }
 
 /* ============================================================
@@ -320,7 +302,7 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
   const carregar = async () => {
     setErro('');
     try {
-      const resposta = await fetch(`${API_BASE_URL}/anuncio_detalhe.php?id=${anuncio.dbId}`, { credentials: 'same-origin' });
+      const resposta = await apiFetch(`${API_BASE_URL}/anuncio_detalhe.php?id=${anuncio.dbId}`, { credentials: 'same-origin' });
       const payload = await resposta.json().catch(() => ({}));
       if (!resposta.ok) throw new Error(payload.erro || 'Não foi possível carregar o anúncio.');
       setDados(payload);
@@ -343,7 +325,7 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setBuscandoFipe(true);
-      fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(termo)}&ordem=mercado&limit=8`, {
+      apiFetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(termo)}&ordem=mercado&limit=8`, {
         signal: controller.signal, credentials: 'same-origin',
       })
         .then(r => r.ok ? r.json() : Promise.reject(new Error()))
@@ -1698,7 +1680,7 @@ function PainelLojista({ lojista, categoria, onClose }) {
   useEffect(() => {
     const controller = new AbortController();
     setDados(null); setErro(''); setAba('resumo');
-    fetch(`${API_BASE_URL}/lojista_detalhe.php?id=${lojista.id}&categoria=${categoria}`, {
+    apiFetch(`${API_BASE_URL}/lojista_detalhe.php?id=${lojista.id}&categoria=${categoria}`, {
       credentials: 'same-origin', signal: controller.signal,
     })
       .then(async resposta => {
@@ -2124,7 +2106,7 @@ function PageFipe() {
     }
     setConsultando(true);
     try {
-      const resposta = await fetch(`${API_BASE_URL}/placa_consulta.php?placa=${encodeURIComponent(placaFormatada)}`, { credentials: 'same-origin' });
+      const resposta = await apiFetch(`${API_BASE_URL}/placa_consulta.php?placa=${encodeURIComponent(placaFormatada)}`, { credentials: 'same-origin' });
       const dados = await resposta.json().catch(() => ({}));
       if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível consultar esta placa.');
       setResultado(dados);
@@ -2505,7 +2487,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${API_BASE_URL}/minha_loja_detalhe.php?id=${itemInicial.id}`, { credentials: 'same-origin', signal: controller.signal })
+    apiFetch(`${API_BASE_URL}/minha_loja_detalhe.php?id=${itemInicial.id}`, { credentials: 'same-origin', signal: controller.signal })
       .then(async resposta => {
         const payload = await resposta.json().catch(() => ({}));
         if (!resposta.ok) throw new Error(payload.erro || 'Não foi possível carregar o veículo.');
@@ -2534,7 +2516,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
     if (q.length < 2) return;
     setComparando(true); setErro(''); setAviso('');
     try {
-      const resposta = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=20&ordem=modelo`, { credentials: 'same-origin' });
+      const resposta = await apiFetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=20&ordem=modelo`, { credentials: 'same-origin' });
       const payload = await resposta.json();
       const opcoes = payload.itens || [];
       setOpcoesFipe(opcoes);
@@ -2560,7 +2542,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
         fipe_preco_id: rascunho.fipe_preco_id, usar_comparativo: Boolean(Number(rascunho.usar_comparativo)),
       }, sessao.csrf);
       await onSalvo();
-      const resposta = await fetch(`${API_BASE_URL}/minha_loja_detalhe.php?id=${rascunho.id}`, { credentials: 'same-origin' });
+      const resposta = await apiFetch(`${API_BASE_URL}/minha_loja_detalhe.php?id=${rascunho.id}`, { credentials: 'same-origin' });
       const payload = await resposta.json().catch(() => ({}));
       if (!resposta.ok) throw new Error(payload.erro || 'O veículo foi salvo, mas a análise não pôde ser atualizada.');
       setDados(payload); setRascunho({ ...payload.item }); setReferenciaNova(null); setOpcoesFipe([]);
@@ -2655,7 +2637,7 @@ function PageMinhaLoja({ sessao }) {
   const carregar = async () => {
     setCarregando(true); setErro('');
     try {
-      const r = await fetch(`${API_BASE_URL}/minha_loja.php`, { credentials: 'same-origin' });
+      const r = await apiFetch(`${API_BASE_URL}/minha_loja.php`, { credentials: 'same-origin' });
       const d = await r.json();
       if (!r.ok) throw new Error(d.erro || 'Estoque indisponível.');
       setItens(d.itens || []);
@@ -2669,7 +2651,7 @@ function PageMinhaLoja({ sessao }) {
     setComparacao({ carregando: true });
     try {
       const q = [form.marca, form.modelo, form.ano].filter(Boolean).join(' ');
-      const r = await fetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=12&ordem=modelo`, { credentials: 'same-origin' });
+      const r = await apiFetch(`${API_BASE_URL}/fipe_consulta.php?modo=buscar&q=${encodeURIComponent(q)}&limit=12&ordem=modelo`, { credentials: 'same-origin' });
       const d = await r.json();
       const opcoes = d.itens || [];
       setOpcoesFipeNovo(opcoes);
@@ -2729,7 +2711,7 @@ function PageMinhaLoja({ sessao }) {
     corpo.append('arquivo', arquivo);
     corpo.append('usar_comparativo', xmlOpcoes.usar_comparativo ? '1' : '0');
     corpo.append('marcar_ausentes', xmlOpcoes.marcar_ausentes ? '1' : '0');
-    const r = await fetch(`${API_BASE_URL}/minha_loja_xml.php?acao=${acao}`, {
+    const r = await apiFetch(`${API_BASE_URL}/minha_loja_xml.php?acao=${acao}`, {
       method: 'POST', body: corpo, credentials: 'same-origin', headers: { 'X-CSRF-Token': sessao.csrf },
     });
     const d = await r.json().catch(() => ({}));
@@ -3161,7 +3143,7 @@ function PageAnalise() {
     const novas = [...msgs, { role: 'user', content: texto }];
     setMsgs(novas); setInput(''); setPensando(true); setChatErro(null);
     try {
-      const r = await fetch(`${API_BASE_URL}/analista.php`, {
+      const r = await apiFetch(`${API_BASE_URL}/analista.php`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: novas }),
       });
@@ -3522,7 +3504,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/auth.php`, { credentials: 'same-origin' })
+    if (DEMO_MODE) { setSessao(DEMO_SESSION); setChecandoSessao(false); return undefined; }
+    apiFetch(`${API_BASE_URL}/auth.php`, { credentials: 'same-origin' })
       .then(r => r.json())
       .then(setSessao)
       .catch(() => setSessao({ autenticado: false, erro: true }))
