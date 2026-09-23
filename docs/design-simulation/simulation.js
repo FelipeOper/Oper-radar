@@ -28,7 +28,7 @@
       ${card('Sinais de eventos','Sequência ilustrativa; eventos.php sem consumidor direto na SPA',row('21/09 · Preço caiu · Volvo FH 540 2021','R$ 499.900 → R$ 489.900 · anúncio EX-001','anuncio.html')+row('18/09 · Saída observada · Scania R 450 2020','Anúncio não revalidado · venda não comprovada','anuncio.html'))}
       ${card('Próximos passos','Mesmo recorte preservado',row('Comparar Volvo FH 540 2021','Curitiba/PR · 30 dias · grupo marca + modelo + ano','comparador.html')+row('Criar ação de monitoramento','Acompanhar nova mudança de preço','plano-de-acao.html'))}`],
     'comparador.html': ['Comparador contextual','Volvo FH 540 · 2021', `
-      ${card('Recorte já preenchido','Recebido do perfil do lojista · grupo marca + modelo + ano',`<span class="or-tag or-tag--selected">Caminhões</span> <span class="or-tag or-tag--selected">Curitiba/PR</span> <span class="or-tag or-tag--selected">30 dias</span> <span class="or-tag or-tag--selected">Volvo FH 540 · 2021</span>`)}
+      ${card('Recorte já preenchido','Recebido do perfil do lojista · grupo marca + modelo + ano',`<div class="context-tags"><span class="or-tag or-tag--selected">Caminhões</span><span class="or-tag or-tag--selected">Curitiba/PR</span><span class="or-tag or-tag--selected">30 dias</span><span class="or-tag or-tag--selected">Volvo FH 540 · 2021</span></div>`)}
       ${evidence('Preço anunciado · Volvo FH 540 2021','30 dias · Curitiba/PR','R$ 489.900','FIPE fictícia R$ 505.000 · mediana qualificada fictícia R$ 498.000','11 ofertas equivalentes','Média','Atualizado em 22/09/2026 · 9/11 preços válidos','R$ 15.100 abaixo da FIPE e R$ 8.100 abaixo da mediana. Comparação ilustrativa; sem cálculo equivalente em backend.',['anuncio.html','Ver anúncio'])}
       ${evidence('Oportunidade regional preliminar','30 dias · Curitiba/PR','7,2 / 10','11 ofertas do grupo exato · 4 saídas observadas','11 ofertas','Baixa','Cobertura ilustrativa · PR','Score proposto para estudo visual; o score real ainda aparece apenas em Minha Loja.',['minha-loja.html','Ver Minha Loja'])}
       ${note('Média bruta do grupo: R$ 512.400, sujeita a extremos. Mediana qualificada ilustrativa: R$ 498.000 após exclusões explícitas. Não apresentar as duas como equivalentes.')}`],
@@ -48,7 +48,7 @@
       ${card('Ligações de contexto','Da oferta para o concorrente, estoque e ação',row('Perfil do lojista','3 saídas observadas · venda não comprovada','lojista.html')+row('Meu veículo equivalente','Volvo FH 540 2021 · AAA0A00','veiculo.html')+row('Registrar decisão','Revisar preço próprio com evidências','plano-de-acao.html'))}`],
     'inteligencia.html': ['Inteligência','Sinais para investigar', `
       ${note('Insights aqui são curadoria visual sobre mocks. insights.php e analista.php ainda não recebem o recorte da tela.')}
-      ${evidence('Diferença entre preço e referência','30 dias · Curitiba/PR · Volvo FH 540 2021','1,6%','Mediana qualificada R$ 498.000 vs oferta R$ 489.900','11 ofertas · 9 válidas','Média','Atualizado em 22/09/2026 · cobertura PR','Preço abaixo da mediana é indício para análise, não recomendação automática.',['comparador.html','Ver evidências'])}
+      ${evidence('Diferença entre preço e referência','30 dias · Curitiba/PR · Volvo FH 540 2021','−1,6%','Mediana qualificada R$ 498.000 vs oferta R$ 489.900','11 ofertas · 9 válidas','Média','Atualizado em 22/09/2026 · cobertura PR','Preço abaixo da mediana é indício para análise, não recomendação automática.',['comparador.html','Ver evidências'])}
       ${card('Sinais de eventos','Exemplos locais; sem consumidor direto de eventos.php',row('Preço caiu · EX-001','R$ 499.900 → R$ 489.900 · 21/09','anuncio.html')+row('Saída observada · EX-002','Scania R 450 · venda não comprovada','lojista.html'))}
       ${card('Analista IA','Painel acessível em todas as telas',`<p>Abra o Analista IA no topo. A conversa mostrada é estática e não consulta serviços.</p><button class="or-btn or-btn--primary" type="button" data-analyst>Ver Analista IA</button>`)}`],
     'plano-de-acao.html': ['Plano de ação','Transformar evidência em decisão', `
@@ -86,7 +86,7 @@
     ];
     main.querySelectorAll('.kpis .stat').forEach((element, index) => {
       const [scope, period, base, sample, confidence, update, explanation, href, action] = metadata[index] || metadata[0];
-      const value = element.querySelector('strong')?.textContent?.trim() || '';
+      const value = element.querySelector('strong')?.textContent?.trim() || '—';
       element.insertAdjacentHTML('beforeend', `<p class="or-card__sub"><strong>Recorte:</strong> ${scope}<br><strong>Período:</strong> ${period}<br><strong>Valor:</strong> ${value}<br><strong>Base comparativa:</strong> ${base}<br><strong>Amostra:</strong> ${sample}<br><strong>Confiança:</strong> ${confidence}<br><strong>Atualização/cobertura:</strong> ${update}<br><strong>Explicação:</strong> ${explanation}<br><strong>Ação:</strong> <a href="${href}">${action} →</a></p>`);
     });
     const kpis = main.querySelector('.kpis');
@@ -103,12 +103,13 @@
     }
     main.querySelectorAll('.card').forEach((element) => element.classList.add('or-card'));
     main.querySelectorAll('.chips').forEach((element) => { element.style.display = 'flex'; element.style.flexWrap = 'wrap'; element.style.gap = 'var(--space-2)'; });
+    main.querySelectorAll('.context-tags').forEach((element) => { element.style.display = 'flex'; element.style.flexWrap = 'wrap'; element.style.gap = 'var(--space-2)'; });
     main.querySelectorAll('.mock').forEach((element) => element.classList.add('or-badge', 'or-badge--neutral'));
     main.querySelectorAll('.grid').forEach((element) => { element.style.display = 'grid'; element.style.gridTemplateColumns = 'minmax(0,1.35fr) minmax(0,.9fr)'; element.style.gap = 'var(--space-4)'; element.style.marginBottom = 'var(--space-4)'; });
     main.querySelectorAll('.split').forEach((element) => { element.style.display = 'grid'; element.style.gridTemplateColumns = 'minmax(0,.82fr) minmax(0,1.18fr)'; element.style.gap = 'var(--space-4)'; });
     main.querySelectorAll('.detail').forEach((element) => { element.style.display = 'grid'; element.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))'; element.style.gap = 'var(--space-4)'; });
     if (current === 'mercado.html') main.querySelectorAll('.detail article').forEach((element, index) => {
-      const value = element.querySelector('strong')?.textContent?.trim() || '';
+      const value = element.querySelector('strong')?.textContent?.trim() || '—';
       const detail = [['31 preços válidos','31 anúncios','Mediana anunciada, não média bruta.'],['18 lojistas','42 anúncios','Oferta ativa no grupo exato.'],['1 referência FIPE fictícia','1 vínculo ilustrativo','FIPE separada do preço anunciado.']][index];
       if (!detail) return;
       element.insertAdjacentHTML('beforeend', `<p class="or-card__sub"><strong>Recorte:</strong> Volvo FH 540 2021 · Paraná<br><strong>Período:</strong> 30 dias<br><strong>Valor:</strong> ${value}<br><strong>Base comparativa:</strong> ${detail[0]}<br><strong>Amostra:</strong> ${detail[1]}<br><strong>Confiança:</strong> Baixa<br><strong>Atualização/cobertura:</strong> 22/09/2026 · PR<br><strong>Explicação:</strong> ${detail[2]}<br><strong>Ação:</strong> <a href="comparador.html">Comparar →</a></p>`);
