@@ -1,44 +1,88 @@
-# Oper Radar — proposta visual BETA
+# Oper Radar — demonstração navegável
 
-Abra [index.html](index.html) diretamente no navegador. As telas são HTML estático com dados fictícios locais, sem build, servidor, autenticação, API ou acesso a produção. Esta é uma proposta de arquitetura visual, **não** uma implementação do backend nem uma medição válida do mercado.
+Demonstração interativa do Oper Radar com **dados fictícios** de um cenário de **22/09/2026**. Serve para explorar o fluxo de decisão do produto (preço × FIPE × concorrência × oportunidade). **Não é o app de produção** e nada aqui é uma medição real do mercado.
+
+- Sem rede: nenhuma tela faz requisição a servidor; tudo é calculado no navegador.
+- Sem login real, sem cookies e sem dados reais.
+- O navegador guarda apenas preferências locais da demonstração: tema, ações do Plano de ação e histórico do Analista IA (`localStorage` e `sessionStorage`). Nada disso sai do seu computador.
+
+## Como abrir
+
+**Opção 1 — servidor local (recomendada).** Na raiz do repositório:
+
+```
+python -m http.server
+```
+
+Depois abra `http://localhost:8000/docs/design-simulation/index.html`.
+
+**Opção 2 — direto no navegador.** Abra `docs/design-simulation/index.html` (`file://`). Funciona porque as telas não dependem de rede.
 
 ## Mapa de telas
 
-| Nível | Telas | Papel |
+| Tela | Arquivo | O que faz |
 | --- | --- | --- |
-| Acesso | `login.html` | Entrada preservada da primeira leva. |
-| Navegação principal | `hoje.html`, `mercado.html`, `concorrencia.html`, `minha-loja.html`, `inteligencia.html`, `plano-de-acao.html`, `dados-e-fipe.html` | Sete destinos: Hoje, Mercado, Concorrência, Minha Loja, Inteligência, Plano de ação, Dados e FIPE. |
-| Contexto | `lojista.html`, `comparador.html`, `anuncio.html`, `veiculo.html` | Perfil de lojista, comparador, oferta e veículo vinculados ao recorte. Oportunidades fica no cruzamento contextual, não na navegação principal. |
-| Conta | `configuracoes.html`, `conta.html` | Preferências e identidade fictícias. |
+| Mapa | `index.html` | Porta de entrada: explica a demonstração e leva às telas. |
+| Login | `login.html` | Entrada de demonstração; não autentica. |
+| Hoje | `hoje.html` | Visão do dia: KPIs, movimento do mercado, regiões com mais saídas, insights e alerta do monitor de dados. |
+| Mercado | `mercado.html` | Filtros (UF, período, segmento, marca), onde há mais ofertas, oportunidade regional, modelos em destaque e detalhes do modelo. |
+| Concorrência | `concorrencia.html` | Lista de revendas com estoque, saídas, reduções de preço, idade média e desvio vs FIPE. |
+| Lojista | `lojista.html?id=` | Perfil de uma revenda: KPIs, estoque ordenável e alerta de reduções. |
+| Comparador | `comparador.html` | Dois modelos lado a lado (padrão: Volvo FH 540 2021 × Scania R 450 2021). |
+| Minha Loja | `minha-loja.html` | Seus 8 veículos contra a mediana do mercado e a FIPE, com "Criar ação" e "Comparar". |
+| Inteligência | `inteligencia.html` | Insights com evidência, perguntas ao Analista e índice de oportunidade regional (preliminar). |
+| Plano de ação | `plano-de-acao.html` | Ações pendentes e concluídas; cria, conclui e remove. |
+| Dados e FIPE | `dados-e-fipe.html` | Monitor de qualidade: inconsistências, cobertura FIPE e frescor da coleta por estado. |
+| Anúncio | `anuncio.html?id=` | Detalhe de uma oferta do mercado. |
+| Veículo | `veiculo.html?id=` | Detalhe de um veículo da sua loja. |
+| Configurações | `configuracoes.html` | Tema e reinício da demonstração. |
+| Conta | `conta.html` | Identidade fictícia da demonstração. |
+| Analista IA | botão no topo das telas | Painel de perguntas e respostas, aberto por `analyst.js`. |
 
-`index.html` apresenta todas as telas. Hoje e Mercado agora também são renderizados por `simulation.js`, junto com as telas novas. Todas usam o shell oficial `or-sidebar`, `or-sidebar__brand`, `or-sidebar__section`, `or-navitem`, `or-sidebar__foot`, `or-topbar` e `or-bottomnav` do design system; não há sidebar legacy, `legacy-nav.js` ou CSS de shell duplicado. Abaixo de 900 px, o sidebar dá lugar ao topbar e à bottom nav oficial. `analyst.js` mantém o painel do Analista IA aberto na navegação simulada por estado de sessão e parâmetro local de URL. O painel usa `or-dialog-scrim` e `or-dialog` do design system; resposta e ressalva de contexto são estáticas.
+Muitas telas aceitam parâmetros na URL para deep-link (por exemplo `mercado.html?uf=PR,SP&periodo=30d`, `comparador.html?a=Volvo|FH 540|2021`).
 
-## Fluxos de navegação
+## O que é a "IA" aqui
 
-1. Concorrência → perfil do lojista → comparador com caminhão, Curitiba/PR e 30 dias já preenchidos → anúncio → Minha Loja/veículo → Plano de ação.
-2. Mercado → comparador e oferta contextual; Inteligência → evidências → anúncio ou comparador.
-3. Minha Loja → veículo → FIPE, mediana qualificada, concorrente e ação.
-4. Dados e FIPE → anúncio com referência separada do preço de mercado.
+**IA de demonstração: respostas calculadas localmente sobre o cenário fictício.** O Analista IA não é um modelo de linguagem e não consulta serviço externo: é um conjunto de regras (`OperDemo.answer`) que responde a alguns temas — preço do seu veículo, regiões, concorrentes, FIPE, qualidade dos dados, oportunidades e panorama do dia. Cada resposta traz fontes e confiança; perguntas fora desses temas recebem a lista do que ele sabe responder.
 
-O grupo exemplificado é **marca + modelo + ano**. A densidade compacta das telas preservadas é preferência documentada. A navegação proposta reorganiza destinos; não declara que as rotas atuais do app já foram alteradas.
+## Regras de produto aplicadas
 
-## Mock-data e leitura de números
+- **Preço de referência = mediana qualificada**, nunca média bruta. Entram só preços válidos: com valor, dentro de 50%–150% da referência do modelo/ano e sem vínculo FIPE ambíguo.
+- **Amostra mínima de 5 preços válidos.** Abaixo disso aparece "Amostra insuficiente" e não há comparação nem veredito.
+- **Saída observada não é venda.** Significa anúncio ausente em verificações seguidas; não comprova negócio fechado.
+- **Redução de preço é sinal, não prova.**
+- **Índice de oportunidade regional é preliminar** e assim rotulado.
+- **Toda métrica mostra evidência:** recorte, período, valor, base comparativa, amostra, confiança, atualização e explicação.
+- **Confiança:** Alta (30+ preços válidos e 5+ revendas), Média (9+), Baixa, Insuficiente (menos de 5). A faixa "Média" a partir de 9 é uma calibração desta demonstração.
+- **FIPE:** cobre só caminhões; implementos não têm FIPE e a comparação usa apenas o mercado anunciado.
+- **Minha Loja:** "Acima do mercado" a partir de 5% acima da mediana; a base é o Paraná e, se houver menos de 5 preços válidos ali, o Brasil (sempre rotulado).
 
-Tudo é ilustrativo: R$ 489.900 para uma oferta Volvo FH 540 2021, FIPE fictícia de R$ 505.000, mediana qualificada fictícia de R$ 498.000, 11 ofertas (9 com preço válido), Curitiba/PR, janela de 30 dias, lojistas inventados e placas placeholder `AAA0A00`, `BBB0B00`, `CCC0C00`. As datas 21–22/09/2026 são marcas de atualização do cenário fictício, não de coleta real. Não há identificador, segredo ou credencial de produção.
+## Como reiniciar
 
-Em todos os cartões de KPI das telas novas e preservadas aparecem recorte, período, valor, base comparativa, amostra, confiança, atualização/cobertura, explicação e ação. A média bruta ilustrativa de R$ 512.400 é separada da mediana qualificada. Saída observada significa anúncio ausente em verificações posteriores; **não comprova venda**.
+Em **Configurações → Reiniciar demonstração**. Apaga as ações do Plano de ação, o histórico do Analista IA e o tema salvo, e volta ao estado inicial.
 
-## Limites conhecidos, expostos nas telas
+## Limitações conhecidas
 
-- Score regional ainda é preliminar e hoje é exposto apenas em Minha Loja. Scores e explicações adicionais nesta proposta não são calculados.
-- `eventos.php` ainda não tem consumidor direto na SPA. Eventos mostrados são locais e fictícios.
-- Quedas de preço em Oportunidades ainda são placeholder.
-- `insights.php` e `analista.php` ainda não recebem o contexto da tela. A resposta do Analista IA é estática.
-- `equivalent_group.php` ainda não é calculável. O recorte de grupo exato no mock não representa esse cálculo.
-- Referência FIPE, preço anunciado, média bruta e mediana qualificada têm significados diferentes; amostras insuficientes não sustentam recomendação.
+- Todos os dados, revendas, placas e valores são fictícios; o cenário é determinístico e não representa o mercado real.
+- Não é o app de produção. A migração das telas para o app real será feita em fases; esta demonstração não implica que as funções já existam lá.
+- Não há coleta, banco de dados, autenticação nem envio de dados.
+- Estado salvo só neste navegador: outro navegador ou aba anônima começa do zero.
+- Layout pensado para desktop e 390 px, mas a verificação visual completa em todos os navegadores não foi feita.
 
-As capacidades atuais foram conferidas em `origin/main:app/src/App.jsx`, `navigation.js`, `useBrowserRoute.js` e `dataState.js`, com o inventário Farol consolidado pelo ATLAS como limite de capacidades reais. O design visual usa somente `../../design-system/styles.css`, `../../design-system/_ds_bundle.js`, classes, tokens, fontes, ícones e logos locais do design system. As telas preservadas mantêm seu CSS de composição original; as novas não adicionam CSS.
+## Estrutura de arquivos
 
-## Verificação
+| Arquivo | Papel |
+| --- | --- |
+| `demo-engine.js` | Motor de dados fictícios e cálculos (`window.OperDemo`): anúncios, filtros, medianas, insights, qualidade, Analista. |
+| `demo-ui.js` | Biblioteca de UI compartilhada (`window.OperUI`), só com classes `or-*` e tokens do design system. |
+| `demo-pages.js` | Núcleo: monta a tela atual, alterna o tema e renderiza Configurações. |
+| `demo-p-mercado.js` | Hoje e Mercado. |
+| `demo-p-concorrencia.js` | Concorrência, Lojista e Comparador. |
+| `demo-p-intel.js` | Inteligência e Dados e FIPE. |
+| `demo-p-loja.js` | Minha Loja e Plano de ação. |
+| `demo-p-detalhe.js` | Anúncio e Veículo. |
+| `analyst.js` | Painel do Analista IA e seu histórico de sessão. |
+| `simulation.js` | Legado da primeira versão: shell de navegação (sidebar, topbar, bottom nav). |
+| `*.html` | Uma página por tela; cada uma carrega os scripts na ordem acima. |
 
-Conferir links e assets relativos, ausência de `fetch`/`XMLHttpRequest` e URLs externas, diff restrito a `docs/design-simulation/`, `git diff --check` e, quando o ambiente permitir, abrir `index.html` por `file://` em desktop e 390 px para confirmar ausência de rolagem horizontal.
+O visual vem do design system em `design-system/` (`styles.css`, `_ds_bundle.js`).
