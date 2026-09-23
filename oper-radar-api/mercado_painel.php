@@ -8,9 +8,10 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/query_contract.php';
+require_once __DIR__ . '/lib/market_period.php';
 
 $conn = conecta();
-$periodo = oper_periodo_contrato($_GET['periodo'] ?? null);
+$periodo = mercado_periodo($_GET['periodo'] ?? null);
 $dias = (int)$periodo['dias'];
 
 $REGIOES = [
@@ -74,7 +75,10 @@ function painel_resumo_grupo(array $grupo, int $saidas, array $periodo): array {
             'menor' => $stats['menor'], 'maior' => $stats['maior'],
             'amostra_total' => $stats['amostra_total'],
             'amostra_qualificada' => $stats['amostra_qualificada'],
-            'confianca' => $stats['confianca'], 'excluidos' => $stats['excluidos'],
+            'confianca' => $stats['confianca'],
+            'confianca_preco' => $stats['confianca_preco'],
+            'confianca_volume' => $stats['confianca_volume'],
+            'excluidos' => $stats['excluidos'],
         ],
     ];
 }
@@ -271,7 +275,10 @@ if ($selecionado) {
         $stats = mercado_calcula_estatisticas($item['registros']);
         $lojistasSelecionado[] = [
             'id' => $item['id'], 'nome' => $item['nome'], 'cidade' => $item['cidade'], 'uf' => $item['uf'],
-            'anuncios' => count($item['registros']), 'mediana' => $stats['mediana'], 'confianca' => $stats['confianca'],
+            'anuncios' => count($item['registros']), 'mediana' => $stats['mediana'],
+            'confianca' => $stats['confianca'],
+            'confianca_preco' => $stats['confianca_preco'],
+            'confianca_volume' => $stats['confianca_volume'],
         ];
     }
 }
@@ -287,6 +294,8 @@ envia_json([
         'cidades' => count($cidadesSet), 'ufs' => count($ufsSet),
         'ticket_mediano' => $statsGeral['mediana'], 'amostra_qualificada' => $statsGeral['amostra_qualificada'],
         'confianca' => $statsGeral['confianca'],
+        'confianca_preco' => $statsGeral['confianca_preco'],
+        'confianca_volume' => $statsGeral['confianca_volume'],
     ],
     'geografia' => ['ufs' => $ufsGeo, 'cidades' => $cidades],
     'modelos' => $modelos,

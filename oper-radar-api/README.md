@@ -19,6 +19,11 @@ modelo e uma série por modelo selecionado. Nesta versão, um grupo é estritame
 marca + modelo + ano-modelo exatos. O endpoint declara isso em `tipo_recorte` e nunca infere
 equivalência comercial nem publica recomendação numérica com confiança insuficiente.
 
+`lib/market_period.php` centraliza as janelas aceitas pelo frontend (`7d`, `30d`, `90d`,
+`180d` e `12m`). `mercado_painel.php` e `comparador.php` usam exclusivamente o número de
+dias normalizado por essa whitelist; valor ausente ou inválido volta com segurança para
+`30d`. `lib/query_contract.php` mantém aliases para clientes internos anteriores.
+
 ## Comparativos de preço
 
 `lib/market_quality.php` centraliza a regra usada por anúncios, detalhe, FIPE, placa, Minha
@@ -35,6 +40,9 @@ Loja e insights:
 - exclui preço ausente, entrada, parcela, leilão, lance, consórcio e mensalidade;
 - rejeita valores incompatíveis com a FIPE e extremos pelo intervalo interquartil;
 - calcula P25, mediana, P75 e confiança;
+- separa `confianca_preco` (ofertas com preço qualificado) de `confianca_volume` (todas
+  as ofertas observadas no recorte); o campo legado `confianca` continua sendo confiança
+  de preço;
 - exige cinco ofertas qualificadas antes de autorizar comparação ou oportunidade;
 - preserva o anúncio no banco e nas buscas comuns, marcando apenas que o preço precisa de
   revisão para fins comparativos.
