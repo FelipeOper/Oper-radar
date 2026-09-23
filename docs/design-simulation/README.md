@@ -11,7 +11,7 @@ Abra [index.html](index.html) diretamente no navegador. As telas são HTML está
 | Contexto | `lojista.html`, `comparador.html`, `anuncio.html`, `veiculo.html` | Perfil de lojista, comparador, oferta e veículo vinculados ao recorte. Oportunidades fica no cruzamento contextual, não na navegação principal. |
 | Conta | `configuracoes.html`, `conta.html` | Preferências e identidade fictícias. |
 
-`index.html` apresenta todas as telas. Hoje e Mercado mantêm sua composição anterior e recebem a nova navegação pelo `legacy-nav.js`. As telas novas são renderizadas com dados locais por `simulation.js`; cada arquivo HTML é aberto diretamente por `file://`. `analyst.js` mantém o painel do Analista IA aberto na navegação simulada por estado de sessão e parâmetro local de URL. O painel usa `or-dialog-scrim` e `or-dialog` do design system; resposta e ressalva de contexto são estáticas.
+`index.html` apresenta todas as telas. Hoje e Mercado mantêm sua composição anterior e recebem a nova navegação pelo `legacy-nav.js`. As telas novas são renderizadas com dados locais por `simulation.js`; cada arquivo HTML é aberto diretamente por `file://`. O shell novo reutiliza `or-sidebar`, `or-sidebar__brand`, `or-sidebar__section`, `or-navitem` e `or-sidebar__foot` do design system, mantendo a mesma navegação lateral de Hoje/Mercado. `analyst.js` mantém o painel do Analista IA aberto na navegação simulada por estado de sessão e parâmetro local de URL. O painel usa `or-dialog-scrim` e `or-dialog` do design system; resposta e ressalva de contexto são estáticas.
 
 ## Fluxos de navegação
 

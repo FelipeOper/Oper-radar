@@ -8,6 +8,7 @@
   ];
   const here = location.pathname.split('/').pop() || 'index.html';
   const icon = name => `<i class="ph ph-${name}" aria-hidden="true"></i>`;
+  const sidebar = () => `<aside class="or-sidebar" aria-label="Principal"><div class="or-sidebar__brand"><img class="mark" src="../../design-system/assets/mark-dark.png" alt=""><strong>OPER RADAR</strong></div><div class="or-sidebar__section">Inteligência</div>${nav.map(([label, href, iconName]) => `<a class="or-navitem ${here === href ? 'or-navitem--active' : ''}" href="${href}" ${here === href ? 'aria-current="page"' : ''}>${icon(iconName)}<span class="or-navitem__label">${label}</span></a>`).join('')}<div class="or-sidebar__section">Preferências</div><a class="or-navitem" href="configuracoes.html">${icon('gear')}<span class="or-navitem__label">Configurações</span></a><a class="or-navitem" href="conta.html">${icon('user-circle')}<span class="or-navitem__label">Conta</span></a><div class="or-sidebar__foot"><span class="or-badge or-badge--neutral">Simulação BETA</span><small>Dados fictícios · sem produção</small></div></aside>`;
   const link = (href, label, kind='secondary') => `<a class="or-btn or-btn--${kind}" href="${href}">${label} ${icon('arrow-right')}</a>`;
   const card = (title, sub, body) => `<section class="or-card"><div class="or-card__head"><div><h2 class="or-card__title">${title}</h2><p class="or-card__sub">${sub}</p></div></div>${body}</section>`;
   const row = (title, sub, href) => `<a class="or-listrow" href="${href}"><span class="or-listrow__body"><span class="or-listrow__t">${title}</span><span class="or-listrow__s">${sub}</span></span><span class="or-listrow__trail">${icon('arrow-right')}</span></a>`;
@@ -64,9 +65,18 @@
       ${card('Conta de exemplo','Nenhuma credencial real ou sessão ativa',`<p>Usuário: Pessoa Exemplo · papel: demonstração · e-mail: exemplo@invalid.example.</p><span class="or-badge or-badge--neutral">Mock local</span>`)}
       ${row('Configurações','Voltar às preferências','configuracoes.html')}`]
   };
-  const shell = (title, subtitle, body) => `<header class="or-topbar"><div class="or-topbar__title"><span class="or-topbar__crumb">OPER RADAR / SIMULAÇÃO BETA</span><h1 class="or-topbar__h">${title}</h1></div><div class="or-topbar__actions"><button class="or-btn or-btn--secondary" type="button" data-analyst>Analista IA</button></div></header><main class="or-card"><section class="or-card"><span class="or-sectiontag or-sectiontag--accent">PROPOSTA VISUAL BETA</span><h2>${subtitle}</h2><p>Dados inteiramente fictícios · nenhuma conexão com produção.</p><nav class="or-tabs" aria-label="Navegação principal">${nav.map(([label,href])=>`<a class="or-tab ${here===href?'or-tab--active':''}" href="${href}" ${here===href?'aria-current="page"':''}>${label}</a>`).join('')}</nav><p>${link('index.html','Mapa de telas')} ${link('configuracoes.html','Configurações')} ${link('conta.html','Conta')}</p></section>${body}${limits}</main>`;
+  const shell = (title, subtitle, body) => `<div style="display:flex;min-height:100vh"><div style="flex:none">${sidebar()}</div><div style="flex:1;min-width:0"><header class="or-topbar"><div class="or-topbar__title"><span class="or-topbar__crumb">OPER RADAR / SIMULAÇÃO BETA</span><h1 class="or-topbar__h">${title}</h1></div><div class="or-topbar__actions"><button class="or-btn or-btn--secondary" type="button" data-analyst>Analista IA</button></div></header><main style="max-width:1440px;margin:auto;padding:32px var(--gutter) 60px"><section class="or-card"><span class="or-sectiontag or-sectiontag--accent">PROPOSTA VISUAL BETA</span><h2>${subtitle}</h2><p>Dados inteiramente fictícios · nenhuma conexão com produção.</p><p>${link('index.html','Mapa de telas')} ${link('configuracoes.html','Configurações')} ${link('conta.html','Conta')}</p></section>${body}${limits}</main></div></div>`;
   if (common[here]) {
     const [title, subtitle, body] = common[here];
     document.getElementById('root').innerHTML = shell(title, subtitle, body);
+    const side = document.querySelector('.or-sidebar');
+    const adaptSidebar = () => {
+      if (!side) return;
+      const compact = window.matchMedia('(max-width: 899px)').matches;
+      side.style.display = compact ? 'none' : '';
+      side.classList.toggle('or-sidebar--collapsed', compact);
+    };
+    adaptSidebar();
+    window.addEventListener('resize', adaptSidebar, { passive: true });
   }
 })();
