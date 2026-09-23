@@ -11,7 +11,7 @@ Abra [index.html](index.html) diretamente no navegador. As telas são HTML está
 | Contexto | `lojista.html`, `comparador.html`, `anuncio.html`, `veiculo.html` | Perfil de lojista, comparador, oferta e veículo vinculados ao recorte. Oportunidades fica no cruzamento contextual, não na navegação principal. |
 | Conta | `configuracoes.html`, `conta.html` | Preferências e identidade fictícias. |
 
-`index.html` apresenta todas as telas. Hoje e Mercado mantêm sua composição anterior e recebem a nova navegação pelo `legacy-nav.js`. As telas novas são renderizadas com dados locais por `simulation.js`; cada arquivo HTML é aberto diretamente por `file://`. O Analista IA é um diálogo nativo acessível em todas as telas novas, com resposta estática e ressalva de contexto.
+`index.html` apresenta todas as telas. Hoje e Mercado mantêm sua composição anterior e recebem a nova navegação pelo `legacy-nav.js`. As telas novas são renderizadas com dados locais por `simulation.js`; cada arquivo HTML é aberto diretamente por `file://`. `analyst.js` mantém o painel do Analista IA aberto na navegação simulada por estado de sessão e parâmetro local de URL. O painel usa `or-dialog-scrim` e `or-dialog` do design system; resposta e ressalva de contexto são estáticas.
 
 ## Fluxos de navegação
 
@@ -26,7 +26,7 @@ O grupo exemplificado é **marca + modelo + ano**. A densidade compacta das tela
 
 Tudo é ilustrativo: R$ 489.900 para uma oferta Volvo FH 540 2021, FIPE fictícia de R$ 505.000, mediana qualificada fictícia de R$ 498.000, 11 ofertas (9 com preço válido), Curitiba/PR, janela de 30 dias, lojistas inventados e placas placeholder `AAA0A00`, `BBB0B00`, `CCC0C00`. As datas 21–22/09/2026 são marcas de atualização do cenário fictício, não de coleta real. Não há identificador, segredo ou credencial de produção.
 
-Nos cartões de evidência aparecem recorte, período, valor, base, amostra, confiança, atualização/cobertura, explicação e ação. A média bruta ilustrativa de R$ 512.400 é separada da mediana qualificada. Saída observada significa anúncio ausente em verificações posteriores; **não comprova venda**.
+Em todos os cartões de KPI das telas novas e preservadas aparecem recorte, período, valor, base comparativa, amostra, confiança, atualização/cobertura, explicação e ação. A média bruta ilustrativa de R$ 512.400 é separada da mediana qualificada. Saída observada significa anúncio ausente em verificações posteriores; **não comprova venda**.
 
 ## Limites conhecidos, expostos nas telas
 

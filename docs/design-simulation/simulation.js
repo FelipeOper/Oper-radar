@@ -12,7 +12,7 @@
   const card = (title, sub, body) => `<section class="or-card"><div class="or-card__head"><div><h2 class="or-card__title">${title}</h2><p class="or-card__sub">${sub}</p></div></div>${body}</section>`;
   const row = (title, sub, href) => `<a class="or-listrow" href="${href}"><span class="or-listrow__body"><span class="or-listrow__t">${title}</span><span class="or-listrow__s">${sub}</span></span><span class="or-listrow__trail">${icon('arrow-right')}</span></a>`;
   const note = text => `<div class="or-alert or-alert--info"><span class="or-alert__ic">${icon('info')}</span><span class="or-alert__body"><strong class="or-alert__t">Como ler</strong><span class="or-alert__d">${text}</span></span></div>`;
-  const evidence = (scope, period, value, base, sample, confidence, update, explanation, action) => card(scope, `${period} · ${update}`, `<div class="or-stat__value">${value}</div><p><strong>Base:</strong> ${base} · <strong>Amostra:</strong> ${sample} · <strong>Confiança:</strong> ${confidence}</p><p>${explanation}</p>${link(action[0],action[1])}`);
+  const evidence = (scope, period, value, base, sample, confidence, update, explanation, action) => card(scope, 'Indicador ilustrativo · evidência para decisão', `<div class="or-stat__value">${value}</div><p><strong>Recorte:</strong> ${scope}<br><strong>Período:</strong> ${period}<br><strong>Valor:</strong> ${value}<br><strong>Base comparativa:</strong> ${base}<br><strong>Amostra:</strong> ${sample}<br><strong>Confiança:</strong> ${confidence}<br><strong>Atualização/cobertura:</strong> ${update}</p><p><strong>Explicação:</strong> ${explanation}</p><p><strong>Ação:</strong> ${link(action[0],action[1])}</p>`);
   const limits = card('Estado da implementação', 'Limites reais para orientar a revisão de Felipe', `<ul><li>Score regional preliminar: hoje exposto apenas em Minha Loja. Confiança e evidências desta tela são uma proposta visual.</li><li><code>eventos.php</code> ainda não tem consumidor direto na SPA; a linha de eventos aqui é ilustrativa.</li><li>Quedas de preço em Oportunidades ainda são placeholder.</li><li><code>insights.php</code> e <code>analista.php</code> ainda não recebem contexto da tela.</li><li><code>equivalent_group.php</code> ainda não é calculável. O grupo exato mostrado no mock não é resultado de backend.</li><li>Saída observada de anúncio não comprova venda. Média bruta não substitui mediana qualificada.</li></ul>`);
   const common = {
     'concorrencia.html': ['Concorrência','Lojistas no recorte', `
@@ -38,7 +38,7 @@
     'veiculo.html': ['Detalhe do veículo','Volvo FH 540 · 2021 · AAA0A00', `
       ${card('Recorte do veículo','Minha Loja · Curitiba/PR · caminhão pesado · 30 dias',`<span class="or-badge or-badge--neutral">Placa placeholder</span><p>Anúncio próprio fictício · R$ 515.000 · 312.000 km · 2021.</p>`)}
       ${evidence('Preço próprio vs referências','30 dias · Curitiba/PR','R$ 515.000','FIPE fictícia R$ 505.000 · mediana qualificada R$ 498.000 · oferta concorrente R$ 489.900','11 ofertas · 9 válidas','Média','Atualizado em 22/09/2026 · cobertura PR','Preço próprio acima da mediana e da oferta concorrente; investigar estado e especificação antes de agir.',['comparador.html','Abrir comparador'])}
-      ${card('Score regional preliminar','Proposta de explicação junto ao valor',`<div class="or-stat__value">6,4 / 10</div><p>Confiança baixa · 11 ofertas · 4 saídas observadas em 30 dias. Não calculado nesta simulação.</p>${link('plano-de-acao.html','Planejar revisão','primary')}`)}
+      ${evidence('Score regional preliminar · Volvo FH 540 2021 · Curitiba/PR','30 dias','6,4 / 10','11 ofertas concorrentes · 4 saídas observadas','11 ofertas','Baixa','22/09/2026 · PR ilustrativo','Valor demonstrativo, não calculado nesta simulação. O score real ainda é preliminar e só aparece em Minha Loja.',['plano-de-acao.html','Planejar revisão'])}
       ${row('Ver anúncio concorrente','Rota Exemplo Caminhões · R$ 489.900','anuncio.html')}`],
     'anuncio.html': ['Oferta contextual','Volvo FH 540 · 2021 · EX-001', `
       ${card('Anúncio fictício','Rota Exemplo Caminhões · Curitiba/PR · placa CCC0C00',`<span class="or-badge or-badge--neutral">Ativo no mock</span><p>Preço atual R$ 489.900 · anterior R$ 499.900 em 21/09/2026. Histórico ilustrativo.</p>`)}
@@ -54,7 +54,7 @@
       ${card('Monitorar redução do concorrente','Ação proposta a partir de evento fictício',`<p>EX-001 caiu R$ 10.000 em 21/09. A visão atual de Oportunidades ainda usa placeholder para quedas de preço.</p>${link('anuncio.html','Ver anúncio')}`)}
       ${note('Esta página representa um fluxo de decisão. Nenhuma ação é gravada no backend pela simulação.')}`],
     'dados-e-fipe.html': ['Dados e FIPE','Origem, cobertura e qualidade', `
-      ${card('Cobertura da amostra','Recorte fictício · caminhões pesados · Curitiba/PR · 30 dias',`<p>11 ofertas do grupo marca + modelo + ano; 9 com preço válido; 1 FIPE ambígua; 1 sem preço. Atualizado em 22/09/2026.</p><span class="or-badge or-badge--warning">Cobertura ilustrativa</span>`)}
+      ${evidence('Cobertura da amostra · caminhões pesados · Curitiba/PR','30 dias','11 ofertas','9 preços válidos · 1 FIPE ambígua · 1 sem preço','11 ofertas','Média','22/09/2026 · PR ilustrativo','Qualidade do recorte fictício para orientar a leitura de FIPE e mercado.',['comparador.html','Ver comparador'])}
       ${evidence('FIPE do Volvo FH 540 · 2021','Referência fictícia de setembro/2026','R$ 505.000','Preço anunciado R$ 489.900 · mediana qualificada R$ 498.000','1 vínculo FIPE ilustrativo · 11 ofertas','Média','Atualizado em 22/09/2026','FIPE é referência separada do mercado anunciado. Vínculo e versão devem ser conferidos.',['anuncio.html','Ver anúncio'])}
       ${card('Qualidade e estados','Contratos de dataState.js',`<p>Estados: loading, ready, empty, error, stale, forbidden e offline. Frescor: fresh, delayed, stale e unknown. Confiança: alta, média, baixa e insuficiente.</p><p>Sem amostra suficiente, o comparativo deve ser ocultado ou identificado como insuficiente.</p>`)}`],
     'configuracoes.html': ['Configurações','Preferências da interface', `
@@ -69,8 +69,4 @@
     const [title, subtitle, body] = common[here];
     document.getElementById('root').innerHTML = shell(title, subtitle, body);
   }
-  document.addEventListener('click', event => {
-    if (event.target.closest('[data-analyst]')) document.getElementById('analyst')?.showModal();
-    if (event.target.closest('[data-close]')) document.getElementById('analyst')?.close();
-  });
 })();
