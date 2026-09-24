@@ -3,6 +3,14 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2 — frontend novo em PRODUÇÃO (`/oper-radar/`) + API 1.4 — 24/09/2026 (PRONTO, aguardando envio e extração)
+
+- Origem: commit `fb41d48` (PR #63, branch `agent/portar-demo-real`). Codex adversarial (revisão final do PR + 2 rodadas) → `approve`; testes: frontend 82/82, PHP 16/16, Python 68/68. As 11 telas foram abertas no beta com dados reais, sem erro de console. Achado da revisão final corrigido: "Ver N ofertas" abria lista mais ampla que a contagem (agora envia marca + modelo + `ano_modelo` exatos; `anuncios.php` ganhou os filtros `modelo` e `ano_modelo`). Ponto aceito e documentado: filtros próprios da lista (preço, revenda, carroceria, tração, fila FIPE) continuam somando ao recorte do modelo.
+- **Estado de produção antes** (lido ao vivo): `/oper-radar/index.html` `6bdac4eedceb39ccddb7616bbb461c39db2967e99a1ff8e3f9030dae54b7906a`, bundle `index-C7TuDJX5.js`, Last-Modified 02/09/2026 23:15 GMT.
+- **Passo 1 — API 1.4** (`Downloads\OperRadar-Release2-Producao\PASSO-1-API.txt`): zip `4bdbcf1727b8bb56538e935eaa1328a8845c566d96b53607429df9511decd5d0`; `anuncios.php` `97bfc0e984006aa8c46243286a443d09538438ac558dd12e32dd5ec30c97b92a` (antes: `f824cfc5…`, API 1.3).
+- **Passo 2 — frontend de produção** (`PASSO-2-FRONTEND-PRODUCAO.txt`): zip `e2bd5e93474ed3cd30ea3fb78b1efb9f09867fe44f5cae5702e37d65fd80028a` (`--base oper-radar`, 17 arquivos, 0644, sem dados de demonstração, sem referência ao beta). `index.html` `ae33b5fc…`, `assets/index-BMzGdwBS.js` `57021b84…`. Pré-checagem no comando: `index.html` atual = `6bdac4ee…`. **Backup da pasta inteira** antes; **`.htaccess` de produção não é sobrescrito** (o hash atual é impresso); bundles antigos ficam em `assets/`.
+- Reversão do frontend: restaurar `index.html` (e o que mudar) do backup `/home1/pro93061/backups/oper-radar-frontend-release2-*`; da API: `anuncios.php` de `/home1/pro93061/backups/api-release1.4-*`. Banco, cron, credenciais: nenhum.
+
 ## Taxonomia do segmento Pesado — 24/09/2026 (PUBLICADA: API 1.3 em produção + beta; frontend de produção `/oper-radar/` intocado)
 
 - Decisão do Felipe: Pesado = caminhão seminovo + implemento rodoviário; o resto (agrícola incluso) em "Outros", sem misturar. `Carreta` → implementos rodoviários; `Implementos-agricolas` → agrícola; `outros` = complemento (tipo não mapeado e anúncio sem tipo entram ao abrir a categoria, igual à contagem da faceta).
