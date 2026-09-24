@@ -42,7 +42,7 @@ if (!empty($_GET['mercado']) && isset($MERCADO_TIPOS[$_GET['mercado']])) {
 if (!empty($_GET['categoria']) && ($filtroCategoria = oper_taxonomia_filtro_categoria((string)$_GET['categoria']))) {
     $tipos = $filtroCategoria['tipos'];
     $ph = implode(',', array_fill(0, count($tipos), '?'));
-    $where[] = "a.tipo {$filtroCategoria['operador']} ($ph)";
+    $where[] = oper_taxonomia_sql_categoria('a.tipo', $filtroCategoria, $ph);
     foreach ($tipos as $t) { $params[] = $t; $types .= 's'; }
 }
 if (!empty($_GET['status']))    { $where[] = 'a.status = ?';    $params[] = $_GET['status']; $types .= 's'; }

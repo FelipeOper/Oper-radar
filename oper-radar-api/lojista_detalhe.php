@@ -56,7 +56,7 @@ $params = [$lojistaId];
 if ($categoria !== 'todas') {
     $filtroCategoria = oper_taxonomia_filtro_categoria($categoria);
     $tipos = $filtroCategoria['tipos'];
-    $where .= " AND a.tipo {$filtroCategoria['operador']} (" . implode(',', array_fill(0, count($tipos), '?')) . ')';
+    $where .= ' AND ' . oper_taxonomia_sql_categoria('a.tipo', $filtroCategoria, implode(',', array_fill(0, count($tipos), '?')));
     foreach ($tipos as $tipo) { $params[] = $tipo; $types .= 's'; }
 }
 

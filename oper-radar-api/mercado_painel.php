@@ -85,9 +85,10 @@ $mercados = oper_taxonomia_tipos_por_mercado();
 $segmento = (string)($_GET['segmento'] ?? 'todas');
 $filtroSegmento = $segmento !== 'todas' ? oper_taxonomia_filtro_categoria($segmento) : null;
 $tipos = $filtroSegmento ? $filtroSegmento['tipos'] : $mercados['principal'];
-$operadorTipos = $filtroSegmento ? $filtroSegmento['operador'] : 'IN';
 
-$baseWhere = ["a.tipo $operadorTipos (" . painel_placeholders($tipos) . ')'];
+$baseWhere = [$filtroSegmento
+    ? oper_taxonomia_sql_categoria('a.tipo', $filtroSegmento, painel_placeholders($tipos))
+    : 'a.tipo IN (' . painel_placeholders($tipos) . ')'];
 $baseParams = array_values($tipos);
 $baseTypes = str_repeat('s', count($tipos));
 

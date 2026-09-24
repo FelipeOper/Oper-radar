@@ -52,6 +52,9 @@ foreach (oper_taxonomia_tipo_categoria() as $tipo => $categoria) {
         );
     }
 }
+// SQL: categorias fechadas usam IN; 'outros' e o complemento e tambem inclui anuncio sem tipo (NULL).
+confirma_taxonomia_mercado(oper_taxonomia_sql_categoria('a.tipo', oper_taxonomia_filtro_categoria('caminhoes'), '?') === 'a.tipo IN (?)', 'sql categoria fechada usa IN');
+confirma_taxonomia_mercado(oper_taxonomia_sql_categoria('a.tipo', $filtroOutros, '?,?') === '(a.tipo IS NULL OR a.tipo NOT IN (?,?))', 'sql outros e complemento com NULL');
 foreach (['Aviao', 'Sementes'] as $naoMapeado) {
     $donas = array_filter(array_keys(oper_taxonomia_tipos_por_categoria()), fn($cat) => tipo_passa_no_filtro($naoMapeado, oper_taxonomia_filtro_categoria($cat)));
     confirma_taxonomia_mercado(array_values($donas) === ['outros'], "$naoMapeado pertence so a outros");

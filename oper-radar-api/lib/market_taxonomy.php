@@ -44,8 +44,8 @@ function oper_taxonomia_tipos_por_categoria(): array {
 /**
  * Filtro de tipo para uma categoria. 'outros' e o COMPLEMENTO das demais categorias: tipo que aparece no
  * banco mas nao esta no mapa (ex.: Aviao, Sementes) cai em 'outros' tambem ao abrir a categoria, igual a
- * contagem da faceta. Devolve ['operador' => 'IN'|'NOT IN', 'tipos' => [...]]. Tipo NULL fica de fora
- * (NULL NOT IN (...) nao e verdadeiro), como na contagem por categoria de facetas.php.
+ * contagem da faceta. Devolve ['operador' => 'IN'|'NOT IN', 'tipos' => [...]]. 'outros' inclui tipo NULL
+ * (anuncio sem tipo), como a contagem por UF e o mercado 'outros' ja faziam; use oper_taxonomia_sql_categoria().
  */
 function oper_taxonomia_filtro_categoria(string $categoria): ?array {
     $categorias = oper_taxonomia_tipos_por_categoria();
@@ -56,6 +56,12 @@ function oper_taxonomia_filtro_categoria(string $categoria): ?array {
         if ($nome !== 'outros') $conhecidos = array_merge($conhecidos, $tipos);
     }
     return ['operador' => 'NOT IN', 'tipos' => $conhecidos];
+}
+
+/** Condicao SQL de tipo para um filtro de categoria. $coluna e literal do codigo (ex.: 'a.tipo'), $ph os '?' ou literais. */
+function oper_taxonomia_sql_categoria(string $coluna, array $filtro, string $ph): string {
+    if ($filtro['operador'] === 'IN') return "$coluna IN ($ph)";
+    return "($coluna IS NULL OR $coluna NOT IN ($ph))";
 }
 
 function oper_taxonomia_tipos_por_mercado(): array {
