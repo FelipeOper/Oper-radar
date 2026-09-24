@@ -25,4 +25,16 @@ verifica($semPreco['preco_qualidade_status'] === 'revisar', 'status sem preco');
 verifica($semPreco['preco_qualidade_motivo'] === 'preco ausente', 'motivo sem preco');
 verifica(array_key_exists('desvio_mercado_pct', $semPreco) && $semPreco['desvio_mercado_pct'] === null, 'desvio sem preco');
 
+// mercado_desvio_fipe_medio_pct: media percentual do desvio de preco vs. FIPE, so entre
+// registros validos (mesmo filtro do mercado_motivo_preco).
+verifica(mercado_desvio_fipe_medio_pct([]) === null, 'desvio fipe sem registros');
+$semFipe = [['preco' => 100000, 'preco_fipe' => 0, 'titulo' => '', 'preco_texto_bruto' => '']];
+verifica(mercado_desvio_fipe_medio_pct($semFipe) === null, 'desvio fipe ignora registro sem fipe');
+$comFipe = [
+    ['preco' => 110000, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => ''], // +10%
+    ['preco' => 90000, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => ''],  // -10%
+    ['preco' => 19900, 'preco_fipe' => 315000, 'titulo' => 'MB 1017', 'preco_texto_bruto' => 'R$ 19.900'], // rejeitado (extremo FIPE)
+];
+verifica(mercado_desvio_fipe_medio_pct($comFipe) === 0.0, 'desvio fipe media ignora extremo rejeitado');
+
 echo "market_quality_test=OK\n";

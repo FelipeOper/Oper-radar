@@ -193,3 +193,20 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
             : null;
     }
 }
+
+function mercado_desvio_fipe_medio_pct(array $registros): ?float {
+    $desvios = [];
+    foreach ($registros as $registro) {
+        $preco = (float)($registro['preco'] ?? 0);
+        $fipe = (float)($registro['preco_fipe'] ?? 0);
+        if ($fipe <= 0) continue;
+        $motivo = mercado_motivo_preco(
+            $registro['preco'] ?? null, $registro['preco_fipe'] ?? null,
+            (string)($registro['titulo'] ?? ''), (string)($registro['preco_texto_bruto'] ?? '')
+        );
+        if ($motivo !== null) continue;
+        $desvios[] = ($preco - $fipe) / $fipe * 100;
+    }
+    if (!$desvios) return null;
+    return round(array_sum($desvios) / count($desvios), 1);
+}
