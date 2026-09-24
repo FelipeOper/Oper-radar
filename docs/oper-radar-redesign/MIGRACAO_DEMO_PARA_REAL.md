@@ -156,3 +156,21 @@ tem e faltava, sem reescrever a lógica de paginação do navegador de ofertas.
 - Verificado: testes PHP, frontend e contratos Python; `php -l` nos três arquivos PHP; build
   normal e demo; navegador em desktop e 390 px, sem rolagem horizontal. As consultas novas
   ainda dependem de verificação com MySQL real na publicação do Release 1.
+
+## Caminho de publicação (24/09/2026)
+
+Estado em produção: **Release 1 da API** publicado (ver `docs/PRODUCAO.md`). O frontend de produção ainda é o antigo.
+
+1. **Release 1.1 (API, 2 arquivos)**: corrige o que a conferência com dados reais achou (reduções contadas como eventos, feed sem saídas/quedas,
+   insight FIPE com amostra de 5 preços, marca duplicada no rótulo). Pacote: `hoje_stats.php` + `lib/hoje_painel.php`.
+2. **Release 2 beta (frontend em `/oper-radar-beta/`)**: `python scripts/empacotar_frontend.py --base oper-radar-beta --saida <pasta>`.
+   Mesmo domínio, então sessão e dados reais funcionam; `/oper-radar/` fica intocado; sai com `noindex`.
+3. **Validação do beta com dados reais** (Hoje, Mercado, Concorrência, tema claro/escuro, celular; as demais telas sob a nova identidade).
+4. **Release 2 (produção)**: `--base oper-radar`, backup da pasta `oper-radar/`, upload por cima, registro em `docs/PRODUCAO.md`.
+5. **Telas restantes**, uma por release: Comparador, Minha Loja, Inteligência (Oportunidades + Análise), Plano de ação, Dados e FIPE,
+   Configurações, Conta. Hoje funcionam com o corpo antigo sob a nova identidade (as 11 rotas renderizam no build de demonstração).
+6. **Mesclar o PR #63 no `main`** (decisão do Felipe): o `main` está atrás de produção desde 02/09; o PR reúne as duas linhas.
+
+Achados da conferência ao vivo (24/09/2026) que viraram teste: feed sem mistura de tipos, contagem de reduções por anúncio distinto,
+amostra mínima de 10 preços para destacar "abaixo da FIPE", rótulo sem marca repetida.
+Pendências de dado: desvio FIPE por revenda chega a +90% (vínculos FIPE suspeitos, aparece com confiança; investigar em etapa própria).
