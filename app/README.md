@@ -19,6 +19,9 @@ entre desktop e celular é por CSS (899px), sem largura em JS. Os ícones vêm d
 para a fonte Phosphor do design system (o `lucide-react` foi removido). A migração tela a tela está em
 `../docs/oper-radar-redesign/MIGRACAO_DEMO_PARA_REAL.md`.
 
+A tela Hoje usa `src/HojeBlocos.jsx`, `src/Evidencia.jsx` e `src/hojeModel.js` (regras puras, com
+testes). No modo demo, `localStorage['oper-demo-api-antiga']='1'` simula um servidor sem os campos novos.
+
 `VITE_DEMO=1 npm run build` gera um build com dados fictícios (`src/demoFixtures.js`) só para
 verificação visual; sem a variável o app usa a API real.
 

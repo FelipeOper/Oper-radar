@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  Radar, LayoutGrid, Building2, Settings, ListChecks,
+  LayoutGrid, Building2, Settings, ListChecks,
   MapPin, ExternalLink, Search,
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
-  Timer, Flame, PackageOpen, Zap, Gauge, RotateCcw,
+  Timer, Flame, PackageOpen, Gauge, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
@@ -28,6 +28,9 @@ import {
 } from './marketTaxonomy.js';
 import { breadcrumbsFor, normalizeAppContext } from './navigation.js';
 import { AppShell, NAV } from './Shell.jsx';
+import { Evidencia } from './Evidencia.jsx';
+import { AlertaColeta, FeedMovimento, InsightsDoDia, RegioesSaidas, SecaoHoje } from './HojeBlocos.jsx';
+import { evidenciaKpis } from './hojeModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
 import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
@@ -695,104 +698,71 @@ function PainelKpi({ titulo, subtitulo, dados, renderItem, style }) {
 }
 
 
-function KpiEntradaSaida({ entrou, saiu }) {
+function KpiHoje({ label, value, sub, evidencia, children }) {
   return (
-    <Card style={{ padding: '18px 20px' }}>
-      <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.inkMuted, fontFamily: T.fontBody, marginBottom: 10 }}>
-        Movimento 48h
-      </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: T.fontDisplay, fontSize: 24, fontWeight: 600, color: T.signal, lineHeight: 1, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <ArrowUpRight size={18} strokeWidth={2.5} />{fmtN(entrou)}
-          </div>
-          <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 6 }}>entrou</div>
-        </div>
-        <div style={{ width: 1, alignSelf: 'stretch', background: T.line, margin: '4px 0' }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: T.fontDisplay, fontSize: 24, fontWeight: 600, color: T.positive, lineHeight: 1, fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <ArrowDownRight size={18} strokeWidth={2.5} />{fmtN(saiu)}
-          </div>
-          <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 6 }}>saiu</div>
-        </div>
-      </div>
-    </Card>
+    <section className="or-card oc-kpi">
+      <span className="oc-kpi__rotulo">{label}</span>
+      {children || <strong className="oc-kpi__valor">{value}</strong>}
+      {sub && <span className="oc-kpi__sub">{sub}</span>}
+      <Evidencia evidencia={evidencia} rotulo="Evidência" />
+    </section>
   );
 }
 
-function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonalizar }) {
+function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonalizar, onNavegar }) {
   const { data: stats } = useApi('hoje_stats.php');
+  const { data: frescor } = useApi('frescor_coleta.php');
   const { data: facetas } = useApi('facetas.php?status=ativo');
-  const [sinalAberto, setSinalAberto] = useState(null);
   const layout = normalizeDashboardLayout(layoutInput);
+  const evidencias = useMemo(() => evidenciaKpis(kpis), [kpis]);
 
-  const sinais = useMemo(() => {
-    const lista = [];
+  // Servidor ainda sem o feed novo (backend e frontend sobem separados): usa os sinais
+  // derivados da lista de anuncios, como a tela fazia antes.
+  const feedLegado = useMemo(() => {
     const agora = Date.now();
+    const lista = [];
     anuncios.forEach(a => {
-      const horasDesdePrimeira = (agora - new Date(a.primeiraVez)) / 3600000;
-      if (a.status === 'saida_detectada') {
-        lista.push({ tipo: 'saida', a, quando: a.dataRemocao || a.ultimaVez });
-      } else if (a.status === 'em_verificacao') {
-        lista.push({ tipo: 'verificacao', a, quando: a.ultimaVez });
-      } else if (horasDesdePrimeira < 48) {
-        lista.push({ tipo: 'novo', a, quando: a.primeiraVez });
-      }
+      const base = { anuncio_id: a.dbId ?? a.id, titulo: a.titulo, cidade: a.cidade, uf: a.uf, preco: a.preco, url: a.url };
+      if (a.status === 'saida_detectada') lista.push({ ...base, tipo: 'saida', quando: a.dataRemocao || a.ultimaVez });
+      else if (a.status === 'em_verificacao') lista.push({ ...base, tipo: 'verificacao', quando: a.ultimaVez });
+      else if ((agora - new Date(a.primeiraVez)) / 3600000 < 48) lista.push({ ...base, tipo: 'novo', quando: a.primeiraVez });
     });
-    return lista.sort((x, y) => new Date(y.quando) - new Date(x.quando)).slice(0, 40);
+    return lista.sort((x, y) => new Date(y.quando) - new Date(x.quando)).slice(0, 12);
   }, [anuncios]);
-
-  const config = {
-    novo:  { icone: Zap,          cor: T.signal,   rotulo: 'NOVO' },
-    verificacao: { icone: Timer,        cor: T.alert,    rotulo: 'VERIFICAR' },
-    saida:       { icone: CheckCircle2, cor: T.positive, rotulo: 'SAIU' },
-  };
+  const feed = Array.isArray(stats?.feed) ? stats.feed : feedLegado;
   const cobertura = kpis?.ufs_ativas?.length
     ? `${kpis.ufs_ativas.length} UFs · ${kpis.regioes_ativas?.length || 0} regiões`
     : usandoReais ? `${Object.keys(facetas?.por_uf || {}).length || 1} UFs` : 'conectando…';
 
   const kpiWidgets = {
-    revendas: <Kpi label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={`${cobertura} · 2×/dia`} />,
-    anuncios: <Kpi label="Anúncios ativos revalidados" value={kpis ? fmtN(kpis.anuncios_ativos_revalidados ?? kpis.anuncios_ativos) : '—'} sub={kpis?.anuncios_ativos_herdados ? `${fmtN(kpis.anuncios_ativos_herdados)} herdados · ciclo ${kpis.ciclo_referencia?.janela || '—'}` : `estoque revalidado · ciclo ${kpis?.ciclo_referencia?.janela || '—'}`} />,
-    saidas: <Kpi label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · ausência confirmada" tone={T.positive} />,
-    movimento: <KpiEntradaSaida entrou={kpis?.entradas_48h ?? sinais.filter(s => s.tipo === 'novo').length} saiu={kpis?.saidas_48h ?? sinais.filter(s => s.tipo === 'saida').length} />,
+    revendas: <KpiHoje label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={`${cobertura} · 2×/dia`} evidencia={evidencias.revendas} />,
+    anuncios: <KpiHoje label="Anúncios ativos revalidados" value={kpis ? fmtN(kpis.anuncios_ativos_revalidados ?? kpis.anuncios_ativos) : '—'} sub={kpis?.anuncios_ativos_herdados ? `${fmtN(kpis.anuncios_ativos_herdados)} herdados · ciclo ${kpis.ciclo_referencia?.janela || '—'}` : `estoque revalidado · ciclo ${kpis?.ciclo_referencia?.janela || '—'}`} evidencia={evidencias.anuncios} />,
+    saidas: <KpiHoje label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · saída observada, não é venda" evidencia={evidencias.saidas} />,
+    movimento: <KpiHoje label="Movimento em 48 h" sub="entradas e saídas observadas" evidencia={evidencias.movimento}>
+      <div className="oc-kpi__mov">
+        <div><b style={{ color: T.signal }}><ArrowUpRight size={20} />{fmtN(kpis?.entradas_48h ?? feed.filter(s => s.tipo === 'novo').length)}</b><span className="oc-kpi__sub">entraram</span></div>
+        <div><b style={{ color: T.steel }}><ArrowDownRight size={20} />{fmtN(kpis?.saidas_48h ?? feed.filter(s => s.tipo === 'saida').length)}</b><span className="oc-kpi__sub">saíram</span></div>
+      </div>
+    </KpiHoje>,
   };
 
   const sectionWidgets = {
     feed: (
-      <Card style={{ padding: 16, height: '100%' }}>
-        <div style={{ fontFamily: T.fontDisplay, fontSize: 14, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Movimento do mercado</div>
-        <div style={{ fontSize: 11.5, color: T.inkMuted, marginBottom: 12 }}>O que mudou desde ontem — selecione um anúncio para ver detalhes</div>
-        {sinais.length === 0 ? (
-          <EmptyState icon={Radar} titulo="Sem sinais ainda" texto="Aguardando o próximo ciclo do radar detectar movimento." />
-        ) : (
-          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
-            {sinais.map((s, i) => {
-              const C = config[s.tipo];
-              const aberto = sinalAberto === i;
-              return (
-                <div key={`${s.a.id}-${s.tipo}-${i}`} style={{ background: aberto ? `${T.signal}12` : `var(--or-zebra-bg, ${T.surface})`, border: `1px solid ${aberto ? `${T.signal}4D` : T.line}`, borderRadius: 8, overflow: 'hidden' }}>
-                  <button type="button" aria-expanded={aberto} onClick={() => setSinalAberto(aberto ? null : i)} style={{ width: '100%', display: 'flex', gap: 10, alignItems: 'center', minHeight: 40, padding: '8px 12px', border: 'none', background: 'transparent', color: T.ink, cursor: 'pointer', fontFamily: T.fontBody, textAlign: 'left' }}>
-                    <C.icone size={13} style={{ color: C.cor, flexShrink: 0 }} />
-                    <span style={{ fontFamily: T.fontMono, fontSize: 9.5, color: C.cor, letterSpacing: '0.05em', minWidth: 55 }}>{C.rotulo}</span>
-                    <span style={{ fontSize: 12.5, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.a.titulo}</span>
-                    <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.inkMuted, whiteSpace: 'nowrap' }}>{new Date(s.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                  </button>
-                  {aberto && <div style={{ padding: '2px 12px 12px 35px', fontSize: 12, color: T.inkMuted, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div><span style={{ color: T.ink }}>{s.a.revenda}</span> · {s.a.cidade}/{s.a.uf}</div>
-                    <div><span style={{ fontFamily: T.fontMono, color: T.ink }}>{fmtBRL(s.a.preco)}</span> · {s.a.dias} dias no ar</div>
-                    <ComparativoAnuncio anuncio={s.a} compacto />
-                    {s.a.url && <a href={s.a.url} target="_blank" rel="noreferrer" style={{ color: T.signal, textDecoration: 'none', display: 'inline-flex', gap: 5, alignItems: 'center', marginTop: 4 }}>Ver no portal <ExternalLink size={11} /></a>}
-                  </div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+      <SecaoHoje titulo="Movimento do mercado" subtitulo="Entradas, quedas de preço e saídas observadas. Saída não é venda.">
+        <FeedMovimento itens={feed} />
+      </SecaoHoje>
     ),
+    insights: Array.isArray(stats?.insights) ? (
+      <SecaoHoje titulo="Insights do dia" subtitulo="Sinais calculados sobre o mercado atual. Confira a evidência antes de decidir.">
+        <InsightsDoDia insights={stats.insights} onNavegar={onNavegar} />
+      </SecaoHoje>
+    ) : null,
     modelos: <PainelKpi titulo="Modelos mais anunciados" subtitulo="Volume ativo · preço médio de mercado" dados={stats?.top_modelos} renderItem={(m, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{m.modelo}</span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, whiteSpace: 'nowrap' }}>{m.n}× · <span style={{ color: T.ink }}>{fmtBRL(m.preco_medio)}</span></span></div>} />,
-    regioes: <PainelKpi titulo="Regiões com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias" dados={stats?.regioes_saidas ?? stats?.regioes_vendas} renderItem={(c, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}><span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}><MapPin size={11} style={{ color: T.inkMuted, flexShrink: 0 }} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.cidade}/{c.uf}</span></span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive, whiteSpace: 'nowrap' }}>{c.n} saídas</span></div>} />,
+    regioes: Array.isArray(stats?.ufs_saidas) ? (
+      <SecaoHoje titulo="Regiões com mais saídas" subtitulo="Onde o mercado mais se movimentou">
+        <RegioesSaidas ufs={stats.ufs_saidas} />
+      </SecaoHoje>
+    ) : <PainelKpi titulo="Regiões com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias" dados={stats?.regioes_saidas ?? stats?.regioes_vendas} renderItem={(c, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5 }}><span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}><MapPin size={11} style={{ color: T.inkMuted, flexShrink: 0 }} /><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.cidade}/{c.uf}</span></span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive, whiteSpace: 'nowrap' }}>{c.n} saídas</span></div>} />,
     lojas_novos: <PainelKpi titulo="Lojas mais ativas" subtitulo="Anúncios novos nos últimos 7 dias" dados={stats?.top_lojas_novos} renderItem={(l, i) => <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.signal }}>+{l.n}</span></div>} />,
     lojas_saidas: <PainelKpi titulo="Lojas com mais saídas" subtitulo="Anúncios que deixaram o portal nos últimos 30 dias" dados={stats?.top_lojas_saidas ?? stats?.top_lojas_vendas} renderItem={(l, i) => <div key={i} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{l.nome}</span><span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.positive }}>{l.n} saídas</span></div>} />,
   };
@@ -800,16 +770,17 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
   const presetLabel = DASHBOARD_PRESETS[layout.preset]?.label || 'Personalizado';
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: T.inkMuted, fontSize: 11.5 }}><LayoutGrid size={14} />Visão: {presetLabel}</div>
-        {onPersonalizar && <button type="button" onClick={onPersonalizar} style={{ ...inputStyle, minHeight: 34, padding: '6px 10px', cursor: 'pointer', color: T.signal }}><Settings size={13} style={{ verticalAlign: -2, marginRight: 6 }} />Personalizar painel</button>}
+    <div className="oc-hoje">
+      <div className="oc-hoje__topo">
+        <span><LayoutGrid size={14} />Visão: {presetLabel}</span>
+        {onPersonalizar && <button type="button" className="or-btn or-btn--secondary or-btn--sm" onClick={onPersonalizar}><Settings size={14} />Personalizar painel</button>}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 22 }}>
+      <AlertaColeta frescor={frescor} />
+      <div className="oc-hoje__kpis">
         {layout.kpis.map(id => <React.Fragment key={id}>{kpiWidgets[id]}</React.Fragment>)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: 12, alignItems: 'stretch' }}>
-        {layout.sections.map(section => <div key={section.id} style={{ gridColumn: section.size === 'wide' ? '1 / -1' : 'auto', minWidth: 0 }}>{sectionWidgets[section.id]}</div>)}
+      <div className="oc-hoje__grade">
+        {layout.sections.filter(section => sectionWidgets[section.id]).map(section => <div key={section.id} style={{ gridColumn: section.size === 'wide' ? '1 / -1' : 'auto', minWidth: 0 }}>{sectionWidgets[section.id]}</div>)}
       </div>
     </div>
   );
@@ -3582,7 +3553,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   };
 
   const paginas = {
-    hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
+    hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} onNavegar={(page, context) => navigate(page, { context })} />,
     mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
     comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,

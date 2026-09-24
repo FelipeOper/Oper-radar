@@ -81,18 +81,19 @@ function oper_frescor_coleta(array $ufs, DateTimeInterface $agora, int $limiteHo
 }
 
 /**
- * Feed de movimento: entradas, quedas de preço e saídas observadas, do mais recente ao
- * mais antigo. Entradas são limitadas à metade do feed para não esconder os demais sinais.
+ * Feed de movimento: entradas, quedas de preço, saídas observadas e saídas aguardando a
+ * 2ª confirmação (status removido_candidato), do mais recente ao mais antigo. Entradas são limitadas à metade do feed para não esconder os demais sinais.
  *
  * Linhas de entrada: anuncio_id, titulo, marca, modelo, ano, cidade, uf, preco, quando.
  * Reduções trazem também preco_anterior, preco_novo e variacao_pct (negativa = queda).
  */
-function oper_hoje_feed(array $novos, array $reducoes, array $saidas, int $limite = 12): array {
+function oper_hoje_feed(array $novos, array $reducoes, array $saidas, int $limite = 12, array $verificacoes = []): array {
     $eventos = [];
     $monta = function (string $tipo, array $linha) {
         return [
             'tipo' => $tipo,
             'anuncio_id' => (int)($linha['anuncio_id'] ?? 0),
+            'url' => $linha['url'] ?? null,
             'titulo' => trim((string)($linha['titulo'] ?? '')),
             'marca' => $linha['marca'] ?? null,
             'modelo' => $linha['modelo'] ?? null,
@@ -112,6 +113,7 @@ function oper_hoje_feed(array $novos, array $reducoes, array $saidas, int $limit
         $eventos[] = $monta('preco', $linha);
     }
     foreach ($saidas as $linha) $eventos[] = $monta('saida', $linha);
+    foreach ($verificacoes as $linha) $eventos[] = $monta('verificacao', $linha);
 
     usort($eventos, fn($a, $b) => (strtotime($b['quando']) ?: 0) <=> (strtotime($a['quando']) ?: 0));
 

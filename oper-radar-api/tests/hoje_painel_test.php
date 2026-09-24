@@ -58,6 +58,10 @@ confirma_hoje($feed[0]['anuncio_id'] === 100, 'mais recente primeiro');
 confirma_hoje(end($feed)['anuncio_id'] === 3, 'mais antigo por ultimo');
 confirma_hoje(count(oper_hoje_feed($novos, $reducoes, $saidas, 3)) === 3, 'respeita o limite');
 confirma_hoje(oper_hoje_feed([], [], []) === [], 'sem eventos, feed vazio');
+$comVerificacao = oper_hoje_feed([], [], [], 12, [['anuncio_id' => 9, 'titulo' => 'Aguardando', 'url' => 'https://exemplo.test/9', 'uf' => 'PR', 'quando' => '2026-09-24 10:00:00']]);
+confirma_hoje(count($comVerificacao) === 1 && $comVerificacao[0]['tipo'] === 'verificacao', 'saida aguardando 2a confirmacao entra no feed');
+confirma_hoje($comVerificacao[0]['url'] === 'https://exemplo.test/9', 'url do anuncio acompanha o evento');
+confirma_hoje($feed[0]['url'] === null, 'url ausente vira null');
 confirma_hoje($feed[count($feed) - 2]['tipo'] === 'preco' && $feed[count($feed) - 2]['variacao_pct'] === -4.0, 'queda traz variacao');
 
 // ---- insights ----

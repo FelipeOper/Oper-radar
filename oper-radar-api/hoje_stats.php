@@ -89,21 +89,27 @@ $bloco = function (string $nome, ?array $linhas) use (&$parciais): array {
 };
 
 $feedNovos = $bloco('feed_novos', oper_hoje_consulta($conn, "
-    SELECT a.id AS anuncio_id, a.titulo, a.marca, a.modelo, $anoModelo AS ano, a.preco,
+    SELECT a.id AS anuncio_id, a.url, a.titulo, a.marca, a.modelo, $anoModelo AS ano, a.preco,
            r.cidade, r.uf, a.primeira_vez_visto AS quando
     FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
     WHERE a.status='ativo' AND a.primeira_vez_visto >= DATE_SUB(NOW(), INTERVAL 48 HOUR)
     ORDER BY a.primeira_vez_visto DESC LIMIT 20"));
 $feedSaidas = $bloco('feed_saidas', oper_hoje_consulta($conn, "
-    SELECT a.id AS anuncio_id, a.titulo, a.marca, a.modelo, $anoModelo AS ano, a.preco,
+    SELECT a.id AS anuncio_id, a.url, a.titulo, a.marca, a.modelo, $anoModelo AS ano, a.preco,
            r.cidade, r.uf, a.data_remocao AS quando
     FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
     WHERE a.status='removido_confirmado' AND a.data_remocao >= DATE_SUB(NOW(), INTERVAL 72 HOUR)
     ORDER BY a.data_remocao DESC LIMIT 20"));
+$feedVerificacao = $bloco('feed_verificacao', oper_hoje_consulta($conn, "
+    SELECT a.id AS anuncio_id, a.url, a.titulo, a.marca, a.modelo, $anoModelo AS ano, a.preco,
+           r.cidade, r.uf, a.ultima_vez_ativo AS quando
+    FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+    WHERE a.status='removido_candidato' AND a.ultima_vez_ativo >= DATE_SUB(NOW(), INTERVAL 72 HOUR)
+    ORDER BY a.ultima_vez_ativo DESC LIMIT 10"));
 $feedReducoes = [];
 if ($temEventos) {
     $feedReducoes = $bloco('feed_reducoes', oper_hoje_consulta($conn, "
-        SELECT e.anuncio_id, a.titulo, a.marca, a.modelo, $anoModelo AS ano, r.cidade, r.uf,
+        SELECT e.anuncio_id, a.url, a.titulo, a.marca, a.modelo, $anoModelo AS ano, r.cidade, r.uf,
                e.valor_anterior_decimal AS preco_anterior, e.valor_novo_decimal AS preco_novo,
                ROUND((e.valor_novo_decimal - e.valor_anterior_decimal) / e.valor_anterior_decimal * 100, 1) AS variacao_pct,
                e.ocorrido_em AS quando
@@ -114,7 +120,7 @@ if ($temEventos) {
 } else {
     $parciais[] = 'feed_reducoes';
 }
-$feed = oper_hoje_feed($feedNovos, $feedReducoes, $feedSaidas, 12);
+$feed = oper_hoje_feed($feedNovos, $feedReducoes, $feedSaidas, 12, $feedVerificacao);
 
 $ufsSaidas = $bloco('ufs_saidas', oper_hoje_consulta($conn, "
     SELECT r.uf,
