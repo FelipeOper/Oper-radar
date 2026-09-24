@@ -4,8 +4,10 @@
 function oper_taxonomia_tipo_categoria(): array {
     return [
         'Caminhao' => 'caminhoes',
-        'Implemento' => 'implementos', 'Carroceria-sobre-chassi' => 'implementos',
-        'Trailer' => 'implementos',
+        // Implementos rodoviarios: 'Carreta' e o tipo real da coleta (3,8 mil anuncios ativos em 24/09/2026);
+        // 'Implemento' e mantido por compatibilidade. Implemento agricola NAO entra aqui.
+        'Implemento' => 'implementos', 'Carreta' => 'implementos',
+        'Carroceria-sobre-chassi' => 'implementos', 'Trailer' => 'implementos',
         'Onibus' => 'onibus_vans', 'Micro-onibus' => 'onibus_vans',
         'Vans' => 'onibus_vans', 'Motorhome' => 'onibus_vans',
         'Carro' => 'leves', 'Utilitarios' => 'leves',
@@ -14,7 +16,7 @@ function oper_taxonomia_tipo_categoria(): array {
         'Colheitadeira' => 'agricolas', 'Plataforma-colheitadeira' => 'agricolas',
         'Pulverizador' => 'agricolas', 'Semeadeira' => 'agricolas',
         'Distribuidor-autopropelido' => 'agricolas', 'Forragem-e-feno' => 'agricolas',
-        'Florestal' => 'agricolas',
+        'Florestal' => 'agricolas', 'Implementos-agricolas' => 'agricolas',
         'Pa-carregadeira' => 'construcao', 'Escavadeira' => 'construcao',
         'Retro-escavadeira' => 'construcao', 'Motoniveladora' => 'construcao',
         'Rolo-compactador' => 'construcao', 'Guindaste' => 'construcao',

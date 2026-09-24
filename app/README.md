@@ -96,3 +96,9 @@ com FIPE (`resumo.desvio_fipe_amostra`); abaixo disso o KPI diz "Amostra insuf."
 amostra e a confiança reais (`desvio_fipe_confianca`). Servidor antigo, sem esses campos, não mostra
 número ("Sem amostra verificável"): publique a API 1.2 antes do frontend para o KPI aparecer. Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
 helper `fmt*` usado sem definição (regressão do beta de 24/09/2026).
+
+## Taxonomia (segmento Pesado)
+
+`src/marketTaxonomy.js` espelha `oper-radar-api/lib/market_taxonomy.php`. O mercado principal é só caminhão +
+implemento rodoviário (`Carreta` incluída); implemento agrícola e o restante ficam em "Outros". Ao mudar um
+lado, mude o outro. Testes em `tests/marketTaxonomy.test.js`.

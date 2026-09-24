@@ -126,3 +126,11 @@ As regras puras ficam em `lib/concorrencia_metricas.php`, cobertas por
   (`OPER_RADAR_AMOSTRA_MINIMA`); `mercado_desvio_fipe_amostra` conta esses preços.
   `mercado_painel.php` expõe `resumo.desvio_fipe_amostra` e `resumo.desvio_fipe_confianca`.
   Testes: `tests/market_quality_test.php`.
+
+## Taxonomia do segmento Pesado (decisão de 24/09/2026)
+
+`lib/market_taxonomy.php`: o mercado `principal` é só caminhão + implemento rodoviário (`Caminhao`, `Carreta`,
+`Carroceria-sobre-chassi`, `Trailer`, `Implemento`); o resto forma o mercado `outros`, sem mistura (o cenário
+agrícola fica separado). `Implementos-agricolas` é categoria agrícola. Tipo não mapeado cai em "outros" como
+categoria, mas ainda não entra na lista de tipos de nenhum mercado — mapeie-o aqui ao surgir.
+Testes: `tests/market_taxonomy_test.php`. O espelho no frontend é `app/src/marketTaxonomy.js`.
