@@ -7,7 +7,7 @@ export const APP_ROUTES = [
   { page: 'oportunidades', path: '/oportunidades', title: 'Oportunidades' },
   { page: 'concorrentes', path: '/concorrencia', title: 'Concorrência' },
   { page: 'analise', path: '/analise', title: 'Análise' },
-  { page: 'acoes', path: '/acoes', title: 'Ações' },
+  { page: 'acoes', path: '/acoes', title: 'Plano de ação' },
   { page: 'ajustes', path: '/configuracoes', title: 'Configurações' },
   { page: 'conta', path: '/conta', title: 'Minha conta' },
 ];

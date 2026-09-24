@@ -13,7 +13,10 @@ O app usa o design system em `../design-system/` como única identidade: `src/ma
 `design-system/styles.css` (tokens, fontes Inter/Manjari, ícones Phosphor, classes `.or-*`) e
 `src/theme.js` espelha os tokens semânticos em dois temas, `dark` (padrão) e `light`. Preferências
 salvas antes da troca migram sozinhas (`radar` → `dark`, `white` → `light`). O `Card` do app usa a
-classe `.oc-card` para não colidir com `.or-card` do design system. A migração tela a tela está em
+classe `.oc-card` para não colidir com `.or-card` do design system. A casca do app (menu lateral, topbar, barra
+inferior no celular) está em `src/Shell.jsx`, com as classes `.or-sidebar`/`.or-topbar`/`.or-bottomnav`; a troca
+entre desktop e celular é por CSS (899px), sem largura em JS. Os ícones vêm de `src/icons.jsx`, um adaptador
+para a fonte Phosphor do design system (o `lucide-react` foi removido). A migração tela a tela está em
 `../docs/oper-radar-redesign/MIGRACAO_DEMO_PARA_REAL.md`.
 
 `VITE_DEMO=1 npm run build` gera um build com dados fictícios (`src/demoFixtures.js`) só para

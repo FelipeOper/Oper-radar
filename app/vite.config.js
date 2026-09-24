@@ -11,9 +11,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const caminho = id.replaceAll('\\', '/');
-          if (caminho.includes('/node_modules/lucide-react/')) {
-            return 'icons';
-          }
           if (
             caminho.includes('/node_modules/react/')
             || caminho.includes('/node_modules/react-dom/')

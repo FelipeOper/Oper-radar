@@ -15,7 +15,7 @@ Nada aqui foi publicado. Produção só muda com aprovação explícita e o flux
 | --- | --- | --- |
 | A | Identidade do design system (tokens, Inter/Manjari, tema escuro e claro), migração de preferências salvas | **Feita** (`797c95c`), verificada no navegador |
 | A+ | Modo demo `VITE_DEMO=1` (PR #61) trazido só para verificação visual | Feita (`82f476f`) |
-| B | Shell (sidebar/topbar/bottom nav) e ícones Phosphor no lugar de lucide | A fazer |
+| B | Shell (sidebar/topbar/bottom nav) e ícones Phosphor no lugar de lucide | **Feita**: `Shell.jsx` (classes do design system, troca desktop/celular por CSS em 899px, alternância de tema na topbar) e `icons.jsx` (adaptador Phosphor; lucide removido). Menu: Concorrentes→Concorrência, Ações→Plano de ação |
 | C | Telas, uma por vez (ordem abaixo) | A fazer |
 | D | Backend: novos cruzamentos e endpoints | A fazer, junto com as telas que dependem deles |
 | E | Release | Só com aprovação |
@@ -88,7 +88,7 @@ Cada um ganha teste PHP em `oper-radar-api/tests/` no padrão atual (lógica pur
 
 ## Ordem de execução das telas
 
-1. Shell (Fase B) — desbloqueia todas as demais.
+1. ~~Shell (Fase B)~~ — feito.
 2. Hoje → Mercado → Concorrência/Lojista → Comparador → Minha Loja → Inteligência/Oportunidades
    → Plano de ação → Dados e FIPE → Anúncio/Veículo → Configurações/Conta.
 

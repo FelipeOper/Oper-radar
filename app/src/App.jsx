@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  Radar, LayoutGrid, Crosshair, Building2, Settings, ListChecks,
+  Radar, LayoutGrid, Building2, Settings, ListChecks,
   MapPin, ExternalLink, Search,
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
-  Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
+  Timer, Flame, PackageOpen, Zap, Gauge, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
   Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
   SlidersHorizontal, BarChart3
-} from 'lucide-react';
+} from './icons.jsx';
 import {
   T, THEMES, DEFAULT_UI_PREFERENCES,
   loadUiPreferences, saveUiPreferences, resolveTheme,
@@ -27,6 +27,7 @@ import {
   CATEGORIAS_MERCADO, categoriaDeTipo, categoriasDoMercado, filtrosDaCategoria, rotuloTipo,
 } from './marketTaxonomy.js';
 import { breadcrumbsFor, normalizeAppContext } from './navigation.js';
+import { AppShell, NAV } from './Shell.jsx';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
 import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
@@ -1038,7 +1039,7 @@ function HelpTip({ titulo, children }) {
   return (
     <span ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
       <button type="button" aria-expanded={aberto} aria-label={`O que é ${titulo}`} onClick={e => { e.stopPropagation(); setAberto(v => !v); }}
-        style={{ position: 'relative', width: 18, height: 18, borderRadius: '50%', border: `1px solid ${aberto ? T.signal : T.inkMuted}`, background: 'none', color: aberto ? T.signal : T.inkMuted, fontSize: 11, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, fontFamily: T.fontMono }}>
+        style={{ position: 'relative', width: 18, height: 18, minWidth: 0, minHeight: 0, borderRadius: '50%', border: `1px solid ${aberto ? T.signal : T.inkMuted}`, background: 'none', color: aberto ? T.signal : T.inkMuted, fontSize: 11, fontWeight: 700, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, fontFamily: T.fontMono }}>
         <span aria-hidden="true" style={{ position: 'absolute', inset: -13 }} />?
       </button>
       {aberto && <span role="tooltip" style={{ position: 'absolute', top: 26, left: 0, zIndex: 20, width: 250, maxWidth: '70vw', background: T.surface3, border: `1px solid ${T.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 12, lineHeight: 1.5, color: T.inkMuted, boxShadow: '0 8px 24px rgba(0,0,0,.4)', fontFamily: T.fontBody }}>{children}</span>}
@@ -1157,7 +1158,7 @@ function ModeloCard({ modelo, ativo, onSelecionar, periodo }) {
   );
 }
 
-function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mobile }) {
+function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
   const periodo = contexto?.periodo || '30d';
   const parametros = useMemo(() => {
     const p = new URLSearchParams({ periodo, segmento: contexto?.segmento || 'todas' });
@@ -1355,7 +1356,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar, mob
   </section>;
 }
 
-function PageMercado({ sessao, contexto, onContexto, mobile }) {
+function PageMercado({ sessao, contexto, onContexto }) {
   const contextoInicial = useRef(normalizeAppContext(contexto));
   const [universo, setUniverso] = useState(contextoInicial.current.mercado);
   const [q, setQ] = useState(contextoInicial.current.busca || '');
@@ -1608,7 +1609,7 @@ function PageMercado({ sessao, contexto, onContexto, mobile }) {
   return (
     <div>
       {universo === 'principal' && <PainelMercadoAnalitico contexto={contextoMercado}
-        onContexto={onContexto} visivel={painelAnalitico} onAlternar={() => setPainelAnalitico(valor => !valor)} mobile={mobile} />}
+        onContexto={onContexto} visivel={painelAnalitico} onAlternar={() => setPainelAnalitico(valor => !valor)} />}
       <SectionTitle sub="Explore os anúncios que sustentam os indicadores do painel.">Navegador de anúncios</SectionTitle>
       <div role="tablist" aria-label="Universo do mercado" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
         {[
@@ -3543,42 +3544,18 @@ function PageAnalise() {
 /* ============================================================
    shell — navegação
    ============================================================ */
-const NAV = [
-  { id: 'hoje', rotulo: 'Hoje', icone: Radar },
-  { id: 'mercado', rotulo: 'Mercado', icone: LayoutGrid },
-  { id: 'comparador', rotulo: 'Comparador', icone: Scale },
-  { id: 'minha-loja', rotulo: 'Minha Loja', icone: Store },
-  { id: 'fipe', rotulo: 'FIPE', icone: Search },
-  { id: 'oportunidades', rotulo: 'Oportunidades', icone: Crosshair },
-  { id: 'concorrentes', rotulo: 'Concorrentes', icone: Building2 },
-  { id: 'analise', rotulo: 'Análise', icone: Gauge },
-  { id: 'acoes', rotulo: 'Ações', icone: ListChecks },
-  { id: 'ajustes', rotulo: 'Configurações', icone: Settings },
-  { id: 'conta', rotulo: 'Minha conta', icone: UserRound },
-];
-const NAV_MOBILE_PRINCIPAL = NAV.filter(item => ['hoje', 'mercado', 'minha-loja', 'oportunidades'].includes(item.id));
-const NAV_MOBILE_MAIS = NAV.filter(item => ['comparador', 'fipe', 'concorrentes', 'analise', 'acoes', 'ajustes', 'conta'].includes(item.id));
-
 function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
   const { page: pagina, context: contexto, navigate, updateContext, goBack } = useBrowserRoute(import.meta.env.BASE_URL);
   const setPagina = useCallback(page => navigate(page), [navigate]);
-  const [menuAberto, setMenuAberto] = useState(false);
   const [acoes, setAcoes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('oper-radar-acoes') || '[]'); } catch { return []; }
   });
-  const [mobile, setMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 760);
   const tituloRef = useRef(null);
 
   const { data: kpis } = useApi('kpis.php');
   const { data: anunciosData } = useApi('anuncios.php?ordem=movimento&limit=200');
   const anuncios = useMemo(() => (anunciosData?.anuncios || []).map(mapeiaAnuncioReal), [anunciosData]);
   const usandoReais = anuncios.length > 0;
-
-  useEffect(() => {
-    const f = () => setMobile(window.innerWidth <= 760);
-    window.addEventListener('resize', f);
-    return () => window.removeEventListener('resize', f);
-  }, []);
 
   useEffect(() => {
     try { localStorage.setItem('oper-radar-acoes', JSON.stringify(acoes)); } catch {}
@@ -3606,7 +3583,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
 
   const paginas = {
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} />,
-    mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} mobile={mobile} />,
+    mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
     comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} />,
     fipe: <PageFipe />,
@@ -3623,115 +3600,15 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   const breadcrumbs = breadcrumbsFor(pagina, contexto);
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: T.bg, color: T.ink, fontFamily: T.fontBody, overflow: 'hidden' }}>
-      {/* sidebar desktop */}
-      {!mobile && (
-        <aside style={{ width: 220, borderRight: `1px solid ${T.line}`, display: 'flex', flexDirection: 'column', padding: '22px 14px', flexShrink: 0 }}>
-          <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 17, letterSpacing: '0.02em', padding: '0 10px', marginBottom: 6 }}>
-            OPER<span style={{ color: T.signal }}> RADAR</span>
-          </div>
-          <div style={{ padding: '10px 10px 18px', borderBottom: `1px solid ${T.line}`, marginBottom: 14 }}>
-            <RadarPulse ultimaColeta={kpis?.ultima_coleta} />
-          </div>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {NAV.map(item => {
-              const ativo = pagina === item.id;
-              return (
-                <button key={item.id} onClick={() => setPagina(item.id)} aria-current={ativo ? 'page' : undefined} style={{
-                  display: 'flex', alignItems: 'center', gap: 11, padding: '10px 10px',
-                  background: ativo ? `${T.signal}1A` : 'transparent',
-                  border: 'none', borderRadius: 9, cursor: 'pointer',
-                  color: ativo ? T.signal : T.inkMuted, fontSize: 13.5, fontWeight: ativo ? 600 : 450,
-                  fontFamily: T.fontBody, transition: 'color 140ms, background 140ms', textAlign: 'left',
-                }}>
-                  <item.icone size={16} /> {item.rotulo}
-                  {item.id === 'acoes' && acoesPendentes > 0 && <span style={{ marginLeft: 'auto', fontFamily: T.fontMono, fontSize: 9, color: T.signal }}>{acoesPendentes}</span>}
-                </button>
-              );
-            })}
-          </nav>
-          <div style={{ marginTop: 'auto' }}>
-            <button onClick={() => setPagina('conta')} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '10px', borderRadius: 9, background: pagina === 'conta' ? `${T.signal}12` : 'transparent', border: 'none', color: T.ink, textAlign: 'left', cursor: 'pointer', fontFamily: T.fontBody }}>
-              <span style={{ width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', background: T.surface2, color: T.signal }}><UserRound size={15} /></span>
-              <span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sessao.usuario.nome}</strong><small style={{ color: T.inkMuted, fontSize: 9.5 }}>{sessao.usuario.papel}</small></span>
-            </button>
-            <div style={{ fontFamily: T.fontMono, fontSize: 9, color: T.inkMuted, padding: '10px', lineHeight: 1.55 }}>AGÊNCIA OPER · inteligência de mercado</div>
-          </div>
-        </aside>
-      )}
-
-      {/* área principal */}
-      <main id="app-scroll-container" style={{ flex: 1, overflowY: 'auto', padding: mobile ? '18px 16px 90px' : '26px 32px 40px' }}>
-        {mobile && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 16 }}>
-              OPER<span style={{ color: T.signal }}> RADAR</span>
-            </div>
-            <RadarPulse ultimaColeta={kpis?.ultima_coleta} />
-          </div>
-        )}
-        {pagina !== 'hoje' && (
-          <div className="or-route-tools">
-            <button type="button" onClick={goBack} className="or-back-button"><ArrowLeft size={14} /> Voltar</button>
-            <nav aria-label="Breadcrumb">
-              <ol className="or-breadcrumb-list">
-                {breadcrumbs.map((item, index) => {
-                  const atual = index === breadcrumbs.length - 1;
-                  return <li key={`${item.label}-${index}`}>
-                    {index > 0 && <ChevronRight size={12} aria-hidden="true" />}
-                    {!atual && item.page
-                      ? <button type="button" onClick={() => setPagina(item.page)}>{item.label}</button>
-                      : <span aria-current={atual ? 'page' : undefined}>{item.label}</span>}
-                  </li>;
-                })}
-              </ol>
-            </nav>
-          </div>
-        )}
-        <h1 ref={tituloRef} tabIndex={-1} style={{ fontFamily: T.fontDisplay, fontSize: mobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px', outline: 'none' }}>{tituloPagina}</h1>
-        <div style={{ height: 2, width: 34, background: T.signal, borderRadius: 1, marginBottom: 22 }} />
-        {paginas[pagina]}
-      </main>
-
-      {/* bottom nav mobile */}
-      {mobile && (
-        <>
-        {menuAberto && <>
-          <div onClick={() => setMenuAberto(false)} style={{ position: 'fixed', inset: 0, background: T.overlay, zIndex: 48 }} />
-          <div style={{ position: 'fixed', left: 10, right: 10, bottom: 'calc(72px + env(safe-area-inset-bottom))', zIndex: 49, background: T.surface, border: `1px solid ${T.line}`, borderRadius: 16, padding: 10, boxShadow: T.shadow }}>
-            {NAV_MOBILE_MAIS.map(item => <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} style={{
-              width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-              background: pagina === item.id ? `${T.signal}1A` : 'transparent', border: 'none', borderRadius: 10,
-              color: pagina === item.id ? T.signal : T.ink, fontFamily: T.fontBody, fontSize: 14, cursor: 'pointer', textAlign: 'left',
-            }}><item.icone size={18} /> {item.rotulo}{item.id === 'acoes' && acoesPendentes > 0 && <Tag tone="sinal">{acoesPendentes} PENDENTES</Tag>}</button>)}
-          </div>
-        </>}
-        <nav style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex',
-          background: T.nav, backdropFilter: 'blur(14px)',
-          borderTop: `1px solid ${T.line}`, padding: '7px 4px calc(7px + env(safe-area-inset-bottom))', zIndex: 50,
-        }}>
-          {NAV_MOBILE_PRINCIPAL.map(item => {
-            const ativo = pagina === item.id;
-            return (
-              <button key={item.id} onClick={() => { setPagina(item.id); setMenuAberto(false); }} aria-current={ativo ? 'page' : undefined} style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                background: 'none', border: 'none', cursor: 'pointer', minHeight: 46, justifyContent: 'center',
-                color: ativo ? T.signal : T.inkMuted, fontSize: 9.5, fontFamily: T.fontBody,
-              }}>
-                <item.icone size={18} /> {item.rotulo}
-              </button>
-            );
-          })}
-          <button onClick={() => setMenuAberto(v => !v)} style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minHeight: 46, justifyContent: 'center',
-            background: 'none', border: 'none', cursor: 'pointer', position: 'relative',
-            color: NAV_MOBILE_MAIS.some(item => item.id === pagina) || menuAberto ? T.signal : T.inkMuted, fontSize: 9.5, fontFamily: T.fontBody,
-          }}><MoreHorizontal size={19} /> Mais{acoesPendentes > 0 && <span style={{ position: 'absolute', top: 3, right: '25%', width: 7, height: 7, borderRadius: '50%', background: T.signal }} />}</button>
-        </nav>
-        </>
-      )}
-    </div>
+    <AppShell
+      pagina={pagina} onNavegar={setPagina} titulo={tituloPagina} tituloRef={tituloRef}
+      breadcrumbs={breadcrumbs} onVoltar={goBack} sessao={sessao} acoesPendentes={acoesPendentes}
+      temaClaro={THEMES[temaResolvido]?.mode === 'light'}
+      onAlternarTema={() => onPreferencias({ theme: THEMES[temaResolvido]?.mode === 'light' ? 'dark' : 'light' })}
+      status={<RadarPulse ultimaColeta={kpis?.ultima_coleta} />}
+    >
+      {paginas[pagina]}
+    </AppShell>
   );
 }
 
