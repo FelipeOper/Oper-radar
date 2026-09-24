@@ -61,7 +61,9 @@ $totalGeral = array_sum($porTipo);
 $categorias['outros'] += max(0, $totalGeral - $somaConhecida);
 // Anuncio sem tipo tambem e 'outros' (mesma regra do filtro de categoria e da contagem por UF).
 $semTipo = $conn->query("SELECT COUNT(*) n FROM anuncio$whereStatus AND tipo IS NULL")->fetch_assoc();
-$categorias['outros'] += (int)($semTipo['n'] ?? 0);
+$semTipo = (int)($semTipo['n'] ?? 0);
+$categorias['outros'] += $semTipo;
+$totalGeral += $semTipo; // o total exibido tem que bater com a soma das categorias
 
 // Subtipos por categoria (pro dropdown de subtipo respeitar a categoria escolhida)
 $subtipos = [];
