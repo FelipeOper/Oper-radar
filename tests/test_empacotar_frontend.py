@@ -43,6 +43,25 @@ class EmpacotarFrontendTest(unittest.TestCase):
         duas_vezes = self.m.htaccess_para_base(uma_vez, "/oper-radar-beta/", noindex=True)
         self.assertEqual(uma_vez, duas_vezes)
 
+    def test_zip_grava_permissoes_0644_em_todos_os_arquivos(self):
+        """Regressao (beta, 24/09/2026): .htaccess saiu 0600 e index.html 0666, e a HostGator respondeu 403."""
+        import tempfile
+        import zipfile
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp) / "dist"
+            (dist / "assets").mkdir(parents=True)
+            (dist / "index.html").write_text("<html></html>", encoding="utf-8")
+            (dist / "assets" / "app.js").write_text("x", encoding="utf-8")
+            destino = Path(tmp) / "saida.zip"
+            arquivos = sorted(p for p in dist.rglob("*") if p.is_file())
+            manifesto = self.m.gera_zip(destino, arquivos, dist, "RewriteBase /x/\n")
+            self.assertEqual([n for _, n in manifesto][0], ".htaccess")
+            with zipfile.ZipFile(destino) as zf:
+                self.assertEqual(sorted(zf.namelist()), [".htaccess", "assets/app.js", "index.html"])
+                for info in zf.infolist():
+                    self.assertEqual((info.external_attr >> 16) & 0o777, 0o644, info.filename)
+                    self.assertEqual(info.create_system, 3, info.filename)
+
     def test_vite_aceita_base_por_variavel_e_mantem_producao_como_padrao(self):
         vite = (ROOT / "app" / "vite.config.js").read_text(encoding="utf-8")
         self.assertIn("process.env.VITE_BASE", vite)

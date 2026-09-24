@@ -16,11 +16,15 @@ import os
 import re
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 BASE_PRODUCAO = "/oper-radar/"
+# Permissoes gravadas no zip. Sem isso, arquivos feitos no Windows saem 0666 (e .htaccess 0600) e a
+# HostGator responde 403: o padrao aceito la e 0644 para arquivos e 0755 para pastas.
+MODO_ARQUIVO = 0o100644
 
 
 def normaliza_base(base: str) -> str:
@@ -49,6 +53,28 @@ def sha256(caminho: Path) -> str:
         for bloco in iter(lambda: arq.read(1 << 20), b""):
             h.update(bloco)
     return h.hexdigest()
+
+
+def entrada_zip(nome: str) -> zipfile.ZipInfo:
+    info = zipfile.ZipInfo(nome, date_time=time.localtime()[:6])
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.create_system = 3  # Unix: faz o unzip respeitar external_attr
+    info.external_attr = MODO_ARQUIVO << 16
+    return info
+
+
+def gera_zip(caminho_zip: Path, arquivos, dist: Path, htaccess: str):
+    """Grava o zip com .htaccess primeiro e permissoes 0644; devolve o manifesto [(sha256, nome)]."""
+    manifesto = []
+    with zipfile.ZipFile(caminho_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+        dados = htaccess.encode("utf-8")
+        zf.writestr(entrada_zip(".htaccess"), dados)
+        manifesto.append((hashlib.sha256(dados).hexdigest(), ".htaccess"))
+        for arq in arquivos:
+            rel = arq.relative_to(dist).as_posix()
+            zf.writestr(entrada_zip(rel), arq.read_bytes())
+            manifesto.append((sha256(arq), rel))
+    return manifesto
 
 
 def main() -> int:
@@ -82,14 +108,7 @@ def main() -> int:
     caminho_zip = saida / nome_zip
 
     arquivos = sorted(p for p in dist.rglob("*") if p.is_file() and p.name != ".htaccess")
-    manifesto = []
-    with zipfile.ZipFile(caminho_zip, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(".htaccess", ht)
-        manifesto.append((hashlib.sha256(ht.encode("utf-8")).hexdigest(), ".htaccess"))
-        for arq in arquivos:
-            rel = arq.relative_to(dist).as_posix()
-            zf.write(arq, rel)
-            manifesto.append((sha256(arq), rel))
+    manifesto = gera_zip(caminho_zip, arquivos, dist, ht)
 
     linhas = [f"{h}  {rel}" for h, rel in manifesto]
     (saida / f"MANIFESTO-SHA256-{sufixo}.txt").write_text("\n".join(linhas) + "\n", encoding="utf-8")
