@@ -3,6 +3,12 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Revisão Codex adversarial do PR #63 — 24/09/2026 (correções PRONTAS, ainda NÃO publicadas)
+
+- 1ª rodada `needs-attention` (3 achados: mediana do insight abaixo-FIPE sem filtro de confiança; desvio FIPE do Mercado sem amostra mínima; Concorrência sem filtros de cidade/segmento). 2ª rodada achou 2 furos nas correções (API antiga exibindo desvio sem amostra; segmento misturando métricas gerais). 3ª rodada: **approve**. Commits `da23dc5` e `62f36ef`.
+- **Release 1.2 da API** (pacote em `Downloads\OperRadar-Release1.2-API-fipe`, zip `6b90b3f8a2c0292ce19a1fe2d732d6524bd26fefff5ae165006d1b1f3ec2b41c`): `hoje_stats.php` `e932cfd6…`, `mercado_painel.php` `6e67a6d9…`, `lib/market_quality.php` `e69f9608…`. Pré-checagem no comando: `hoje_stats` = `811ee437…` (Release 1.1) e `mercado_painel` = `aff3ef54…` (Release 1). Publicar **antes** do frontend novo (sem ela o KPI de desvio FIPE aparece como "Sem amostra verificável").
+- **Beta do frontend com filtros de segmento/cidade**: zip `1299cbed968ffbc32c8a386d10eb70a8cbdf61fbb869720622502d8758db1caf`, bundle `index-DvJcyySi.js`. Pendente de envio e extração.
+
 ## Beta do frontend (`/oper-radar-beta/`) — 24/09/2026 (NÃO é produção; `/oper-radar/` intocado)
 
 - Pasta paralela `/home1/pro93061/agenciaoper.com.br/oper-radar-beta/`, mesma API e mesmo login de produção; `.htaccess` com `RewriteBase /oper-radar-beta/` e `X-Robots-Tag: noindex`.
