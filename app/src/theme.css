@@ -482,6 +482,7 @@ select {
 }
 .oc-hoje__kpis {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
   gap: 12px;
 }
@@ -932,7 +933,6 @@ select {
 .or-tag:disabled { opacity:.45; cursor:not-allowed; }
 .or-card--accent .oc-evidencia__botao { color: inherit; opacity: .8; }
 .or-card--accent .oc-evidencia__botao:hover { background: rgba(0,0,0,.12); color: inherit; opacity: 1; }
-.or-card--accent .oc-evidencia__lista dt, .or-card--accent .oc-evidencia__lista dd { color: inherit; }
 /* Duas colunas por padrao; quatro so quando a area de conteudo comporta (viewport >= 1180 px, ja descontada a sidebar). */
 .or-panorama-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (min-width: 1180px) { .or-panorama-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
