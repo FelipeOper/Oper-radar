@@ -3014,7 +3014,7 @@ function PageAnalise() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 14 }}>
           <Kpi label="FIPE vinculados" value={fmtN(ins.fipe?.vinculados || 0)} sub="ativos com preço comparável" />
           <Kpi label="Abaixo da FIPE" value={fmtN(ins.fipe?.abaixo_fipe || 0)} sub="candidatos para validação" tone={T.positive} />
-          <Kpi label="Desvio mediano FIPE" value={(ins.fipe?.desvio_mediano_pct ?? ins.fipe?.desvio_medio_pct) == null ? '—' : `${(ins.fipe.desvio_mediano_pct ?? ins.fipe.desvio_medio_pct).toLocaleString('pt-BR')}%`} sub="amostra qualificada vs referência" />
+          <Kpi label="Desvio mediano FIPE" value={ins.fipe?.desvio_mediano_pct == null ? '—' : `${ins.fipe.desvio_mediano_pct.toLocaleString('pt-BR')}%`} sub="amostra qualificada vs referência" />
           <Kpi label="Atualizado" value={ins.gerado_em ? new Date(ins.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'} sub="leitura calculada agora" />
         </div>
       )}

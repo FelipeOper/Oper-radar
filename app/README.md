@@ -91,8 +91,8 @@ revendas ainda não coletadas aparecem separados e nunca são apresentados como 
 
 ## Desvio da FIPE no Panorama do Mercado
 
-`desvioFipeExibivel` em `src/mercadoModel.js` só mostra o desvio médio com ao menos 5 preços válidos
-com FIPE (`resumo.desvio_fipe_amostra`); abaixo disso o KPI diz "Amostra insuf." e a evidência traz a
+`desvioFipeExibivel` em `src/mercadoModel.js` só mostra o desvio **mediano** (`resumo.desvio_fipe_mediano_pct`; a média antiga
+não é fallback) com ao menos 5 preços válidos com FIPE (`resumo.desvio_fipe_amostra`); abaixo disso o KPI diz "Amostra insuf." e a evidência traz a
 amostra e a confiança reais (`desvio_fipe_confianca`). Servidor antigo, sem esses campos, não mostra
 número ("Sem amostra verificável"): publique a API 1.2 antes do frontend para o KPI aparecer. Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
 helper `fmt*` usado sem definição (regressão do beta de 24/09/2026).
