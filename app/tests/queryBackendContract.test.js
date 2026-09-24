@@ -58,6 +58,5 @@ test('Panorama do Mercado fala em desvio MEDIANO da FIPE em todo texto visivel (
 
 test('README e Insights nao voltam a chamar a mediana de media nem usam a media como fallback', () => {
   assert.doesNotMatch(read('app/README.md'), /desvio médio com ao menos/);
-  assert.doesNotMatch(read('app/src/App.jsx'), /desvio_mediano_pct \?\? [^
-]*desvio_medio_pct/);
+  assert.doesNotMatch(read('app/src/App.jsx'), /desvio_mediano_pct \?\? [^\n]*desvio_medio_pct/);
 });
