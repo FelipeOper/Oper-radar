@@ -798,3 +798,123 @@ select {
     margin-bottom: 8px;
   }
 }
+
+/* ---- Login (Login.jsx): layout do projeto Beta ---- */
+.oc-logo-dark {
+  display: block;
+}
+.oc-logo-light {
+  display: none;
+}
+[data-theme='light'] .oc-logo-dark {
+  display: none;
+}
+[data-theme='light'] .oc-logo-light {
+  display: block;
+}
+.oc-login {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+  background: var(--bg-app);
+  color: var(--text-primary);
+}
+.oc-login__marca {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px;
+  background: var(--bg-sunken);
+  border-right: 1px solid var(--border-subtle);
+}
+.oc-login__marca-centro {
+  max-width: 560px;
+  margin: auto;
+  text-align: center;
+}
+.oc-login__logo {
+  width: min(370px, 80%);
+  height: auto;
+  margin: 0 auto 40px;
+}
+.oc-login__frase {
+  margin: 0 0 26px;
+  font: 700 clamp(34px, 3.3vw, 54px) / 1.07 var(--font-display);
+  letter-spacing: var(--ls-display);
+}
+.oc-login__frase strong {
+  color: var(--text-accent);
+}
+.oc-login__marca-rodape {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.oc-login__painel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+}
+.oc-login__caixa {
+  width: min(100%, 420px);
+}
+.oc-login__logo-mobile {
+  display: none;
+  margin: 0 0 40px;
+}
+.oc-login__logo-mobile img {
+  width: 190px;
+  height: auto;
+}
+.oc-login__titulo {
+  margin-bottom: 28px;
+}
+.oc-login__titulo h1 {
+  margin: 15px 0 9px;
+  font: 700 38px / 1.05 var(--font-display);
+  letter-spacing: var(--ls-display);
+}
+.oc-login__titulo p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.oc-login__form {
+  display: grid;
+  gap: 18px;
+}
+.oc-login__form .or-input input {
+  width: 100%;
+}
+.oc-login__rodape {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 32px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+@media (max-width: 850px) {
+  .oc-login {
+    display: block;
+  }
+  .oc-login__marca {
+    display: none;
+  }
+  .oc-login__painel {
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  .oc-login__caixa {
+    margin: auto;
+  }
+  .oc-login__logo-mobile {
+    display: block;
+  }
+  .oc-login__titulo h1 {
+    font-size: 34px;
+  }
+}

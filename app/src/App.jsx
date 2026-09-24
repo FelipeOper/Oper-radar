@@ -28,6 +28,7 @@ import {
 } from './marketTaxonomy.js';
 import { breadcrumbsFor, normalizeAppContext } from './navigation.js';
 import { AppShell, NAV } from './Shell.jsx';
+import { LoginLayout } from './Login.jsx';
 import { Evidencia } from './Evidencia.jsx';
 import { AlertaColeta, FeedMovimento, InsightsDoDia, RegioesSaidas, SecaoHoje } from './HojeBlocos.jsx';
 import { evidenciaKpis } from './hojeModel.js';
@@ -2242,30 +2243,7 @@ function LoginScreen({ onLogin }) {
     }
   };
 
-  return <div style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 20, background: `radial-gradient(circle at 72% 18%, ${T.signal}18, transparent 34%), ${T.bg}`, color: T.ink, fontFamily: T.fontBody }}>
-    <div style={{ width: 'min(100%, 430px)' }}>
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 20 }}>OPER<span style={{ color: T.signal }}> RADAR</span></div>
-        <div style={{ color: T.inkMuted, fontSize: 12.5, marginTop: 5 }}>Inteligência de mercado para transporte pesado</div>
-      </div>
-      <Card style={{ padding: 26, boxShadow: T.shadow }}>
-        <div style={{ width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', background: `${T.signal}18`, color: T.signal, marginBottom: 18 }}><LockKeyhole size={20} /></div>
-        <h1 style={{ fontFamily: T.fontDisplay, fontSize: 23, margin: '0 0 7px' }}>Acesse sua área</h1>
-        <p style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.55, margin: '0 0 20px' }}>Dados de mercado, FIPE e seu estoque em um ambiente privado.</p>
-        <form onSubmit={entrar} style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-          <label style={{ fontSize: 12, color: T.inkMuted }}>E-mail
-            <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 6 }} placeholder="seu@email.com" />
-          </label>
-          <label style={{ fontSize: 12, color: T.inkMuted }}>Senha
-            <input type="password" autoComplete="current-password" required value={senha} onChange={e => setSenha(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 6 }} placeholder="Sua senha" />
-          </label>
-          {erro && <div role="alert" style={{ color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}30`, borderRadius: 9, padding: 10, fontSize: 12.5 }}>{erro}</div>}
-          <button disabled={enviando} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: enviando ? 'wait' : 'pointer' }}>{enviando ? 'Entrando…' : 'Entrar no radar'}</button>
-        </form>
-      </Card>
-      <div style={{ display: 'flex', gap: 7, alignItems: 'center', justifyContent: 'center', color: T.inkMuted, fontSize: 11.5, marginTop: 16 }}><ShieldCheck size={14} /> Sessão protegida e senha criptografada</div>
-    </div>
-  </div>;
+  return <LoginLayout email={email} onEmail={setEmail} senha={senha} onSenha={setSenha} erro={erro} enviando={enviando} onSubmit={entrar} />;
 }
 
 function PageConta({ sessao, onSessao, onLogout }) {
