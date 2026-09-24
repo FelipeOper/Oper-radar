@@ -41,6 +41,14 @@ export function cidadesDisponiveis(lojistas = [], ufs = []) {
   return [...mapa.values()].sort((a, b) => b.revendas - a.revendas || a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
 }
 
+/* Numero de revendas por UF no recorte atual (segmento e busca ja aplicados; UF e cidade nao): assim o numero do chip e
+   exatamente o total que a lista mostra ao marcar aquela UF. */
+export function contagemPorUf(lojistas = [], { busca = '', categoria = 'todas' } = {}) {
+  const contagem = {};
+  for (const l of filtraRevendas(lojistas, { busca, categoria })) contagem[l.uf] = (contagem[l.uf] || 0) + 1;
+  return contagem;
+}
+
 export function filtraRevendas(lojistas = [], { ufs = [], busca = '', ordem = 'estoque', categoria = 'todas', cidade = 'todas' } = {}) {
   const termo = busca.trim().toLocaleLowerCase('pt-BR');
   const lista = lojistas.filter(l => (!ufs.length || ufs.includes(l.uf)) &&
@@ -73,10 +81,10 @@ export function panoramaConcorrencia(lojistas = [], escopo = 'Todas as UFs', atu
   const reducoes = reducoesDisponiveis ? lojistas.reduce((s, l) => s + n(l.reducoes_30d), 0) : null;
   const comum = { recorte: `${escopo}${rotuloCategoria ? ` · ${rotuloCategoria}` : ''} · revendas monitoradas`, base: `${inteiro(ativos)} anúncios ativos${rotuloCategoria ? ` de ${rotuloCategoria.toLocaleLowerCase('pt-BR')}` : ''} em ${inteiro(lojistas.length)} revendas`, amostra: `${inteiro(lojistas.length)} revendas`, atualizacao };
   return [
-    { titulo: 'Revendas no recorte', valor: inteiro(lojistas.length), evidencia: { ...comum, periodo: 'Estoque atual', valor: inteiro(lojistas.length), explicacao: 'Revendas retornadas pela API dentro das UFs selecionadas.' } },
-    { titulo: 'Anúncios ativos', valor: inteiro(ativos), evidencia: { ...comum, periodo: 'Estoque atual', valor: inteiro(ativos), explicacao: rotuloCategoria ? `Soma dos anúncios ativos de ${rotuloCategoria.toLocaleLowerCase('pt-BR')} nas revendas listadas.` : 'Soma dos anúncios ativos das revendas listadas.' } },
-    { titulo: 'Saídas observadas (30 d)', valor: inteiro(saidas), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: inteiro(saidas), explicacao: `Ausência confirmada no portal. Não comprova venda.${rotuloCategoria ? NOTA_TODO_ESTOQUE : ''}` } },
-    { titulo: 'Reduções de preço (30 d)', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), explicacao: 'Anúncios com ao menos uma queda de preço registrada nos eventos. Queda acima de 50% é descartada como provável erro de coleta. Redução é sinal, não prova.' + (rotuloCategoria ? NOTA_TODO_ESTOQUE : '') } },
+    { titulo: 'Revendas no recorte', icone: 'buildings', detalhe: escopo, valor: inteiro(lojistas.length), evidencia: { ...comum, periodo: 'Estoque atual', valor: inteiro(lojistas.length), explicacao: 'Revendas retornadas pela API dentro das UFs selecionadas.' } },
+    { titulo: 'Anúncios ativos', icone: 'truck', detalhe: rotuloCategoria ? `Estoque de ${rotuloCategoria.toLocaleLowerCase('pt-BR')} somado` : 'Estoque somado das revendas', valor: inteiro(ativos), evidencia: { ...comum, periodo: 'Estoque atual', valor: inteiro(ativos), explicacao: rotuloCategoria ? `Soma dos anúncios ativos de ${rotuloCategoria.toLocaleLowerCase('pt-BR')} nas revendas listadas.` : 'Soma dos anúncios ativos das revendas listadas.' } },
+    { titulo: 'Saídas observadas (30 d)', icone: 'check-circle', detalhe: 'Saída observada não é venda', valor: inteiro(saidas), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: inteiro(saidas), explicacao: `Ausência confirmada no portal. Não comprova venda.${rotuloCategoria ? NOTA_TODO_ESTOQUE : ''}` } },
+    { titulo: 'Reduções de preço (30 d)', icone: 'trend-down', detalhe: 'Sinal, não prova', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), explicacao: 'Anúncios com ao menos uma queda de preço registrada nos eventos. Queda acima de 50% é descartada como provável erro de coleta. Redução é sinal, não prova.' + (rotuloCategoria ? NOTA_TODO_ESTOQUE : '') } },
   ];
 }
 
@@ -88,4 +96,28 @@ export function leituraRevenda(l, atualizacao = null) {
     desvio: desvio == null ? 'Amostra insuficiente' : percentual(desvio),
     evidenciaDesvio: { recorte: `${l.nome} · ${l.cidade}/${l.uf}`, periodo: 'Estoque ativo', valor: desvio == null ? 'Amostra insuficiente' : percentual(desvio), base: 'Preço anunciado frente à FIPE vinculada de cada veículo', amostra: `${inteiro(l.desvio_fipe_amostra)} preços válidos com FIPE`, confianca: l.desvio_fipe_confianca || 'insuficiente', atualizacao, explicacao: 'Mediana dos desvios individuais. Só é exibida com ao menos 5 preços válidos vinculados à FIPE.' },
   };
+}
+
+const plural = (qtd, singular, plur) => `${inteiro(qtd)} ${n(qtd) === 1 ? singular : plur}`;
+
+/* Duas linhas de texto da revenda na lista, no vocabulario da demo aprovada. Com segmento escolhido a lista so traz o
+   total (idade e desvio por segmento aparecem no painel do lojista), entao esses dois ficam de fora e o texto avisa. */
+export function linhasRevenda(l, { categoria = 'todas', rotuloCategoria = '' } = {}) {
+  const local = `${l.cidade}/${l.uf}`;
+  const saidas = plural(l.saidas_30d, 'saída observada', 'saídas observadas');
+  const reducoes = l.reducoes_30d == null ? 'reduções indisponíveis' : plural(l.reducoes_30d, 'redução', 'reduções');
+  if (categoria !== 'todas') {
+    return [
+      `${local} · ${plural(ativosNaCategoria(l, categoria), 'anúncio', 'anúncios')} em ${rotuloCategoria || categoria} (de ${inteiro(l.ativos)} no total)`,
+      `${saidas} · ${reducoes} (30 d) · estoque total da revenda`,
+    ];
+  }
+  const idade = l.idade_observada_confiavel && l.idade_media_estoque != null
+    ? `idade média ${Math.round(n(l.idade_media_estoque))} d`
+    : 'idade média indisponível (menos de 14 dias de coleta)';
+  const desvio = l.desvio_fipe_mediano_pct == null ? 'amostra insuficiente' : percentual(l.desvio_fipe_mediano_pct);
+  return [
+    `${local} · ${plural(l.ativos, 'anúncio', 'anúncios')} · ${idade}`,
+    `${saidas} · ${reducoes} (30 d) · desvio FIPE (mediana) ${desvio}`,
+  ];
 }

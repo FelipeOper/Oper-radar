@@ -110,3 +110,10 @@ Com um modelo selecionado no painel (marca + modelo + ano no contexto), `PageMer
 Teste de contrato: `tests/queryBackendContract.test.js`.
 Filtros próprios da lista (preço, revenda, carroceria, tração, fila FIPE) continuam somando ao recorte do modelo: a
 contagem do botão é a do modelo/ano no recorte geográfico do painel, e a lista mostra seus filtros ativos.
+
+## Auditoria visual contra a DEMO
+
+`docs/oper-radar-redesign/AUDITORIA_BETA_VS_DEMO.md` registra, tela a tela, as divergências entre o app e a DEMO aprovada
+(corrigidas, decisões e telas ainda não portadas). Cartões de indicador seguem `or-stat` do design system (ícone, legenda,
+evidência); na Concorrência, o número de cada chip de UF vem de `contagemPorUf` (segmento e busca atuais) e o texto das
+linhas de `linhasRevenda`, ambos em `src/concorrenciaModel.js` com testes.

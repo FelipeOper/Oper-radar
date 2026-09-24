@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   LayoutGrid, Settings, ListChecks,
   MapPin, ExternalLink, Search,
-  TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
+  TrendingDown, ArrowDownRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Gauge, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
@@ -702,12 +702,13 @@ function PainelKpi({ titulo, subtitulo, dados, renderItem, style }) {
 }
 
 
-function KpiHoje({ label, value, sub, evidencia, children }) {
+/* Cartao no formato da demo aprovada (classes or-stat do design system): rotulo + icone, valor, legenda, evidencia. */
+function KpiHoje({ label, value, sub, evidencia, children, icone, destaque }) {
   return (
-    <section className="or-card oc-kpi">
-      <span className="oc-kpi__rotulo">{label}</span>
-      {children || <strong className="oc-kpi__valor">{value}</strong>}
-      {sub && <span className="oc-kpi__sub">{sub}</span>}
+    <section className={`or-card or-stat oc-kpi${destaque ? ' or-card--accent' : ''}`} style={{ minWidth: 0 }}>
+      <div className="or-stat__top"><span className="or-stat__label">{label}</span>{icone && <span className="or-stat__ic"><i className={`ph ph-${icone}`} aria-hidden="true" /></span>}</div>
+      {children || <div className="or-stat__row"><span className="or-stat__value">{value}</span></div>}
+      {sub && <p className="or-card__sub" style={{ margin: 0 }}>{sub}</p>}
       <Evidencia evidencia={evidencia} rotulo="Evidência" />
     </section>
   );
@@ -749,15 +750,14 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
     ? `${kpis.ufs_ativas.length} UFs · ${kpis.regioes_ativas?.length || 0} regiões`
     : usandoReais ? `${Object.keys(facetas?.por_uf || {}).length || 1} UFs` : 'conectando…';
 
+  const entradas48 = kpis?.entradas_48h ?? feed.filter(s => s.tipo === 'novo').length;
+  const saidas48 = kpis?.saidas_48h ?? feed.filter(s => s.tipo === 'saida').length;
   const kpiWidgets = {
-    revendas: <KpiHoje label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={`${cobertura} · 2×/dia`} evidencia={evidencias.revendas} />,
-    anuncios: <KpiHoje label="Anúncios ativos revalidados" value={kpis ? fmtN(kpis.anuncios_ativos_revalidados ?? kpis.anuncios_ativos) : '—'} sub={kpis?.anuncios_ativos_herdados ? `${fmtN(kpis.anuncios_ativos_herdados)} herdados · ciclo ${kpis.ciclo_referencia?.janela || '—'}` : `estoque revalidado · ciclo ${kpis?.ciclo_referencia?.janela || '—'}`} evidencia={evidencias.anuncios} />,
-    saidas: <KpiHoje label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · saída observada, não é venda" evidencia={evidencias.saidas} />,
-    movimento: <KpiHoje label="Movimento em 48 h" sub="entradas e saídas observadas" evidencia={evidencias.movimento}>
-      <div className="oc-kpi__mov">
-        <div><b style={{ color: T.signal }}><ArrowUpRight size={20} />{fmtN(kpis?.entradas_48h ?? feed.filter(s => s.tipo === 'novo').length)}</b><span className="oc-kpi__sub">entraram</span></div>
-        <div><b style={{ color: T.steel }}><ArrowDownRight size={20} />{fmtN(kpis?.saidas_48h ?? feed.filter(s => s.tipo === 'saida').length)}</b><span className="oc-kpi__sub">saíram</span></div>
-      </div>
+    revendas: <KpiHoje icone="storefront" label="Revendas no radar" value={kpis ? fmtN(kpis.revendas_monitoradas) : '—'} sub={`${cobertura} · 2×/dia`} evidencia={evidencias.revendas} />,
+    anuncios: <KpiHoje icone="truck" label="Anúncios ativos revalidados" value={kpis ? fmtN(kpis.anuncios_ativos_revalidados ?? kpis.anuncios_ativos) : '—'} sub={kpis?.anuncios_ativos_herdados ? `${fmtN(kpis.anuncios_ativos_herdados)} herdados · ciclo ${kpis.ciclo_referencia?.janela || '—'}` : `estoque revalidado · ciclo ${kpis?.ciclo_referencia?.janela || '—'}`} evidencia={evidencias.anuncios} />,
+    saidas: <KpiHoje icone="check-circle" label="Saídas detectadas" value={kpis ? fmtN(kpis.saidas_detectadas_mes ?? kpis.vendas_estimadas_mes) : '—'} sub="este mês · saída observada, não é venda" evidencia={evidencias.saidas} />,
+    movimento: <KpiHoje icone="arrows-left-right" destaque label="Movimento em 48 h" sub="entradas / saídas observadas" evidencia={evidencias.movimento}>
+      <div className="or-stat__row"><span className="or-stat__value" aria-label={`${fmtN(entradas48)} entradas e ${fmtN(saidas48)} saídas`}>+{fmtN(entradas48)} / −{fmtN(saidas48)}</span></div>
     </KpiHoje>,
   };
 
@@ -1252,37 +1252,34 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
     ) : <>
       <section style={{ marginBottom: 14 }}>
         <SecaoCabecalho titulo="Panorama do mercado" ajuda={<>Resumo do estoque ativo nas UFs e período selecionados. "Entraram/saíram" é contagem de anúncios (não preço). "Desvio médio da FIPE" compara o preço anunciado dos ativos com a referência FIPE — positivo é acima da FIPE.</>} />
-        <Card style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="or-panorama-grid">
-            <div className="or-kpi">
-              <div style={{ fontSize: 11, color: T.inkMuted }}>Anúncios ativos</div>
-              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{fmtN(resumo.anuncios)}</div>
-              <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.4 }}>
-                <span style={{ color: T.positive }}>▲ {fmtN(resumo.entradas_periodo)} entraram</span><br />
-                <span style={{ color: T.alert }}>▼ {fmtN(resumo.saidas_periodo)} saíram</span> <span style={{ color: T.inkMuted }}>({periodo})</span>
-              </div>
-              <Evidencia evidencia={evPanorama.anuncios} rotulo="Evidência" />
-            </div>
-            <div className="or-kpi">
-              <div style={{ fontSize: 11, color: T.inkMuted }}>Lojistas no radar</div>
-              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{fmtN(resumo.lojistas)}</div>
-              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>em {fmtN(resumo.cidades)} cidades · {fmtN(resumo.ufs)} UFs</div>
-              <Evidencia evidencia={evPanorama.lojistas} rotulo="Evidência" />
-            </div>
-            <div className="or-kpi">
-              <div style={{ fontSize: 11, color: T.inkMuted }}>Ticket mediano</div>
-              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{resumo.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(resumo.ticket_mediano)}</div>
-              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>{fmtN(resumo.amostra_qualificada || 0)} preços qualificados</div>
-              <Evidencia evidencia={evPanorama.ticket} rotulo="Evidência" />
-            </div>
-            <div className="or-kpi">
-              <div style={{ fontSize: 11, color: T.inkMuted }}>Desvio médio da FIPE</div>
-              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{desvioFipe.valor == null ? (desvioFipe.amostra == null ? '—' : 'Amostra insuf.') : fmtPctAssinado(desvioFipe.valor)}</div>
-              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>{desvioFipe.amostra == null ? 'anúncios ativos vs. referência FIPE' : `${fmtN(desvioFipe.amostra)} preços válidos com FIPE`}</div>
-              <Evidencia evidencia={evPanorama.desvio} rotulo="Evidência" />
-            </div>
-          </div>
-        </Card>
+        <div className="or-panorama-cards">
+          <article className="or-card or-stat" style={{ minWidth: 0 }}>
+            <div className="or-stat__top"><span className="or-stat__label">Anúncios ativos</span><span className="or-stat__ic"><i className="ph ph-truck" aria-hidden="true" /></span></div>
+            <div className="or-stat__row"><span className="or-stat__value">{fmtN(resumo.anuncios)}</span></div>
+            <p className="or-card__sub" style={{ margin: 0 }}>
+              <span style={{ color: T.positive }}>▲ {fmtN(resumo.entradas_periodo)} entraram</span> · <span style={{ color: T.alert }}>▼ {fmtN(resumo.saidas_periodo)} saíram</span> ({periodo})
+            </p>
+            <Evidencia evidencia={evPanorama.anuncios} rotulo="Evidência" />
+          </article>
+          <article className="or-card or-stat" style={{ minWidth: 0 }}>
+            <div className="or-stat__top"><span className="or-stat__label">Lojistas no radar</span><span className="or-stat__ic"><i className="ph ph-storefront" aria-hidden="true" /></span></div>
+            <div className="or-stat__row"><span className="or-stat__value">{fmtN(resumo.lojistas)}</span></div>
+            <p className="or-card__sub" style={{ margin: 0 }}>em {fmtN(resumo.cidades)} cidades · {fmtN(resumo.ufs)} UFs</p>
+            <Evidencia evidencia={evPanorama.lojistas} rotulo="Evidência" />
+          </article>
+          <article className="or-card or-stat" style={{ minWidth: 0 }}>
+            <div className="or-stat__top"><span className="or-stat__label">Ticket mediano</span><span className="or-stat__ic"><i className="ph ph-currency-circle-dollar" aria-hidden="true" /></span></div>
+            <div className="or-stat__row"><span className="or-stat__value">{resumo.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(resumo.ticket_mediano)}</span></div>
+            <p className="or-card__sub" style={{ margin: 0 }}>{fmtN(resumo.amostra_qualificada || 0)} preços qualificados</p>
+            <Evidencia evidencia={evPanorama.ticket} rotulo="Evidência" />
+          </article>
+          <article className="or-card or-stat" style={{ minWidth: 0 }}>
+            <div className="or-stat__top"><span className="or-stat__label">Desvio médio da FIPE</span><span className="or-stat__ic"><i className="ph ph-percent" aria-hidden="true" /></span></div>
+            <div className="or-stat__row"><span className="or-stat__value">{desvioFipe.valor == null ? (desvioFipe.amostra == null ? '—' : 'Amostra insuf.') : fmtPctAssinado(desvioFipe.valor)}</span></div>
+            <p className="or-card__sub" style={{ margin: 0 }}>{desvioFipe.amostra == null ? 'anúncios ativos vs. referência FIPE' : `${fmtN(desvioFipe.amostra)} preços válidos com FIPE`}</p>
+            <Evidencia evidencia={evPanorama.desvio} rotulo="Evidência" />
+          </article>
+        </div>
       </section>
 
       <section style={{ marginBottom: 14 }}>

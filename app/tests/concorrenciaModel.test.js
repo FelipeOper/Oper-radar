@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ativosNaCategoria, cidadesDisponiveis, contagemPorCategoria, filtraRevendas, panoramaConcorrencia, leituraRevenda } from '../src/concorrenciaModel.js';
+import { ativosNaCategoria, cidadesDisponiveis, contagemPorCategoria, contagemPorUf, filtraRevendas, linhasRevenda, panoramaConcorrencia, leituraRevenda } from '../src/concorrenciaModel.js';
 
 test('ordena por reducoes e preserva ausentes no fim', () => {
   const rows = [{ nome: 'A', uf: 'PR', reducoes_30d: null }, { nome: 'B', uf: 'SP', reducoes_30d: 2 }, { nome: 'C', uf: 'SP', reducoes_30d: 4 }];
@@ -60,3 +60,29 @@ test('panorama com segmento soma so os ativos do segmento e avisa que saidas/red
   assert.doesNotMatch(semSegmento[2].evidencia.explicacao, /todo o estoque/);
 });
 
+
+test('chip de UF conta revendas no recorte atual (segmento e busca), nunca mais que a lista mostra ao marcar', () => {
+  assert.deepEqual(contagemPorUf(base), { PR: 3, SP: 1, SC: 1 });
+  assert.deepEqual(contagemPorUf(base, { categoria: 'caminhoes' }), { PR: 2 });
+  assert.deepEqual(contagemPorUf(base, { busca: 'curitiba' }), { PR: 1 });
+  for (const uf of ['PR', 'SP', 'SC']) {
+    assert.equal(contagemPorUf(base, { categoria: 'caminhoes' })[uf] || 0, filtraRevendas(base, { ufs: [uf], categoria: 'caminhoes' }).length);
+  }
+});
+
+test('KPIs da Concorrencia trazem icone e legenda curta no vocabulario da demo', () => {
+  const kpis = panoramaConcorrencia(base, 'Todas as UFs');
+  assert.deepEqual(kpis.map(k => k.icone), ['buildings', 'truck', 'check-circle', 'trend-down']);
+  assert.deepEqual(kpis.map(k => k.detalhe), ['Todas as UFs', 'Estoque somado das revendas', 'Saída observada não é venda', 'Sinal, não prova']);
+  assert.equal(panoramaConcorrencia(base, 'PR', null, { categoria: 'caminhoes' })[1].detalhe, 'Estoque de caminhões somado');
+});
+
+test('linhas da revenda seguem o texto da demo e nao misturam recortes', () => {
+  const l = { nome: 'A', cidade: 'Curitiba', uf: 'PR', ativos: 54, saidas_30d: 0, reducoes_30d: 9, idade_media_estoque: 38, idade_observada_confiavel: true, desvio_fipe_mediano_pct: -4.4, mix_categorias: { Caminhao: 30, Carreta: 24 } };
+  assert.deepEqual(linhasRevenda(l), ['Curitiba/PR · 54 anúncios · idade média 38 d', '0 saídas observadas · 9 reduções (30 d) · desvio FIPE (mediana) -4,4%']);
+  assert.deepEqual(linhasRevenda({ ...l, saidas_30d: 1, reducoes_30d: 1 })[1].split(' · ').slice(0, 2), ['1 saída observada', '1 redução (30 d)']);
+  const segmento = linhasRevenda(l, { categoria: 'caminhoes', rotuloCategoria: 'Caminhões' });
+  assert.equal(segmento[0], 'Curitiba/PR · 30 anúncios em Caminhões (de 54 no total)');
+  assert.doesNotMatch(segmento.join(' '), /idade média|desvio FIPE/);
+  assert.match(linhasRevenda({ ...l, idade_observada_confiavel: false, reducoes_30d: null, desvio_fipe_mediano_pct: null }).join(' '), /menos de 14 dias de coleta.*reduções indisponíveis.*amostra insuficiente/);
+});
