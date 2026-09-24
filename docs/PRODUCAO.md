@@ -3,6 +3,30 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 1 da API — 24/09/2026 (só PHP, aditivo)
+
+- Responsável: Felipe Hilario (upload e extração manuais pelo cPanel); conferência: Claude.
+- Origem: branch `agent/portar-demo-real` (PR #63), commit `40b49b2`; CI Python 3.9 e 3.13 verde. Testes: 16/16 PHP, 63/63 app, 62/62 contratos.
+- Backup anterior: `/home1/pro93061/backups/oper-radar-api-20260924-115707` (29 itens).
+- Conferência antes (leitura): `hoje_stats.php` = commit `662c93a`, `mercado_painel.php` = `57bbe6e`, `lojistas.php` = `a7e66fe`, `lojista_detalhe.php` = `1b89814` (todos versões conhecidas do Git); os 4 arquivos novos não existiam; as 16 funções das bibliotecas usadas existiam (`market_quality`, `regional_insight`, `store_market`, `competitor_history`, `market_scope`).
+- Publicados (SHA-256 no servidor, conferidos contra o pacote):
+
+| Arquivo (`oper-radar-api/`) | Situação | SHA-256 |
+|---|---|---|
+| `frescor_coleta.php` | novo | `be20ff6e5cd53f450f26e8860e1e9bf7688022257898129a4bcdae3c19f906a1` |
+| `lib/hoje_painel.php` | novo | `b86a4ab55489b67f366a029b99026d64344d39212fcc745a177465193ed87ffc` |
+| `lib/regional_modelo.php` | novo | `20fb0ba06791d43ea98d9b2735e056ce7a4e9d5a0ba63d3e78f5648cfd856f20` |
+| `lib/concorrencia_metricas.php` | novo | `29c50321988f69b80e613f451129dcb817c4e449ec577176a1a89eda547cfa16` |
+| `hoje_stats.php` | alterado | `aa29b41469f9130c37e92797b0de6657258c3a9921a5721173c8a770f73d89b5` |
+| `mercado_painel.php` | alterado | `aff3ef54fd27073d6e4c5b735cb15b2236e916cd92892ec345f870467ad869d1` |
+| `lojistas.php` | alterado | `827e1a10e5c118cc84d9d551d7411edd508e91d14080a7b4505dc3163c4c330d` |
+| `lojista_detalhe.php` | alterado | `554d69fba980655e38c53a513c9b3b1e60064fda7c37fba381cca6079d7dcfce` |
+
+- Validação no servidor (PHP 8.3.33): `php -l` sem erro nos 8 arquivos; os 8 hashes idênticos aos do pacote.
+- Migrações: nenhuma. Cron: nenhuma alteração. Banco e credenciais: não tocados. Frontend: **não publicado** (o app em produção ignora os campos novos; nenhuma mudança visível).
+- **Pendente:** conferir ao vivo `hoje_stats.php` (esperado `parciais_indisponiveis` vazio), `frescor_coleta.php`, `mercado_painel.php` com modelo selecionado (`selecionado.oportunidade_regional`) e `lojistas.php` (`reducoes_30d`, `desvio_fipe_mediano_pct`); as consultas novas ainda não foram executadas em MySQL real até essa conferência.
+- Reversão: restaurar do backup acima os 4 arquivos alterados e apagar os 4 novos (roteiro em `Downloads\OperRadar-Release1-API-v2\LEIA-ME.md`).
+
 ## Release de 01/09/2026 às 07h35
 
 - Origem funcional: branch `redesign-oper-radar-20260831`, commit `165333b`.
