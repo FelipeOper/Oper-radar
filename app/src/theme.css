@@ -1,15 +1,16 @@
 :root {
-  --or-bg: #0b0e13;
-  --or-surface: #141922;
-  --or-surface-2: #1b212c;
-  --or-surface-3: #242c39;
-  --or-ink: #edeff3;
-  --or-ink-muted: #8a94a6;
-  --or-signal: #f5a623;
-  --or-positive: #3dd68c;
-  --or-alert: #ff6b4a;
-  --or-line: rgba(255, 255, 255, 0.07);
-  --or-line-strong: rgba(255, 255, 255, 0.16);
+  /* Valores iniciais = tema escuro do design system; applyUiPreferences() sobrescreve em runtime. */
+  --or-bg: #0a0a0a;
+  --or-surface: #141414;
+  --or-surface-2: #1a1a1a;
+  --or-surface-3: #262626;
+  --or-ink: #ffffff;
+  --or-ink-muted: #a3a3a3;
+  --or-signal: #46f84b;
+  --or-positive: #46f84b;
+  --or-alert: #ff6b6b;
+  --or-line: rgba(255, 255, 255, 0.1);
+  --or-line-strong: rgba(255, 255, 255, 0.22);
   --or-control-min-height: 42px;
   --or-card-default-padding: 20px;
 }
@@ -140,7 +141,7 @@ select {
   box-shadow: inset 0 -1px 0 var(--or-line);
 }
 
-.or-zebra-list > .or-card {
+.or-zebra-list > .oc-card {
   border-color: var(--or-line-strong) !important;
 }
 

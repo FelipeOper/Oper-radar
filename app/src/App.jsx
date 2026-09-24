@@ -11,7 +11,7 @@ import {
   SlidersHorizontal, BarChart3
 } from 'lucide-react';
 import {
-  T, THEMES, COMING_THEMES, DEFAULT_UI_PREFERENCES,
+  T, THEMES, DEFAULT_UI_PREFERENCES,
   loadUiPreferences, saveUiPreferences, resolveTheme,
   activateTheme, applyUiPreferences,
 } from './theme.js';
@@ -211,7 +211,7 @@ function RadarPulse({ ultimaColeta }) {
 function Card({ children, style, onClick, className = '' }) {
   const usaPaddingPadrao = style?.padding == null;
   return (
-    <div className={`${usaPaddingPadrao ? 'or-card or-card-density' : 'or-card'} ${className}`.trim()} onClick={onClick}
+    <div className={`${usaPaddingPadrao ? 'oc-card or-card-density' : 'oc-card'} ${className}`.trim()} onClick={onClick}
       role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); } }) : undefined}
       style={{
@@ -3260,10 +3260,9 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
         <div style={{ fontSize: 12, color: T.inkMuted, marginBottom: 12 }}>TEMA</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: 9 }}>
           {[
-            { id: 'auto', label: 'Automático', description: 'Segue o aparelho', icon: Monitor, colors: ['#0B0E13', '#FFFFFF', '#5B8AA6'] },
-            { ...THEMES.radar, icon: Radar, colors: [THEMES.radar.tokens.bg, THEMES.radar.tokens.surface, THEMES.radar.tokens.signal] },
+            { id: 'auto', label: 'Automático', description: 'Segue o aparelho', icon: Monitor, colors: [THEMES.dark.tokens.bg, THEMES.light.tokens.surface, THEMES.dark.tokens.signal] },
             { ...THEMES.dark, icon: Moon, colors: [THEMES.dark.tokens.bg, THEMES.dark.tokens.surface, THEMES.dark.tokens.signal] },
-            { ...THEMES.white, icon: Sun, colors: [THEMES.white.tokens.bg, THEMES.white.tokens.surface, THEMES.white.tokens.signal] },
+            { ...THEMES.light, icon: Sun, colors: [THEMES.light.tokens.bg, THEMES.light.tokens.surface, THEMES.light.tokens.signal] },
           ].map(opcao => {
             const ativo = preferencias.theme === opcao.id;
             const Icon = opcao.icon;
@@ -3273,8 +3272,6 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
             </button>;
           })}
         </div>
-        <div style={{ fontSize: 12, color: T.inkMuted, margin: '18px 0 9px' }}>PRÓXIMOS TEMAS</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{COMING_THEMES.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${T.line}`, background: T.surface2, borderRadius: 9, padding: '8px 10px', color: T.inkMuted, fontSize: 11.5 }}><Palette size={14} />{t.label}<Tag tone="neutro">EM BREVE</Tag></div>)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: 14, marginTop: 20, paddingTop: 18, borderTop: `1px solid ${T.line}` }}>
           <div><div style={{ fontSize: 12, color: T.inkMuted, marginBottom: 8 }}>DENSIDADE</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{[['compact','Compacta'],['standard','Padrão'],['comfortable','Confortável']].map(([id,label]) => <button key={id} onClick={() => onPreferencias({ density: id })} style={{ ...inputStyle, cursor: 'pointer', color: preferencias.density === id ? T.signal : T.ink, borderColor: preferencias.density === id ? T.signal : T.line }}>{label}</button>)}</div></div>
           <div><div style={{ fontSize: 12, color: T.inkMuted, marginBottom: 8 }}>MOVIMENTO</div><button onClick={() => onPreferencias({ reduceMotion: !preferencias.reduceMotion })} style={{ ...inputStyle, cursor: 'pointer', width: '100%', textAlign: 'left', color: preferencias.reduceMotion ? T.positive : T.ink }}>{preferencias.reduceMotion ? '✓ Animações reduzidas' : 'Animações normais'}</button></div>
@@ -3375,7 +3372,7 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
             const max = Math.max(1, ...cobertura.map(c => c.qtd));
             return <div key={item.name} title={`${item.nome}: ${item.qtd} revendas coletadas`} style={{ minWidth: 0 }}>
               <div style={{ height: 96, display: 'flex', alignItems: 'flex-end', background: T.surface2, borderRadius: 7, overflow: 'hidden' }}>
-                <div style={{ width: '100%', height: `${Math.max(5, item.qtd / max * 100)}%`, background: `linear-gradient(180deg, ${T.positive}, #23865A)`, borderRadius: '6px 6px 0 0' }} />
+                <div style={{ width: '100%', height: `${Math.max(5, item.qtd / max * 100)}%`, background: `linear-gradient(180deg, ${T.positive}, ${T.positive}99)`, borderRadius: '6px 6px 0 0' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4, marginTop: 6, fontFamily: T.fontMono, fontSize: 10.5 }}>
                 <span>{item.name}</span><span style={{ color: T.inkMuted }}>{fmtN(item.qtd)}</span>
