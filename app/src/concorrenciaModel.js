@@ -98,6 +98,14 @@ export function leituraRevenda(l, atualizacao = null) {
   };
 }
 
+/* Diz POR QUE a idade nao existe so quando a causa e conhecida: sem anuncio ativo, coleta curta (< 14 dias) ou generica. */
+function motivoIdadeIndisponivel(l) {
+  if (n(l.ativos) === 0) return ' (sem anúncios ativos)';
+  if (l.dias_de_coleta != null && n(l.dias_de_coleta) < 14) return ' (menos de 14 dias de coleta)';
+  if (l.idade_observada_confiavel === false) return ' (coleta ainda curta)';
+  return '';
+}
+
 const plural = (qtd, singular, plur) => `${inteiro(qtd)} ${n(qtd) === 1 ? singular : plur}`;
 
 /* Duas linhas de texto da revenda na lista, no vocabulario da demo aprovada. Com segmento escolhido a lista so traz o
@@ -114,7 +122,7 @@ export function linhasRevenda(l, { categoria = 'todas', rotuloCategoria = '' } =
   }
   const idade = l.idade_observada_confiavel && l.idade_media_estoque != null
     ? `idade média ${Math.round(n(l.idade_media_estoque))} d`
-    : 'idade média indisponível (menos de 14 dias de coleta)';
+    : `idade média indisponível${motivoIdadeIndisponivel(l)}`;
   const desvio = l.desvio_fipe_mediano_pct == null ? 'amostra insuficiente' : percentual(l.desvio_fipe_mediano_pct);
   return [
     `${local} · ${plural(l.ativos, 'anúncio', 'anúncios')} · ${idade}`,

@@ -933,6 +933,8 @@ select {
 .or-card--accent .oc-evidencia__botao { color: inherit; opacity: .8; }
 .or-card--accent .oc-evidencia__botao:hover { background: rgba(0,0,0,.12); color: inherit; opacity: 1; }
 .or-card--accent .oc-evidencia__lista dt, .or-card--accent .oc-evidencia__lista dd { color: inherit; }
-.or-panorama-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 980px) { .or-panorama-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Duas colunas por padrao; quatro so quando a area de conteudo comporta (viewport >= 1180 px, ja descontada a sidebar). */
+.or-panorama-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 1180px) { .or-panorama-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 420px) { .or-panorama-cards { grid-template-columns: minmax(0, 1fr); } }
+.or-panorama-cards .or-stat__value, .oc-kpi .or-stat__value { white-space: normal; overflow-wrap: anywhere; }

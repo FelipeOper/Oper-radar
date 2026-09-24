@@ -84,5 +84,16 @@ test('linhas da revenda seguem o texto da demo e nao misturam recortes', () => {
   const segmento = linhasRevenda(l, { categoria: 'caminhoes', rotuloCategoria: 'Caminhões' });
   assert.equal(segmento[0], 'Curitiba/PR · 30 anúncios em Caminhões (de 54 no total)');
   assert.doesNotMatch(segmento.join(' '), /idade média|desvio FIPE/);
-  assert.match(linhasRevenda({ ...l, idade_observada_confiavel: false, reducoes_30d: null, desvio_fipe_mediano_pct: null }).join(' '), /menos de 14 dias de coleta.*reduções indisponíveis.*amostra insuficiente/);
+  assert.match(linhasRevenda({ ...l, idade_observada_confiavel: false, reducoes_30d: null, desvio_fipe_mediano_pct: null }).join(' '), /coleta ainda curta.*reduções indisponíveis.*amostra insuficiente/);
+});
+
+test('idade indisponivel diz a causa certa: sem anuncios ativos, coleta curta ou generica', () => {
+  const base2 = { nome: 'A', cidade: 'Curitiba', uf: 'PR', saidas_30d: 0, reducoes_30d: 0, desvio_fipe_mediano_pct: null };
+  // revenda antiga (>14 dias de coleta) sem anuncios ativos: NAO pode dizer "menos de 14 dias"
+  const antigaSemAtivos = linhasRevenda({ ...base2, ativos: 0, dias_de_coleta: 120, idade_observada_confiavel: true, idade_media_estoque: null })[0];
+  assert.match(antigaSemAtivos, /idade média indisponível \(sem anúncios ativos\)/);
+  assert.doesNotMatch(antigaSemAtivos, /14 dias/);
+  assert.match(linhasRevenda({ ...base2, ativos: 7, dias_de_coleta: 5, idade_observada_confiavel: false, idade_media_estoque: 3 })[0], /menos de 14 dias de coleta/);
+  const generica = linhasRevenda({ ...base2, ativos: 7, dias_de_coleta: 90, idade_observada_confiavel: true, idade_media_estoque: null })[0];
+  assert.match(generica, /idade média indisponível$/);
 });
