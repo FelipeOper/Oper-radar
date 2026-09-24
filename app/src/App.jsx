@@ -1448,6 +1448,9 @@ function PageMercado({ sessao, contexto, onContexto }) {
     return () => clearTimeout(t);
   }, [q]);
 
+  const recorteModelo = useMemo(() => (contexto?.marca && contexto?.modelo && contexto?.ano
+    ? { marca: contexto.marca, modelo: contexto.modelo, ano: String(contexto.ano) } : null),
+  [contexto?.marca, contexto?.modelo, contexto?.ano]);
   const queryBase = useMemo(() => {
     const p = new URLSearchParams();
     p.set('mercado', universo);
@@ -1461,13 +1464,15 @@ function PageMercado({ sessao, contexto, onContexto }) {
     if (precoMin) p.set('preco_min', precoMin);
     if (precoMax) p.set('preco_max', precoMax);
     if (marca !== 'todas') p.set('marca', marca);
+    // Modelo selecionado no painel: a lista usa o mesmo recorte exato (marca + modelo + ano-modelo) da contagem do botao.
+    if (recorteModelo) { p.set('marca', recorteModelo.marca); p.set('modelo', recorteModelo.modelo); p.set('ano_modelo', recorteModelo.ano); }
     if (carroceria !== 'todas') p.set('carroceria', carroceria);
     if (tracao !== 'todas') p.set('tracao', tracao);
     if (fipeFila !== 'todos') p.set('fipe_fila', fipeFila);
     if (qDebounced) p.set('q', qDebounced);
     p.set('ordem', ordem);
     return p.toString();
-  }, [universo, categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, marca, carroceria, tracao, fipeFila, qDebounced, ordem]);
+  }, [universo, categoria, regiao, uf, tipo, statusDb, cidade, revendaId, precoMin, precoMax, marca, carroceria, tracao, fipeFila, qDebounced, ordem, recorteModelo]);
 
   // Busca a primeira pagina sempre que qualquer filtro muda
   useEffect(() => {

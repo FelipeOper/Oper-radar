@@ -102,3 +102,9 @@ helper `fmt*` usado sem definição (regressão do beta de 24/09/2026).
 `src/marketTaxonomy.js` espelha `oper-radar-api/lib/market_taxonomy.php`. O mercado principal é só caminhão +
 implemento rodoviário (`Carreta` incluída); implemento agrícola e o restante ficam em "Outros". Ao mudar um
 lado, mude o outro. Testes em `tests/marketTaxonomy.test.js`.
+
+## Ofertas de um modelo (Mercado)
+
+Com um modelo selecionado no painel (marca + modelo + ano no contexto), `PageMercado` envia `marca`, `modelo` e
+`ano_modelo` a `anuncios.php`, então "Ver N ofertas disponíveis" abre exatamente as N ofertas contadas.
+Teste de contrato: `tests/queryBackendContract.test.js`.

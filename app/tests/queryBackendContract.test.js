@@ -33,3 +33,15 @@ test('grupo equivalente permanece opaco e inapto para recomendacao', () => {
   assert.match(contract, /'calculavel' => false/);
   assert.match(contract, /'apto_para_recomendacao' => false/);
 });
+
+test('lista de ofertas envia o recorte exato de modelo e ano que o backend entende', () => {
+  const app = read('app/src/App.jsx');
+  const endpoint = read('oper-radar-api/anuncios.php');
+  assert.match(app, /p\.set\('modelo', recorteModelo\.modelo\)/);
+  assert.match(app, /p\.set\('ano_modelo', recorteModelo\.ano\)/);
+  assert.match(endpoint, /\$_GET\['modelo'\]/);
+  assert.match(endpoint, /\$_GET\['ano_modelo'\]/);
+  // mesma chave de ano do painel (mercado_painel.php agrupa por COALESCE(ano_final, ano_inicial))
+  assert.match(endpoint, /COALESCE\(a\.ano_final, a\.ano_inicial\) = \?/);
+  assert.match(read('oper-radar-api/mercado_painel.php'), /COALESCE\(a\.ano_final,a\.ano_inicial\) ano/);
+});

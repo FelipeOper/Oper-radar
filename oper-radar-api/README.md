@@ -136,3 +136,9 @@ demais (`oper_taxonomia_filtro_categoria` devolve `NOT IN`, e `oper_taxonomia_sq
 tanto na contagem da faceta quanto ao abrir a categoria (`anuncios.php`, `facetas.php`, `lojista_detalhe.php`,
 `mercado_painel.php?segmento=`). Ao surgir um tipo novo relevante, mapeie-o aqui e em `app/src/marketTaxonomy.js`. A comparação de tipo no SQL segue a collation da coluna (o coletor grava o slug canônico do portal).
 Testes: `tests/market_taxonomy_test.php`. O espelho no frontend é `app/src/marketTaxonomy.js`.
+
+## Recorte exato de modelo e ano em `anuncios.php`
+
+`modelo` (comparação exata, sem caixa/espaços) e `ano_modelo` (`COALESCE(ano_final, ano_inicial)`, a mesma chave que
+`mercado_painel.php` usa para agrupar) filtram a lista. O botão "Ver N ofertas" do Mercado envia marca + modelo +
+ano_modelo para a lista bater com a contagem anunciada. Ambos entram no fingerprint do cursor (`$_GET` inteiro).

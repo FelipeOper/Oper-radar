@@ -70,6 +70,10 @@ if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GE
 if (!empty($_GET['revenda_id'])) { $where[] = 'r.id = ?'; $params[] = (int)$_GET['revenda_id']; $types .= 'i'; }
 if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
 if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
+// Recorte exato de modelo + ano-modelo (mesma chave do painel de Mercado: marca, modelo, COALESCE(ano_final, ano_inicial)).
+// Sem isso, o botao "Ver N ofertas" de um modelo/ano abria uma lista mais ampla que a contagem anunciada.
+if (!empty($_GET['modelo'])) { $where[] = 'UPPER(TRIM(a.modelo)) = ?'; $params[] = strtoupper(trim((string)$_GET['modelo'])); $types .= 's'; }
+if (!empty($_GET['ano_modelo']) && (int)$_GET['ano_modelo'] > 0) { $where[] = 'COALESCE(a.ano_final, a.ano_inicial) = ?'; $params[] = (int)$_GET['ano_modelo']; $types .= 'i'; }
 if (!empty($_GET['carroceria'])) { $where[] = 'TRIM(a.carroceria) = ?'; $params[] = trim($_GET['carroceria']); $types .= 's'; }
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
 if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
