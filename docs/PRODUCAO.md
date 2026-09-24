@@ -3,6 +3,15 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Beta do frontend (`/oper-radar-beta/`) — 24/09/2026 (NÃO é produção; `/oper-radar/` intocado)
+
+- Pasta paralela `/home1/pro93061/agenciaoper.com.br/oper-radar-beta/`, mesma API e mesmo login de produção; `.htaccess` com `RewriteBase /oper-radar-beta/` e `X-Robots-Tag: noindex`.
+- Pacote: `python scripts/empacotar_frontend.py --base oper-radar-beta --saida <pasta>`; zip `f946b7433cfb76734c6d1575a1a8ba2c36d0510ea5d3ff4efb7f08ac23d864ae`, extraído por Felipe no Terminal do cPanel (upload do zip por Claude).
+- Commit fonte: `34a8a3e` (branch `agent/portar-demo-real`, PR #63). Inclui o novo login (layout do projeto Beta).
+- Bug pego na validação ao vivo e corrigido nesta rodada: tela Mercado quebrava com `fmtDataObservada is not defined` (helper removido junto com a Concorrência antiga). Teste de regressão `app/tests/helpersDefinidos.test.js`.
+- Conferido ao vivo após a instalação: bundle `index-CzYmM2XN.js`; SHA-256 servidos batem com o manifesto — `index.html` `e49d9820…`, `index-CzYmM2XN.js` `3d141f5d…`, `index-Dm0X-5Mu.css` `7966ec56…`. Hoje, Mercado e Concorrência renderizam com dados reais, sem erro de console.
+- Pendente: conferir visualmente a tela de login deslogado e o mobile real.
+
 ## Release 1.1 da API — 24/09/2026 (correção, 2 arquivos PHP)
 
 - Responsável: Felipe Hilario (extração no Terminal do cPanel); upload do zip e conferência: Claude (upload pelo Gerenciador de Arquivos, no Chrome logado pelo Felipe).
