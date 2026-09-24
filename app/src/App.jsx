@@ -5,7 +5,7 @@ import {
   TrendingDown, ArrowDownRight, ArrowUpRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Zap, Gauge, MoreHorizontal, RotateCcw,
   ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
-  Monitor, Moon, Sun, Palette, Save, X, ScanLine, BadgeInfo,
+  Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
   Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
   SlidersHorizontal, BarChart3

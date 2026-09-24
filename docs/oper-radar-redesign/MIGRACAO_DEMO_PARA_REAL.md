@@ -98,7 +98,6 @@ para layout e build normal para o contrato de dados), commit próprio.
 ## Riscos conhecidos
 
 - `App.jsx` tem ~3.800 linhas com estilos inline; migrar tela a tela evita quebrar as que ainda não foram portadas.
-- O modo demo (PR #61) carrega fixtures no bundle de produção quando `VITE_DEMO` não está definido?
-  Não executa (`DEMO_MODE=false`), mas o arquivo entra no bundle — decidir se removemos antes do release.
+- O modo demo (PR #61) não entra no build normal: conferido em 24/09/2026, `demoFixtures` tem 0 ocorrências no bundle sem `VITE_DEMO`.
 - Fixtures da demo do app real ainda são rasas; para layout serve, para validar números não serve.
 - `main` está atrás de produção (o redesign do Mercado só existe em branch); este PR corrige isso ao mesclar as duas linhas.
