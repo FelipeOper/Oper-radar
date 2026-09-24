@@ -237,8 +237,12 @@ function mercado_desvio_fipe_medio_pct(array $registros): ?float {
  * 4,4% dos comparaveis acima de +90%, o que inflava a media. null abaixo da amostra minima.
  */
 function mercado_desvio_fipe_mediano_pct(array $registros): ?float {
-    $desvios = mercado_desvios_fipe($registros);
-    if (count($desvios) < OPER_RADAR_AMOSTRA_MINIMA) return null;
-    $mediana = mercado_percentil($desvios, 0.5);
+    return mercado_mediana_com_amostra_minima(mercado_desvios_fipe($registros));
+}
+
+/** Mediana (1 casa) so com a amostra minima de 5 observacoes; abaixo disso null. Uma unica regra para todo desvio agregado. */
+function mercado_mediana_com_amostra_minima(array $valores): ?float {
+    if (count($valores) < OPER_RADAR_AMOSTRA_MINIMA) return null;
+    $mediana = mercado_percentil($valores, 0.5);
     return $mediana === null ? null : round($mediana, 1);
 }

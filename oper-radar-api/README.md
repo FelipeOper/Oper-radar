@@ -146,3 +146,6 @@ ano_modelo para a lista bater com a contagem anunciada. Ambos entram no fingerpr
 `mercado_painel.php` também devolve `resumo.desvio_fipe_mediano_pct` (mediana dos desvios, mesma amostra mínima de 5). O app do Mercado
 mostra a **mediana**: a média (`desvio_fipe_medio_pct`, mantida por compatibilidade) é puxada pelos vínculos FIPE suspeitos que a
 frente de saneamento mediu (4,4% dos comparáveis acima de +90%, 24/09/2026).
+
+`insights.php` (KPI de FIPE da tela Análise) devolve `fipe.desvio_mediano_pct`, `desvio_amostra` e `desvio_confianca`; a mediana só existe com
+5 ou mais desvios agregados (`mercado_mediana_com_amostra_minima`). O alias legado `desvio_medio_pct` foi removido (carregava a mediana sob nome de média).

@@ -57,4 +57,10 @@ verifica(mercado_desvio_fipe_medio_pct($comOutlier) === 23.3, 'a media e puxada 
 verifica(mercado_desvio_fipe_mediano_pct([$reg(110000), $reg(90000), $reg(105000), $reg(95000)]) === null, 'mediana do desvio com 4 precos e null');
 verifica(mercado_desvio_fipe_mediano_pct([]) === null, 'mediana do desvio sem registros e null');
 
+// Mediana agregada com amostra minima unica (Insights): 0-4 observacoes = null, 5 = valor.
+verifica(mercado_mediana_com_amostra_minima([]) === null, 'mediana agregada sem observacoes e null');
+verifica(mercado_mediana_com_amostra_minima([10.0, 20.0, 30.0, 40.0]) === null, 'mediana agregada com 4 observacoes e null');
+verifica(mercado_mediana_com_amostra_minima([10.0, 20.0, 30.0, 40.0, 50.0]) === 30.0, 'mediana agregada com 5 observacoes');
+verifica(mercado_mediana_com_amostra_minima([1.24, 1.26, 9.0, 9.5, 100.0]) === 9.0, 'mediana agregada arredonda em 1 casa');
+
 echo "market_quality_test=OK\n";

@@ -80,14 +80,16 @@ foreach ($fipeLinhas as &$linhaFipe) {
         / (float)$linhaFipe['preco_fipe'] * 100;
 }
 unset($linhaFipe);
-$desvioMedianoFipe = mercado_percentil($desviosFipe, 0.50);
+// Amostra minima de 5 desvios AGREGADOS (nao so por grupo): 1 anuncio de um grupo suficiente nao vira indicador.
+$amostraDesvioFipe = count($desviosFipe);
+$desvioMedianoFipe = mercado_mediana_com_amostra_minima($desviosFipe);
 $fipe = [
     'vinculados'=>count($fipeLinhas),
     'comparaveis_qualificados'=>$comparaveisFipe,
     'abaixo_fipe'=>$abaixoFipe,
-    'desvio_mediano_pct'=>$desvioMedianoFipe !== null ? round($desvioMedianoFipe, 1) : null,
-    // Alias temporário para clientes antigos; o valor agora é a mediana qualificada.
-    'desvio_medio_pct'=>$desvioMedianoFipe !== null ? round($desvioMedianoFipe, 1) : null,
+    'desvio_mediano_pct'=>$desvioMedianoFipe,
+    'desvio_amostra'=>$amostraDesvioFipe,
+    'desvio_confianca'=>mercado_confianca($amostraDesvioFipe),
 ];
 
 $descobertas = [];
