@@ -992,6 +992,12 @@ function fmtDiaCurto(iso) {
   return partes.length === 3 ? `${partes[2]}/${partes[1]}` : String(iso);
 }
 
+const fmtDataObservada = valor => {
+  if (!valor) return '—';
+  const data = new Date(`${String(valor).slice(0, 10)}T12:00:00`);
+  return Number.isNaN(data.getTime()) ? '—' : data.toLocaleDateString('pt-BR');
+};
+
 function fmtPctAssinado(v) {
   if (v == null) return '—';
   const num = Number(v);
