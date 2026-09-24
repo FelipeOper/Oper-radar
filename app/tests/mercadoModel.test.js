@@ -35,7 +35,7 @@ test('ticket sem amostra suficiente nao mostra numero; desvio sem FIPE diz que n
   const ev = evidenciaPanorama({ resumo: { anuncios: 3, ticket_mediano: 100000, amostra_qualificada: 2, confianca: 'insuficiente', desvio_fipe_medio_pct: null } });
   assert.equal(ev.ticket.valor, 'Amostra insuficiente');
   assert.equal(ev.ticket.confianca, 'insuficiente');
-  assert.equal(ev.desvio.valor, 'Sem base FIPE');
+  assert.equal(ev.desvio.valor, 'Sem amostra verificável');
   assert.equal(ev.anuncios.atualizacao, null);
 });
 
@@ -81,14 +81,15 @@ test('texto de amostra do modelo', () => {
 test('desvio da FIPE: amostra abaixo de 5 nao mostra numero, mesmo que o servidor mande um valor', () => {
   assert.deepEqual(desvioFipeExibivel({ desvio_fipe_medio_pct: 42.0, desvio_fipe_amostra: 1 }), { valor: null, amostra: 1 });
   assert.deepEqual(desvioFipeExibivel({ desvio_fipe_medio_pct: -3.1, desvio_fipe_amostra: 5 }), { valor: -3.1, amostra: 5 });
-  // servidor antigo (sem amostra): mantem o valor que veio, sem inventar amostra
-  assert.deepEqual(desvioFipeExibivel({ desvio_fipe_medio_pct: -3.1 }), { valor: -3.1, amostra: null });
+  // servidor antigo (sem amostra verificavel): nao mostra o numero, mesmo que tenha vindo um valor
+  assert.deepEqual(desvioFipeExibivel({ desvio_fipe_medio_pct: -3.1 }), { valor: null, amostra: null });
   assert.deepEqual(desvioFipeExibivel({}), { valor: null, amostra: null });
   const ev = evidenciaPanorama({ resumo: { anuncios: 9, confianca: 'insuficiente', desvio_fipe_medio_pct: null, desvio_fipe_amostra: 2, desvio_fipe_confianca: 'insuficiente' } });
   assert.equal(ev.desvio.valor, 'Amostra insuficiente');
   assert.equal(ev.desvio.amostra, '2 preços válidos com FIPE');
   assert.equal(ev.desvio.confianca, 'insuficiente');
   const semBase = evidenciaPanorama({ resumo: { anuncios: 9, desvio_fipe_medio_pct: null } });
-  assert.equal(semBase.desvio.valor, 'Sem base FIPE');
+  assert.equal(semBase.desvio.valor, 'Sem amostra verificável');
+  assert.equal(evidenciaPanorama({ resumo: { anuncios: 9, desvio_fipe_medio_pct: 42 } }).desvio.valor, 'Sem amostra verificável');
   assert.ok(!('confianca' in semBase.desvio));
 });

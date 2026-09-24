@@ -7,7 +7,9 @@ por múltiplas UFs, cidade (só dentro das UFs escolhidas), segmento de atuaçã
 um anúncio ativo da categoria, via `mix_categorias`), nome e indicador. Com segmento escolhido, o
 estoque exibido e a ordenação "maior estoque" usam os ativos da categoria; saídas e reduções seguem
 contando todo o estoque da revenda (a API não as separa) e a evidência avisa isso. O painel do lojista
-recebe o mesmo segmento (`lojista_detalhe.php?categoria=`). O painel do lojista usa `lojista_detalhe.php` e mostra
+recebe o mesmo segmento (`lojista_detalhe.php?categoria=`). Com segmento escolhido, a linha da revenda
+não mostra idade média nem desvio FIPE (a lista traz só o total) e a ordenação por idade fica
+desabilitada; esses valores por segmento aparecem no painel do lojista. O painel do lojista usa `lojista_detalhe.php` e mostra
 estoque, saídas observadas, reduções, idade e desvio mediano vs FIPE com evidência.
 `src/concorrenciaModel.js` mantém as regras de ordenação e de dados indisponíveis, com testes
 em `tests/concorrenciaModel.test.js`. Em servidor antigo, redução ausente aparece como
@@ -91,6 +93,6 @@ revendas ainda não coletadas aparecem separados e nunca são apresentados como 
 
 `desvioFipeExibivel` em `src/mercadoModel.js` só mostra o desvio médio com ao menos 5 preços válidos
 com FIPE (`resumo.desvio_fipe_amostra`); abaixo disso o KPI diz "Amostra insuf." e a evidência traz a
-amostra e a confiança reais (`desvio_fipe_confianca`). Servidor antigo, sem esses campos, mantém o
-comportamento anterior. Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
+amostra e a confiança reais (`desvio_fipe_confianca`). Servidor antigo, sem esses campos, não mostra
+número ("Sem amostra verificável"): publique a API 1.2 antes do frontend para o KPI aparecer. Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
 helper `fmt*` usado sem definição (regressão do beta de 24/09/2026).

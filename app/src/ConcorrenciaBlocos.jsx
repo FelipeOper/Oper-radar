@@ -107,9 +107,10 @@ export function PageConcorrencia() {
   }, []);
   const lojistas = useMemo(() => dados?.lojistas || [], [dados]);
   const contagemUf = useMemo(() => lojistas.reduce((m, l) => ({ ...m, [l.uf]: (m[l.uf] || 0) + 1 }), {}), [lojistas]);
+  const ordemEfetiva = categoria !== 'todas' && ordem === 'idade' ? 'estoque' : ordem;
   const contagemCategoria = useMemo(() => contagemPorCategoria(lojistas), [lojistas]);
   const cidades = useMemo(() => cidadesDisponiveis(lojistas, ufs), [lojistas, ufs]);
-  const filtrados = useMemo(() => filtraRevendas(lojistas, { ufs, busca, ordem, categoria, cidade }), [lojistas, ufs, busca, ordem, categoria, cidade]);
+  const filtrados = useMemo(() => filtraRevendas(lojistas, { ufs, busca, ordem: ordemEfetiva, categoria, cidade }), [lojistas, ufs, busca, ordemEfetiva, categoria, cidade]);
   const alternaUf = uf => { setCidade('todas'); setUfs(v => v.includes(uf) ? v.filter(x => x !== uf) : [...v, uf].sort()); };
   const cidadeAtiva = cidades.find(c => c.chave === cidade);
   const escopo = `${ufs.length ? ufs.join(', ') : 'Todas as UFs'}${cidadeAtiva ? ` · ${cidadeAtiva.rotulo}` : ''}`;
@@ -121,9 +122,9 @@ export function PageConcorrencia() {
       <div className="oc-conc__segmento"><span className="or-sectiontag">SEGMENTO DE ATUAÇÃO</span>
         <div className="oc-conc__chips"><button type="button" className={`or-tag ${categoria === 'todas' ? 'or-tag--selected' : ''}`} aria-pressed={categoria === 'todas'} onClick={() => setCategoria('todas')}>Todos os segmentos</button>
           {Object.entries(CATEGORIAS_MERCADO).filter(([chave]) => contagemCategoria[chave]).map(([chave, info]) => <button type="button" key={chave} className={`or-tag ${categoria === chave ? 'or-tag--selected' : ''}`} aria-pressed={categoria === chave} onClick={() => setCategoria(chave)}>{info.label} <span className="or-tag__count">{inteiro(contagemCategoria[chave])}</span></button>)}</div>
-        {categoria !== 'todas' && <p className="or-card__sub">Mostra revendas com anúncios ativos deste segmento. Saídas e reduções contam todo o estoque da revenda.</p>}</div>
+        {categoria !== 'todas' && <p className="or-card__sub">Mostra revendas com anúncios ativos deste segmento. Saídas e reduções contam todo o estoque da revenda; idade média e desvio FIPE por segmento aparecem ao abrir o lojista.</p>}</div>
       <div className="oc-conc__controls"><label><Search size={15} /><input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar revenda" aria-label="Buscar revenda" /></label>
-        <select aria-label="Ordenar revendas" value={ordem} onChange={e => setOrdem(e.target.value)}><option value="estoque">Maior estoque</option><option value="saidas">Mais saídas observadas</option><option value="reducoes">Mais reduções de preço</option><option value="idade">Maior idade média</option></select>
+        <select aria-label="Ordenar revendas" value={ordemEfetiva} onChange={e => setOrdem(e.target.value)}><option value="estoque">Maior estoque</option><option value="saidas">Mais saídas observadas</option><option value="reducoes">Mais reduções de preço</option><option value="idade" disabled={categoria !== 'todas'}>Maior idade média{categoria !== 'todas' ? ' (sem segmento)' : ''}</option></select>
         {ufs.length > 0 ? <select aria-label="Filtrar por cidade" value={cidade} onChange={e => setCidade(e.target.value)}><option value="todas">Todas as cidades</option>{cidades.map(c => <option key={c.chave} value={c.chave}>{c.rotulo} ({inteiro(c.revendas)})</option>)}</select>
           : <span className="or-card__sub oc-conc__dica">Escolha uma UF para filtrar por cidade.</span>}</div>
     </section>
@@ -135,8 +136,8 @@ export function PageConcorrencia() {
         {filtrados.length === 0 && <p className="or-card__sub">Nenhuma revenda neste recorte. Escolha outra UF, segmento ou cidade, ou remova a busca.</p>}
         <div className="oc-conc__rows">{filtrados.map(l => { const leitura = leituraRevenda(l, dados?._meta?.generated_at); return <button type="button" className="or-listrow oc-conc__row" key={l.id} onClick={() => setAberta(l)}>
           <span className="or-listrow__lead"><Building2 size={18} /></span><span className="or-listrow__body"><strong className="or-listrow__t">{l.nome}</strong>
-            <span className="or-listrow__s"><MapPin size={12} /> {l.cidade}/{l.uf} · {categoria !== 'todas' ? `${inteiro(ativosNaCategoria(l, categoria))} ativos em ${CATEGORIAS_MERCADO[categoria]?.label || categoria} (de ${inteiro(l.ativos)})` : `${inteiro(l.ativos)} ativos`} · idade média {leitura.idade}</span>
-            <span className="or-listrow__s">{inteiro(l.saidas_30d)} saídas em 30 d · {leitura.reducoes} reduções · desvio FIPE {leitura.desvio}</span></span><ChevronRight className="or-listrow__arrow" size={17} />
+            <span className="or-listrow__s"><MapPin size={12} /> {l.cidade}/{l.uf} · {categoria !== 'todas' ? `${inteiro(ativosNaCategoria(l, categoria))} ativos em ${CATEGORIAS_MERCADO[categoria]?.label || categoria} (de ${inteiro(l.ativos)} no total)` : `${inteiro(l.ativos)} ativos · idade média ${leitura.idade}`}</span>
+            <span className="or-listrow__s">{inteiro(l.saidas_30d)} saídas em 30 d · {leitura.reducoes} reduções{categoria !== 'todas' ? ' (estoque total da revenda)' : ` · desvio FIPE ${leitura.desvio}`}</span></span><ChevronRight className="or-listrow__arrow" size={17} />
         </button>; })}</div>
       </section>
       <div className="or-alert or-alert--info">Saída observada não é venda. Redução de preço é sinal, não prova. O desvio FIPE só aparece com ao menos 5 preços válidos.</div>

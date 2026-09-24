@@ -183,4 +183,5 @@ Veredito inicial `needs-attention`; três achados, todos confirmados no código 
 3. Concorrência sem filtros de cidade e segmento → restaurados (cidade dentro das UFs; segmento por
    `mix_categorias`; detalhe do lojista recebe `categoria`).
 Depende de **Release 1.2 da API** (`lib/market_quality.php`, `hoje_stats.php`, `mercado_painel.php`) e de
-novo pacote do beta. Sem a API nova, o frontend degrada: o desvio antigo continua aparecendo como antes.
+novo pacote do beta. Sem a API nova o KPI de desvio FIPE não aparece ("Sem amostra verificável"): publicar a API 1.2 antes do frontend.
+Reverificação Codex (2ª rodada) achou mais 2 pontos, também corrigidos: desvio sem amostra verificável não é mais exibido e a linha da revenda com segmento não mistura idade/desvio gerais.

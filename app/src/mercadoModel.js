@@ -58,7 +58,7 @@ export function evidenciaPanorama({ resumo = {}, escopo = {}, fonte = {}, period
     desvio: {
       recorte,
       periodo: 'Estoque ativo hoje',
-      valor: desvio.valor == null ? (desvio.amostra == null ? 'Sem base FIPE' : 'Amostra insuficiente') : pctAssinado(desvio.valor),
+      valor: desvio.valor == null ? (desvio.amostra == null ? 'Sem amostra verificável' : 'Amostra insuficiente') : pctAssinado(desvio.valor),
       base: 'Preço anunciado contra a tabela FIPE',
       ...(desvio.amostra == null ? {} : { amostra: `${inteiro(desvio.amostra)} preços válidos com FIPE`, confianca: resumo.desvio_fipe_confianca || 'insuficiente' }),
       atualizacao,
@@ -67,13 +67,14 @@ export function evidenciaPanorama({ resumo = {}, escopo = {}, fonte = {}, period
   };
 }
 
-/* Desvio medio da FIPE do Panorama: null quando a API nao mandou valor ou quando a amostra informada
-   e menor que o minimo (5 precos validos). Numero errado e pior que nenhum. */
+/* Desvio medio da FIPE do Panorama: so vira numero quando a API informa amostra >= 5 precos validos.
+   Sem amostra verificavel (servidor antigo) ou com amostra menor, nao ha numero: errado e pior que nenhum. */
 export const AMOSTRA_MINIMA_DESVIO_FIPE = 5;
 export function desvioFipeExibivel(resumo = {}) {
   const amostra = resumo.desvio_fipe_amostra == null ? null : Number(resumo.desvio_fipe_amostra);
   const valor = resumo.desvio_fipe_medio_pct == null ? null : Number(resumo.desvio_fipe_medio_pct);
-  if (amostra != null && amostra < AMOSTRA_MINIMA_DESVIO_FIPE) return { valor: null, amostra };
+  if (amostra == null) return { valor: null, amostra: null };
+  if (amostra < AMOSTRA_MINIMA_DESVIO_FIPE) return { valor: null, amostra };
   return { valor, amostra };
 }
 
