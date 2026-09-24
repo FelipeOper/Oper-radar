@@ -3,6 +3,14 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Taxonomia do segmento Pesado — 24/09/2026 (PRONTA, ainda NÃO publicada: API 1.3 + beta)
+
+- Decisão do Felipe: Pesado = caminhão seminovo + implemento rodoviário; o resto (agrícola incluso) em "Outros", sem misturar. `Carreta` → implementos rodoviários; `Implementos-agricolas` → agrícola; `outros` = complemento (tipo não mapeado e anúncio sem tipo entram ao abrir a categoria, igual à contagem da faceta).
+- Revisão Codex adversarial em 4 rodadas (achados: `outros` fechado nos filtros; faceta por UF com tipo NULL; `total_geral` sem os sem-tipo) → **approve**. Commits `b0236e6`, `8fcfd4d`, `664ba32`, `c519c0e`. Testes: PHP 16/16, frontend 81/81, Python 68/68.
+- **Release 1.3 da API** (`Downloads\OperRadar-Release1.3-API-taxonomia`, zip `d121b58d7e3787ebfc0d25d1aa15a9f0b46a2f6f58dd072c16ffa39b2eb6096f`): `lib/market_taxonomy.php` `93b796b5…`, `anuncios.php` `f824cfc5…`, `facetas.php` `553b8839…`, `lojista_detalhe.php` `181c1cfc…`, `mercado_painel.php` `6bec5beb…`. Pré-checagem no comando: `mercado_painel` = `6e67a6d9…` (1.2) e `lojista_detalhe` = `554d69fb…` (Release 1). **Publicar antes do beta novo.**
+- **Beta com a taxonomia**: zip `3e71e7fad83a6be58269b34258f2f31940bb6a57fa823ed80d2b5696bde5b3c6`, bundle `index-C2m3WyHa.js`.
+- Efeito esperado: "Caminhões e implementos" de ~12,2 mil para ~16 mil anúncios; o ticket mediano do recorte "todos" passa a misturar caminhão e carreta (usar segmento Caminhões ou Implementos para comparar preço). Risco aceito: a comparação de `tipo` no SQL segue a collation da coluna (o coletor grava o slug canônico do portal).
+
 ## Revisão Codex adversarial do PR #63 — 24/09/2026 (publicada: API 1.2 em produção; frontend só no beta)
 
 - 1ª rodada `needs-attention` (3 achados: mediana do insight abaixo-FIPE sem filtro de confiança; desvio FIPE do Mercado sem amostra mínima; Concorrência sem filtros de cidade/segmento). 2ª rodada achou 2 furos nas correções (API antiga exibindo desvio sem amostra; segmento misturando métricas gerais). 3ª rodada: **approve**. Commits `da23dc5` e `62f36ef`.
