@@ -46,3 +46,12 @@ test('lista de ofertas envia o recorte exato de modelo e ano que o backend enten
   assert.match(endpoint, /COALESCE\(a\.ano_final, a\.ano_inicial\) = \?/);
   assert.match(read('oper-radar-api/mercado_painel.php'), /COALESCE\(a\.ano_final,a\.ano_inicial\) ano/);
 });
+
+test('Panorama do Mercado fala em desvio MEDIANO da FIPE em todo texto visivel (a media foi aposentada)', () => {
+  const app = read('app/src/App.jsx');
+  const modelo = read('app/src/mercadoModel.js');
+  assert.match(app, /Desvio mediano da FIPE/);
+  assert.doesNotMatch(app, /Desvio médio da FIPE/);
+  assert.doesNotMatch(modelo, /Média do desvio/);
+  assert.match(modelo, /desvio_fipe_mediano_pct/);
+});

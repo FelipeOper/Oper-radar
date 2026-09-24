@@ -1251,7 +1251,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
       <EmptyState icon={PackageOpen} titulo="Nenhum anúncio ativo neste recorte" texto="Ajuste os filtros na barra de contexto acima (tipo, estado ou período) para ver dados do mercado." />
     ) : <>
       <section style={{ marginBottom: 14 }}>
-        <SecaoCabecalho titulo="Panorama do mercado" ajuda={<>Resumo do estoque ativo nas UFs e período selecionados. "Entraram/saíram" é contagem de anúncios (não preço). "Desvio médio da FIPE" compara o preço anunciado dos ativos com a referência FIPE — positivo é acima da FIPE.</>} />
+        <SecaoCabecalho titulo="Panorama do mercado" ajuda={<>Resumo do estoque ativo nas UFs e período selecionados. "Entraram/saíram" é contagem de anúncios (não preço). "Desvio mediano da FIPE" é a mediana dos desvios individuais entre o preço anunciado e a referência FIPE — positivo é acima da FIPE; a mediana não é puxada por vínculos FIPE suspeitos.</>} />
         <div className="or-panorama-cards">
           <article className="or-card or-stat" style={{ minWidth: 0 }}>
             <div className="or-stat__top"><span className="or-stat__label">Anúncios ativos</span><span className="or-stat__ic"><i className="ph ph-truck" aria-hidden="true" /></span></div>
