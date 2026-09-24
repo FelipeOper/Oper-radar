@@ -3,6 +3,16 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 1.1 da API — 24/09/2026 (correção, 2 arquivos PHP)
+
+- Responsável: Felipe Hilario (extração no Terminal do cPanel); upload do zip e conferência: Claude (upload pelo Gerenciador de Arquivos, no Chrome logado pelo Felipe).
+- Origem: commit `1e7ed64` (PR #63), CI verde. Corrige o que a conferência ao vivo do Release 1 mostrou com dados reais: reduções por revenda contadas como eventos (271 num revenda de 39 anúncios; agora anúncios distintos), feed sem saídas nem quedas de preço (agora os tipos se revezam), insight "abaixo da FIPE" com amostra de 5 preços (agora exige 10) e rótulo com marca repetida.
+- Pré-checagem automática (falha interrompe tudo): `hoje_stats.php` e `lib/hoje_painel.php` = hashes do Release 1 (`aa29b414…`, `b86a4ab5…`) — ok.
+- Backup: `/home1/pro93061/backups/api-release1.1-20260924-153206` (os 2 arquivos anteriores).
+- Publicados (SHA-256 no servidor, iguais ao pacote): `hoje_stats.php` `811ee437994775e10d6eca99d018df83bc2cdfd05fd996d9195933f8d6867549`; `lib/hoje_painel.php` `cbca256b088743ca6e59ab3b45340d58bb628f80beeb17c3fd084fa41e2420dd`.
+- Validação: `php -l` sem erro nos 2 (PHP 8.3.33). Migrações, cron, banco, credenciais: nenhum. Frontend: não publicado.
+- **Pendente:** conferência ao vivo de `hoje_stats.php` (feed com `saida`/`preco`, contagem de reduções menor que os ativos, sem "abaixo da FIPE" com amostra < 10). Reversão: copiar os 2 arquivos do backup acima.
+
 ## Release 1 da API — 24/09/2026 (só PHP, aditivo)
 
 - Responsável: Felipe Hilario (upload e extração manuais pelo cPanel); conferência: Claude.
