@@ -3,13 +3,14 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
-## Release 2.1 (frontend) — correções da auditoria visual — 24/09/2026 (PACOTE PRONTO)
+## Release 2.2 — API 1.5 + frontend (beta e produção) — 24/09/2026 (PACOTE PRONTO; substitui o "2.1")
 
-- Origem: commit `cb2a7f1` (PR #63). Codex adversarial `approve` em 3 rodadas (achados corrigidos: Panorama do Mercado por largura útil, causa correta da idade indisponível, contraste da evidência no cartão de destaque). Frontend 86/86, contratos Python 68/68, lint limpo. Sem mudança de API/banco/cron/credencial. Conteúdo: `docs/oper-radar-redesign/AUDITORIA_BETA_VS_DEMO.md`.
-- Pacote `Downloads\OperRadar-Release2.1` (comando único `PASSO-UNICO.txt`: beta, e só se ok, produção; pré-checagem de `index.html` atual — beta `30906009…`, produção `ae33b5fc…` — e dos zips; backup da pasta `oper-radar/` inteira; `.htaccess` de produção mantido; bundles antigos mantidos).
-- Beta: zip `5b051c3fcb087d16be49bec89faa3eed97bb56ba70487d05af8cd399565bcbd2`; depois `index.html` `2114fb46…`, `assets/index-96owgwHC.js` `d4da2d20…`.
-- Produção: zip `0374f68993d9247a3080261acbe3afadaa6cdd9cbe4a01e88246c726bf196fb5`; depois `index.html` `906cf8b3443a7b4f688a46206a4b8b99cc92dacfc08a84ed9ef164ea4a217f27`, `assets/index-B-bZSXLe.js` `ce7d9844916b482c00dfdbcf9ea4c0e86a7697ee393a22502f502e3935b6d7d4`.
-- Reversão: restaurar `index.html` do backup `oper-radar-frontend-release2.1-*`.
+- Origem: commit `bd54e85` (PR #63). Codex adversarial `approve` em todas as rodadas; frontend 88/88, PHP 16/16, contratos Python 68/68, lint limpo. Sem mudança de banco/cron/credencial.
+- **Mediana do desvio FIPE** (Panorama do Mercado e KPI de Análise): a F0b da frente FIPE (24/09; `docs/fipe-saneamento`, branch `agent/fipe-saneamento`) mediu 5.417 vínculos comparáveis com histograma do desvio `<-50` 9, `-50..-20` 169, `-20..+20` 3.919, `+20..+50` 838, `+50..+90` 245, `+90..+150` 146, `>+150` 91: 237 (4,4%) acima de +90%, que inflam a média (+10,8%). `mercado_painel.php` devolve `desvio_fipe_mediano_pct`; `insights.php` exige 5 desvios agregados e devolve `desvio_amostra`/`desvio_confianca`, sem o alias legado `desvio_medio_pct`. `fipe_consulta.php` (catálogo FIPE) não foi alterado.
+- **Correções da auditoria visual** (Concorrência, Hoje, Mercado): `docs/oper-radar-redesign/AUDITORIA_BETA_VS_DEMO.md`.
+- Pacote `Downloads\OperRadar-Release2.1` (mesma pasta já liberada; conteúdo trocado): comando único API 1.5 → beta → produção. Zips: API `fba923f7d62b6bbd5ea0021a074badd6c9f62062412d24b36ffe5479a36e4de9`, beta `701152f1d1cdd0144ed580742d16e1e829142f3edc9a573d45372b07a07c6824`, produção `ffcee06358c30d814873ffba062d7f62193393fd5645013417669016cd9166b9`.
+- Pré-checagens: `mercado_painel.php` `6bec5beb…` (API 1.3), `lib/market_quality.php` `e69f9608…` (API 1.2), `index.html` do beta `30906009…` e da produção `ae33b5fc…`. Depois: API `market_quality.php` `32d1b31b…`, `mercado_painel.php` `cac0b9bb…`, `insights.php` `6b92ef64…`; beta `index.html` `7e9bf446…` / `index-CMFbwT-B.js` `bb7d7c3d…`; produção `index.html` `e68b94e2…` / `index-DI-NjRfr.js` `db1e22d9…`.
+- Reversão: API — copiar os 3 arquivos de `api-release1.5-*`; produção — restaurar `index.html` de `oper-radar-frontend-release2.2-*`.
 
 ## Release 2 — frontend novo em PRODUÇÃO (`/oper-radar/`) + API 1.4 — 24/09/2026 (PUBLICADO ~17h25, conferido ao vivo)
 
