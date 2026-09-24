@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowUpRight, CheckCircle2, ExternalLink, Plus, Radar, Timer, TrendingDown } from './icons.jsx';
+import React, { useState } from 'react';
+import { ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Plus, Radar, Timer, TrendingDown } from './icons.jsx';
 import { Evidencia } from './Evidencia.jsx';
 import { formataItemFeed, linhasUfsSaidas, navegacaoDoInsight, resumoFrescor, rotuloQuando } from './hojeModel.js';
 
@@ -55,7 +55,10 @@ export function AlertaColeta({ frescor }) {
 const ICONE_FEED = { novo: Plus, preco: TrendingDown, saida: CheckCircle2, verificacao: Timer };
 const ROTULO_FEED = { novo: 'Novo', preco: 'Preço', saida: 'Saída', verificacao: 'Verificar' };
 
-export function FeedMovimento({ itens }) {
+/* `renderDetalhe(item)` devolve o conteudo expandido do item (ou null). Assim o feed continua
+   mostrando o comparativo FIPE/mercado quando o anuncio esta na lista carregada pela tela. */
+export function FeedMovimento({ itens, renderDetalhe }) {
+  const [aberto, setAberto] = useState(null);
   if (!itens.length) {
     return <VazioHoje titulo="Sem movimento recente" texto="Nenhuma entrada, queda de preço ou saída nas últimas horas." />;
   }
@@ -64,15 +67,25 @@ export function FeedMovimento({ itens }) {
       {itens.map((bruto, indice) => {
         const item = formataItemFeed(bruto);
         const Icone = ICONE_FEED[item.tipo] || Radar;
+        const detalhe = renderDetalhe ? renderDetalhe(bruto) : null;
+        const expandido = aberto === indice && Boolean(detalhe);
+        const Seta = expandido ? ChevronUp : ChevronDown;
         return (
           <li key={`${item.anuncioId}-${item.tipo}-${indice}`} className={`oc-feed__item oc-feed__item--${item.tipo}`}>
-            <span className="oc-feed__icone" title={ROTULO_FEED[item.tipo]}><Icone size={16} /></span>
-            <span className="oc-feed__corpo">
-              <strong>{item.titulo}</strong>
-              <small>{item.detalhe}</small>
-            </span>
-            <span className="oc-feed__quando">{rotuloQuando(item.quando)}</span>
-            {item.url && <a className="oc-feed__link" href={item.url} target="_blank" rel="noreferrer" aria-label={`Ver ${item.titulo} no portal`}><ExternalLink size={14} /></a>}
+            <div className="oc-feed__linha">
+              <span className="oc-feed__icone" title={ROTULO_FEED[item.tipo]}><Icone size={16} /></span>
+              <span className="oc-feed__corpo">
+                <strong>{item.titulo}</strong>
+                <small>{item.detalhe}</small>
+              </span>
+              <span className="oc-feed__quando">{rotuloQuando(item.quando)}</span>
+              {item.url && <a className="oc-feed__link" href={item.url} target="_blank" rel="noreferrer" aria-label={`Ver ${item.titulo} no portal`}><ExternalLink size={14} /></a>}
+              {detalhe && (
+                <button type="button" className="oc-feed__abrir" aria-expanded={expandido} aria-label={`${expandido ? 'Ocultar' : 'Ver'} detalhes de ${item.titulo}`}
+                  onClick={() => setAberto(expandido ? null : indice)}><Seta size={16} /></button>
+              )}
+            </div>
+            {expandido && <div className="oc-feed__detalhe">{detalhe}</div>}
           </li>
         );
       })}

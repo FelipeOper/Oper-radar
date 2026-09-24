@@ -508,12 +508,42 @@ select {
 }
 .oc-feed__item {
   display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.oc-feed__linha {
+  display: flex;
   align-items: center;
   gap: 12px;
   min-height: 56px;
   padding: 8px 12px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
+}
+.oc-feed__abrir {
+  display: grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.oc-feed__abrir:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+.oc-feed__detalhe {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px 12px 58px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 .oc-feed__icone {
   display: grid;

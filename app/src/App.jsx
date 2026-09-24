@@ -732,6 +732,17 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
     return lista.sort((x, y) => new Date(y.quando) - new Date(x.quando)).slice(0, 12);
   }, [anuncios]);
   const feed = Array.isArray(stats?.feed) ? stats.feed : feedLegado;
+  const anuncioPorId = useMemo(() => new Map(anuncios.map(item => [Number(item.dbId ?? item.id), item])), [anuncios]);
+  // Detalhe expandido do feed: comparativo FIPE/mercado do anuncio, quando ele esta na lista carregada.
+  const detalheDoFeed = item => {
+    const anuncio = anuncioPorId.get(Number(item.anuncio_id));
+    if (!anuncio) return null;
+    return <>
+      <div><span style={{ color: T.ink }}>{anuncio.revenda}</span> · {anuncio.cidade}/{anuncio.uf}</div>
+      <div><span style={{ color: T.ink }}>{fmtBRL(anuncio.preco)}</span> · {anuncio.dias} dias no ar</div>
+      <ComparativoAnuncio anuncio={anuncio} compacto />
+    </>;
+  };
   const cobertura = kpis?.ufs_ativas?.length
     ? `${kpis.ufs_ativas.length} UFs · ${kpis.regioes_ativas?.length || 0} regiões`
     : usandoReais ? `${Object.keys(facetas?.por_uf || {}).length || 1} UFs` : 'conectando…';
@@ -751,7 +762,7 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
   const sectionWidgets = {
     feed: (
       <SecaoHoje titulo="Movimento do mercado" subtitulo="Entradas, quedas de preço e saídas observadas. Saída não é venda.">
-        <FeedMovimento itens={feed} />
+        <FeedMovimento itens={feed} renderDetalhe={detalheDoFeed} />
       </SecaoHoje>
     ),
     insights: Array.isArray(stats?.insights) ? (
