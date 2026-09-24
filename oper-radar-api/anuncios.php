@@ -69,7 +69,8 @@ if (!empty($_GET['regiao']) && isset($REGIOES[$_GET['regiao']])) {
 if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GET['revenda']; $types .= 's'; }
 if (!empty($_GET['revenda_id'])) { $where[] = 'r.id = ?'; $params[] = (int)$_GET['revenda_id']; $types .= 'i'; }
 if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
-if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
+// Com recorte exato de modelo, a marca usa a mesma chave normalizada do painel (UPPER(TRIM)); sem ele, mantem a comparacao simples.
+if (!empty($_GET['marca']))     { $where[] = !empty($_GET['modelo']) ? 'UPPER(TRIM(a.marca)) = ?' : 'a.marca = ?'; $params[] = strtoupper(trim((string)$_GET['marca'])); $types .= 's'; }
 // Recorte exato de modelo + ano-modelo (mesma chave do painel de Mercado: marca, modelo, COALESCE(ano_final, ano_inicial)).
 // Sem isso, o botao "Ver N ofertas" de um modelo/ano abria uma lista mais ampla que a contagem anunciada.
 if (!empty($_GET['modelo'])) { $where[] = 'UPPER(TRIM(a.modelo)) = ?'; $params[] = strtoupper(trim((string)$_GET['modelo'])); $types .= 's'; }

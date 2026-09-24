@@ -108,3 +108,5 @@ lado, mude o outro. Testes em `tests/marketTaxonomy.test.js`.
 Com um modelo selecionado no painel (marca + modelo + ano no contexto), `PageMercado` envia `marca`, `modelo` e
 `ano_modelo` a `anuncios.php`, então "Ver N ofertas disponíveis" abre exatamente as N ofertas contadas.
 Teste de contrato: `tests/queryBackendContract.test.js`.
+Filtros próprios da lista (preço, revenda, carroceria, tração, fila FIPE) continuam somando ao recorte do modelo: a
+contagem do botão é a do modelo/ano no recorte geográfico do painel, e a lista mostra seus filtros ativos.

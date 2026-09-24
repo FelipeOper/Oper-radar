@@ -41,6 +41,7 @@ test('lista de ofertas envia o recorte exato de modelo e ano que o backend enten
   assert.match(app, /p\.set\('ano_modelo', recorteModelo\.ano\)/);
   assert.match(endpoint, /\$_GET\['modelo'\]/);
   assert.match(endpoint, /\$_GET\['ano_modelo'\]/);
+  assert.match(endpoint, /UPPER\(TRIM\(a\.marca\)\) = \?/);
   // mesma chave de ano do painel (mercado_painel.php agrupa por COALESCE(ano_final, ano_inicial))
   assert.match(endpoint, /COALESCE\(a\.ano_final, a\.ano_inicial\) = \?/);
   assert.match(read('oper-radar-api/mercado_painel.php'), /COALESCE\(a\.ano_final,a\.ano_inicial\) ano/);
