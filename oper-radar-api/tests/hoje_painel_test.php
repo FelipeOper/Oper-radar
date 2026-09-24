@@ -51,12 +51,21 @@ $reducoes = [
 $saidas = [['anuncio_id' => 3, 'titulo' => 'Saiu', 'uf' => 'GO', 'quando' => '2026-09-24 07:00:00']];
 $feed = oper_hoje_feed($novos, $reducoes, $saidas, 12);
 $tipos = array_count_values(array_column($feed, 'tipo'));
-confirma_hoje(($tipos['novo'] ?? 0) === 6, 'entradas limitadas a metade do feed');
 confirma_hoje(($tipos['preco'] ?? 0) === 1, 'so quedas de preco entram (alta ignorada)');
-confirma_hoje(($tipos['saida'] ?? 0) === 1, 'saida entra');
+confirma_hoje(($tipos['saida'] ?? 0) === 1, 'saida entra mesmo com muitas entradas mais recentes');
+confirma_hoje(($tipos['novo'] ?? 0) === 10, 'as entradas preenchem o que sobrou');
 confirma_hoje($feed[0]['anuncio_id'] === 100, 'mais recente primeiro');
 confirma_hoje(end($feed)['anuncio_id'] === 3, 'mais antigo por ultimo');
+$curto = array_count_values(array_column(oper_hoje_feed($novos, $reducoes, $saidas, 3), 'tipo'));
 confirma_hoje(count(oper_hoje_feed($novos, $reducoes, $saidas, 3)) === 3, 'respeita o limite');
+confirma_hoje(($curto['novo'] ?? 0) === 1 && ($curto['preco'] ?? 0) === 1 && ($curto['saida'] ?? 0) === 1, 'com poucas vagas cada tipo aparece uma vez');
+// Regressao real (producao 24/09): itens aguardando 2a confirmacao sao os mais recentes e escondiam saidas e quedas.
+$verif = [];
+for ($i = 0; $i < 10; $i++) $verif[] = ['anuncio_id' => 500 + $i, 'titulo' => "Verif $i", 'uf' => 'PR', 'quando' => sprintf('2026-09-24 11:%02d:00', 50 - $i)];
+$saidasVelhas = [];
+for ($i = 0; $i < 3; $i++) $saidasVelhas[] = ['anuncio_id' => 700 + $i, 'titulo' => "Saiu $i", 'uf' => 'GO', 'quando' => sprintf('2026-09-22 10:%02d:00', 30 - $i)];
+$mistura = array_count_values(array_column(oper_hoje_feed([], [], $saidasVelhas, 6, $verif), 'tipo'));
+confirma_hoje(($mistura['saida'] ?? 0) === 3 && ($mistura['verificacao'] ?? 0) === 3, 'verificacoes recentes nao escondem as saidas');
 confirma_hoje(oper_hoje_feed([], [], []) === [], 'sem eventos, feed vazio');
 $comVerificacao = oper_hoje_feed([], [], [], 12, [['anuncio_id' => 9, 'titulo' => 'Aguardando', 'url' => 'https://exemplo.test/9', 'uf' => 'PR', 'quando' => '2026-09-24 10:00:00']]);
 confirma_hoje(count($comVerificacao) === 1 && $comVerificacao[0]['tipo'] === 'verificacao', 'saida aguardando 2a confirmacao entra no feed');
@@ -70,7 +79,8 @@ $ctx = [
     'saidas_total' => 37,
     'saidas_por_uf' => [['uf' => 'SP', 'saidas' => 9, 'ativos' => 581], ['uf' => 'PR', 'saidas' => 21, 'ativos' => 422]],
     'abaixo_fipe' => [
-        ['marca' => 'Volvo', 'modelo' => 'FH 540', 'ano' => 2021, 'mediana' => 480000, 'fipe' => 505000, 'amostra' => 9, 'revendas' => 6],
+        ['marca' => 'Volvo', 'modelo' => 'FH 540', 'ano' => 2021, 'mediana' => 480000, 'fipe' => 505000, 'amostra' => 12, 'revendas' => 6],
+        ['marca' => 'MB', 'modelo' => 'Actros 2651', 'ano' => 2022, 'mediana' => 400000, 'fipe' => 520000, 'amostra' => 9, 'revendas' => 5],
         ['marca' => 'Scania', 'modelo' => 'R 450', 'ano' => 2020, 'mediana' => 400000, 'fipe' => 500000, 'amostra' => 3, 'revendas' => 2],
         ['marca' => 'DAF', 'modelo' => 'XF', 'ano' => 2022, 'mediana' => 500000, 'fipe' => 505000, 'amostra' => 12, 'revendas' => 5],
     ],
@@ -89,7 +99,8 @@ confirma_hoje($ids === ['saidas-uf', 'abaixo-fipe', 'estoque-parado', 'concorren
 $porId = array_column($ins, null, 'id');
 confirma_hoje(strpos($porId['saidas-uf']['titulo'], 'PR') === 0, 'UF com mais saidas vence');
 confirma_hoje($porId['abaixo-fipe']['acao']['contexto']['modelo'] === 'FH 540', 'so o modelo com amostra suficiente e desvio relevante');
-confirma_hoje($porId['abaixo-fipe']['evidencia']['confianca'] === 'baixa', 'confianca segue a regra real (9 precos = baixa)');
+confirma_hoje($porId['abaixo-fipe']['evidencia']['confianca'] === 'media', 'confianca segue a regra real (12 precos = media)');
+confirma_hoje($porId['abaixo-fipe']['acao']['contexto']['modelo'] !== 'Actros 2651', 'amostra de 9 precos nao vira destaque mesmo com desvio de -23%');
 confirma_hoje(strpos($porId['abaixo-fipe']['texto'], '5,0%') !== false, 'desvio formatado em pt-BR');
 confirma_hoje($porId['estoque-parado']['evidencia']['valor'] === '6 anúncios', 'estoque parado usa o grupo com mais parados');
 confirma_hoje($porId['concorrente-reduziu']['titulo'] === 'Rota Exemplo reduziu preço em 5 anúncios', 'revenda com >=3 reducoes');
@@ -110,5 +121,10 @@ $fraco = oper_hoje_insights([
 ]);
 confirma_hoje($fraco === [], 'sem amostra suficiente nao ha insight');
 confirma_hoje(oper_hoje_insights([]) === [], 'contexto vazio nao quebra');
+
+confirma_hoje(oper_hoje_rotulo_modelo('SCANIA', 'SCANIA R450', 2020) === 'SCANIA R450 2020', 'nao repete a marca quando o modelo ja a traz');
+confirma_hoje(oper_hoje_rotulo_modelo('Volvo', 'FH 540', 2021) === 'Volvo FH 540 2021', 'marca e modelo distintos');
+confirma_hoje(oper_hoje_rotulo_modelo('', 'XF 530', 2022) === 'XF 530 2022', 'sem marca');
+confirma_hoje(oper_hoje_rotulo_modelo('DAF', 'daf xf', 2022) === 'daf xf 2022', 'comparacao sem diferenciar maiusculas');
 
 echo "hoje_painel_test=OK\n";

@@ -152,7 +152,7 @@ $parados = $bloco('estoque_parado', oper_hoje_consulta($conn, "
 $reducoesRevendas = [];
 if ($temEventos) {
     $reducoesRevendas = $bloco('reducoes_revendas', oper_hoje_consulta($conn, "
-        SELECT r.id, r.nome, r.cidade, r.uf, COUNT(*) AS reducoes,
+        SELECT r.id, r.nome, r.cidade, r.uf, COUNT(DISTINCT e.anuncio_id) AS reducoes,
                (SELECT COUNT(*) FROM anuncio x WHERE x.revenda_id=r.id AND x.status='ativo') AS ativos
         FROM anuncio_evento e
         JOIN anuncio a ON a.id=e.anuncio_id JOIN revenda r ON r.id=a.revenda_id

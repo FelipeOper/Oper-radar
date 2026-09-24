@@ -18,6 +18,9 @@ const OPER_HOJE_INSIGHT_SAIDAS_MIN = 5;
 const OPER_HOJE_INSIGHT_PARADOS_MIN = 4;
 const OPER_HOJE_INSIGHT_REDUCOES_MIN = 3;
 const OPER_HOJE_INSIGHT_ABAIXO_FIPE_PCT = -4.0;
+// Amostra minima para destacar um modelo abaixo da FIPE: 10 precos (confianca ao menos media).
+// Com 5 a 9 precos a mediana e instavel e o insight premiaria o ruido.
+const OPER_HOJE_INSIGHT_ABAIXO_FIPE_AMOSTRA = 10;
 
 function oper_hoje_horas_desde(?string $quando, DateTimeInterface $agora): ?int {
     if ($quando === null || trim($quando) === '') return null;
@@ -117,18 +120,30 @@ function oper_hoje_feed(array $novos, array $reducoes, array $saidas, int $limit
 
     usort($eventos, fn($a, $b) => (strtotime($b['quando']) ?: 0) <=> (strtotime($a['quando']) ?: 0));
 
-    $limiteNovos = (int)ceil($limite / 2);
-    $totalNovos = 0;
+    // Revezamento entre os tipos: itens "aguardando 2a confirmacao" sao sempre os mais recentes e, ordenados
+    // so por horario, ocupariam todas as vagas e esconderiam saidas e quedas de preco.
+    $porTipo = ['novo' => [], 'preco' => [], 'saida' => [], 'verificacao' => []];
+    foreach ($eventos as $evento) $porTipo[$evento['tipo']][] = $evento;
     $feed = [];
-    foreach ($eventos as $evento) {
-        if (count($feed) >= $limite) break;
-        if ($evento['tipo'] === 'novo') {
-            if ($totalNovos >= $limiteNovos) continue;
-            $totalNovos++;
+    while (count($feed) < $limite) {
+        $adicionou = false;
+        foreach (array_keys($porTipo) as $tipo) {
+            if (count($feed) >= $limite) break;
+            $proximo = array_shift($porTipo[$tipo]);
+            if ($proximo !== null) { $feed[] = $proximo; $adicionou = true; }
         }
-        $feed[] = $evento;
+        if (!$adicionou) break;
     }
+    usort($feed, fn($a, $b) => (strtotime($b['quando']) ?: 0) <=> (strtotime($a['quando']) ?: 0));
     return $feed;
+}
+
+/** "SCANIA" + "SCANIA R450" + 2020 -> "SCANIA R450 2020" (o modelo ja costuma trazer a marca). */
+function oper_hoje_rotulo_modelo($marca, $modelo, $ano): string {
+    $marca = trim((string)$marca);
+    $modelo = trim((string)$modelo);
+    $jaTemMarca = $marca !== '' && stripos($modelo, $marca) === 0;
+    return trim(($jaTemMarca ? '' : $marca . ' ') . $modelo . ' ' . $ano);
 }
 
 function oper_hoje_brl($valor): string {
@@ -185,13 +200,13 @@ function oper_hoje_insights(array $ctx, int $maximo = 4): array {
     foreach (($ctx['abaixo_fipe'] ?? []) as $linha) {
         $fipe = (float)($linha['fipe'] ?? 0);
         $mediana = (float)($linha['mediana'] ?? 0);
-        if ($fipe <= 0 || $mediana <= 0 || (int)($linha['amostra'] ?? 0) < OPER_RADAR_AMOSTRA_MINIMA) continue;
+        if ($fipe <= 0 || $mediana <= 0 || (int)($linha['amostra'] ?? 0) < OPER_HOJE_INSIGHT_ABAIXO_FIPE_AMOSTRA) continue;
         $desvio = ($mediana - $fipe) / $fipe * 100;
         if ($desvio > OPER_HOJE_INSIGHT_ABAIXO_FIPE_PCT) continue;
         if ($melhorFipe === null || $desvio < $melhorFipe['desvio']) $melhorFipe = $linha + ['desvio' => $desvio];
     }
     if ($melhorFipe !== null) {
-        $rotulo = trim("{$melhorFipe['marca']} {$melhorFipe['modelo']} {$melhorFipe['ano']}");
+        $rotulo = oper_hoje_rotulo_modelo($melhorFipe['marca'], $melhorFipe['modelo'], $melhorFipe['ano']);
         $amostra = (int)$melhorFipe['amostra'];
         $insights[] = [
             'id' => 'abaixo-fipe',
@@ -223,7 +238,7 @@ function oper_hoje_insights(array $ctx, int $maximo = 4): array {
         if ($melhorParado === null || (int)$linha['parados'] > (int)$melhorParado['parados']) $melhorParado = $linha;
     }
     if ($melhorParado !== null) {
-        $rotulo = trim("{$melhorParado['marca']} {$melhorParado['modelo']} {$melhorParado['ano']}");
+        $rotulo = oper_hoje_rotulo_modelo($melhorParado['marca'], $melhorParado['modelo'], $melhorParado['ano']);
         $p = (int)$melhorParado['parados'];
         $t = (int)$melhorParado['total'];
         $dias = OPER_HOJE_PARADO_DIAS;
@@ -271,7 +286,7 @@ function oper_hoje_insights(array $ctx, int $maximo = 4): array {
                 'amostra' => "{$a} anúncios",
                 'confianca' => mercado_confianca($a),
                 'atualizacao' => $atualizacao,
-                'explicacao' => 'Redução = queda de preço detectada entre duas coletas.',
+                'explicacao' => 'Anúncios distintos com ao menos uma queda de preço detectada entre duas coletas nos últimos 30 dias.',
             ],
             'acao' => ['rotulo' => 'Ver concorrência', 'pagina' => 'concorrentes', 'contexto' => []],
         ];
