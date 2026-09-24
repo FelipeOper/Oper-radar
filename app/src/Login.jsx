@@ -8,8 +8,8 @@ import logoLight from '../../design-system/assets/logo-light-transparent.png';
 
 function Logo({ className = '' }) {
   return <>
-    <img className={`oc-logo-dark ${className}`.trim()} src={logoDark} alt="Oper Radar" />
-    <img className={`oc-logo-light ${className}`.trim()} src={logoLight} alt="Oper Radar" />
+    <img className={`oc-logo-dark ${className}`.trim()} src={logoDark} alt="Oper Radar" loading="lazy" decoding="async" />
+    <img className={`oc-logo-light ${className}`.trim()} src={logoLight} alt="Oper Radar" loading="lazy" decoding="async" />
   </>;
 }
 
