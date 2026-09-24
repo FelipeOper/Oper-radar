@@ -37,9 +37,9 @@ if (isset($MERCADO_TIPOS[$mercado])) {
 
 $categoriaAtributos = $_GET['categoria'] ?? 'todas';
 $condicaoCategoriaAtributos = '';
-if ($categoriaAtributos !== 'todas' && isset($CATEGORIA_TIPOS[$categoriaAtributos])) {
-    $tiposSeguros = array_map(fn($tipo) => "'" . $conn->real_escape_string($tipo) . "'", $CATEGORIA_TIPOS[$categoriaAtributos]);
-    $condicaoCategoriaAtributos = ' AND a.tipo IN (' . implode(',', $tiposSeguros) . ')';
+if ($categoriaAtributos !== 'todas' && ($filtroCategoriaAtributos = oper_taxonomia_filtro_categoria((string)$categoriaAtributos))) {
+    $tiposSeguros = array_map(fn($tipo) => "'" . $conn->real_escape_string($tipo) . "'", $filtroCategoriaAtributos['tipos']);
+    $condicaoCategoriaAtributos = " AND a.tipo {$filtroCategoriaAtributos['operador']} (" . implode(',', $tiposSeguros) . ')';
 }
 
 // Contagem por tipo (uma consulta), depois soma nas categorias

@@ -39,10 +39,10 @@ if (!empty($_GET['mercado']) && isset($MERCADO_TIPOS[$_GET['mercado']])) {
     $where[] = $_GET['mercado'] === 'principal' ? "a.tipo IN ($ph)" : "COALESCE(a.tipo,'') NOT IN ($ph)";
     foreach ($tipos as $t) { $params[] = $t; $types .= 's'; }
 }
-if (!empty($_GET['categoria']) && isset($CATEGORIA_TIPOS[$_GET['categoria']])) {
-    $tipos = $CATEGORIA_TIPOS[$_GET['categoria']];
+if (!empty($_GET['categoria']) && ($filtroCategoria = oper_taxonomia_filtro_categoria((string)$_GET['categoria']))) {
+    $tipos = $filtroCategoria['tipos'];
     $ph = implode(',', array_fill(0, count($tipos), '?'));
-    $where[] = "a.tipo IN ($ph)";
+    $where[] = "a.tipo {$filtroCategoria['operador']} ($ph)";
     foreach ($tipos as $t) { $params[] = $t; $types .= 's'; }
 }
 if (!empty($_GET['status']))    { $where[] = 'a.status = ?';    $params[] = $_GET['status']; $types .= 's'; }

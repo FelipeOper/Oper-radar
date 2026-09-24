@@ -81,14 +81,13 @@ function painel_resumo_grupo(array $grupo, int $saidas, array $periodo): array {
     ];
 }
 
-$categorias = oper_taxonomia_tipos_por_categoria();
 $mercados = oper_taxonomia_tipos_por_mercado();
 $segmento = (string)($_GET['segmento'] ?? 'todas');
-$tipos = $segmento !== 'todas' && isset($categorias[$segmento])
-    ? $categorias[$segmento]
-    : $mercados['principal'];
+$filtroSegmento = $segmento !== 'todas' ? oper_taxonomia_filtro_categoria($segmento) : null;
+$tipos = $filtroSegmento ? $filtroSegmento['tipos'] : $mercados['principal'];
+$operadorTipos = $filtroSegmento ? $filtroSegmento['operador'] : 'IN';
 
-$baseWhere = ['a.tipo IN (' . painel_placeholders($tipos) . ')'];
+$baseWhere = ["a.tipo $operadorTipos (" . painel_placeholders($tipos) . ')'];
 $baseParams = array_values($tipos);
 $baseTypes = str_repeat('s', count($tipos));
 

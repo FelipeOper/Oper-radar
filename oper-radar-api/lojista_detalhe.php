@@ -54,8 +54,9 @@ $where = 'a.revenda_id=?';
 $types = 'i';
 $params = [$lojistaId];
 if ($categoria !== 'todas') {
-    $tipos = $categorias[$categoria];
-    $where .= ' AND a.tipo IN (' . implode(',', array_fill(0, count($tipos), '?')) . ')';
+    $filtroCategoria = oper_taxonomia_filtro_categoria($categoria);
+    $tipos = $filtroCategoria['tipos'];
+    $where .= " AND a.tipo {$filtroCategoria['operador']} (" . implode(',', array_fill(0, count($tipos), '?')) . ')';
     foreach ($tipos as $tipo) { $params[] = $tipo; $types .= 's'; }
 }
 

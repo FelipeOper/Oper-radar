@@ -131,6 +131,8 @@ As regras puras ficam em `lib/concorrencia_metricas.php`, cobertas por
 
 `lib/market_taxonomy.php`: o mercado `principal` é só caminhão + implemento rodoviário (`Caminhao`, `Carreta`,
 `Carroceria-sobre-chassi`, `Trailer`, `Implemento`); o resto forma o mercado `outros`, sem mistura (o cenário
-agrícola fica separado). `Implementos-agricolas` é categoria agrícola. Tipo não mapeado cai em "outros" como
-categoria, mas ainda não entra na lista de tipos de nenhum mercado — mapeie-o aqui ao surgir.
+agrícola fica separado). `Implementos-agricolas` é categoria agrícola. A categoria `outros` é o **complemento** das
+demais (`oper_taxonomia_filtro_categoria` devolve `NOT IN`): tipo não mapeado (ex.: `Aviao`) aparece em "outros"
+tanto na contagem da faceta quanto ao abrir a categoria (`anuncios.php`, `facetas.php`, `lojista_detalhe.php`,
+`mercado_painel.php?segmento=`). Ao surgir um tipo novo relevante, mapeie-o aqui e em `app/src/marketTaxonomy.js`.
 Testes: `tests/market_taxonomy_test.php`. O espelho no frontend é `app/src/marketTaxonomy.js`.
