@@ -1,5 +1,15 @@
 # OPER RADAR — frontend
 
+## Concorrência
+
+`PageConcorrencia` em `src/ConcorrenciaBlocos.jsx` usa `lojistas.php` para filtrar revendas
+por múltiplas UFs, nome e indicador. O painel do lojista usa `lojista_detalhe.php` e mostra
+estoque, saídas observadas, reduções, idade e desvio mediano vs FIPE com evidência.
+`src/concorrenciaModel.js` mantém as regras de ordenação e de dados indisponíveis, com testes
+em `tests/concorrenciaModel.test.js`. Em servidor antigo, redução ausente aparece como
+indisponível e desvio sem amostra como insuficiente. O modo `VITE_DEMO=1` tem fixtures apenas
+para conferência visual; o build normal consulta a API real.
+
 Aplicação React/Vite publicada em `agenciaoper.com.br/oper-radar/` e conectada à API PHP
 em `agenciaoper.com.br/oper-radar-api/`.
 

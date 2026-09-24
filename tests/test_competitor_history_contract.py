@@ -22,13 +22,16 @@ class CompetitorHistoryContractTest(unittest.TestCase):
         self.assertIn("preco_ativo_amostra", api)
         self.assertIn("preco_ativo_confianca", api)
 
-    def test_frontend_abre_painel_com_tres_abas(self):
+    def test_frontend_abre_painel_com_evidencia_e_estoque(self):
         app = (ROOT / "app" / "src" / "App.jsx").read_text(encoding="utf-8")
-        self.assertIn("function PainelLojista", app)
-        self.assertIn("lojista_detalhe.php", app)
-        self.assertIn("Histórico observado", app)
-        self.assertIn("Saídas ·", app)
-        self.assertIn("O preço exibido é o último preço publicado", app)
+        painel = (ROOT / "app" / "src" / "ConcorrenciaBlocos.jsx").read_text(encoding="utf-8")
+        self.assertIn("<PageConcorrencia />", app)
+        self.assertIn("function PainelRevenda", painel)
+        self.assertIn("lojista_detalhe.php", painel)
+        self.assertIn("<Evidencia", painel)
+        self.assertIn("Saídas observadas (30 d)", painel)
+        self.assertIn("Estoque do lojista", painel)
+        self.assertIn("não comprova venda", painel)
 
     def test_materializador_aceita_intervalo_seguro(self):
         materializador = (ROOT / "fase3-series" / "materializar_eventos.py").read_text(encoding="utf-8")

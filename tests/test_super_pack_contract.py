@@ -21,7 +21,10 @@ class SuperPackContractTest(unittest.TestCase):
 
     def test_hierarquia_geografica_esta_nas_telas_operacionais(self):
         app = (ROOT / "app" / "src" / "App.jsx").read_text(encoding="utf-8")
-        self.assertGreaterEqual(app.count("<SeletorGeografico"), 3)
+        self.assertGreaterEqual(app.count("<SeletorGeografico"), 2)
+        concorrencia = (ROOT / "app" / "src" / "ConcorrenciaBlocos.jsx").read_text(encoding="utf-8")
+        self.assertIn("Todas as UFs", concorrencia)
+        self.assertIn("ufs.includes(uf)", concorrencia)
         # Rotulos sem numeracao ("1. Regiao ... 4. Ordenacao" pareciam processo interno, ver
         # docs/oper-radar-redesign): a hierarquia continua sendo regiao -> estado.
         self.assertIn(">REGIÃO</div>", app)

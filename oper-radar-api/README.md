@@ -103,3 +103,15 @@ modelo selecionado). Ele compara as UFs onde aquele marca + modelo + ano aparece
 revendas, saídas e cobertura de eventos). UF com menos de 5 comparáveis, sem trilha de eventos ou com
 menos de 7 dias de cobertura fica sem nota (`publicavel: false`). Se a consulta falhar, o campo vem
 `null` e o restante do painel continua. Testes: `tests/regional_modelo_test.php`.
+
+## Concorrência e lojista
+
+`lojistas.php` preserva os campos anteriores e acrescenta `reducoes_30d` (quantidade de
+anúncios com queda válida nos últimos 30 dias), `desvio_fipe_mediano_pct`,
+`desvio_fipe_amostra` e `desvio_fipe_confianca`. `lojista_detalhe.php` acrescenta esses
+campos ao `resumo`, além de `idade_media_estoque` e `idade_observada_confiavel`.
+As quedas vêm de `anuncio_evento`, descartando reduções acima de 50% como provável erro;
+sem a tabela de eventos, o valor é `null`, nunca zero. O desvio é a mediana dos desvios
+individuais de preços válidos com FIPE inequívoca, publicado só com cinco ou mais preços.
+As regras puras ficam em `lib/concorrencia_metricas.php`, cobertas por
+`tests/concorrencia_metricas_test.php`. Saída observada continua sem comprovar venda.

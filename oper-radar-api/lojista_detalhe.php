@@ -4,6 +4,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/competitor_history.php';
 require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
+require_once __DIR__ . '/lib/concorrencia_metricas.php';
 $conn = conecta();
 
 function concorrente_linhas(mysqli $conn, string $sql, string $types = '', array $params = []): array {
@@ -77,9 +78,13 @@ $estoqueAtivo = concorrente_linhas($conn, "SELECT $baseCampos,
 $estoqueAtivo = array_map('concorrente_normaliza_anuncio', $estoqueAtivo);
 
 $precosAtivos = concorrente_linhas($conn, "SELECT a.preco, a.titulo, a.preco_texto_bruto,
-    f.preco preco_fipe FROM anuncio a LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
+    a.fipe_match_status, f.preco preco_fipe FROM anuncio a LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE $where AND a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0", $types, $params);
 $estatisticasPrecoAtivo = mercado_calcula_estatisticas($precosAtivos);
+$desvioFipe = oper_concorrencia_desvio_fipe($precosAtivos);
+$idadeAtual = concorrente_linhas($conn, "SELECT ROUND(AVG(GREATEST(0, DATEDIFF(CURDATE(), DATE(a.primeira_vez_visto)))), 1) idade_media,
+    DATEDIFF(CURDATE(), MIN(DATE(a.primeira_vez_visto))) dias_coleta
+    FROM anuncio a WHERE $where AND a.status='ativo'", $types, $params)[0];
 
 $tabelaEventos = $conn->query("SELECT COUNT(*) total FROM information_schema.TABLES
     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='anuncio_evento'");
@@ -88,9 +93,17 @@ $contagensEventos = [];
 $coberturaInicio = null;
 $coberturaFim = null;
 $saidas30d = 0;
+$reducoes30d = null;
 $duracoesSaida = [];
 
 if ($eventosDisponiveis) {
+    $reducoes = concorrente_linhas($conn, "SELECT COUNT(DISTINCT e.anuncio_id) quantidade
+        FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id
+        WHERE $where AND e.tipo_evento='mudanca_preco'
+          AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+          AND e.valor_anterior_decimal>e.valor_novo_decimal
+          AND e.valor_novo_decimal>=e.valor_anterior_decimal*0.5", $types, $params);
+    $reducoes30d = (int)($reducoes[0]['quantidade'] ?? 0);
     $eventosResumo = concorrente_linhas($conn, "SELECT e.tipo_evento, COUNT(*) quantidade,
         MIN(e.dia_referencia) primeira_data, MAX(e.dia_referencia) ultima_data,
         SUM(CASE WHEN e.tipo_evento='saida_detectada'
@@ -165,6 +178,10 @@ envia_json([
         'preco_mediano_ativo' => $estatisticasPrecoAtivo['mediana'],
         'preco_ativo_amostra' => (int)$estatisticasPrecoAtivo['amostra_qualificada'],
         'preco_ativo_confianca' => $estatisticasPrecoAtivo['confianca'],
+        'idade_media_estoque' => (int)($idadeAtual['dias_coleta'] ?? 0) >= 14 ? (float)$idadeAtual['idade_media'] : null,
+        'idade_observada_confiavel' => (int)($idadeAtual['dias_coleta'] ?? 0) >= 14,
+        'reducoes_30d' => $reducoes30d,
+        ...$desvioFipe,
     ],
     'historico_eventos' => [
         'disponivel' => $eventosDisponiveis,

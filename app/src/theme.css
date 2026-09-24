@@ -247,6 +247,30 @@ select {
   transition: none !important;
 }
 
+/* Concorrencia: filtros, indicadores e painel responsivos do design system. */
+.oc-conc { display:flex; flex-direction:column; gap:16px; }
+.oc-conc__chips { display:flex; gap:8px; flex-wrap:wrap; }
+.oc-conc__controls { display:flex; gap:10px; flex-wrap:wrap; }
+.oc-conc__controls label { display:flex; align-items:center; gap:8px; flex:1 1 240px; padding:0 12px; background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--radius-md); }
+.oc-conc__controls input { width:100%; min-width:0; border:0; background:transparent; color:var(--text-primary); font:inherit; }
+.oc-conc__controls select,.oc-conc__sort select { min-height:42px; padding:0 12px; border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-2); color:var(--text-primary); font:inherit; }
+.oc-conc__controls select { flex:1 1 220px; }
+.oc-conc__metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr)); gap:10px; }
+.oc-conc__metrica { gap:8px; }
+.oc-conc__metrica .or-stat__value { font:var(--type-kpi); white-space:normal; overflow-wrap:anywhere; }
+.oc-conc__rows { display:flex; flex-direction:column; gap:8px; }
+.oc-conc__row { min-height:78px; }
+.oc-conc__row .or-listrow__s { display:flex; align-items:center; gap:4px; white-space:normal; }
+.oc-conc__backdrop { position:fixed; inset:0; z-index:1000; display:flex; justify-content:flex-end; background:rgba(0,0,0,.65); }
+.oc-conc__panel { width:min(760px,100vw); height:100%; overflow-y:auto; background:var(--or-bg); color:var(--text-primary); border-left:1px solid var(--border-subtle); box-shadow:0 0 30px rgba(0,0,0,.25); }
+.oc-conc__panelhead { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:20px; background:var(--or-bg); border-bottom:1px solid var(--border-subtle); }
+.oc-conc__panelhead h2 { margin:4px 0; font:var(--type-page-title); }
+.oc-conc__panelhead p { margin:0; color:var(--text-tertiary); }
+.oc-conc__eyebrow { color:var(--accent); font-size:11px; font-weight:700; letter-spacing:.08em; }
+.oc-conc__panelbody { display:flex; flex-direction:column; gap:14px; padding:20px; }
+.oc-conc__sort { display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--text-secondary); font-size:13px; }
+@media(max-width:600px) { .oc-conc__panelhead,.oc-conc__panelbody { padding:14px; } .oc-conc__row .or-listrow__lead { display:none; } .oc-conc__row { padding:12px; } }
+
 @media (max-width: 760px) {
   :root {
     --or-control-min-height: 44px;

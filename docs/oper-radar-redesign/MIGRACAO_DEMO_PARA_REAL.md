@@ -16,7 +16,7 @@ Nada aqui foi publicado. Produção só muda com aprovação explícita e o flux
 | A | Identidade do design system (tokens, Inter/Manjari, tema escuro e claro), migração de preferências salvas | **Feita** (`797c95c`), verificada no navegador |
 | A+ | Modo demo `VITE_DEMO=1` (PR #61) trazido só para verificação visual | Feita (`82f476f`) |
 | B | Shell (sidebar/topbar/bottom nav) e ícones Phosphor no lugar de lucide | **Feita**: `Shell.jsx` (classes do design system, troca desktop/celular por CSS em 899px, alternância de tema na topbar) e `icons.jsx` (adaptador Phosphor; lucide removido). Menu: Concorrentes→Concorrência, Ações→Plano de ação |
-| C | Telas, uma por vez (ordem abaixo) | Em andamento: **Hoje e Mercado feitas** (24/09/2026); as demais a fazer |
+| C | Telas, uma por vez (ordem abaixo) | Em andamento: **Hoje, Mercado e Concorrência/Lojista feitas** (24/09/2026); as demais a fazer |
 | D | Backend: novos cruzamentos e endpoints | Junto com cada tela. Feito para a Hoje: `hoje_stats.php` estendido e `frescor_coleta.php` |
 | E | Release | Só com aprovação |
 
@@ -89,7 +89,7 @@ Cada um ganha teste PHP em `oper-radar-api/tests/` no padrão atual (lógica pur
 ## Ordem de execução das telas
 
 1. ~~Shell (Fase B)~~ — feito.
-2. ~~Hoje~~ (feita) → ~~Mercado~~ (feito) → Concorrência/Lojista → Comparador → Minha Loja → Inteligência/Oportunidades
+2. ~~Hoje~~ (feita) → ~~Mercado~~ (feito) → ~~Concorrência/Lojista~~ (feita) → Comparador → Minha Loja → Inteligência/Oportunidades
    → Plano de ação → Dados e FIPE → Anúncio/Veículo → Configurações/Conta.
 
 Cada tela: portar visual, ligar ao dado real, testes, verificação no navegador (build `VITE_DEMO=1`
@@ -142,3 +142,17 @@ tem e faltava, sem reescrever a lógica de paginação do navegador de ofertas.
 - Verificado: 15/15 testes PHP, 61/61 no app, SQL das 4 consultas novas em parser MySQL (não em MySQL
   real), navegador real com `agent-browser` em desktop e 390 px (achou e corrigiu quebra de texto na
   lista de componentes no celular).
+
+## Tela Concorrência/Lojista (feita em 24/09/2026)
+
+- A lista segue a demo: UFs múltiplas, busca, ordenação por estoque, saídas, reduções e idade;
+  KPIs com evidência e linhas de revenda com idade e desvio vs FIPE. O painel do lojista mostra
+  indicadores, qualidade do histórico, estoque ordenável e episódios de saída, com limite
+  explícito da API (150 por lista).
+- `lojistas.php` e `lojista_detalhe.php` preservam o contrato antigo e acrescentam reduções de
+  preço em 30 dias e desvio mediano vs FIPE. A lógica pura está em
+  `lib/concorrencia_metricas.php`. Sem eventos, reduções são indisponíveis; desvio só aparece
+  com cinco preços válidos com FIPE. Saída observada continua sem significar venda.
+- Verificado: testes PHP, frontend e contratos Python; `php -l` nos três arquivos PHP; build
+  normal e demo; navegador em desktop e 390 px, sem rolagem horizontal. As consultas novas
+  ainda dependem de verificação com MySQL real na publicação do Release 1.
