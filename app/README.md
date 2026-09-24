@@ -7,6 +7,18 @@ O Mercado abre no universo principal de caminhões e implementos rodoviários; o
 segmentos ficam na aba "Outros mercados". A página Comparador cruza dois recortes de
 caminhões por marca, modelo ou marca + modelo usando métricas calculadas no servidor.
 
+## Identidade visual (design system)
+
+O app usa o design system em `../design-system/` como única identidade: `src/main.jsx` importa
+`design-system/styles.css` (tokens, fontes Inter/Manjari, ícones Phosphor, classes `.or-*`) e
+`src/theme.js` espelha os tokens semânticos em dois temas, `dark` (padrão) e `light`. Preferências
+salvas antes da troca migram sozinhas (`radar` → `dark`, `white` → `light`). O `Card` do app usa a
+classe `.oc-card` para não colidir com `.or-card` do design system. A migração tela a tela está em
+`../docs/oper-radar-redesign/MIGRACAO_DEMO_PARA_REAL.md`.
+
+`VITE_DEMO=1 npm run build` gera um build com dados fictícios (`src/demoFixtures.js`) só para
+verificação visual; sem a variável o app usa a API real.
+
 ## Desenvolvimento
 
 ```text
