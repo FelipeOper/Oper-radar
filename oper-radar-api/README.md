@@ -68,3 +68,29 @@ preferem mediana, `movimento_por_revenda` e `idade_observada_confiavel`.
 revalidados e os herdados no ciclo de referência (`07h` ou `19h`). Um anúncio só conta como
 revalidado quando sua revenda possui execução bem-sucedida naquele ciclo; a interface usa
 essa parcela como número principal e declara separadamente qualquer estoque herdado.
+
+## Tela "Hoje": movimento, insights e frescor da coleta
+
+As regras vivem em `lib/hoje_painel.php` (funções puras, testadas em
+`tests/hoje_painel_test.php`); os endpoints só consultam e orquestram.
+
+- `hoje_stats.php` mantém todas as chaves antigas e acrescenta `feed` (entradas em 48 h,
+  quedas de preço em 3 dias e saídas em 72 h, do mais recente ao mais antigo; entradas ficam
+  limitadas à metade do feed), `ufs_saidas`, `insights` e `atualizado_em`. Cada insight traz
+  `evidencia` (recorte, período, valor, base, amostra, confiança, atualização, explicação) e uma
+  `acao` de navegação. Só existe insight que passa do mínimo de amostra da sua regra, e a
+  confiança usa `mercado_confianca` (a regra real: 5/10/20 preços).
+- Quedas de preço vêm dos eventos `mudanca_preco` de `anuncio_evento`; queda maior que 50% é
+  descartada como provável erro de coleta. Sem a migração de eventos, o bloco fica em
+  `parciais_indisponiveis` e o restante da tela continua.
+- `frescor_coleta.php` (novo) classifica cada UF em `em_dia`, `parcial` (dentro do prazo, mas
+  menos de 80% das revendas coletadas em 24 h), `atrasada` (mais de 24 h sem execução
+  bem-sucedida) ou `sem_coleta` (nenhuma nos últimos 30 dias). Responde 503 se a consulta falhar;
+  o cliente não deve interpretar a ausência de resposta como "coleta em dia".
+
+Consultas novas são tolerantes: em PHP 8.1+ um erro de SQL lança exceção, então
+`oper_hoje_consulta()` devolve `null` e o bloco é listado em `parciais_indisponiveis`.
+
+Para rodar os testes PHP sem instalar nada: baixe o zip oficial de PHP 8.3 (NTS x64) de
+`downloads.php.net`, confira o SHA-256 publicado em `releases.json` e execute
+`php -d extension_dir=ext -d extension=mbstring tests/<nome>_test.php`.
