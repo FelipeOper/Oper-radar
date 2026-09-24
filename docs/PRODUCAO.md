@@ -3,6 +3,14 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.1 (frontend) — correções da auditoria visual — 24/09/2026 (PACOTE PRONTO)
+
+- Origem: commit `cb2a7f1` (PR #63). Codex adversarial `approve` em 3 rodadas (achados corrigidos: Panorama do Mercado por largura útil, causa correta da idade indisponível, contraste da evidência no cartão de destaque). Frontend 86/86, contratos Python 68/68, lint limpo. Sem mudança de API/banco/cron/credencial. Conteúdo: `docs/oper-radar-redesign/AUDITORIA_BETA_VS_DEMO.md`.
+- Pacote `Downloads\OperRadar-Release2.1` (comando único `PASSO-UNICO.txt`: beta, e só se ok, produção; pré-checagem de `index.html` atual — beta `30906009…`, produção `ae33b5fc…` — e dos zips; backup da pasta `oper-radar/` inteira; `.htaccess` de produção mantido; bundles antigos mantidos).
+- Beta: zip `5b051c3fcb087d16be49bec89faa3eed97bb56ba70487d05af8cd399565bcbd2`; depois `index.html` `2114fb46…`, `assets/index-96owgwHC.js` `d4da2d20…`.
+- Produção: zip `0374f68993d9247a3080261acbe3afadaa6cdd9cbe4a01e88246c726bf196fb5`; depois `index.html` `906cf8b3443a7b4f688a46206a4b8b99cc92dacfc08a84ed9ef164ea4a217f27`, `assets/index-B-bZSXLe.js` `ce7d9844916b482c00dfdbcf9ea4c0e86a7697ee393a22502f502e3935b6d7d4`.
+- Reversão: restaurar `index.html` do backup `oper-radar-frontend-release2.1-*`.
+
 ## Release 2 — frontend novo em PRODUÇÃO (`/oper-radar/`) + API 1.4 — 24/09/2026 (PUBLICADO ~17h25, conferido ao vivo)
 
 - Origem: commit `fb41d48` (PR #63, branch `agent/portar-demo-real`). Codex adversarial (revisão final do PR + 2 rodadas) → `approve`; testes: frontend 82/82, PHP 16/16, Python 68/68. As 11 telas foram abertas no beta com dados reais, sem erro de console. Achado da revisão final corrigido: "Ver N ofertas" abria lista mais ampla que a contagem (agora envia marca + modelo + `ano_modelo` exatos; `anuncios.php` ganhou os filtros `modelo` e `ano_modelo`). Ponto aceito e documentado: filtros próprios da lista (preço, revenda, carroceria, tração, fila FIPE) continuam somando ao recorte do modelo.
