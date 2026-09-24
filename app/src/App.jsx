@@ -1274,7 +1274,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
             <Evidencia evidencia={evPanorama.ticket} rotulo="Evidência" />
           </article>
           <article className="or-card or-stat" style={{ minWidth: 0 }}>
-            <div className="or-stat__top"><span className="or-stat__label">Desvio médio da FIPE</span><span className="or-stat__ic"><i className="ph ph-percent" aria-hidden="true" /></span></div>
+            <div className="or-stat__top"><span className="or-stat__label">Desvio mediano da FIPE</span><span className="or-stat__ic"><i className="ph ph-percent" aria-hidden="true" /></span></div>
             <div className="or-stat__row"><span className="or-stat__value">{desvioFipe.valor == null ? (desvioFipe.amostra == null ? '—' : 'Amostra insuf.') : fmtPctAssinado(desvioFipe.valor)}</span></div>
             <p className="or-card__sub" style={{ margin: 0 }}>{desvioFipe.amostra == null ? 'anúncios ativos vs. referência FIPE' : `${fmtN(desvioFipe.amostra)} preços válidos com FIPE`}</p>
             <Evidencia evidencia={evPanorama.desvio} rotulo="Evidência" />

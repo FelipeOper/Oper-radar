@@ -231,3 +231,14 @@ function mercado_desvio_fipe_medio_pct(array $registros): ?float {
     if (count($desvios) < OPER_RADAR_AMOSTRA_MINIMA) return null;
     return round(array_sum($desvios) / count($desvios), 1);
 }
+
+/**
+ * Mediana dos desvios (preco anunciado vs. FIPE). Robusta a vinculos FIPE suspeitos: a medicao F0b de 24/09/2026 achou
+ * 4,4% dos comparaveis acima de +90%, o que inflava a media. null abaixo da amostra minima.
+ */
+function mercado_desvio_fipe_mediano_pct(array $registros): ?float {
+    $desvios = mercado_desvios_fipe($registros);
+    if (count($desvios) < OPER_RADAR_AMOSTRA_MINIMA) return null;
+    $mediana = mercado_percentil($desvios, 0.5);
+    return $mediana === null ? null : round($mediana, 1);
+}

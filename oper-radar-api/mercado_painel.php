@@ -131,6 +131,7 @@ $ativos = painel_rows($conn, "SELECT a.preco, a.preco_texto_bruto, a.titulo, f.p
 $statsGeral = mercado_calcula_estatisticas($ativos);
 $desvioFipeMedioPct = mercado_desvio_fipe_medio_pct($ativos);
 $desvioFipeAmostra = mercado_desvio_fipe_amostra($ativos);
+$desvioFipeMedianoPct = mercado_desvio_fipe_mediano_pct($ativos);
 $lojistasSet = []; $cidadesSet = []; $ufsSet = [];
 foreach ($ativos as $item) {
     $lojistasSet[(int)$item['revenda_id']] = true;
@@ -362,6 +363,7 @@ envia_json([
         'ticket_mediano' => $statsGeral['mediana'], 'amostra_qualificada' => $statsGeral['amostra_qualificada'],
         'confianca' => $statsGeral['confianca'],
         'desvio_fipe_medio_pct' => $desvioFipeMedioPct,
+        'desvio_fipe_mediano_pct' => $desvioFipeMedianoPct,
         'desvio_fipe_amostra' => $desvioFipeAmostra,
         'desvio_fipe_confianca' => mercado_confianca($desvioFipeAmostra),
         'entradas_periodo' => $entradasPeriodoGeral, 'saidas_periodo' => $saidasPeriodoGeral,

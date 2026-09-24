@@ -142,3 +142,7 @@ Testes: `tests/market_taxonomy_test.php`. O espelho no frontend é `app/src/mark
 `modelo` (comparação exata, sem caixa/espaços) e `ano_modelo` (`COALESCE(ano_final, ano_inicial)`, a mesma chave que
 `mercado_painel.php` usa para agrupar) filtram a lista. O botão "Ver N ofertas" do Mercado envia marca + modelo +
 ano_modelo para a lista bater com a contagem anunciada. Ambos entram no fingerprint do cursor (`$_GET` inteiro).
+
+`mercado_painel.php` também devolve `resumo.desvio_fipe_mediano_pct` (mediana dos desvios, mesma amostra mínima de 5). O app do Mercado
+mostra a **mediana**: a média (`desvio_fipe_medio_pct`, mantida por compatibilidade) é puxada pelos vínculos FIPE suspeitos que a
+frente de saneamento mediu (4,4% dos comparáveis acima de +90%, 24/09/2026).

@@ -50,4 +50,11 @@ verifica(mercado_desvio_fipe_medio_pct([$reg(110000), $reg(110000), $reg(110000)
 verifica(mercado_sql_confianca_fipe(false) === '', 'sql confianca fipe desligado nao filtra');
 verifica(mercado_sql_confianca_fipe(true) === " AND a.fipe_match_confianca='alto'", 'sql confianca fipe ligado exige alto');
 
+// Mediana do desvio: nao e puxada por vinculos FIPE suspeitos (a media e).
+$comOutlier = [$reg(100000), $reg(101000), $reg(99000), $reg(102000), $reg(98000), $reg(240000)]; // +0, +1, -1, +2, -2, +140%
+verifica(mercado_desvio_fipe_mediano_pct($comOutlier) === 0.5, 'mediana do desvio ignora o outlier (0,5%)');
+verifica(mercado_desvio_fipe_medio_pct($comOutlier) === 23.3, 'a media e puxada pelo outlier (23,3%)');
+verifica(mercado_desvio_fipe_mediano_pct([$reg(110000), $reg(90000), $reg(105000), $reg(95000)]) === null, 'mediana do desvio com 4 precos e null');
+verifica(mercado_desvio_fipe_mediano_pct([]) === null, 'mediana do desvio sem registros e null');
+
 echo "market_quality_test=OK\n";

@@ -59,21 +59,22 @@ export function evidenciaPanorama({ resumo = {}, escopo = {}, fonte = {}, period
       recorte,
       periodo: 'Estoque ativo hoje',
       valor: desvio.valor == null ? (desvio.amostra == null ? 'Sem amostra verificável' : 'Amostra insuficiente') : pctAssinado(desvio.valor),
-      base: 'Preço anunciado contra a tabela FIPE',
+      base: 'Preço anunciado contra a tabela FIPE (mediana dos desvios)',
       ...(desvio.amostra == null ? {} : { amostra: `${inteiro(desvio.amostra)} preços válidos com FIPE`, confianca: resumo.desvio_fipe_confianca || 'insuficiente' }),
       atualizacao,
-      explicacao: 'Média do desvio entre o preço anunciado e a FIPE, só nos anúncios ativos com FIPE vinculada e preço válido. Só é exibida com ao menos 5 preços válidos. FIPE cobre parte dos anúncios e não cobre implementos.',
+      explicacao: 'Mediana do desvio entre o preço anunciado e a FIPE, só nos anúncios ativos com FIPE vinculada e preço válido; a mediana não é puxada por vínculos FIPE suspeitos. Só é exibida com ao menos 5 preços válidos. FIPE cobre parte dos anúncios e não cobre implementos.',
     },
   };
 }
 
-/* Desvio medio da FIPE do Panorama: so vira numero quando a API informa amostra >= 5 precos validos.
+/* Desvio MEDIANO da FIPE do Panorama: so vira numero quando a API informa amostra >= 5 precos validos e o campo da mediana.
    Sem amostra verificavel (servidor antigo) ou com amostra menor, nao ha numero: errado e pior que nenhum. */
 export const AMOSTRA_MINIMA_DESVIO_FIPE = 5;
 export function desvioFipeExibivel(resumo = {}) {
   const amostra = resumo.desvio_fipe_amostra == null ? null : Number(resumo.desvio_fipe_amostra);
-  const valor = resumo.desvio_fipe_medio_pct == null ? null : Number(resumo.desvio_fipe_medio_pct);
-  if (amostra == null) return { valor: null, amostra: null };
+  const valor = resumo.desvio_fipe_mediano_pct == null ? null : Number(resumo.desvio_fipe_mediano_pct);
+  // API antiga (sem o campo da mediana): a media nao serve como substituta, entao nao ha numero verificavel
+  if (amostra == null || resumo.desvio_fipe_mediano_pct === undefined) return { valor: null, amostra: null };
   if (amostra < AMOSTRA_MINIMA_DESVIO_FIPE) return { valor: null, amostra };
   return { valor, amostra };
 }
