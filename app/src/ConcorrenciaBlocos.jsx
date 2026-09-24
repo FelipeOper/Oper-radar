@@ -74,7 +74,7 @@ function PainelRevenda({ revenda, onClose }) {
             {resumo.ativos > estoque.length && <p className="or-card__sub">A API lista até 150 anúncios; o total acima considera todo o estoque.</p>}
           </section>
           <section className="or-card">
-            <div className="or-card__head"><div><h3 className="or-card__title">Saídas observadas</h3><p className="or-card__sub">{inteiro(resumo.saidas_observadas)} episódios no histórico · ausência confirmada, não venda</p></div></div>
+            <div className="or-card__head"><div><h3 className="or-card__title">Saídas observadas</h3><p className="or-card__sub">{inteiro(resumo.saidas_observadas)} episódios no histórico · ausência confirmada, não venda. O preço exibido é o último preço publicado, não o valor de venda</p></div></div>
             <div className="oc-conc__rows">{(dados.saidas_observadas || []).map((a, i) => <div className="or-listrow or-listrow--static" key={`${a.evento_id || a.anuncio_id}-${i}`}>
               <span className="or-listrow__body"><strong className="or-listrow__t">{a.titulo}</strong><span className="or-listrow__s">{brl(a.preco_saida ?? a.preco)} · {inteiro(a.dias_observados)} dias até a saída{a.reapareceu ? ' · reapareceu' : ''}</span></span>
               {a.url && <a href={a.url} target="_blank" rel="noreferrer" aria-label={`Ver ${a.titulo} no portal`}><ExternalLink size={16} /></a>}
@@ -107,7 +107,7 @@ export function PageConcorrencia() {
   const filtrados = useMemo(() => filtraRevendas(lojistas, { ufs, busca, ordem }), [lojistas, ufs, busca, ordem]);
   const escopo = ufs.length ? ufs.join(', ') : 'Todas as UFs';
   const indicadores = panoramaConcorrencia(filtrados, escopo, dados?._meta?.generated_at);
-  return <main className="oc-conc">
+  return <div className="oc-conc">
     <section className="or-card"><div className="or-card__head"><div><h2 className="or-card__title">Refinar resultados</h2><p className="or-card__sub">Selecione uma ou mais UFs. Sem seleção, mostramos todas.</p></div></div>
       <div className="oc-conc__chips"><button type="button" className={`or-tag ${ufs.length ? '' : 'or-tag--selected'}`} onClick={() => setUfs([])}>Todas as UFs</button>
         {Object.keys(contagemUf).sort().map(uf => <button type="button" key={uf} className={`or-tag ${ufs.includes(uf) ? 'or-tag--selected' : ''}`} aria-pressed={ufs.includes(uf)} onClick={() => setUfs(v => v.includes(uf) ? v.filter(x => x !== uf) : [...v, uf].sort())}>{uf} <span className="or-tag__count">{inteiro(contagemUf[uf])}</span></button>)}</div>
@@ -129,5 +129,5 @@ export function PageConcorrencia() {
       <div className="or-alert or-alert--info">Saída observada não é venda. Redução de preço é sinal, não prova. O desvio FIPE só aparece com ao menos 5 preços válidos.</div>
     </>}
     {aberta && <PainelRevenda revenda={aberta} onClose={() => setAberta(null)} />}
-  </main>;
+  </div>;
 }

@@ -32,6 +32,8 @@ class CompetitorHistoryContractTest(unittest.TestCase):
         self.assertIn("Saídas observadas (30 d)", painel)
         self.assertIn("Estoque do lojista", painel)
         self.assertIn("não comprova venda", painel)
+        self.assertIn("O preço exibido é o último preço publicado", painel)
+        self.assertNotIn("<main", painel)  # o shell já fornece o <main> da página
 
     def test_materializador_aceita_intervalo_seguro(self):
         materializador = (ROOT / "fase3-series" / "materializar_eventos.py").read_text(encoding="utf-8")
