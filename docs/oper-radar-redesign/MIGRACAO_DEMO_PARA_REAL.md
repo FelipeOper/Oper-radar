@@ -174,3 +174,13 @@ Estado em produção: **Release 1 da API** publicado (ver `docs/PRODUCAO.md`). O
 Achados da conferência ao vivo (24/09/2026) que viraram teste: feed sem mistura de tipos, contagem de reduções por anúncio distinto,
 amostra mínima de 10 preços para destacar "abaixo da FIPE", rótulo sem marca repetida.
 Pendências de dado: desvio FIPE por revenda chega a +90% (vínculos FIPE suspeitos, aparece com confiança; investigar em etapa própria).
+
+## Correções da revisão Codex adversarial (24/09/2026, PR #63)
+
+Veredito inicial `needs-attention`; três achados, todos confirmados no código e corrigidos:
+1. Insight "abaixo da FIPE" misturava vínculos de confiança menor na mediana → filtro opt-in `alto`.
+2. Desvio FIPE do Mercado sem amostra mínima → `null` abaixo de 5 preços, amostra e confiança expostas.
+3. Concorrência sem filtros de cidade e segmento → restaurados (cidade dentro das UFs; segmento por
+   `mix_categorias`; detalhe do lojista recebe `categoria`).
+Depende de **Release 1.2 da API** (`lib/market_quality.php`, `hoje_stats.php`, `mercado_painel.php`) e de
+novo pacote do beta. Sem a API nova, o frontend degrada: o desvio antigo continua aparecendo como antes.

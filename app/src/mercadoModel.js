@@ -28,6 +28,7 @@ export function evidenciaPanorama({ resumo = {}, escopo = {}, fonte = {}, period
   const atualizacao = textoData(fonte.atualizado_em);
   const janela = (PERIODOS[periodo] || periodo).toLowerCase();
   const suficiente = resumo.confianca && resumo.confianca !== 'insuficiente';
+  const desvio = desvioFipeExibivel(resumo);
   return {
     anuncios: {
       recorte,
@@ -57,12 +58,23 @@ export function evidenciaPanorama({ resumo = {}, escopo = {}, fonte = {}, period
     desvio: {
       recorte,
       periodo: 'Estoque ativo hoje',
-      valor: resumo.desvio_fipe_medio_pct == null ? 'Sem base FIPE' : pctAssinado(resumo.desvio_fipe_medio_pct),
+      valor: desvio.valor == null ? (desvio.amostra == null ? 'Sem base FIPE' : 'Amostra insuficiente') : pctAssinado(desvio.valor),
       base: 'Preço anunciado contra a tabela FIPE',
+      ...(desvio.amostra == null ? {} : { amostra: `${inteiro(desvio.amostra)} preços válidos com FIPE`, confianca: resumo.desvio_fipe_confianca || 'insuficiente' }),
       atualizacao,
-      explicacao: 'Média do desvio entre o preço anunciado e a FIPE, só nos anúncios ativos com FIPE vinculada e preço válido. FIPE cobre parte dos anúncios e não cobre implementos.',
+      explicacao: 'Média do desvio entre o preço anunciado e a FIPE, só nos anúncios ativos com FIPE vinculada e preço válido. Só é exibida com ao menos 5 preços válidos. FIPE cobre parte dos anúncios e não cobre implementos.',
     },
   };
+}
+
+/* Desvio medio da FIPE do Panorama: null quando a API nao mandou valor ou quando a amostra informada
+   e menor que o minimo (5 precos validos). Numero errado e pior que nenhum. */
+export const AMOSTRA_MINIMA_DESVIO_FIPE = 5;
+export function desvioFipeExibivel(resumo = {}) {
+  const amostra = resumo.desvio_fipe_amostra == null ? null : Number(resumo.desvio_fipe_amostra);
+  const valor = resumo.desvio_fipe_medio_pct == null ? null : Number(resumo.desvio_fipe_medio_pct);
+  if (amostra != null && amostra < AMOSTRA_MINIMA_DESVIO_FIPE) return { valor: null, amostra };
+  return { valor, amostra };
 }
 
 export const COMPONENTES_OPORTUNIDADE = [

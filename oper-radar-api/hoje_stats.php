@@ -177,7 +177,7 @@ $candidatosFipe = $bloco('abaixo_fipe', oper_hoje_consulta($conn, "
     ORDER BY n DESC LIMIT 40"));
 if ($candidatosFipe) {
     try {
-        $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($candidatosFipe, 'fipe_preco_id'));
+        $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($candidatosFipe, 'fipe_preco_id'), true);
         // Nome proprio: $c, $m e $l ainda sao referencias dos foreach acima.
         foreach ($candidatosFipe as $candidato) {
             $st = $estatisticas[(int)$candidato['fipe_preco_id']] ?? null;

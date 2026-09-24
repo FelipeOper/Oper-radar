@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evidenciaPanorama, leituraOportunidade, recorteDoPainel, textoAmostraModelo } from '../src/mercadoModel.js';
+import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, recorteDoPainel, textoAmostraModelo } from '../src/mercadoModel.js';
 
 const espaco = texto => texto.replace(/ /g, ' ');
 
@@ -12,7 +12,7 @@ test('recorte descreve UFs, cidade e segmento', () => {
 
 test('evidencia do panorama usa so campos da API e a confianca real do ticket', () => {
   const ev = evidenciaPanorama({
-    resumo: { anuncios: 1284, lojistas: 48, cidades: 22, ufs: 3, ticket_mediano: 428000, amostra_qualificada: 310, confianca: 'alta', desvio_fipe_medio_pct: -1.4, entradas_periodo: 64, saidas_periodo: 21 },
+    resumo: { anuncios: 1284, lojistas: 48, cidades: 22, ufs: 3, ticket_mediano: 428000, amostra_qualificada: 310, confianca: 'alta', desvio_fipe_medio_pct: -1.4, desvio_fipe_amostra: 37, desvio_fipe_confianca: 'media', entradas_periodo: 64, saidas_periodo: 21 },
     escopo: { ufs: ['PR'] },
     fonte: { atualizado_em: '2026-09-24 07:05:00' },
     periodo: '30d',
@@ -25,7 +25,10 @@ test('evidencia do panorama usa so campos da API e a confianca real do ticket', 
   assert.equal(ev.desvio.valor, '-1,4%');
   assert.equal(ev.lojistas.atualizacao, '24/09/2026 07:05');
   // contagens nao ganham confianca inventada
-  assert.ok(!('confianca' in ev.anuncios) && !('confianca' in ev.lojistas) && !('confianca' in ev.desvio));
+  assert.ok(!('confianca' in ev.anuncios) && !('confianca' in ev.lojistas));
+  // o desvio carrega amostra e confianca reais da API (regra 5/10/20)
+  assert.equal(ev.desvio.amostra, '37 preços válidos com FIPE');
+  assert.equal(ev.desvio.confianca, 'media');
 });
 
 test('ticket sem amostra suficiente nao mostra numero; desvio sem FIPE diz que nao ha base', () => {
@@ -73,4 +76,19 @@ test('texto de amostra do modelo', () => {
   assert.equal(textoAmostraModelo({ amostra_qualificada: 12, confianca: 'media' }), '12 preços válidos · confiança média');
   assert.equal(textoAmostraModelo({}), '');
   assert.equal(textoAmostraModelo(undefined), '');
+});
+
+test('desvio da FIPE: amostra abaixo de 5 nao mostra numero, mesmo que o servidor mande um valor', () => {
+  assert.deepEqual(desvioFipeExibivel({ desvio_fipe_medio_pct: 42.0, desvio_fipe_amostra: 1 }), { valor: null, amostra: 1 });
+  assert.deepEqual(desvioFipeExibivel({ desvio_fipe_medio_pct: -3.1, desvio_fipe_amostra: 5 }), { valor: -3.1, amostra: 5 });
+  // servidor antigo (sem amostra): mantem o valor que veio, sem inventar amostra
+  assert.deepEqual(desvioFipeExibivel({ desvio_fipe_medio_pct: -3.1 }), { valor: -3.1, amostra: null });
+  assert.deepEqual(desvioFipeExibivel({}), { valor: null, amostra: null });
+  const ev = evidenciaPanorama({ resumo: { anuncios: 9, confianca: 'insuficiente', desvio_fipe_medio_pct: null, desvio_fipe_amostra: 2, desvio_fipe_confianca: 'insuficiente' } });
+  assert.equal(ev.desvio.valor, 'Amostra insuficiente');
+  assert.equal(ev.desvio.amostra, '2 preços válidos com FIPE');
+  assert.equal(ev.desvio.confianca, 'insuficiente');
+  const semBase = evidenciaPanorama({ resumo: { anuncios: 9, desvio_fipe_medio_pct: null } });
+  assert.equal(semBase.desvio.valor, 'Sem base FIPE');
+  assert.ok(!('confianca' in semBase.desvio));
 });

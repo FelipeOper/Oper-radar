@@ -34,7 +34,7 @@ import { AlertaColeta, FeedMovimento, InsightsDoDia, RegioesSaidas, SecaoHoje } 
 import { evidenciaKpis } from './hojeModel.js';
 import { OportunidadeRegional } from './MercadoBlocos.jsx';
 import { PageConcorrencia } from './ConcorrenciaBlocos.jsx';
-import { evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
+import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
 import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
@@ -1192,6 +1192,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
   if (status === 'loading' || !data) return <Card style={{ marginBottom: 18, padding: 22 }}><div style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 11 }}>CARREGANDO LEITURA DO MERCADO…</div></Card>;
 
   const serie = selecionado?.serie || [];
+  const desvioFipe = desvioFipeExibivel(resumo);
   const evPanorama = evidenciaPanorama({ resumo, escopo, fonte: data.fonte, periodo, segmentoRotulo: contexto?.segmento && contexto.segmento !== 'todas' ? (CATEGORIAS_MERCADO[contexto.segmento]?.label || contexto.segmento) : undefined });
   const oportunidade = leituraOportunidade(selecionado?.oportunidade_regional);
   const maxUf = Math.max(1, ...(data.geografia?.ufs || []).map(item => item.anuncios));
@@ -1276,8 +1277,8 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
             </div>
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Desvio médio da FIPE</div>
-              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{resumo.desvio_fipe_medio_pct == null ? '—' : fmtPctAssinado(resumo.desvio_fipe_medio_pct)}</div>
-              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>anúncios ativos vs. referência FIPE</div>
+              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{desvioFipe.valor == null ? (desvioFipe.amostra == null ? '—' : 'Amostra insuf.') : fmtPctAssinado(desvioFipe.valor)}</div>
+              <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>{desvioFipe.amostra == null ? 'anúncios ativos vs. referência FIPE' : `${fmtN(desvioFipe.amostra)} preços válidos com FIPE`}</div>
               <Evidencia evidencia={evPanorama.desvio} rotulo="Evidência" />
             </div>
           </div>

@@ -1,34 +1,82 @@
 /* Leitura honesta dos indicadores da Concorrencia. Dados antigos podem omitir
    reducoes e desvio FIPE; ausente nunca vira zero. */
+import { CATEGORIAS_MERCADO, categoriaDeTipo } from './marketTaxonomy.js';
+
 const n = valor => Number(valor ?? 0);
 const inteiro = valor => n(valor).toLocaleString('pt-BR');
 const percentual = valor => `${n(valor) > 0 ? '+' : ''}${n(valor).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
-export function filtraRevendas(lojistas = [], { ufs = [], busca = '', ordem = 'estoque' } = {}) {
+/* Segmento de atuacao: a revenda entra na categoria quando tem ao menos 1 anuncio ATIVO de algum tipo dela
+   (mix_categorias: tipo -> anuncios ativos, vindo de lojistas.php). */
+export function ativosNaCategoria(l, categoria) {
+  if (!categoria || categoria === 'todas') return n(l.ativos);
+  return Object.entries(l.mix_categorias || {})
+    .filter(([tipo]) => categoriaDeTipo(tipo) === categoria)
+    .reduce((soma, [, qtd]) => soma + n(qtd), 0);
+}
+
+export function contagemPorCategoria(lojistas = []) {
+  const contagem = {};
+  for (const l of lojistas) {
+    for (const categoria of Object.keys(CATEGORIAS_MERCADO)) {
+      if (ativosNaCategoria(l, categoria) > 0) contagem[categoria] = (contagem[categoria] || 0) + 1;
+    }
+  }
+  return contagem;
+}
+
+export const chaveCidade = l => `${l.uf}|${l.cidade}`;
+
+/* Cidades so fazem sentido dentro de UFs escolhidas (hierarquia previsivel). Ordena por numero de revendas. */
+export function cidadesDisponiveis(lojistas = [], ufs = []) {
+  if (!ufs.length) return [];
+  const mapa = new Map();
+  for (const l of lojistas) {
+    if (!l.cidade || !ufs.includes(l.uf)) continue;
+    const chave = chaveCidade(l);
+    const atual = mapa.get(chave) || { chave, rotulo: `${l.cidade}/${l.uf}`, revendas: 0 };
+    atual.revendas += 1;
+    mapa.set(chave, atual);
+  }
+  return [...mapa.values()].sort((a, b) => b.revendas - a.revendas || a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
+}
+
+export function filtraRevendas(lojistas = [], { ufs = [], busca = '', ordem = 'estoque', categoria = 'todas', cidade = 'todas' } = {}) {
   const termo = busca.trim().toLocaleLowerCase('pt-BR');
   const lista = lojistas.filter(l => (!ufs.length || ufs.includes(l.uf)) &&
+    (categoria === 'todas' || ativosNaCategoria(l, categoria) > 0) &&
+    (cidade === 'todas' || chaveCidade(l) === cidade) &&
     (!termo || String(l.nome || '').toLocaleLowerCase('pt-BR').includes(termo)));
   const campo = { estoque: 'ativos', saidas: 'saidas_30d', reducoes: 'reducoes_30d', idade: 'idade_media_estoque' }[ordem] || 'ativos';
+  const valorDe = (l, nomeCampo) => {
+    if (nomeCampo === 'idade_media_estoque' && !l.idade_observada_confiavel) return null;
+    if (nomeCampo === 'ativos') return ativosNaCategoria(l, categoria);
+    return l[nomeCampo];
+  };
   return lista.sort((a, b) => {
-    const va = campo === 'idade' && !a.idade_observada_confiavel ? null : a[campo];
-    const vb = campo === 'idade' && !b.idade_observada_confiavel ? null : b[campo];
+    const va = valorDe(a, campo);
+    const vb = valorDe(b, campo);
     if (va == null && vb != null) return 1;
     if (vb == null && va != null) return -1;
     return n(vb) - n(va) || String(a.nome).localeCompare(String(b.nome), 'pt-BR');
   });
 }
 
-export function panoramaConcorrencia(lojistas = [], escopo = 'Todas as UFs', atualizacao = null) {
-  const ativos = lojistas.reduce((s, l) => s + n(l.ativos), 0);
+/* Saidas e reducoes nao sao separadas por categoria na API: com segmento escolhido elas seguem contando todo o estoque. */
+const NOTA_TODO_ESTOQUE = ' Com segmento selecionado, este número ainda considera todo o estoque das revendas listadas.';
+
+export function panoramaConcorrencia(lojistas = [], escopo = 'Todas as UFs', atualizacao = null, { categoria = 'todas' } = {}) {
+  const rotuloCategoria = categoria !== 'todas' ? (CATEGORIAS_MERCADO[categoria]?.label || categoria) : null;
+  const ativos = lojistas.reduce((s, l) => s + ativosNaCategoria(l, categoria), 0);
   const saidas = lojistas.reduce((s, l) => s + n(l.saidas_30d), 0);
   const reducoesDisponiveis = lojistas.every(l => l.reducoes_30d != null);
   const reducoes = reducoesDisponiveis ? lojistas.reduce((s, l) => s + n(l.reducoes_30d), 0) : null;
-  const comum = { recorte: `${escopo} · revendas monitoradas`, base: `${inteiro(ativos)} anúncios ativos em ${inteiro(lojistas.length)} revendas`, amostra: `${inteiro(lojistas.length)} revendas`, atualizacao };
+  const comum = { recorte: `${escopo}${rotuloCategoria ? ` · ${rotuloCategoria}` : ''} · revendas monitoradas`, base: `${inteiro(ativos)} anúncios ativos${rotuloCategoria ? ` de ${rotuloCategoria.toLocaleLowerCase('pt-BR')}` : ''} em ${inteiro(lojistas.length)} revendas`, amostra: `${inteiro(lojistas.length)} revendas`, atualizacao };
   return [
     { titulo: 'Revendas no recorte', valor: inteiro(lojistas.length), evidencia: { ...comum, periodo: 'Estoque atual', valor: inteiro(lojistas.length), explicacao: 'Revendas retornadas pela API dentro das UFs selecionadas.' } },
-    { titulo: 'Anúncios ativos', valor: inteiro(ativos), evidencia: { ...comum, periodo: 'Estoque atual', valor: inteiro(ativos), explicacao: 'Soma dos anúncios ativos das revendas listadas.' } },
-    { titulo: 'Saídas observadas (30 d)', valor: inteiro(saidas), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: inteiro(saidas), explicacao: 'Ausência confirmada no portal. Não comprova venda.' } },
-    { titulo: 'Reduções de preço (30 d)', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), explicacao: 'Anúncios com ao menos uma queda de preço registrada nos eventos. Queda acima de 50% é descartada como provável erro de coleta. Redução é sinal, não prova.' } },
+    { titulo: 'Anúncios ativos', valor: inteiro(ativos), evidencia: { ...comum, periodo: 'Estoque atual', valor: inteiro(ativos), explicacao: rotuloCategoria ? `Soma dos anúncios ativos de ${rotuloCategoria.toLocaleLowerCase('pt-BR')} nas revendas listadas.` : 'Soma dos anúncios ativos das revendas listadas.' } },
+    { titulo: 'Saídas observadas (30 d)', valor: inteiro(saidas), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: inteiro(saidas), explicacao: `Ausência confirmada no portal. Não comprova venda.${rotuloCategoria ? NOTA_TODO_ESTOQUE : ''}` } },
+    { titulo: 'Reduções de preço (30 d)', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), evidencia: { ...comum, periodo: 'Últimos 30 dias', valor: reducoes == null ? 'Dados indisponíveis' : inteiro(reducoes), explicacao: 'Anúncios com ao menos uma queda de preço registrada nos eventos. Queda acima de 50% é descartada como provável erro de coleta. Redução é sinal, não prova.' + (rotuloCategoria ? NOTA_TODO_ESTOQUE : '') } },
   ];
 }
 

@@ -115,3 +115,14 @@ sem a tabela de eventos, o valor é `null`, nunca zero. O desvio é a mediana do
 individuais de preços válidos com FIPE inequívoca, publicado só com cinco ou mais preços.
 As regras puras ficam em `lib/concorrencia_metricas.php`, cobertas por
 `tests/concorrencia_metricas_test.php`. Saída observada continua sem comprovar venda.
+
+## Regras de confiança da FIPE (revisão adversarial de 24/09/2026)
+
+- `mercado_estatisticas_por_fipe($conn, $ids, $apenasConfiancaAlta = false)`: com `true`, a mediana e a
+  amostra contam só anúncios com `fipe_match_confianca='alto'`. O insight "abaixo da FIPE" de
+  `hoje_stats.php` usa `true`, para a mediana obedecer ao mesmo critério dos candidatos. Os demais
+  chamadores mantêm o comportamento anterior (o filtro é opt-in via `mercado_sql_confianca_fipe`).
+- `mercado_desvio_fipe_medio_pct` devolve `null` com menos de 5 preços válidos
+  (`OPER_RADAR_AMOSTRA_MINIMA`); `mercado_desvio_fipe_amostra` conta esses preços.
+  `mercado_painel.php` expõe `resumo.desvio_fipe_amostra` e `resumo.desvio_fipe_confianca`.
+  Testes: `tests/market_quality_test.php`.

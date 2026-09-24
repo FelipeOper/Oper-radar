@@ -3,7 +3,11 @@
 ## Concorrência
 
 `PageConcorrencia` em `src/ConcorrenciaBlocos.jsx` usa `lojistas.php` para filtrar revendas
-por múltiplas UFs, nome e indicador. O painel do lojista usa `lojista_detalhe.php` e mostra
+por múltiplas UFs, cidade (só dentro das UFs escolhidas), segmento de atuação (revenda com ao menos
+um anúncio ativo da categoria, via `mix_categorias`), nome e indicador. Com segmento escolhido, o
+estoque exibido e a ordenação "maior estoque" usam os ativos da categoria; saídas e reduções seguem
+contando todo o estoque da revenda (a API não as separa) e a evidência avisa isso. O painel do lojista
+recebe o mesmo segmento (`lojista_detalhe.php?categoria=`). O painel do lojista usa `lojista_detalhe.php` e mostra
 estoque, saídas observadas, reduções, idade e desvio mediano vs FIPE com evidência.
 `src/concorrenciaModel.js` mantém as regras de ordenação e de dados indisponíveis, com testes
 em `tests/concorrenciaModel.test.js`. Em servidor antigo, redução ausente aparece como
@@ -82,3 +86,11 @@ valide a API correspondente. O conteúdo deve ser enviado para
 
 O KPI de estoque mostra anúncios ativos revalidados no ciclo atual. Registros herdados de
 revendas ainda não coletadas aparecem separados e nunca são apresentados como atuais.
+
+## Desvio da FIPE no Panorama do Mercado
+
+`desvioFipeExibivel` em `src/mercadoModel.js` só mostra o desvio médio com ao menos 5 preços válidos
+com FIPE (`resumo.desvio_fipe_amostra`); abaixo disso o KPI diz "Amostra insuf." e a evidência traz a
+amostra e a confiança reais (`desvio_fipe_confianca`). Servidor antigo, sem esses campos, mantém o
+comportamento anterior. Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
+helper `fmt*` usado sem definição (regressão do beta de 24/09/2026).

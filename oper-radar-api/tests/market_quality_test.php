@@ -30,11 +30,24 @@ verifica(array_key_exists('desvio_mercado_pct', $semPreco) && $semPreco['desvio_
 verifica(mercado_desvio_fipe_medio_pct([]) === null, 'desvio fipe sem registros');
 $semFipe = [['preco' => 100000, 'preco_fipe' => 0, 'titulo' => '', 'preco_texto_bruto' => '']];
 verifica(mercado_desvio_fipe_medio_pct($semFipe) === null, 'desvio fipe ignora registro sem fipe');
-$comFipe = [
-    ['preco' => 110000, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => ''], // +10%
-    ['preco' => 90000, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => ''],  // -10%
-    ['preco' => 19900, 'preco_fipe' => 315000, 'titulo' => 'MB 1017', 'preco_texto_bruto' => 'R$ 19.900'], // rejeitado (extremo FIPE)
-];
-verifica(mercado_desvio_fipe_medio_pct($comFipe) === 0.0, 'desvio fipe media ignora extremo rejeitado');
+$reg = fn($preco) => ['preco' => $preco, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => ''];
+$extremo = ['preco' => 19900, 'preco_fipe' => 315000, 'titulo' => 'MB 1017', 'preco_texto_bruto' => 'R$ 19.900']; // rejeitado (extremo FIPE)
+
+// Abaixo da amostra minima (5 precos validos) o desvio nao e exibido: uma observacao nao representa o recorte.
+$poucos = [$reg(110000), $reg(90000), $extremo];
+verifica(mercado_desvio_fipe_amostra($poucos) === 2, 'amostra do desvio ignora extremo rejeitado');
+verifica(mercado_desvio_fipe_medio_pct($poucos) === null, 'desvio fipe abaixo da amostra minima e null');
+verifica(mercado_desvio_fipe_medio_pct([$reg(110000)]) === null, 'desvio fipe com 1 preco e null');
+$quatro = [$reg(110000), $reg(90000), $reg(105000), $reg(95000)];
+verifica(mercado_desvio_fipe_medio_pct($quatro) === null, 'desvio fipe com 4 precos ainda e null');
+
+$suficientes = [$reg(110000), $reg(90000), $reg(105000), $reg(95000), $reg(100000), $extremo];
+verifica(mercado_desvio_fipe_amostra($suficientes) === 5, 'amostra do desvio conta so precos validos');
+verifica(mercado_desvio_fipe_medio_pct($suficientes) === 0.0, 'desvio fipe media com amostra minima ignora extremo');
+verifica(mercado_desvio_fipe_medio_pct([$reg(110000), $reg(110000), $reg(110000), $reg(110000), $reg(110000)]) === 10.0, 'desvio fipe media com 5 precos');
+
+// Vinculo FIPE de confianca alta: o filtro de SQL so entra quando pedido, sem mudar os demais endpoints.
+verifica(mercado_sql_confianca_fipe(false) === '', 'sql confianca fipe desligado nao filtra');
+verifica(mercado_sql_confianca_fipe(true) === " AND a.fipe_match_confianca='alto'", 'sql confianca fipe ligado exige alto');
 
 echo "market_quality_test=OK\n";

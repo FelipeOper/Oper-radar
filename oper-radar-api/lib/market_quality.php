@@ -124,7 +124,16 @@ function mercado_calcula_estatisticas(array $registros): array {
     ];
 }
 
-function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds): array {
+/**
+ * Trecho SQL que restringe as estatisticas aos vinculos FIPE de confianca alta.
+ * Usado por comparativos que ja selecionam candidatos so com vinculo alto: sem isso a mediana
+ * misturaria vinculos fracos e a amostra exibida nao corresponderia ao criterio do insight.
+ */
+function mercado_sql_confianca_fipe(bool $apenasConfiancaAlta): string {
+    return $apenasConfiancaAlta ? " AND a.fipe_match_confianca='alto'" : '';
+}
+
+function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds, bool $apenasConfiancaAlta = false): array {
     $ids = array_values(array_unique(array_filter(array_map('intval', $fipeIds), fn($id) => $id > 0)));
     if (!$ids) return [];
 
@@ -134,7 +143,7 @@ function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds): array {
                          FROM anuncio a
                          JOIN fipe_preco fp ON fp.id=a.fipe_preco_id
                          WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
-                           AND a.fipe_preco_id IN ($marcadores)");
+                           AND a.fipe_preco_id IN ($marcadores)" . mercado_sql_confianca_fipe($apenasConfiancaAlta));
     $tipos = str_repeat('i', count($ids));
     $st->bind_param($tipos, ...$ids);
     $st->execute();
@@ -194,7 +203,8 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
     }
 }
 
-function mercado_desvio_fipe_medio_pct(array $registros): ?float {
+/** Desvios percentuais (preco anunciado vs. FIPE) dos registros validos: mesmo filtro de mercado_motivo_preco. */
+function mercado_desvios_fipe(array $registros): array {
     $desvios = [];
     foreach ($registros as $registro) {
         $preco = (float)($registro['preco'] ?? 0);
@@ -207,6 +217,17 @@ function mercado_desvio_fipe_medio_pct(array $registros): ?float {
         if ($motivo !== null) continue;
         $desvios[] = ($preco - $fipe) / $fipe * 100;
     }
-    if (!$desvios) return null;
+    return $desvios;
+}
+
+/** Quantos precos validos com FIPE sustentam o desvio medio. */
+function mercado_desvio_fipe_amostra(array $registros): int {
+    return count(mercado_desvios_fipe($registros));
+}
+
+/** Media dos desvios; null abaixo da amostra minima (uma unica observacao nao representa o recorte). */
+function mercado_desvio_fipe_medio_pct(array $registros): ?float {
+    $desvios = mercado_desvios_fipe($registros);
+    if (count($desvios) < OPER_RADAR_AMOSTRA_MINIMA) return null;
     return round(array_sum($desvios) / count($desvios), 1);
 }
