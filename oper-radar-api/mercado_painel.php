@@ -9,6 +9,7 @@ require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_scope.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/query_contract.php';
+require_once __DIR__ . '/lib/regional_modelo.php';
 
 $conn = conecta();
 $periodo = oper_periodo_contrato($_GET['periodo'] ?? null);
@@ -231,6 +232,7 @@ $selecionado = $chaveSelecionada && isset($grupos[$chaveSelecionada])
 
 $serie = [];
 $regioesSelecionado = [];
+$oportunidadeRegional = null;
 $lojistasSelecionado = [];
 $temSnapshots = false;
 if ($selecionado) {
@@ -279,6 +281,48 @@ if ($selecionado) {
     arsort($regiaoMapa);
     foreach ($regiaoMapa as $nome => $n) $regioesSelecionado[] = ['regiao' => $nome, 'anuncios' => $n];
 
+    // Oportunidade regional do modelo (mesma regra da Minha Loja). Tolerante: se algo falhar,
+    // o painel segue sem este bloco em vez de derrubar a resposta.
+    try {
+        $nacionalSql = implode(' AND ', $nacionalWhere);
+        $linhasRegiao = painel_rows($conn, "SELECT r.uf, r.id AS revenda_id, a.preco, a.preco_texto_bruto, a.titulo, f.preco AS preco_fipe
+            FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+            LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
+            WHERE a.status='ativo' AND $nacionalSql", $nacionalTypes, $nacionalParams);
+        $porUfModelo = [];
+        foreach ($linhasRegiao as $linha) $porUfModelo[strtoupper((string)$linha['uf'])][] = $linha;
+
+        $tabelaEventos = painel_rows($conn, "SELECT COUNT(*) n FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='anuncio_evento'");
+        $eventosDisponiveis = (int)($tabelaEventos[0]['n'] ?? 0) > 0;
+        $coberturaDias = 0;
+        $saidasPorUfModelo = [];
+        if ($eventosDisponiveis) {
+            $cobertura = painel_rows($conn, "SELECT MIN(e.dia_referencia) inicio, MAX(e.dia_referencia) fim
+                FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id JOIN revenda r ON r.id=a.revenda_id
+                WHERE e.origem='anuncio_snapshot' AND $nacionalSql", $nacionalTypes, $nacionalParams)[0] ?? [];
+            if (!empty($cobertura['inicio']) && !empty($cobertura['fim'])) {
+                $coberturaDias = max(1, (int)((strtotime($cobertura['fim']) - strtotime($cobertura['inicio'])) / 86400) + 1);
+            }
+            $saidasRows = painel_rows($conn, "SELECT r.uf,
+                    GREATEST(0, DATEDIFF(e.dia_referencia, COALESCE(
+                      (SELECT MAX(origem.dia_referencia) FROM anuncio_evento origem
+                       WHERE origem.anuncio_id=e.anuncio_id
+                         AND origem.tipo_evento IN ('primeira_observacao','reaparecimento')
+                         AND origem.ocorrido_em<=e.ocorrido_em), DATE(a.primeira_vez_visto)))) AS dias_observados
+                FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id JOIN revenda r ON r.id=a.revenda_id
+                WHERE e.tipo_evento='saida_detectada' AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 180 DAY)
+                  AND $nacionalSql", $nacionalTypes, $nacionalParams);
+            foreach ($saidasRows as $saida) {
+                $saidasPorUfModelo[strtoupper((string)$saida['uf'])][] =
+                    $saida['dias_observados'] !== null ? (int)$saida['dias_observados'] : null;
+            }
+        }
+        $oportunidadeRegional = oper_regioes_do_modelo($porUfModelo, $saidasPorUfModelo, $eventosDisponiveis, $coberturaDias);
+    } catch (Throwable $e) {
+        $oportunidadeRegional = null;
+    }
+
     $lojistaRows = painel_rows($conn, "SELECT r.id, r.nome, r.cidade, r.uf, a.preco,
             a.preco_texto_bruto, a.titulo, f.preco preco_fipe
         FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
@@ -325,6 +369,7 @@ envia_json([
     'modelos_total' => count($grupos),
     'selecionado' => $selecionado ? $selecionado + [
         'serie' => $serie, 'regioes' => $regioesSelecionado, 'lojistas_destaque' => $lojistasSelecionado,
+        'oportunidade_regional' => $oportunidadeRegional,
     ] : null,
     'fonte' => [
         'atualizado_em' => $ultima, 'historico_snapshot' => $temSnapshots,
