@@ -690,3 +690,57 @@ select {
     display: none;
   }
 }
+
+/* ---- Mercado: oportunidade regional (MercadoBlocos.jsx) ---- */
+.oc-oport {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.oc-oport__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.oc-oport__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.oc-oport__item--sem-selo {
+  opacity: 0.85;
+}
+.oc-oport__cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.oc-oport__fatos {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.oc-oport__detalhe summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .oc-evidencia__lista {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .oc-evidencia__lista dd {
+    margin-bottom: 8px;
+  }
+}

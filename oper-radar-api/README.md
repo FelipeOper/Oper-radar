@@ -94,3 +94,12 @@ Consultas novas são tolerantes: em PHP 8.1+ um erro de SQL lança exceção, en
 Para rodar os testes PHP sem instalar nada: baixe o zip oficial de PHP 8.3 (NTS x64) de
 `downloads.php.net`, confira o SHA-256 publicado em `releases.json` e execute
 `php -d extension_dir=ext -d extension=mbstring tests/<nome>_test.php`.
+
+## Mercado: oportunidade regional do modelo
+
+`mercado_painel.php` devolve, dentro de `selecionado`, o bloco `oportunidade_regional` (só quando há
+modelo selecionado). Ele compara as UFs onde aquele marca + modelo + ano aparece, com a regra de
+`lib/regional_modelo.php` (a mesma da Minha Loja: pesos 30/20/20/15/15, confiança por amostra,
+revendas, saídas e cobertura de eventos). UF com menos de 5 comparáveis, sem trilha de eventos ou com
+menos de 7 dias de cobertura fica sem nota (`publicavel: false`). Se a consulta falhar, o campo vem
+`null` e o restante do painel continua. Testes: `tests/regional_modelo_test.php`.

@@ -31,6 +31,8 @@ import { AppShell, NAV } from './Shell.jsx';
 import { Evidencia } from './Evidencia.jsx';
 import { AlertaColeta, FeedMovimento, InsightsDoDia, RegioesSaidas, SecaoHoje } from './HojeBlocos.jsx';
 import { evidenciaKpis } from './hojeModel.js';
+import { OportunidadeRegional } from './MercadoBlocos.jsx';
+import { evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
 import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
@@ -618,7 +620,7 @@ function somaPorUfs(facetas, regiao, uf, campo) {
 function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anuncios' }) {
   return (
     <Card style={{ padding: 14, marginBottom: 12 }}>
-      <div style={rotuloFiltroStyle}>1. REGIÃO</div>
+      <div style={rotuloFiltroStyle}>REGIÃO</div>
       <div style={filtroGridRegiaoStyle}>
         {['todas', ...Object.keys(REGIOES_UFS)].map(nome => {
           const dados = nome === 'todas' ? null : facetas?.regioes?.[nome];
@@ -642,7 +644,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
         })}
       </div>
 
-      <div style={{ ...rotuloFiltroStyle, marginTop: 10 }}>2. ESTADO</div>
+      <div style={{ ...rotuloFiltroStyle, marginTop: 10 }}>ESTADO</div>
       {regiao === 'todas' ? (
         <div style={{ color: T.inkMuted, fontSize: 12.5, padding: '8px 2px' }}>Escolha uma região para ver seus estados.</div>
       ) : (
@@ -1125,6 +1127,7 @@ function ModeloCard({ modelo, ativo, onSelecionar, periodo }) {
           ↕ Estoque {fmtPctAssinado(modelo.movimento_pct)}
         </span>
       </div>
+      {textoAmostraModelo(modelo.precos) && <div style={{ fontSize: 10.5, color: T.inkMuted, marginTop: 6 }}>{textoAmostraModelo(modelo.precos)}</div>}
     </button>
   );
 }
@@ -1170,6 +1173,8 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
   if (status === 'loading' || !data) return <Card style={{ marginBottom: 18, padding: 22 }}><div style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 11 }}>CARREGANDO LEITURA DO MERCADO…</div></Card>;
 
   const serie = selecionado?.serie || [];
+  const evPanorama = evidenciaPanorama({ resumo, escopo, fonte: data.fonte, periodo, segmentoRotulo: contexto?.segmento && contexto.segmento !== 'todas' ? (CATEGORIAS_MERCADO[contexto.segmento]?.label || contexto.segmento) : undefined });
+  const oportunidade = leituraOportunidade(selecionado?.oportunidade_regional);
   const maxUf = Math.max(1, ...(data.geografia?.ufs || []).map(item => item.anuncios));
   const segmentoRotulo = contexto?.segmento && contexto.segmento !== 'todas' ? (CATEGORIAS_MERCADO[contexto.segmento]?.label || contexto.segmento) : 'Caminhões e implementos';
   const listaOfertas = noEstado ? (data.geografia?.cidades || []) : (data.geografia?.ufs || []);
@@ -1236,21 +1241,25 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
                 <span style={{ color: T.positive }}>▲ {fmtN(resumo.entradas_periodo)} entraram</span><br />
                 <span style={{ color: T.alert }}>▼ {fmtN(resumo.saidas_periodo)} saíram</span> <span style={{ color: T.inkMuted }}>({periodo})</span>
               </div>
+              <Evidencia evidencia={evPanorama.anuncios} rotulo="Evidência" />
             </div>
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Lojistas no radar</div>
               <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{fmtN(resumo.lojistas)}</div>
               <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>em {fmtN(resumo.cidades)} cidades · {fmtN(resumo.ufs)} UFs</div>
+              <Evidencia evidencia={evPanorama.lojistas} rotulo="Evidência" />
             </div>
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Ticket mediano</div>
               <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{resumo.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(resumo.ticket_mediano)}</div>
               <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>{fmtN(resumo.amostra_qualificada || 0)} preços qualificados</div>
+              <Evidencia evidencia={evPanorama.ticket} rotulo="Evidência" />
             </div>
             <div className="or-kpi">
               <div style={{ fontSize: 11, color: T.inkMuted }}>Desvio médio da FIPE</div>
               <div style={{ fontSize: 26, fontWeight: 700, marginTop: 6, fontFamily: T.fontMono }}>{resumo.desvio_fipe_medio_pct == null ? '—' : fmtPctAssinado(resumo.desvio_fipe_medio_pct)}</div>
               <div style={{ fontSize: 11, marginTop: 6, color: T.inkMuted }}>anúncios ativos vs. referência FIPE</div>
+              <Evidencia evidencia={evPanorama.desvio} rotulo="Evidência" />
             </div>
           </div>
         </Card>
@@ -1311,6 +1320,11 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
               <span style={{ color: T.ink }}><strong style={{ fontFamily: T.fontMono, color: T.steel }}>{fmtPctAssinado(selecionado.movimento_pct)}</strong> saldo sobre o estoque ativo</span>
             </div>
           </div>
+          {oportunidade && <div style={{ paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
+            <h3 style={{ fontSize: 12.5, fontWeight: 700, color: T.ink, margin: 0 }}>Onde vender melhor — oportunidade regional deste modelo</h3>
+            <p style={{ fontSize: 11.5, color: T.inkMuted, marginTop: 2 }}>Compara as UFs onde este modelo e ano aparece. Saída observada não é venda; UFs sem amostra ou histórico suficiente não recebem selo.</p>
+            <OportunidadeRegional leitura={oportunidade} />
+          </div>}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11, color: T.inkMuted, maxWidth: 420 }}>
               <BadgeInfo size={13} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -1581,7 +1595,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
     <div>
       {universo === 'principal' && <PainelMercadoAnalitico contexto={contextoMercado}
         onContexto={onContexto} visivel={painelAnalitico} onAlternar={() => setPainelAnalitico(valor => !valor)} />}
-      <SectionTitle sub="Explore os anúncios que sustentam os indicadores do painel.">Navegador de anúncios</SectionTitle>
+      <SectionTitle sub="As ofertas por trás dos números do painel. Use a barra de contexto acima ou os filtros abaixo para refinar.">Ofertas disponíveis</SectionTitle>
       <div role="tablist" aria-label="Universo do mercado" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
         {[
           ['principal', 'Caminhões e implementos', 'Foco principal do Oper Radar'],
@@ -1609,7 +1623,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
         onRegiao={valor => { setRegiao(valor); setUf('todas'); setCidade('todas'); setRevendaId('todas'); }}
         onUf={valor => { setUf(valor); setCidade('todas'); setRevendaId('todas'); }} />
 
-      <div style={rotuloFiltroStyle}>3. SEGMENTO</div>
+      <div style={rotuloFiltroStyle}>SEGMENTO</div>
       <div style={{ ...filtroGridSegmentoStyle, marginBottom: 14 }}>
         {chipsCategorias.map(cat => {
           const info = cat === 'todas'
@@ -1634,7 +1648,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
         })}
       </div>
 
-      <div style={{ ...rotuloFiltroStyle, marginTop: 2 }}>4. ORDENAÇÃO E FILTROS</div>
+      <div style={{ ...rotuloFiltroStyle, marginTop: 2 }}>REFINAR OFERTAS</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <select aria-label="Ordenar anúncios" value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, flex: '1 1 190px' }}>
           <option value="aleatorio">Amostra do mercado</option>
@@ -2102,7 +2116,7 @@ function PageConcorrentes() {
 
       {/* Chips de categorias — quais lojistas atuam em cada segmento */}
       <div style={{ marginBottom: 14 }}>
-        <div style={rotuloFiltroStyle}>3. SEGMENTO DE ATUAÇÃO</div>
+        <div style={rotuloFiltroStyle}>SEGMENTO DE ATUAÇÃO</div>
         <div style={filtroGridSegmentoStyle}>
           {chipsCategorias.map(cat => {
             const info = cat === 'todas' ? { label: 'Todas', icone: '📊', cor: T.ink } : CATEGORIAS[cat];

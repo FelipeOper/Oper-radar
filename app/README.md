@@ -19,6 +19,7 @@ entre desktop e celular é por CSS (899px), sem largura em JS. Os ícones vêm d
 para a fonte Phosphor do design system (o `lucide-react` foi removido). A migração tela a tela está em
 `../docs/oper-radar-redesign/MIGRACAO_DEMO_PARA_REAL.md`.
 
+O Mercado usa `src/mercadoModel.js` (evidência e leitura da oportunidade regional) e `src/MercadoBlocos.jsx`.
 A tela Hoje usa `src/HojeBlocos.jsx`, `src/Evidencia.jsx` e `src/hojeModel.js` (regras puras, com
 testes). No modo demo, `localStorage['oper-demo-api-antiga']='1'` simula um servidor sem os campos novos.
 

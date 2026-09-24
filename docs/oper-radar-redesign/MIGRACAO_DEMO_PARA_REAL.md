@@ -16,7 +16,7 @@ Nada aqui foi publicado. Produção só muda com aprovação explícita e o flux
 | A | Identidade do design system (tokens, Inter/Manjari, tema escuro e claro), migração de preferências salvas | **Feita** (`797c95c`), verificada no navegador |
 | A+ | Modo demo `VITE_DEMO=1` (PR #61) trazido só para verificação visual | Feita (`82f476f`) |
 | B | Shell (sidebar/topbar/bottom nav) e ícones Phosphor no lugar de lucide | **Feita**: `Shell.jsx` (classes do design system, troca desktop/celular por CSS em 899px, alternância de tema na topbar) e `icons.jsx` (adaptador Phosphor; lucide removido). Menu: Concorrentes→Concorrência, Ações→Plano de ação |
-| C | Telas, uma por vez (ordem abaixo) | Em andamento: **Hoje feita** (24/09/2026); as demais a fazer |
+| C | Telas, uma por vez (ordem abaixo) | Em andamento: **Hoje e Mercado feitas** (24/09/2026); as demais a fazer |
 | D | Backend: novos cruzamentos e endpoints | Junto com cada tela. Feito para a Hoje: `hoje_stats.php` estendido e `frescor_coleta.php` |
 | E | Release | Só com aprovação |
 
@@ -89,7 +89,7 @@ Cada um ganha teste PHP em `oper-radar-api/tests/` no padrão atual (lógica pur
 ## Ordem de execução das telas
 
 1. ~~Shell (Fase B)~~ — feito.
-2. ~~Hoje~~ (feita) → Mercado → Concorrência/Lojista → Comparador → Minha Loja → Inteligência/Oportunidades
+2. ~~Hoje~~ (feita) → ~~Mercado~~ (feito) → Concorrência/Lojista → Comparador → Minha Loja → Inteligência/Oportunidades
    → Plano de ação → Dados e FIPE → Anúncio/Veículo → Configurações/Conta.
 
 Cada tela: portar visual, ligar ao dado real, testes, verificação no navegador (build `VITE_DEMO=1`
@@ -119,3 +119,26 @@ para layout e build normal para o contrato de dados), commit próprio.
 - Limiares dos insights (conservadores, ajustáveis em `lib/hoje_painel.php`): 5 saídas na UF, 4
   anúncios parados há mais de 90 dias, 3 reduções na revenda, mediana 4% abaixo da FIPE com amostra
   mínima de 5 preços. Confiança usa a regra real (5/10/20 preços), não a calibração da demo.
+
+## Tela Mercado (feita em 24/09/2026)
+
+O painel do Mercado já estava redesenhado e em produção (02/09); esta etapa acrescentou o que a demo
+tem e faltava, sem reescrever a lógica de paginação do navegador de ofertas.
+
+- **Evidência nos KPIs do Panorama** (`mercadoModel.js` → `Evidencia.jsx`): recorte, período, valor,
+  base, amostra, confiança (só a do ticket, vinda de `resumo.confianca`), atualização e explicação.
+- **Oportunidade regional do modelo** em "Detalhes do modelo": mesma regra da Minha Loja
+  (`lib/regional_modelo.php`, pesos 30/20/20/15/15, confiança por amostra e histórico), calculada só
+  para o recorte marca + modelo + ano, comparando UFs. UF sem amostra ou sem histórico não recebe nota.
+  A demo calculava o índice sobre todos os caminhões juntos; a especificação
+  (`docs/ESPECIFICACAO_INSIGHT_REGIONAL.md`) proíbe misturar recortes, então **não foi copiado**.
+- **Cards de modelo** mostram amostra e confiança (`9 preços válidos · confiança média`).
+- **Nomenclatura**: "Navegador de anúncios" virou "Ofertas disponíveis"; as etapas numeradas
+  ("1. Região … 4. Ordenação") viram rótulos simples. A lógica de filtros e paginação não mudou.
+- Servidor antigo (sem `oportunidade_regional`): o bloco simplesmente não aparece.
+- **Pendente no Mercado**: o navegador de ofertas ainda usa o visual antigo (estilos inline) e mantém
+  filtros próprios de região/estado/segmento, parcialmente sobrepostos à barra de contexto. Unificar
+  exige mexer na paginação por cursor e na sincronia com o contexto; fica para uma etapa própria.
+- Verificado: 15/15 testes PHP, 61/61 no app, SQL das 4 consultas novas em parser MySQL (não em MySQL
+  real), navegador real com `agent-browser` em desktop e 390 px (achou e corrigiu quebra de texto na
+  lista de componentes no celular).
