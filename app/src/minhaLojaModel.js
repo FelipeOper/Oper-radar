@@ -2,6 +2,7 @@
    Lógica pura (sem React) para ser testada. Só usa o que `minha_loja.php` entrega:
    número sem base vira "amostra insuficiente" ou "fora da base", nunca um valor inventado. */
 
+export const AMOSTRA_MINIMA = 5; // mesmo mínimo de preços válidos do backend (OPER_RADAR_AMOSTRA_MINIMA)
 export const CORTE_ACIMA_PCT = 5; // % acima da mediana a partir do qual o veículo é "Acima do mercado" (mesmo corte da DEMO)
 
 const num = valor => {

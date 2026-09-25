@@ -103,3 +103,9 @@ test('painel do veículo (Minha Loja) só mostra mediana e posicionamento com am
   assert.match(app, /mercado\?\.amostra_suficiente && mercado\?\.preco_mediano > 0/);
   assert.match(app, /mercado\.amostra_suficiente \? fmtBRL\(mercado\.preco_mediano\) : 'Amostra insuficiente'/);
 });
+
+test('painel regional da Minha Loja não mostra mediana abaixo da amostra mínima', () => {
+  assert.match(read('app/src/App.jsx'), /Number\(regiao\.comparaveis\) >= AMOSTRA_MINIMA_LOJA \? fmtBRL\(regiao\.preco_mediano\) : 'Amostra insuficiente'/);
+  assert.match(read('oper-radar-api/lib/market_quality.php'), /OPER_RADAR_AMOSTRA_MINIMA = 5;/);
+  assert.match(read('app/src/minhaLojaModel.js'), /AMOSTRA_MINIMA = 5;/);
+});
