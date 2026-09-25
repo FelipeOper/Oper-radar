@@ -216,17 +216,32 @@ function mercado_ano_comparavel_fipe(array $registro): bool {
     return $ano >= OPER_RADAR_ANO_MINIMO_FIPE;
 }
 
-/** A carroceria permite comparar com a FIPE? Falha FECHADA: sem a chave 'carroceria' nao e comparavel. Vazio, Cavalo ou Chassi sao. */
+/**
+ * Carrocerias canonicas comparaveis com a FIPE (valores do portal): o veiculo SEM implemento. Lista EXATA de proposito:
+ * texto misto ("Cavalo Mecanico com Bau", "Chassi + Munck") nao entra. Sem iconv/translit (varia por servidor): o acento de
+ * "Mecanico" e coberto por um caractere curinga, como no LIKE do SQL equivalente.
+ */
+const OPER_RADAR_CARROCERIAS_FIPE = ['CHASSIS', 'CHASSI'];
+
+/** A carroceria permite comparar com a FIPE? Falha FECHADA: sem a chave 'carroceria' nao e comparavel. Vazio ou valor canonico e. */
 function mercado_carroceria_comparavel_fipe(array $registro): bool {
     if (!array_key_exists('carroceria', $registro)) return false;
-    $carroceria = mercado_texto_normalizado((string)($registro['carroceria'] ?? ''));
-    if ($carroceria === '') return true;
-    return strpos($carroceria, 'CAVALO') !== false || strpos($carroceria, 'CHASSI') !== false;
+    $valor = trim((string)($registro['carroceria'] ?? ''));
+    if ($valor === '') return true;
+    $valor = function_exists('mb_strtoupper') ? mb_strtoupper($valor, 'UTF-8') : strtoupper($valor);
+    if (in_array($valor, OPER_RADAR_CARROCERIAS_FIPE, true)) return true;
+    return preg_match('/^CAVALO MEC.{1,2}NICO$/u', $valor) === 1;
 }
 
-/** Trecho SQL equivalente (alias a): carroceria vazia, cavalo ou chassi. */
+/** Universo validado pela F0d: so caminhao. Falha FECHADA: sem a chave 'tipo' nao e comparavel. */
+function mercado_tipo_comparavel_fipe(array $registro): bool {
+    return ($registro['tipo'] ?? null) === 'Caminhao';
+}
+
+/** Trecho SQL equivalente (alias a): tipo Caminhao e carroceria vazia ou canonica. O '%' cobre o acento de "Mecânico" em qualquer collation. */
 function mercado_sql_carroceria_comparavel(): string {
-    return " AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(a.carroceria) LIKE '%CAVALO%' OR UPPER(a.carroceria) LIKE '%CHASSI%')";
+    return " AND a.tipo='Caminhao' AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(TRIM(a.carroceria)) LIKE 'CAVALO MEC%NICO'"
+        . " OR UPPER(TRIM(a.carroceria)) IN ('CHASSIS','CHASSI'))";
 }
 
 /** Trecho SQL que restringe estatisticas a anuncios de ano-modelo >= $anoMinimo (null = sem restricao). $anoMinimo e int do codigo. */
@@ -240,7 +255,7 @@ function mercado_desvios_fipe(array $registros): array {
     foreach ($registros as $registro) {
         $preco = (float)($registro['preco'] ?? 0);
         $fipe = (float)($registro['preco_fipe'] ?? 0);
-        if ($fipe <= 0 || !mercado_ano_comparavel_fipe($registro) || !mercado_carroceria_comparavel_fipe($registro)) continue;
+        if ($fipe <= 0 || !mercado_ano_comparavel_fipe($registro) || !mercado_carroceria_comparavel_fipe($registro) || !mercado_tipo_comparavel_fipe($registro)) continue;
         $motivo = mercado_motivo_preco(
             $registro['preco'] ?? null, $registro['preco_fipe'] ?? null,
             (string)($registro['titulo'] ?? ''), (string)($registro['preco_texto_bruto'] ?? '')

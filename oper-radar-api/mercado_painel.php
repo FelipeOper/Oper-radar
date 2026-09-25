@@ -124,7 +124,7 @@ if ($cidade !== '' && strtolower($cidade) !== 'todas') {
 $scopeSql = implode(' AND ', $scopeWhere);
 
 $ativos = painel_rows($conn, "SELECT a.preco, a.preco_texto_bruto, a.titulo, f.preco preco_fipe,
-        COALESCE(a.ano_final,a.ano_inicial) ano, a.carroceria, r.id revenda_id, r.uf, r.cidade
+        COALESCE(a.ano_final,a.ano_inicial) ano, a.carroceria, a.tipo, r.id revenda_id, r.uf, r.cidade
     FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
     LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE a.status='ativo' AND $scopeSql", $scopeTypes, $scopeParams);

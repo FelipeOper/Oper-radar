@@ -55,7 +55,7 @@ $faixas = consulta($conn, 'faixas_preco', "
 
 $fipeLinhas = consulta($conn, 'fipe', "
     SELECT a.id, a.fipe_preco_id, a.preco, a.titulo, a.preco_texto_bruto,
-           COALESCE(a.ano_final,a.ano_inicial) AS ano, a.carroceria, f.preco AS preco_fipe
+           COALESCE(a.ano_final,a.ano_inicial) AS ano, a.carroceria, a.tipo, f.preco AS preco_fipe
     FROM anuncio a JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
       AND f.preco IS NOT NULL AND f.preco>0");
@@ -77,7 +77,7 @@ foreach ($fipeLinhas as &$linhaFipe) {
         (float)$linhaFipe['preco_fipe']
     );
     if (!$linhaFipe['mercado_amostra_suficiente'] || $linhaFipe['preco_qualidade_status'] !== 'valido') continue;
-    if (!mercado_ano_comparavel_fipe($linhaFipe) || !mercado_carroceria_comparavel_fipe($linhaFipe)) continue; // F0c/F0d
+    if (!mercado_ano_comparavel_fipe($linhaFipe) || !mercado_carroceria_comparavel_fipe($linhaFipe) || !mercado_tipo_comparavel_fipe($linhaFipe)) continue; // F0c/F0d
     $comparaveisFipe++;
     if ((float)$linhaFipe['preco'] < (float)$linhaFipe['preco_fipe']) $abaixoFipe++;
     $desviosFipe[] = ((float)$linhaFipe['preco'] - (float)$linhaFipe['preco_fipe'])
