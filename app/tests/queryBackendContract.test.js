@@ -109,3 +109,7 @@ test('painel regional da Minha Loja não mostra mediana abaixo da amostra mínim
   assert.match(read('oper-radar-api/lib/market_quality.php'), /OPER_RADAR_AMOSTRA_MINIMA = 5;/);
   assert.match(read('app/src/minhaLojaModel.js'), /AMOSTRA_MINIMA = 5;/);
 });
+
+test('DEMO: detalhe da Minha Loja devolve o veículo pedido pelo id, não sempre o primeiro', () => {
+  assert.match(read('app/src/demoFixtures.js'), /estoque\.find\(i => String\(i\.id\) === String\(params\.get\('id'\)\)\)/);
+});

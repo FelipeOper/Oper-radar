@@ -46,7 +46,7 @@ export function demoGet(input) {
   if (path === 'analista_status.php') return { disponivel: true, configurado: true, modo: 'demo', aviso: 'Resposta local ficticia; sem contexto de backend.' };
   if (path === 'auth.php') return DEMO_SESSION;
   if (path === 'anuncio_detalhe.php') return { anuncio: baseAnuncios[0], historico: [{ data: '2026-09-21', preco: 499900 }, { data: '2026-09-23', preco: 489900 }], similares: baseAnuncios };
-  if (path === 'minha_loja.php' || path === 'minha_loja_detalhe.php') return path === 'minha_loja.php' ? { itens: estoque, total: estoque.length } : { item: estoque[0], mercado: fipes[0] };
+  if (path === 'minha_loja.php' || path === 'minha_loja_detalhe.php') return path === 'minha_loja.php' ? { itens: estoque, total: estoque.length } : { item: estoque.find(i => String(i.id) === String(params.get('id'))) || estoque[0], mercado: fipes[0] };
   return { demo: true, _meta: { demo: true, endpoint: path, atualizado_em: today } };
 }
 export function demoPost(input) {
