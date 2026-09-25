@@ -238,10 +238,13 @@ function mercado_tipo_comparavel_fipe(array $registro): bool {
     return ($registro['tipo'] ?? null) === 'Caminhao';
 }
 
-/** Trecho SQL equivalente (alias a): tipo Caminhao e carroceria vazia ou canonica. O '%' cobre o acento de "Mecânico" em qualquer collation. */
+/**
+ * Trecho SQL equivalente (alias a): tipo Caminhao e carroceria vazia ou canonica. '_' = exatamente 1 caractere (a conexao e utf8mb4, entao
+ * o acento de "Mecânico" e 1 caractere); '__' cobre o acento decomposto/2 caracteres, espelhando /^CAVALO MEC.{1,2}NICO$/u do PHP.
+ */
 function mercado_sql_carroceria_comparavel(): string {
-    return " AND a.tipo='Caminhao' AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(TRIM(a.carroceria)) LIKE 'CAVALO MEC%NICO'"
-        . " OR UPPER(TRIM(a.carroceria)) IN ('CHASSIS','CHASSI'))";
+    return " AND a.tipo='Caminhao' AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(TRIM(a.carroceria)) LIKE 'CAVALO MEC_NICO'"
+        . " OR UPPER(TRIM(a.carroceria)) LIKE 'CAVALO MEC__NICO' OR UPPER(TRIM(a.carroceria)) IN ('CHASSIS','CHASSI'))";
 }
 
 /** Trecho SQL que restringe estatisticas a anuncios de ano-modelo >= $anoMinimo (null = sem restricao). $anoMinimo e int do codigo. */

@@ -91,8 +91,24 @@ verifica(mercado_tipo_comparavel_fipe(['tipo' => 'Carreta']) === false, 'carreta
 verifica(mercado_tipo_comparavel_fipe(['preco' => 1]) === false, 'sem a chave tipo falha fechado');
 // paridade PHP x SQL: cada valor canonico aparece no trecho SQL
 $sqlCarroceria = mercado_sql_carroceria_comparavel();
-verifica(strpos($sqlCarroceria, "a.tipo='Caminhao'") !== false && strpos($sqlCarroceria, "LIKE 'CAVALO MEC%NICO'") !== false && strpos($sqlCarroceria, "IN ('CHASSIS','CHASSI')") !== false, 'sql carroceria: tipo e valores canonicos');
-verifica(strpos($sqlCarroceria, "'%CAVALO%'") === false, 'sql carroceria nao usa mais LIKE amplo');
+verifica(strpos($sqlCarroceria, "a.tipo='Caminhao'") !== false && strpos($sqlCarroceria, "IN ('CHASSIS','CHASSI')") !== false, 'sql carroceria: tipo e valores canonicos');
+verifica(strpos($sqlCarroceria, "'%") === false && strpos($sqlCarroceria, "%'") === false, 'sql carroceria nao usa curinga % (so _ de 1 caractere)');
+// Paridade EXECUTAVEL PHP x SQL: converte cada LIKE do trecho para regex e compara com a funcao PHP em valores de teste.
+preg_match_all("/LIKE '([^']+)'/", $sqlCarroceria, $likes);
+preg_match_all("/IN \(([^)]+)\)/", $sqlCarroceria, $ins);
+$padroes = array_map(fn($p) => '/^' . str_replace('_', '.', preg_quote($p, '/')) . '$/u', $likes[1]);
+$listaIn = array_map(fn($x) => trim($x, "' "), explode(',', $ins[1][0]));
+$sqlAceita = function (?string $v) use ($padroes, $listaIn): bool {
+    $v = trim((string)$v);
+    if ($v === '') return true;
+    $v = mb_strtoupper($v, 'UTF-8');
+    if (in_array($v, $listaIn, true)) return true;
+    foreach ($padroes as $re) if (preg_match($re, $v)) return true;
+    return false;
+};
+foreach (['Cavalo Mecânico', 'CAVALO MECANICO', 'Chassis', 'Chassi', '', null, 'Cavalo MecNico', 'Cavalo MecABCnico', 'Cavalo Mecânico com Baú', 'Chassi + Munck', 'Baú Furgão', 'Munck', 'Caçamba Basculante'] as $valor) {
+    verifica(mercado_carroceria_comparavel_fipe(['carroceria' => $valor]) === $sqlAceita($valor), 'paridade PHP x SQL para carroceria: ' . var_export($valor, true));
+}
 $semImpl = [$comAno(300000, 2018), $comAno(101000, 2018), $comAno(99000, 2019), $comAno(100000, 2020), $comAno(102000, 2021), $comAno(98000, 2022)];
 $semImpl[0]['carroceria'] = 'Baú Furgão'; // com implemento: fora
 foreach ($semImpl as $i => $r) if ($i > 0) $semImpl[$i]['carroceria'] = ($i % 2 ? 'Cavalo Mecânico' : 'Chassis');
