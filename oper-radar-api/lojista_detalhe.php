@@ -79,7 +79,7 @@ $estoqueAtivo = concorrente_linhas($conn, "SELECT $baseCampos,
 $estoqueAtivo = array_map('concorrente_normaliza_anuncio', $estoqueAtivo);
 
 $precosAtivos = concorrente_linhas($conn, "SELECT a.preco, a.titulo, a.preco_texto_bruto,
-    a.fipe_match_status, f.preco preco_fipe FROM anuncio a LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
+    a.fipe_match_status, COALESCE(a.ano_final,a.ano_inicial) ano, f.preco preco_fipe FROM anuncio a LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE $where AND a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0", $types, $params);
 $estatisticasPrecoAtivo = mercado_calcula_estatisticas($precosAtivos);
 $desvioFipe = oper_concorrencia_desvio_fipe($precosAtivos);

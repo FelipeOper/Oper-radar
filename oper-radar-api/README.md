@@ -149,3 +149,8 @@ frente de saneamento mediu (4,4% dos comparáveis acima de +90%, 24/09/2026).
 
 `insights.php` (KPI de FIPE da tela Análise) devolve `fipe.desvio_mediano_pct`, `desvio_amostra` e `desvio_confianca`; a mediana só existe com
 5 ou mais desvios agregados (`mercado_mediana_com_amostra_minima`). O alias legado `desvio_medio_pct` foi removido (carregava a mediana sob nome de média).
+
+**Ano-modelo mínimo para o desvio da FIPE** (`OPER_RADAR_ANO_MINIMO_FIPE = 2006`, `mercado_ano_comparavel_fipe`): a medição F0c (24/09/2026,
+5.400 vinculados) mostrou mediana do desvio de +77,8% para modelos até 2005, +10,9% em 2006–2015 e +1,0% de 2016 em diante; até 2005 a FIPE
+não é referência confiável do preço anunciado. Esses anúncios ficam fora dos desvios **agregados** (Panorama do Mercado, desvio por revenda,
+KPI da Análise e o insight "abaixo da FIPE"); o comparativo anúncio a anúncio segue disponível. Consultas que alimentam essas contas passam `ano`.

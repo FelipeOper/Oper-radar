@@ -7,6 +7,7 @@ function oper_concorrencia_desvio_fipe(array $linhas): array {
     foreach ($linhas as $linha) {
         $fipe = (float)($linha['preco_fipe'] ?? 0);
         if ($fipe <= 0 || in_array($linha['fipe_match_status'] ?? '', ['ambiguo', 'ambigua'], true)) continue;
+        if (!mercado_ano_comparavel_fipe($linha)) continue; // modelo antigo: FIPE nao e referencia (F0c)
         if (mercado_motivo_preco($linha['preco'] ?? null, $fipe,
             (string)($linha['titulo'] ?? ''), (string)($linha['preco_texto_bruto'] ?? '')) !== null) continue;
         $desvios[] = ((float)$linha['preco'] - $fipe) / $fipe * 100;

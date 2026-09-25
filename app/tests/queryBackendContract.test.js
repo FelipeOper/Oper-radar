@@ -60,3 +60,12 @@ test('README e Insights nao voltam a chamar a mediana de media nem usam a media 
   assert.doesNotMatch(read('app/README.md'), /desvio médio com ao menos/);
   assert.doesNotMatch(read('app/src/App.jsx'), /desvio_mediano_pct \?\? [^\n]*desvio_medio_pct/);
 });
+
+test('regra de ano-modelo minimo para o desvio FIPE aparece na API e nos textos ao usuario', () => {
+  assert.match(read('oper-radar-api/lib/market_quality.php'), /OPER_RADAR_ANO_MINIMO_FIPE = 2006/);
+  for (const arq of ['mercado_painel.php', 'lojistas.php', 'lojista_detalhe.php', 'insights.php']) {
+    assert.match(read(`oper-radar-api/${arq}`), /COALESCE\(a\.ano_final,a\.ano_inicial\)/, `${arq} deve passar o ano-modelo`);
+  }
+  assert.match(read('app/src/mercadoModel.js'), /Modelos até 2005 ficam de fora/);
+  assert.match(read('app/src/concorrenciaModel.js'), /modelos até 2005 não entram/);
+});

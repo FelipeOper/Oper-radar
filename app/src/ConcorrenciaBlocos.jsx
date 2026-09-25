@@ -151,7 +151,7 @@ export function PageConcorrencia() {
             </button>; })}</div>
           </section>
         </>}
-      <div className="or-alert or-alert--info"><span className="or-alert__ic"><i className="ph ph-info" aria-hidden="true" /></span><span className="or-alert__body"><strong className="or-alert__t">Como ler</strong><span className="or-alert__d">Desvio FIPE só aparece com ao menos 5 preços válidos; abaixo disso, "amostra insuficiente". Saída observada não é venda; redução de preço é sinal, não prova.</span></span></div>
+      <div className="or-alert or-alert--info"><span className="or-alert__ic"><i className="ph ph-info" aria-hidden="true" /></span><span className="or-alert__body"><strong className="or-alert__t">Como ler</strong><span className="or-alert__d">Desvio FIPE só aparece com ao menos 5 preços válidos de modelos a partir de 2006; abaixo disso, "amostra insuficiente". Saída observada não é venda; redução de preço é sinal, não prova.</span></span></div>
     </>}
     {aberta && <PainelRevenda revenda={aberta} categoria={categoria} onClose={() => setAberta(null)} />}
   </div>;

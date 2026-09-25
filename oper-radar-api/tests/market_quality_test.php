@@ -63,4 +63,14 @@ verifica(mercado_mediana_com_amostra_minima([10.0, 20.0, 30.0, 40.0]) === null, 
 verifica(mercado_mediana_com_amostra_minima([10.0, 20.0, 30.0, 40.0, 50.0]) === 30.0, 'mediana agregada com 5 observacoes');
 verifica(mercado_mediana_com_amostra_minima([1.24, 1.26, 9.0, 9.5, 100.0]) === 9.0, 'mediana agregada arredonda em 1 casa');
 
+// F0c: modelos ate 2005 ficam fora dos desvios agregados (FIPE nao e referencia); sem chave 'ano' = comparavel (compat).
+$comAno = fn($preco, $ano) => ['preco' => $preco, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => '', 'ano' => $ano];
+$misto = [$comAno(300000, 1998), $comAno(240000, 2003), $comAno(101000, 2018), $comAno(99000, 2019), $comAno(100000, 2020), $comAno(102000, 2021), $comAno(98000, 2022)];
+verifica(mercado_desvio_fipe_amostra($misto) === 5, 'ano <= 2005 fora da amostra do desvio');
+verifica(mercado_desvio_fipe_mediano_pct($misto) === 0.0, 'mediana so com modelos a partir de 2006');
+verifica(mercado_ano_comparavel_fipe(['ano' => 2005]) === false, 'ano 2005 nao comparavel');
+verifica(mercado_ano_comparavel_fipe(['ano' => 2006]) === true, 'ano 2006 comparavel');
+verifica(mercado_ano_comparavel_fipe(['ano' => null]) === false, 'ano desconhecido nao comparavel');
+verifica(mercado_ano_comparavel_fipe(['preco' => 1]) === true, 'sem a chave ano (consulta antiga) e comparavel');
+
 echo "market_quality_test=OK\n";

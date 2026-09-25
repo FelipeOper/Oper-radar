@@ -9,6 +9,10 @@
 const OPER_RADAR_AMOSTRA_MINIMA = 5;
 const OPER_RADAR_RAZAO_MIN_FIPE = 0.35;
 const OPER_RADAR_RAZAO_MAX_FIPE = 2.50;
+// F0c (24/09/2026, 5.400 vinculados): mediana do desvio vs FIPE = +77,8% (<=2005), +10,9% (2006-2015), +1,0% (>=2016).
+// Para modelos ate 2005 a FIPE nao e referencia confiavel do preco anunciado; ficam fora dos desvios AGREGADOS
+// (o comparativo anuncio a anuncio continua disponivel). Ano desconhecido tambem fica de fora.
+const OPER_RADAR_ANO_MINIMO_FIPE = 2006;
 
 function mercado_texto_normalizado(string $texto): string {
     if (function_exists('iconv')) {
@@ -203,13 +207,20 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
     }
 }
 
+/** O ano-modelo permite comparar com a FIPE? Registro sem a chave 'ano' (consulta antiga) e tratado como comparavel. */
+function mercado_ano_comparavel_fipe(array $registro): bool {
+    if (!array_key_exists('ano', $registro)) return true;
+    $ano = (int)$registro['ano'];
+    return $ano >= OPER_RADAR_ANO_MINIMO_FIPE;
+}
+
 /** Desvios percentuais (preco anunciado vs. FIPE) dos registros validos: mesmo filtro de mercado_motivo_preco. */
 function mercado_desvios_fipe(array $registros): array {
     $desvios = [];
     foreach ($registros as $registro) {
         $preco = (float)($registro['preco'] ?? 0);
         $fipe = (float)($registro['preco_fipe'] ?? 0);
-        if ($fipe <= 0) continue;
+        if ($fipe <= 0 || !mercado_ano_comparavel_fipe($registro)) continue;
         $motivo = mercado_motivo_preco(
             $registro['preco'] ?? null, $registro['preco_fipe'] ?? null,
             (string)($registro['titulo'] ?? ''), (string)($registro['preco_texto_bruto'] ?? '')

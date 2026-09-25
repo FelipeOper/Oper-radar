@@ -20,4 +20,12 @@ $linhas[] = ['preco' => 20000, 'preco_fipe' => 100000, 'titulo' => 'Entrada de c
 $linhas[] = ['preco' => 100000, 'preco_fipe' => 100000, 'titulo' => 'Caminhao', 'fipe_match_status' => 'ambiguo'];
 confere(oper_concorrencia_desvio_fipe($linhas)['desvio_fipe_amostra'] === 5,
     'excluir condicao comercial e FIPE ambigua');
+// F0c: revenda com estoque antigo (<=2005) nao ganha desvio inflado; so os modelos recentes contam.
+$antiga = [];
+foreach ([1990, 1995, 2000, 2004, 2005] as $ano) $antiga[] = ['preco' => 300000, 'preco_fipe' => 100000, 'titulo' => 'VW', 'ano' => $ano, 'fipe_match_status' => 'confirmado'];
+$r0 = oper_concorrencia_desvio_fipe($antiga);
+confere($r0['desvio_fipe_amostra'] === 0 && $r0['desvio_fipe_mediano_pct'] === null, 'estoque so de modelos antigos nao publica desvio');
+foreach ([2016, 2017, 2018, 2019, 2020] as $ano) $antiga[] = ['preco' => 101000, 'preco_fipe' => 100000, 'titulo' => 'VW', 'ano' => $ano, 'fipe_match_status' => 'confirmado'];
+$r1 = oper_concorrencia_desvio_fipe($antiga);
+confere($r1['desvio_fipe_amostra'] === 5 && $r1['desvio_fipe_mediano_pct'] === 1.0, 'so modelos recentes entram na mediana');
 echo "concorrencia_metricas_test=OK\n";

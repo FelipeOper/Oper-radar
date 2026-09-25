@@ -117,3 +117,6 @@ contagem do botão é a do modelo/ano no recorte geográfico do painel, e a list
 (corrigidas, decisões e telas ainda não portadas). Cartões de indicador seguem `or-stat` do design system (ícone, legenda,
 evidência); na Concorrência, o número de cada chip de UF vem de `contagemPorUf` (segmento e busca atuais) e o texto das
 linhas de `linhasRevenda`, ambos em `src/concorrenciaModel.js` com testes.
+
+Desvio da FIPE só considera modelos a partir de 2006 (`OPER_RADAR_ANO_MINIMO_FIPE` na API; F0c: mediana +77,8% até 2005): os textos de evidência
+do Mercado e da Concorrência dizem isso ao usuário (`tests/queryBackendContract.test.js`).
