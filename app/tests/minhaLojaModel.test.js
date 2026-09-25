@@ -77,3 +77,11 @@ test('pct formata sinal e evita -0', () => {
   assert.equal(pct(0.01), '0%');
   assert.equal(pct(null), '—');
 });
+
+test('corte de 5% usa o desvio exato: 4,96% continua competitivo mesmo exibindo 5%', () => {
+  const p = posicaoItem(item({ preco_mediana_mercado: 100000, preco_anunciado: 104960 }));
+  assert.equal(p.status, 'comp');
+  assert.equal(p.vsMediana, 5);
+  assert.equal(posicaoItem(item({ preco_mediana_mercado: 100000, preco_anunciado: 105000 })).status, 'acima');
+  assert.equal(posicaoItem(item({ preco_mediana_mercado: 100000, preco_anunciado: 104999 })).status, 'comp');
+});

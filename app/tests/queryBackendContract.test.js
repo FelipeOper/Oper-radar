@@ -97,3 +97,9 @@ test('Minha Loja: cartões e resumo leem só campos que minha_loja.php entrega (
   assert.match(read('oper-radar-api/minha_loja.php'), /mercado_aplica_estatisticas/);
   assert.match(read('app/src/App.jsx'), /<CartaoVeiculo /);
 });
+
+test('painel do veículo (Minha Loja) só mostra mediana e posicionamento com amostra suficiente', () => {
+  const app = read('app/src/App.jsx');
+  assert.match(app, /mercado\?\.amostra_suficiente && mercado\?\.preco_mediano > 0/);
+  assert.match(app, /mercado\.amostra_suficiente \? fmtBRL\(mercado\.preco_mediano\) : 'Amostra insuficiente'/);
+});

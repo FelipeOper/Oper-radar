@@ -30,8 +30,8 @@ export function posicaoItem(item) {
   const vsFipe = preco != null && fipe != null ? Math.round((preco / fipe - 1) * 1000) / 10 : null;
   if (Number(item?.usar_comparativo ?? 1) !== 1) return { status: 'fora', vsMediana: null, vsFipe: null };
   if (!item?.mercado_amostra_suficiente || mediana == null || preco == null) return { status: 'insuf', vsMediana: null, vsFipe };
-  const vsMediana = Math.round((preco / mediana - 1) * 1000) / 10;
-  return { status: vsMediana >= CORTE_ACIMA_PCT ? 'acima' : 'comp', vsMediana, vsFipe };
+  const desvio = (preco / mediana - 1) * 100; // o corte usa o valor exato; só a exibição arredonda (4,96% não vira "5%" e "acima")
+  return { status: desvio >= CORTE_ACIMA_PCT ? 'acima' : 'comp', vsMediana: Math.round(desvio * 10) / 10, vsFipe };
 }
 
 export const ROTULO_STATUS = {
