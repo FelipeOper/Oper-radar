@@ -4,7 +4,6 @@
  * GET kpis.php  ->  { revendas_monitoradas, anuncios_ativos, saidas_detectadas_mes, desvio_medio_fipe, ultima_coleta }
  */
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/lib/market_quality.php';
 $conn = conecta();
 
 $revendas = $conn->query('SELECT COUNT(*) AS n FROM revenda')->fetch_assoc()['n'];
@@ -48,15 +47,16 @@ $saidasDetectadasMes = $conn->query("
       AND data_remocao >= DATE_FORMAT(NOW(), '%Y-%m-01')
 ")->fetch_assoc()['n'];
 
-$desvioRow = $conn->query("
-    SELECT AVG((a.preco - f.preco) / NULLIF(f.preco, 0)) * 100 AS media,
-           COUNT(*) AS vinculados
-    FROM anuncio a
+// desvio_medio_fipe foi DESCONTINUADO (24/09/2026): era uma media simples sem a qualidade de preco, a amostra minima e as regras de
+// comparabilidade (ano-modelo >= 2006, so cavalo/chassi) dos demais agregadores. Use mercado_painel.php -> resumo.desvio_fipe_mediano_pct.
+// O app nao consome este campo. Mantem so a contagem de vinculos de confianca alta.
+$vinculadosAlta = (int)$conn->query("
+    SELECT COUNT(*) AS n FROM anuncio a
     JOIN fipe_preco f ON f.id = a.fipe_preco_id
     WHERE a.status='ativo' AND a.preco IS NOT NULL AND f.preco IS NOT NULL
-      AND a.fipe_match_confianca='alto'" . mercado_sql_ano_minimo(OPER_RADAR_ANO_MINIMO_FIPE) . mercado_sql_carroceria_comparavel() . "
-")->fetch_assoc();
-$desvioMedioFipe = $desvioRow['media'] !== null ? round((float)$desvioRow['media'], 1) : null;
+      AND a.fipe_match_confianca='alto'
+")->fetch_assoc()['n'];
+$desvioMedioFipe = null;
 
 $ultimaColeta = $conn->query('SELECT MAX(timestamp) AS t FROM execucao_coleta')->fetch_assoc()['t'];
 
@@ -92,7 +92,7 @@ envia_json([
     // Compatibilidade temporaria com bundles anteriores.
     'vendas_estimadas_mes' => (int) $saidasDetectadasMes,
     'desvio_medio_fipe' => $desvioMedioFipe,
-    'fipe_vinculados_ativos_alta_confianca' => (int)$desvioRow['vinculados'],
+    'fipe_vinculados_ativos_alta_confianca' => $vinculadosAlta,
     'ufs_ativas' => $ufsAtivas,
     'regioes_ativas' => $regioesAtivas,
     'ultima_coleta' => $ultimaColeta,
