@@ -13,6 +13,9 @@ const OPER_RADAR_RAZAO_MAX_FIPE = 2.50;
 // Para modelos ate 2005 a FIPE nao e referencia confiavel do preco anunciado; ficam fora dos desvios AGREGADOS
 // (o comparativo anuncio a anuncio continua disponivel). Ano desconhecido tambem fica de fora.
 const OPER_RADAR_ANO_MINIMO_FIPE = 2006;
+// F0d (25/09/2026, 5.135 vinculados de 2006+): a FIPE precifica o veiculo SEM implemento. Com implemento (bau, cacamba, munck,
+// tanque...) o desvio fica deslocado para cima (36% entre +20% e +90% contra 5% em cavalo/chassi; cauda >+90% de 4,96% contra 0,40%).
+// So cavalo/chassi (ou carroceria nao informada) entra no desvio AGREGADO da FIPE.
 
 function mercado_texto_normalizado(string $texto): string {
     if (function_exists('iconv')) {
@@ -137,7 +140,7 @@ function mercado_sql_confianca_fipe(bool $apenasConfiancaAlta): string {
     return $apenasConfiancaAlta ? " AND a.fipe_match_confianca='alto'" : '';
 }
 
-function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds, bool $apenasConfiancaAlta = false, ?int $anoMinimo = null): array {
+function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds, bool $apenasConfiancaAlta = false, ?int $anoMinimo = null, bool $semImplemento = false): array {
     $ids = array_values(array_unique(array_filter(array_map('intval', $fipeIds), fn($id) => $id > 0)));
     if (!$ids) return [];
 
@@ -147,7 +150,7 @@ function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds, bool $apena
                          FROM anuncio a
                          JOIN fipe_preco fp ON fp.id=a.fipe_preco_id
                          WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
-                           AND a.fipe_preco_id IN ($marcadores)" . mercado_sql_confianca_fipe($apenasConfiancaAlta) . mercado_sql_ano_minimo($anoMinimo));
+                           AND a.fipe_preco_id IN ($marcadores)" . mercado_sql_confianca_fipe($apenasConfiancaAlta) . mercado_sql_ano_minimo($anoMinimo) . ($semImplemento ? mercado_sql_carroceria_comparavel() : ''));
     $tipos = str_repeat('i', count($ids));
     $st->bind_param($tipos, ...$ids);
     $st->execute();
@@ -213,6 +216,19 @@ function mercado_ano_comparavel_fipe(array $registro): bool {
     return $ano >= OPER_RADAR_ANO_MINIMO_FIPE;
 }
 
+/** A carroceria permite comparar com a FIPE? Falha FECHADA: sem a chave 'carroceria' nao e comparavel. Vazio, Cavalo ou Chassi sao. */
+function mercado_carroceria_comparavel_fipe(array $registro): bool {
+    if (!array_key_exists('carroceria', $registro)) return false;
+    $carroceria = mercado_texto_normalizado((string)($registro['carroceria'] ?? ''));
+    if ($carroceria === '') return true;
+    return strpos($carroceria, 'CAVALO') !== false || strpos($carroceria, 'CHASSI') !== false;
+}
+
+/** Trecho SQL equivalente (alias a): carroceria vazia, cavalo ou chassi. */
+function mercado_sql_carroceria_comparavel(): string {
+    return " AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(a.carroceria) LIKE '%CAVALO%' OR UPPER(a.carroceria) LIKE '%CHASSI%')";
+}
+
 /** Trecho SQL que restringe estatisticas a anuncios de ano-modelo >= $anoMinimo (null = sem restricao). $anoMinimo e int do codigo. */
 function mercado_sql_ano_minimo(?int $anoMinimo): string {
     return $anoMinimo === null ? '' : ' AND COALESCE(a.ano_final,a.ano_inicial) >= ' . (int)$anoMinimo;
@@ -224,7 +240,7 @@ function mercado_desvios_fipe(array $registros): array {
     foreach ($registros as $registro) {
         $preco = (float)($registro['preco'] ?? 0);
         $fipe = (float)($registro['preco_fipe'] ?? 0);
-        if ($fipe <= 0 || !mercado_ano_comparavel_fipe($registro)) continue;
+        if ($fipe <= 0 || !mercado_ano_comparavel_fipe($registro) || !mercado_carroceria_comparavel_fipe($registro)) continue;
         $motivo = mercado_motivo_preco(
             $registro['preco'] ?? null, $registro['preco_fipe'] ?? null,
             (string)($registro['titulo'] ?? ''), (string)($registro['preco_texto_bruto'] ?? '')

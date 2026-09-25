@@ -92,7 +92,7 @@ if ($lojistas) {
     }
 
     $precos = $conn->prepare("SELECT a.revenda_id, a.preco, a.titulo, a.preco_texto_bruto,
-        a.fipe_match_status, COALESCE(a.ano_final,a.ano_inicial) ano, f.preco preco_fipe FROM anuncio a
+        a.fipe_match_status, COALESCE(a.ano_final,a.ano_inicial) ano, a.carroceria, f.preco preco_fipe FROM anuncio a
         JOIN fipe_preco f ON f.id=a.fipe_preco_id
         WHERE a.revenda_id IN ($placeholders) AND a.status='ativo'");
     $precos->bind_param(str_repeat('i', count($ids)), ...$ids);

@@ -75,3 +75,14 @@ test('todo agregador do desvio FIPE aplica o ano-modelo minimo (insights, kpis l
   assert.match(read('oper-radar-api/kpis.php'), /mercado_sql_ano_minimo\(OPER_RADAR_ANO_MINIMO_FIPE\)/);
   assert.match(read('oper-radar-api/hoje_stats.php'), /'alto'\)|true, OPER_RADAR_ANO_MINIMO_FIPE\)/);
 });
+
+test('regra de carroceria (so cavalo/chassi) no desvio FIPE: API passa a carroceria e os textos avisam', () => {
+  assert.match(read('oper-radar-api/lib/market_quality.php'), /function mercado_carroceria_comparavel_fipe/);
+  for (const arq of ['mercado_painel.php', 'lojistas.php', 'lojista_detalhe.php', 'insights.php']) {
+    assert.match(read(`oper-radar-api/${arq}`), /a\.carroceria/, `${arq} deve passar a carroceria`);
+  }
+  assert.match(read('oper-radar-api/kpis.php'), /mercado_sql_carroceria_comparavel\(\)/);
+  assert.match(read('oper-radar-api/hoje_stats.php'), /mercado_sql_carroceria_comparavel\(\)/);
+  assert.match(read('app/src/mercadoModel.js'), /caminhões com implemento/);
+  assert.match(read('app/src/concorrenciaModel.js'), /caminhões com implemento também não/);
+});

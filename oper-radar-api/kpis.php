@@ -54,7 +54,7 @@ $desvioRow = $conn->query("
     FROM anuncio a
     JOIN fipe_preco f ON f.id = a.fipe_preco_id
     WHERE a.status='ativo' AND a.preco IS NOT NULL AND f.preco IS NOT NULL
-      AND a.fipe_match_confianca='alto'" . mercado_sql_ano_minimo(OPER_RADAR_ANO_MINIMO_FIPE) . "
+      AND a.fipe_match_confianca='alto'" . mercado_sql_ano_minimo(OPER_RADAR_ANO_MINIMO_FIPE) . mercado_sql_carroceria_comparavel() . "
 ")->fetch_assoc();
 $desvioMedioFipe = $desvioRow['media'] !== null ? round((float)$desvioRow['media'], 1) : null;
 

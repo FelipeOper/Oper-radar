@@ -120,3 +120,6 @@ linhas de `linhasRevenda`, ambos em `src/concorrenciaModel.js` com testes.
 
 Desvio da FIPE só considera modelos a partir de 2006 (`OPER_RADAR_ANO_MINIMO_FIPE` na API; F0c: mediana +77,8% até 2005): os textos de evidência
 do Mercado e da Concorrência dizem isso ao usuário (`tests/queryBackendContract.test.js`).
+
+O desvio da FIPE também só considera cavalo, chassi ou carroceria não informada (F0d: com implemento o preço inclui o equipamento e o desvio desloca para cima);
+os textos de evidência dizem isso ao usuário (`tests/queryBackendContract.test.js`).

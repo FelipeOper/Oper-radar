@@ -94,7 +94,7 @@ export function leituraRevenda(l, atualizacao = null) {
     idade: l.idade_observada_confiavel && l.idade_media_estoque != null ? `${Math.round(n(l.idade_media_estoque))} d` : 'Amostra temporal insuficiente',
     reducoes: l.reducoes_30d == null ? 'Indisponível' : inteiro(l.reducoes_30d),
     desvio: desvio == null ? 'Amostra insuficiente' : percentual(desvio),
-    evidenciaDesvio: { recorte: `${l.nome} · ${l.cidade}/${l.uf}`, periodo: 'Estoque ativo', valor: desvio == null ? 'Amostra insuficiente' : percentual(desvio), base: 'Preço anunciado frente à FIPE vinculada de cada veículo', amostra: `${inteiro(l.desvio_fipe_amostra)} preços válidos com FIPE`, confianca: l.desvio_fipe_confianca || 'insuficiente', atualizacao, explicacao: 'Mediana dos desvios individuais. Só é exibida com ao menos 5 preços válidos vinculados à FIPE; modelos até 2005 não entram (a FIPE não é referência confiável para eles).' },
+    evidenciaDesvio: { recorte: `${l.nome} · ${l.cidade}/${l.uf}`, periodo: 'Estoque ativo', valor: desvio == null ? 'Amostra insuficiente' : percentual(desvio), base: 'Preço anunciado frente à FIPE vinculada de cada veículo', amostra: `${inteiro(l.desvio_fipe_amostra)} preços válidos com FIPE`, confianca: l.desvio_fipe_confianca || 'insuficiente', atualizacao, explicacao: 'Mediana dos desvios individuais. Só é exibida com ao menos 5 preços válidos vinculados à FIPE; modelos até 2005 não entram (a FIPE não é referência confiável para eles) e caminhões com implemento também não (a FIPE precifica o veículo sem o equipamento): só cavalo, chassi ou sem carroceria informada.' },
   };
 }
 

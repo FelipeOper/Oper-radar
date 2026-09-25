@@ -62,7 +62,7 @@ export function evidenciaPanorama({ resumo = {}, escopo = {}, fonte = {}, period
       base: 'Preço anunciado contra a tabela FIPE (mediana dos desvios)',
       ...(desvio.amostra == null ? {} : { amostra: `${inteiro(desvio.amostra)} preços válidos com FIPE`, confianca: resumo.desvio_fipe_confianca || 'insuficiente' }),
       atualizacao,
-      explicacao: 'Mediana do desvio entre o preço anunciado e a FIPE, só nos anúncios ativos com FIPE vinculada e preço válido; a mediana não é puxada por vínculos FIPE suspeitos. Modelos até 2005 ficam de fora: para eles a FIPE não é referência confiável do preço anunciado. Só é exibida com ao menos 5 preços válidos. FIPE cobre parte dos anúncios e não cobre implementos.',
+      explicacao: 'Mediana do desvio entre o preço anunciado e a FIPE, só nos anúncios ativos com FIPE vinculada e preço válido; a mediana não é puxada por vínculos FIPE suspeitos. Ficam de fora modelos até 2005 (a FIPE não é referência confiável para eles) e caminhões com implemento (baú, caçamba, munck, tanque…): a FIPE precifica o veículo sem o equipamento, então só cavalos mecânicos, chassis e anúncios sem carroceria informada entram. Só é exibida com ao menos 5 preços válidos. FIPE cobre parte dos anúncios e não cobre implementos.',
     },
   };
 }

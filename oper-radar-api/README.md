@@ -154,3 +154,8 @@ frente de saneamento mediu (4,4% dos comparáveis acima de +90%, 24/09/2026).
 5.400 vinculados) mostrou mediana do desvio de +77,8% para modelos até 2005, +10,9% em 2006–2015 e +1,0% de 2016 em diante; até 2005 a FIPE
 não é referência confiável do preço anunciado. Esses anúncios ficam fora dos desvios **agregados** (Panorama do Mercado, desvio por revenda,
 KPI da Análise e o insight "abaixo da FIPE"); o comparativo anúncio a anúncio segue disponível. Consultas que alimentam essas contas passam `ano`.
+
+**Só cavalo/chassi no desvio da FIPE** (`mercado_carroceria_comparavel_fipe`, `mercado_sql_carroceria_comparavel`): a F0d (25/09/2026, 5.135 vinculados de 2006+)
+mostrou que a FIPE precifica o veículo sem implemento; com implemento (baú, caçamba, munck, tanque…) o desvio desloca para cima (36% entre +20% e +90%
+contra 5% em cavalo/chassi; cauda >+90% de 4,96% contra 0,40%). Carroceria vazia também entra (0,77% de cauda). Falha fechada: consulta sem `carroceria`
+não é comparável. Aplica nos mesmos agregadores da regra de ano-modelo.

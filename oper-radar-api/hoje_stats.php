@@ -172,13 +172,13 @@ $candidatosFipe = $bloco('abaixo_fipe', oper_hoje_consulta($conn, "
            COUNT(DISTINCT a.revenda_id) AS revendas, COUNT(*) AS n
     FROM anuncio a JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE a.status='ativo' AND a.fipe_match_confianca='alto' AND a.preco>0 AND f.preco>0
-      AND $anoModelo >= " . OPER_RADAR_ANO_MINIMO_FIPE . "
+      AND $anoModelo >= " . OPER_RADAR_ANO_MINIMO_FIPE . mercado_sql_carroceria_comparavel() . "
     GROUP BY a.fipe_preco_id
     HAVING n >= " . OPER_RADAR_AMOSTRA_MINIMA . "
     ORDER BY n DESC LIMIT 40"));
 if ($candidatosFipe) {
     try {
-        $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($candidatosFipe, 'fipe_preco_id'), true, OPER_RADAR_ANO_MINIMO_FIPE);
+        $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($candidatosFipe, 'fipe_preco_id'), true, OPER_RADAR_ANO_MINIMO_FIPE, true);
         // Nome proprio: $c, $m e $l ainda sao referencias dos foreach acima.
         foreach ($candidatosFipe as $candidato) {
             $st = $estatisticas[(int)$candidato['fipe_preco_id']] ?? null;
