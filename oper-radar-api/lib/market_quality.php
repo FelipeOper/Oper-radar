@@ -217,11 +217,11 @@ function mercado_ano_comparavel_fipe(array $registro): bool {
 }
 
 /**
- * Carrocerias canonicas comparaveis com a FIPE (valores do portal): o veiculo SEM implemento. Lista EXATA de proposito:
- * texto misto ("Cavalo Mecanico com Bau", "Chassi + Munck") nao entra. Sem iconv/translit (varia por servidor): o acento de
- * "Mecanico" e coberto por um caractere curinga, como no LIKE do SQL equivalente.
+ * Carrocerias canonicas comparaveis com a FIPE (valores do portal): o veiculo SEM implemento. Lista EXATA (sem curinga) de proposito:
+ * texto misto ("Cavalo Mecanico com Bau", "Chassi + Munck") e grafias inesperadas nao entram. As duas grafias de "Mecanico"
+ * (com e sem acento) sao enumeradas em vez de normalizadas por iconv/translit, que varia por servidor.
  */
-const OPER_RADAR_CARROCERIAS_FIPE = ['CHASSIS', 'CHASSI'];
+const OPER_RADAR_CARROCERIAS_FIPE = ['CAVALO MECÂNICO', 'CAVALO MECANICO', 'CHASSIS', 'CHASSI'];
 
 /** A carroceria permite comparar com a FIPE? Falha FECHADA: sem a chave 'carroceria' nao e comparavel. Vazio ou valor canonico e. */
 function mercado_carroceria_comparavel_fipe(array $registro): bool {
@@ -229,8 +229,7 @@ function mercado_carroceria_comparavel_fipe(array $registro): bool {
     $valor = trim((string)($registro['carroceria'] ?? ''));
     if ($valor === '') return true;
     $valor = function_exists('mb_strtoupper') ? mb_strtoupper($valor, 'UTF-8') : strtoupper($valor);
-    if (in_array($valor, OPER_RADAR_CARROCERIAS_FIPE, true)) return true;
-    return preg_match('/^CAVALO MEC.{1,2}NICO$/u', $valor) === 1;
+    return in_array($valor, OPER_RADAR_CARROCERIAS_FIPE, true);
 }
 
 /** Universo validado pela F0d: so caminhao. Falha FECHADA: sem a chave 'tipo' nao e comparavel. */
@@ -238,13 +237,10 @@ function mercado_tipo_comparavel_fipe(array $registro): bool {
     return ($registro['tipo'] ?? null) === 'Caminhao';
 }
 
-/**
- * Trecho SQL equivalente (alias a): tipo Caminhao e carroceria vazia ou canonica. '_' = exatamente 1 caractere (a conexao e utf8mb4, entao
- * o acento de "Mecânico" e 1 caractere); '__' cobre o acento decomposto/2 caracteres, espelhando /^CAVALO MEC.{1,2}NICO$/u do PHP.
- */
+/** Trecho SQL equivalente (alias a): tipo Caminhao e carroceria vazia ou na mesma lista exata (IN, sem LIKE). */
 function mercado_sql_carroceria_comparavel(): string {
-    return " AND a.tipo='Caminhao' AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(TRIM(a.carroceria)) LIKE 'CAVALO MEC_NICO'"
-        . " OR UPPER(TRIM(a.carroceria)) LIKE 'CAVALO MEC__NICO' OR UPPER(TRIM(a.carroceria)) IN ('CHASSIS','CHASSI'))";
+    $lista = implode(',', array_map(fn($x) => "'" . $x . "'", OPER_RADAR_CARROCERIAS_FIPE));
+    return " AND a.tipo='Caminhao' AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(TRIM(a.carroceria)) IN (" . $lista . "))";
 }
 
 /** Trecho SQL que restringe estatisticas a anuncios de ano-modelo >= $anoMinimo (null = sem restricao). $anoMinimo e int do codigo. */
