@@ -44,7 +44,7 @@ ser conferido tela a tela (marcado **a verificar**).
 | Concorrência | `PageConcorrentes` | `lojistas.php`, `lojista_detalhe.php` | `revenda`, `mudanca_preco` | Idade média, reduções e desvio FIPE por revenda: **a verificar** |
 | Lojista | painel do lojista | `lojista_detalhe.php` | idem | idem |
 | Comparador | `PageComparador` | `comparador.php` | `anuncio` | Existe; demo compara dois modelos com mediana qualificada |
-| Minha Loja | `PageMinhaLoja` | `minha_loja.php`, `minha_loja_detalhe.php`, `minha_loja_xml.php` | estoque próprio (XML) | Base PR→Brasil com rótulo explícito: **a verificar** |
+| Minha Loja | `PageMinhaLoja` | `minha_loja.php`, `minha_loja_detalhe.php`, `minha_loja_xml.php` | estoque próprio (XML) | **Feita.** API entrega só mediana nacional (`mercado_escopo: Brasil`), rotulada na tela; recorte por UF fica como evolução |
 | Inteligência | `PageAnalise` / `PageOportunidades` | `insights.php`, `analista.php` | `lib/regional_insight.php` | Índice regional já tem pesos em `docs/ESPECIFICACAO_INSIGHT_REGIONAL.md` |
 | Plano de ação | `PageAcoes` | (ações do usuário) | **a verificar** | Persistência atual das ações |
 | Dados e FIPE | `PageFipe`, `PageFipeCatalogo` | `fipe_status.php`, `fipe_consulta.php` | `execucao_coleta` | Monitor de qualidade da demo é **novo** (ver abaixo) |
@@ -89,7 +89,7 @@ Cada um ganha teste PHP em `oper-radar-api/tests/` no padrão atual (lógica pur
 ## Ordem de execução das telas
 
 1. ~~Shell (Fase B)~~ — feito.
-2. ~~Hoje~~ (feita) → ~~Mercado~~ (feito) → ~~Concorrência/Lojista~~ (feita) → Comparador → Minha Loja → Inteligência/Oportunidades
+2. ~~Hoje~~ (feita) → ~~Mercado~~ (feito) → ~~Concorrência/Lojista~~ (feita) → ~~Minha Loja~~ (feita) → Comparador → Inteligência/Oportunidades
    → Plano de ação → Dados e FIPE → Anúncio/Veículo → Configurações/Conta.
 
 Cada tela: portar visual, ligar ao dado real, testes, verificação no navegador (build `VITE_DEMO=1`

@@ -74,7 +74,14 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Mercado equivalente usa mediana e faixa central somente com pelo menos cinco ofertas
   qualificadas; amostras menores são identificadas como insuficientes.
 - Minha Loja possui busca, filtro, ordenação, salvamento otimista com reversão em erro e
-  ação de desfazer a última mudança de status.
+  ação de desfazer a última mudança de status. No layout da DEMO: resumo de posição (acima do
+  mercado, competitivos, sem comparação), alertas e um cartão por veículo com preço próprio,
+  mediana do mercado nacional, desvio vs mediana e vs FIPE, e a evidência de cada número. Regra
+  em `src/minhaLojaModel.js`: "acima do mercado" = preço 5% ou mais acima da mediana qualificada;
+  sem 5 preços válidos vira "amostra insuficiente" (sem número inventado); veículo fora da base
+  comparativa e vínculo FIPE incompatível não geram desvio. Ordenação padrão "Posição no mercado".
+  Base atual da API: Brasil (`mercado_escopo`); a DEMO usa Paraná com queda para Brasil, então a
+  tela rotula "Mercado nacional" e não promete recorte por UF.
 
 As regras puras ficam em `src/domainRules.js`, `src/dataState.js` e `src/navigation.js`, com
 testes independentes na pasta `tests/`.

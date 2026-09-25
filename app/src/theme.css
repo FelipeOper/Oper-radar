@@ -938,3 +938,14 @@ select {
 @media (min-width: 1180px) { .or-panorama-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 420px) { .or-panorama-cards { grid-template-columns: minmax(0, 1fr); } }
 .or-panorama-cards .or-stat__value, .oc-kpi .or-stat__value { white-space: normal; overflow-wrap: anywhere; }
+
+/* Minha Loja: resumo de posição e cartões dos veículos próprios. */
+.oc-loja__resumo { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.oc-loja__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.oc-loja__cartao { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.oc-loja__topo, .oc-loja__linha-preco, .oc-loja__rodape { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.oc-loja__controles { display: flex; align-items: center; gap: 6px; }
+.oc-loja__status { min-height: 32px; padding: 0 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 12px; }
+.oc-loja__dados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.oc-loja__dado { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.oc-loja__preco { font: var(--type-kpi); }

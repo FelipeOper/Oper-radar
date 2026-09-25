@@ -85,3 +85,15 @@ test('regra de carroceria (so cavalo/chassi) no desvio FIPE: API passa a carroce
   assert.match(read('app/src/mercadoModel.js'), /caminhões com implemento/);
   assert.match(read('app/src/concorrenciaModel.js'), /caminhões com implemento também não/);
 });
+
+test('Minha Loja: cartões e resumo leem só campos que minha_loja.php entrega (mediana nacional, amostra, FIPE)', () => {
+  const modelo = read('app/src/minhaLojaModel.js');
+  const api = read('oper-radar-api/lib/market_quality.php');
+  for (const campo of ['preco_mediana_mercado', 'mercado_amostra_suficiente', 'anuncios_comparaveis', 'mercado_amostra_total', 'mercado_confianca', 'menor_preco_mercado']) {
+    assert.match(api, new RegExp(campo), `${campo} deve existir em mercado_aplica_estatisticas`);
+  }
+  assert.match(modelo, /preco_mediana_mercado/);
+  assert.doesNotMatch(read('app/src/minhaLojaModel.js') + read('app/src/MinhaLojaBlocos.jsx'), /preco_mediano_mercado/, 'campo real é preco_mediana_mercado');
+  assert.match(read('oper-radar-api/minha_loja.php'), /mercado_aplica_estatisticas/);
+  assert.match(read('app/src/App.jsx'), /<CartaoVeiculo /);
+});

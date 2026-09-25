@@ -4,7 +4,7 @@ import {
   MapPin, ExternalLink, Search,
   TrendingDown, ArrowDownRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Gauge, RotateCcw,
-  ShieldCheck, Store, Trash2, LogOut, UserRound, LockKeyhole,
+  ShieldCheck, Store, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
   Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
@@ -34,6 +34,8 @@ import { AlertaColeta, FeedMovimento, InsightsDoDia, RegioesSaidas, SecaoHoje } 
 import { evidenciaKpis } from './hojeModel.js';
 import { OportunidadeRegional } from './MercadoBlocos.jsx';
 import { PageConcorrencia } from './ConcorrenciaBlocos.jsx';
+import { ResumoLoja, CartaoVeiculo } from './MinhaLojaBlocos.jsx';
+import { resumoLoja } from './minhaLojaModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
@@ -2474,7 +2476,7 @@ function PageMinhaLoja({ sessao }) {
   const [xmlOpcoes, setXmlOpcoes] = useState({ usar_comparativo: true, marcar_ausentes: false });
   const [buscaEstoque, setBuscaEstoque] = useState('');
   const [statusEstoque, setStatusEstoque] = useState('todos');
-  const [ordemEstoque, setOrdemEstoque] = useState('recente');
+  const [ordemEstoque, setOrdemEstoque] = useState('posicao');
   const [statusSalvandoId, setStatusSalvandoId] = useState(null);
   const [ultimaAlteracao, setUltimaAlteracao] = useState(null);
   const [itemAberto, setItemAberto] = useState(null);
@@ -2590,10 +2592,7 @@ function PageMinhaLoja({ sessao }) {
     } catch (e) { setXmlEstado(v => ({ ...v, importando: false, erro: e.message })); }
   };
 
-  const ativos = itens.filter(i => i.status !== 'vendido');
-  const valor = ativos.reduce((s, i) => s + Number(i.preco_anunciado || 0), 0);
-  const mediaDias = ativos.length ? Math.round(ativos.reduce((s, i) => s + Number(i.dias_estoque || 0), 0) / ativos.length) : 0;
-  const vinculados = ativos.filter(i => i.fipe_preco_id && Number(i.usar_comparativo ?? 1) === 1).length;
+  const resumo = useMemo(() => resumoLoja(itens), [itens]);
   const itensVisiveis = useMemo(
     () => filtraOrdenaEstoque(itens, buscaEstoque, statusEstoque, ordemEstoque),
     [itens, buscaEstoque, statusEstoque, ordemEstoque],
@@ -2601,18 +2600,13 @@ function PageMinhaLoja({ sessao }) {
 
   return <div>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-      <SectionTitle sub="Seu estoque publicado como base interna de comparação com FIPE e mercado">Meu estoque</SectionTitle>
+      <SectionTitle sub="Como cada veículo seu se posiciona contra a mediana do mercado nacional e a FIPE">Seu estoque no mercado</SectionTitle>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button aria-expanded={xmlAberto} aria-controls="painel-importacao-xml" onClick={() => { setXmlAberto(v => !v); setFormAberto(false); }} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}><UploadCloud size={16} />{xmlAberto ? 'Fechar XML' : 'Importar XML'}</button>
         <button aria-expanded={formAberto} aria-controls="form-novo-veiculo" onClick={() => { setFormAberto(v => !v); setXmlAberto(false); }} style={{ ...inputStyle, border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: 'pointer', display: 'flex', gap: 7, alignItems: 'center' }}>{formAberto ? <X size={16} /> : <Plus size={16} />}{formAberto ? 'Fechar' : 'Adicionar veículo'}</button>
       </div>
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10 }}>
-      <Kpi label="No estoque" value={fmtN(ativos.length)} sub="veículos próprios" />
-      <Kpi label="Valor anunciado" value={fmtBRL(valor)} sub="soma do estoque ativo" />
-      <Kpi label="Idade média" value={`${mediaDias}d`} sub="tempo em estoque" />
-      <Kpi label="Comparados" value={`${vinculados}/${ativos.length}`} sub="vínculo FIPE automático" tone={T.positive} />
-    </div>
+    {!carregando && itens.length > 0 && <ResumoLoja resumo={resumo} />}
 
     {xmlAberto && <Card id="painel-importacao-xml" style={{ marginTop: 16, borderColor: `${T.signal}55` }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, marginBottom: 15 }}>
@@ -2671,36 +2665,20 @@ function PageMinhaLoja({ sessao }) {
       <span>Status atualizado para {String(ultimaAlteracao.novo).toUpperCase()}.</span>
       <button onClick={desfazerStatus} disabled={statusSalvandoId != null} style={{ ...inputStyle, cursor: 'pointer', padding: '6px 9px' }}><Undo2 size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Desfazer</button>
     </div>}
-    <SectionTitle sub="Preço próprio versus referência e anúncios ativos equivalentes">Comparativo da loja</SectionTitle>
+    <SectionTitle sub="Preço próprio versus mediana do mercado nacional e FIPE, com a evidência de cada número">Seus veículos</SectionTitle>
     <Card style={{ padding: 12, marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 8 }}>
       <input aria-label="Buscar no estoque" value={buscaEstoque} onChange={e => setBuscaEstoque(e.target.value)} placeholder="Buscar marca, modelo ou referência..." style={{ ...inputStyle, width: '100%' }} />
       <select aria-label="Filtrar estoque por status" value={statusEstoque} onChange={e => setStatusEstoque(e.target.value)} style={inputStyle}>
         <option value="todos">Todos os status</option><option value="estoque">No estoque</option><option value="reservado">Reservados</option><option value="vendido">Vendidos</option>
       </select>
       <select aria-label="Ordenar estoque" value={ordemEstoque} onChange={e => setOrdemEstoque(e.target.value)} style={inputStyle}>
-        <option value="recente">Entrada mais recente</option><option value="antigo">Entrada mais antiga</option><option value="modelo">Marca e modelo</option><option value="preco_asc">Menor preço</option><option value="preco_desc">Maior preço</option>
+        <option value="posicao">Posição no mercado</option><option value="recente">Entrada mais recente</option><option value="antigo">Entrada mais antiga</option><option value="modelo">Marca e modelo</option><option value="preco_asc">Menor preço</option><option value="preco_desc">Maior preço</option>
       </select>
     </Card>
     {carregando ? <Card><span style={{ color: T.inkMuted }}>Carregando seu estoque…</span></Card> : itens.length === 0 ? <EmptyState icon={Store} titulo="Seu estoque começa aqui" texto="Adicione os veículos da sua loja para comparar preço, idade e posicionamento contra a FIPE e o mercado monitorado." /> :
       itensVisiveis.length === 0 ? <EmptyState icon={Search} titulo="Nenhum veículo encontrado" texto="Remova a busca ou altere o filtro de status." /> :
-      <div className="or-zebra-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: 11 }}>
-        {itensVisiveis.map(item => {
-          const mercado = item.mercado_amostra_suficiente ? Number(item.preco_mediana_mercado || 0) : 0;
-          const preco = Number(item.preco_anunciado || 0);
-          const delta = mercado && preco ? Math.round((preco / mercado - 1) * 100) : null;
-          return <Card key={item.id} onClick={() => setItemAberto(item)} style={{ padding: 16, cursor: 'pointer' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><select aria-label={`Status de ${item.marca || ''} ${item.modelo || ''}`} disabled={statusSalvandoId === item.id} value={item.status} onClick={e => e.stopPropagation()} onChange={e => alterarStatus(item, e.target.value)} style={{ ...inputStyle, minHeight: 30, padding: '4px 8px', fontSize: 10.5, color: item.status === 'estoque' ? T.positive : T.inkMuted, opacity: statusSalvandoId === item.id ? 0.6 : 1 }}><option value="estoque">NO ESTOQUE</option><option value="reservado">RESERVADO</option><option value="vendido">VENDIDO</option></select>{item.origem === 'xml' && <Tag tone="sinal">XML</Tag>}</div><button aria-label={`Excluir ${item.marca || ''} ${item.modelo || 'veículo'}`} onClick={e => { e.stopPropagation(); excluir(item.id); }} style={{ border: 'none', background: 'transparent', color: T.inkMuted, cursor: 'pointer', minHeight: 30 }}><Trash2 size={15} /></button></div>
-            <div style={{ fontFamily: T.fontDisplay, fontSize: 16, fontWeight: 650, marginTop: 12 }}>{item.titulo || [item.marca, item.modelo].filter(Boolean).join(' ')}</div>
-            <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 4 }}>{item.referencia_interna ? `ID ${item.referencia_interna} · ` : ''}{item.placa ? `${item.placa} · ` : ''}{[item.marca, item.modelo, item.ano].filter(Boolean).join(' · ')} · {[item.cidade, item.uf].filter(Boolean).join('/') || 'local não informado'} · {item.dias_estoque} dias{item.quilometragem ? ` · ${fmtN(item.quilometragem)} km` : ''}</div>
-            <div style={{ fontFamily: T.fontMono, fontSize: 19, fontWeight: 650, marginTop: 15 }}>{fmtBRL(item.preco_anunciado)}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>FIPE</small>{item.modelo_fipe && <div style={{ color: T.inkMuted, fontSize: 9.5, lineHeight: 1.35, marginTop: 3 }}>{[item.marca_fipe, item.modelo_fipe, String(item.ano_fipe || '').split('-')[0]].filter(Boolean).join(' · ')}</div>}<div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{fmtBRL(item.preco_fipe)}</div></div>
-              <div style={{ background: T.surface2, borderRadius: 8, padding: 9 }}><small style={{ color: T.inkMuted }}>Mediana de mercado</small><div style={{ fontFamily: T.fontMono, fontSize: 11.5, marginTop: 3 }}>{item.mercado_amostra_suficiente ? fmtBRL(item.preco_mediana_mercado) : 'Amostra insuficiente'}</div></div>
-            </div>
-            <div style={{ marginTop: 11, color: delta == null ? T.inkMuted : delta <= 0 ? T.positive : T.alert, fontSize: 12 }}>{Number(item.usar_comparativo ?? 1) !== 1 ? 'Fora da base comparativa' : delta == null ? 'Aguardando amostra mínima compatível' : `${Math.abs(delta)}% ${delta <= 0 ? 'abaixo' : 'acima'} da mediana · ${fmtN(item.anuncios_ativos)} anúncios · confiança ${item.mercado_confianca}`}</div>
-            <div style={{ color: T.signal, fontFamily: T.fontMono, fontSize: 9.5, marginTop: 12 }}>ABRIR CADASTRO E ANÁLISE →</div>
-          </Card>;
-        })}
+      <div className="oc-loja__grade">
+        {itensVisiveis.map(item => <CartaoVeiculo key={item.id} item={item} salvandoStatus={statusSalvandoId === item.id} onAbrir={setItemAberto} onStatus={alterarStatus} onExcluir={excluir} />)}
       </div>}
     {itemAberto && <PainelMeuVeiculo itemInicial={itemAberto} sessao={sessao} onClose={() => setItemAberto(null)} onSalvo={carregar} />}
   </div>;
