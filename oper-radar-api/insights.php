@@ -61,7 +61,9 @@ $fipeLinhas = consulta($conn, 'fipe', "
       AND f.preco IS NOT NULL AND f.preco>0");
 $estatisticasFipe = mercado_estatisticas_por_fipe(
     $conn,
-    array_column($fipeLinhas, 'fipe_preco_id')
+    array_column($fipeLinhas, 'fipe_preco_id'),
+    false,
+    OPER_RADAR_ANO_MINIMO_FIPE // amostra e limites so com modelos a partir de 2006 (F0c)
 );
 $abaixoFipe = 0;
 $comparaveisFipe = 0;

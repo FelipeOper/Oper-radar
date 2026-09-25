@@ -4,6 +4,7 @@
  * GET kpis.php  ->  { revendas_monitoradas, anuncios_ativos, saidas_detectadas_mes, desvio_medio_fipe, ultima_coleta }
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/market_quality.php';
 $conn = conecta();
 
 $revendas = $conn->query('SELECT COUNT(*) AS n FROM revenda')->fetch_assoc()['n'];
@@ -53,7 +54,7 @@ $desvioRow = $conn->query("
     FROM anuncio a
     JOIN fipe_preco f ON f.id = a.fipe_preco_id
     WHERE a.status='ativo' AND a.preco IS NOT NULL AND f.preco IS NOT NULL
-      AND a.fipe_match_confianca='alto'
+      AND a.fipe_match_confianca='alto'" . mercado_sql_ano_minimo(OPER_RADAR_ANO_MINIMO_FIPE) . "
 ")->fetch_assoc();
 $desvioMedioFipe = $desvioRow['media'] !== null ? round((float)$desvioRow['media'], 1) : null;
 

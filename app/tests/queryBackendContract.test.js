@@ -69,3 +69,9 @@ test('regra de ano-modelo minimo para o desvio FIPE aparece na API e nos textos 
   assert.match(read('app/src/mercadoModel.js'), /Modelos até 2005 ficam de fora/);
   assert.match(read('app/src/concorrenciaModel.js'), /modelos até 2005 não entram/);
 });
+
+test('todo agregador do desvio FIPE aplica o ano-modelo minimo (insights, kpis legado, hoje_stats)', () => {
+  assert.match(read('oper-radar-api/insights.php'), /OPER_RADAR_ANO_MINIMO_FIPE \/\/ amostra e limites/);
+  assert.match(read('oper-radar-api/kpis.php'), /mercado_sql_ano_minimo\(OPER_RADAR_ANO_MINIMO_FIPE\)/);
+  assert.match(read('oper-radar-api/hoje_stats.php'), /'alto'\)|true, OPER_RADAR_ANO_MINIMO_FIPE\)/);
+});
