@@ -3,6 +3,14 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.3 — API 1.6 + frontend (beta e produção) — 24/09/2026 (PACOTE PRONTO e zips enviados; aguardando o comando)
+
+- Origem: commit `2258857` (PR #63). Codex adversarial `approve` (3 rodadas; achados corrigidos: regra de ano falha fechada, estatística do insight "abaixo da FIPE" e `kpis.php` legado também filtram o ano). Frontend 90/90, PHP 16/16, contratos Python 68/68, lint limpo.
+- **Regra nova (evidência da F0c, `docs/fipe-saneamento/f0c-comparabilidade.md`, 5.400 vínculos):** mediana do desvio vs FIPE de +77,8% para modelos até 2005 (N=265), +10,9% em 2006–2015 (N=1.795) e +1,0% de 2016 em diante (N=3.340). Modelos até 2005 (e ano desconhecido) saem dos desvios **agregados** da FIPE — Panorama do Mercado, desvio por revenda (Concorrência/Lojista), KPI da Análise, insight "abaixo da FIPE" e `kpis.php` legado (`OPER_RADAR_ANO_MINIMO_FIPE = 2006`); o comparativo anúncio a anúncio e o catálogo FIPE (`fipe_consulta.php`) não mudam. Textos de evidência avisam o usuário.
+- Conclusão da frente FIPE que motivou isto: a F3 mostrou que os vínculos das caudas estão **corretos** (ano e modelo batem em 235/236); a distorção vem de idade do modelo (e de carroceria/implemento, ainda a medir) e de preço errado no anúncio, não de re-vinculação. F4 de re-vinculação em massa **não se justifica**.
+- Pacote `Downloads\OperRadar-Release2.1` (mesma pasta liberada; conteúdo trocado): comando único API → beta → produção. Zips: API `oper-radar-api-release1.6-2258857.zip` `50a9dc0f43c8909a024742029f27a171deea24a94666999d8a7164f9d455d3fb` (8 PHP: `lib/market_quality.php`, `lib/concorrencia_metricas.php`, `mercado_painel.php`, `lojistas.php`, `lojista_detalhe.php`, `insights.php`, `hoje_stats.php`, `kpis.php`); beta `8f84495d8f2d70bf5532a4c6e6dbe793f3db383b71b342250de8a14719c84acc` (`index-mIs49Ozi.js`); produção `980261abd8e9bd05371034a8fe67259e8ffbc680ccd0791da76ecb9cff03bf7f` (`index-C7BeFFAy.js`). Pré-checagens: hashes publicados dos 7 PHP (Releases 1–2.2), `index.html` do beta `7e9bf446…` e da produção `e68b94e2…`; `kpis.php` sem hash registrado (só impresso e salvo no backup).
+- Reversão: API — copiar os 8 arquivos de `api-release1.6-*`; produção — restaurar `index.html` de `oper-radar-frontend-release2.3-*`.
+
 ## Release 2.2 — API 1.5 + frontend (beta e produção) — 24/09/2026 (PUBLICADO ~21h01 e conferido ao vivo; substitui o "2.1")
 
 - Origem: commit `bd54e85` (PR #63). Codex adversarial `approve` em todas as rodadas; frontend 88/88, PHP 16/16, contratos Python 68/68, lint limpo. Sem mudança de banco/cron/credencial.
