@@ -3,6 +3,13 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.4 — frontend (beta e produção): Minha Loja no layout da DEMO — 25/09/2026 (PACOTE PRONTO e zips enviados; aguardando o comando)
+
+- Origem: commit `f0e58ee` (PR #63). Só frontend: API, banco, cron e credenciais não mudam. Codex adversarial em 3 rodadas; achados corrigidos: corte de 5% com desvio exato (4,96% não vira "acima"), painel do veículo e painel regional só mostram mediana com amostra mínima (5), DEMO abre o veículo pelo id. CUSTODIA: bloqueou `0e3741a` por teste Python de contrato desatualizado (CI vermelho), corrigido e **aprovou `f0e58ee`** (CI Python 3.9/3.13 verde; app 106/106, lint 0, PHP 16/16, Python 68/68).
+- O que muda na Minha Loja: resumo de posição (acima do mercado, competitivos, sem comparação), alertas, cartão por veículo com preço próprio, mediana do **mercado nacional** (a API entrega só `mercado_escopo: Brasil`), desvio vs mediana e vs FIPE e a evidência de cada número; ordenação padrão "Posição no mercado". CRUD, status, exclusão e importação XML preservados. Regra em `app/src/minhaLojaModel.js`.
+- Pacote `Downloads\OperRadar-Release2.1` (mesma pasta liberada; conteúdo trocado): comando único beta → produção. Zips em `/home1/pro93061/backups/`: beta `83e8a0e88deccc6c2e7b6a7a847ab063c410ce17d6ffc57bb1338e0e81c3d31c` (`index.html` `03cecfb7…`, `index-BjEvlm97.js` `5d886de0…`); produção `5c7a25a15c8c09ca21c1a72c6fa8fef8ceda1acf54efaff6a571de9f1d8c2583` (`index.html` `780cd403…`, `index-kfmlcEva.js` `463aff9f…`). Pré-checagens: `index.html` do beta `009ad93c…` e da produção `83b6e805…` (Release 2.3).
+- Reversão: restaurar `index.html` de `oper-radar-frontend-release2.4-*`.
+
 ## Release 2.3 — API 1.6 + frontend (beta e produção) — 25/09/2026 (PUBLICADO ~10h12 e conferido ao vivo)
 
 - Origem: commit `974998f` (PR #63). Codex adversarial em 5 rodadas; achados corrigidos: regra de ano falha fechada, estatística do insight "abaixo da FIPE" e `kpis.php` legado, carroceria por texto misto, tipo não-caminhão e, na última, curinga de carroceria → **lista exata** (`CAVALO MECÂNICO`/`CAVALO MECANICO`/`CHASSIS`/`CHASSI`, `IN` no SQL, mesma constante no PHP). Limitação aceita: sem MySQL local, a paridade PHP × SQL é testada por texto/constante; conferir ao vivo após o deploy. Frontend 91/91, PHP 16/16, contratos Python 68/68, lint limpo.

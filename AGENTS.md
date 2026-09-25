@@ -31,7 +31,7 @@ Rode tudo, na raiz do worktree:
 
 ```text
 cd app && npm test && npm run lint && npm run build
-python -m unittest discover -s tests -p "test_*.py"      # 62 testes de contrato do CI (leem o texto do App.jsx)
+python -m unittest discover -s tests -p "test_*.py"      # 68 testes de contrato do CI (leem o texto do App.jsx)
 ```
 
 Testes PHP (`oper-radar-api/tests/*_test.php`): a máquina não tem PHP instalado. Use o zip oficial do
