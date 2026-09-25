@@ -11,7 +11,7 @@ verifica(mercado_motivo_preco(300000, 300000, 'Sem entrada aceita troca', 'R$ 30
 
 $registros = [];
 foreach ([100, 110, 120, 130, 140, 999] as $preco) {
-    $registros[] = ['preco' => $preco, 'preco_fipe' => null, 'titulo' => '', 'preco_texto_bruto' => ''];
+    $registros[] = ['preco' => $preco, 'preco_fipe' => null, 'titulo' => '', 'preco_texto_bruto' => '', 'ano' => 2020];
 }
 $stats = mercado_calcula_estatisticas($registros);
 verifica($stats['amostra_qualificada'] === 5, 'IQR remove extremo');
@@ -28,10 +28,10 @@ verifica(array_key_exists('desvio_mercado_pct', $semPreco) && $semPreco['desvio_
 // mercado_desvio_fipe_medio_pct: media percentual do desvio de preco vs. FIPE, so entre
 // registros validos (mesmo filtro do mercado_motivo_preco).
 verifica(mercado_desvio_fipe_medio_pct([]) === null, 'desvio fipe sem registros');
-$semFipe = [['preco' => 100000, 'preco_fipe' => 0, 'titulo' => '', 'preco_texto_bruto' => '']];
+$semFipe = [['preco' => 100000, 'preco_fipe' => 0, 'titulo' => '', 'preco_texto_bruto' => '', 'ano' => 2020]];
 verifica(mercado_desvio_fipe_medio_pct($semFipe) === null, 'desvio fipe ignora registro sem fipe');
-$reg = fn($preco) => ['preco' => $preco, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => ''];
-$extremo = ['preco' => 19900, 'preco_fipe' => 315000, 'titulo' => 'MB 1017', 'preco_texto_bruto' => 'R$ 19.900']; // rejeitado (extremo FIPE)
+$reg = fn($preco) => ['preco' => $preco, 'preco_fipe' => 100000, 'titulo' => '', 'preco_texto_bruto' => '', 'ano' => 2020];
+$extremo = ['preco' => 19900, 'preco_fipe' => 315000, 'titulo' => 'MB 1017', 'preco_texto_bruto' => 'R$ 19.900', 'ano' => 2020]; // rejeitado (extremo FIPE)
 
 // Abaixo da amostra minima (5 precos validos) o desvio nao e exibido: uma observacao nao representa o recorte.
 $poucos = [$reg(110000), $reg(90000), $extremo];
@@ -71,6 +71,8 @@ verifica(mercado_desvio_fipe_mediano_pct($misto) === 0.0, 'mediana so com modelo
 verifica(mercado_ano_comparavel_fipe(['ano' => 2005]) === false, 'ano 2005 nao comparavel');
 verifica(mercado_ano_comparavel_fipe(['ano' => 2006]) === true, 'ano 2006 comparavel');
 verifica(mercado_ano_comparavel_fipe(['ano' => null]) === false, 'ano desconhecido nao comparavel');
-verifica(mercado_ano_comparavel_fipe(['preco' => 1]) === true, 'sem a chave ano (consulta antiga) e comparavel');
+verifica(mercado_ano_comparavel_fipe(['preco' => 1]) === false, 'sem a chave ano falha fechado (nao comparavel)');
+verifica(mercado_sql_ano_minimo(null) === '', 'sql ano minimo desligado');
+verifica(mercado_sql_ano_minimo(2006) === ' AND COALESCE(a.ano_final,a.ano_inicial) >= 2006', 'sql ano minimo 2006');
 
 echo "market_quality_test=OK\n";

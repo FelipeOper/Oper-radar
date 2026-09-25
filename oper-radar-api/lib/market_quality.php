@@ -137,7 +137,7 @@ function mercado_sql_confianca_fipe(bool $apenasConfiancaAlta): string {
     return $apenasConfiancaAlta ? " AND a.fipe_match_confianca='alto'" : '';
 }
 
-function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds, bool $apenasConfiancaAlta = false): array {
+function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds, bool $apenasConfiancaAlta = false, ?int $anoMinimo = null): array {
     $ids = array_values(array_unique(array_filter(array_map('intval', $fipeIds), fn($id) => $id > 0)));
     if (!$ids) return [];
 
@@ -147,7 +147,7 @@ function mercado_estatisticas_por_fipe(mysqli $conn, array $fipeIds, bool $apena
                          FROM anuncio a
                          JOIN fipe_preco fp ON fp.id=a.fipe_preco_id
                          WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
-                           AND a.fipe_preco_id IN ($marcadores)" . mercado_sql_confianca_fipe($apenasConfiancaAlta));
+                           AND a.fipe_preco_id IN ($marcadores)" . mercado_sql_confianca_fipe($apenasConfiancaAlta) . mercado_sql_ano_minimo($anoMinimo));
     $tipos = str_repeat('i', count($ids));
     $st->bind_param($tipos, ...$ids);
     $st->execute();
@@ -207,11 +207,15 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
     }
 }
 
-/** O ano-modelo permite comparar com a FIPE? Registro sem a chave 'ano' (consulta antiga) e tratado como comparavel. */
+/** O ano-modelo permite comparar com a FIPE? Falha FECHADA: sem a chave 'ano', ano nulo ou <= 2005 nao e comparavel. */
 function mercado_ano_comparavel_fipe(array $registro): bool {
-    if (!array_key_exists('ano', $registro)) return true;
-    $ano = (int)$registro['ano'];
+    $ano = (int)($registro['ano'] ?? 0);
     return $ano >= OPER_RADAR_ANO_MINIMO_FIPE;
+}
+
+/** Trecho SQL que restringe estatisticas a anuncios de ano-modelo >= $anoMinimo (null = sem restricao). $anoMinimo e int do codigo. */
+function mercado_sql_ano_minimo(?int $anoMinimo): string {
+    return $anoMinimo === null ? '' : ' AND COALESCE(a.ano_final,a.ano_inicial) >= ' . (int)$anoMinimo;
 }
 
 /** Desvios percentuais (preco anunciado vs. FIPE) dos registros validos: mesmo filtro de mercado_motivo_preco. */

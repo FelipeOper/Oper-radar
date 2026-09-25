@@ -8,7 +8,7 @@ function confere(bool $ok, string $mensagem): void {
 $linhas = [];
 foreach ([-10, -5, 0, 5, 10] as $pct) {
     $linhas[] = ['preco' => 100000 * (1 + $pct / 100), 'preco_fipe' => 100000,
-        'titulo' => 'Caminhao', 'preco_texto_bruto' => '', 'fipe_match_status' => 'confirmado'];
+        'titulo' => 'Caminhao', 'preco_texto_bruto' => '', 'fipe_match_status' => 'confirmado', 'ano' => 2020];
 }
 $resultado = oper_concorrencia_desvio_fipe($linhas);
 confere($resultado['desvio_fipe_mediano_pct'] === 0.0, 'mediana dos desvios');
