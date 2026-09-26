@@ -82,6 +82,11 @@ Cada um ganha teste PHP em `oper-radar-api/tests/` no padrão atual (lógica pur
   Detalhes do modelo, com a lacuna de cobertura sinalizada.
 - **Alerta de oportunidade acionável**: cruzar "abaixo da FIPE" + "revenda que reduziu preço" + "tempo
   no ar alto" numa lista priorizada de compra, com evidência por linha.
+- **Anúncio ideal por região ("o que comprar")**: proposta em `ANUNCIO_IDEAL_POR_REGIAO.md` (modelo por praça + anúncios candidatos, pontuação explicável).
+- **Conferência de telas (CUSTODIA, 26/09/2026, `PARECER-CUSTODIA-CONFERENCIA-TELAS.md`)**: pendências a tratar antes de fechar o redesign: alvos de toque
+  mobile abaixo de 44 px (botão Evidência 32 px, ajuda "?" 18×18), números incoerentes nas fixtures da DEMO (64 vs −21 em 48 h e 30 d; 9 preços válidos
+  com "amostra insuficiente"), Hoje sem Analista IA / "Ver monitor" / "Ver todos", Mercado sem filtro de Marca. A baseline da TERRA usou o HTML estático da DEMO
+  em vez da renderizada (12 sinais em Hoje; Volvo FH 540 2021 = 22 anúncios): usar a renderizada como referência.
 - **Minha Loja com posição relativa**: percentil do seu preço dentro do grupo, não só "acima/abaixo da mediana".
 - **Comparador de revendas** (lado a lado, como o de modelos).
 - **Plano de ação ligado à evidência**: cada ação nasce de um insight e guarda a métrica de origem.
