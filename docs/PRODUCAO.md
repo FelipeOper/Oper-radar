@@ -3,6 +3,14 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.5 — frontend (beta e produção): Comparador no layout da DEMO + ajustes da Minha Loja — 26/09/2026 (PACOTE PRONTO e zips enviados; aguardando o comando)
+
+- Origem: commit `f08631a` (PR #63). Só frontend: API, banco, cron e credenciais não mudam. Codex adversarial: achados corrigidos (fixture da DEMO só cobria "marca+modelo+ano", resposta de escolha anterior podia sobrescrever a atual, FIPE incompatível contava como "poucos anúncios") e rodada final `approve`. app 118/118, lint 0, PHP 16/16, Python 68/68.
+- **Comparador** (`ComparadorBlocos.jsx`, regras em `comparadorModel.js`): mantém os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo), ano-modelo e janela de movimento; compara sozinho quando os dois lados estão completos; veredito ("A está X% acima/abaixo de B na mediana qualificada", confiança do veredito = a menor dos dois lados); métricas lado a lado; evidência por lado. `comparador.php` devolve a mediana mesmo com amostra pequena, então a tela impõe o mínimo de **5 preços válidos por lado**: abaixo disso mostra "Insuficiente"/"—" e não dá veredito. Volume, movimento e tempo observado aparecem sempre. Preço médio bruto deixou de ser exibido (a decisão é pela mediana).
+- **Minha Loja**: o alerta de "sem amostra" agora separa "sem vínculo com a FIPE" (sem ID, referência não encontrada ou vínculo incompatível) de "poucos anúncios equivalentes"; vendidos vão por último na ordenação por posição.
+- Zips em `/home1/pro93061/backups/` (`Downloads\OperRadar-Release2.1`, mesma pasta): beta `817316460b76ba817f1d1a02a8710318b0f97d70064d613404ff241c8bca5278` (`index.html` `a3541a4e…`, `index-B_JMUpu4.js` `f85dd563…`); produção `6f4e34ab50638e99db9ef621301c86d526e9c2086daefd1f0e55b84db9426042` (`index.html` `b1f8e21c…`, `index-XnIIfpsf.js` `b720b6ab…`). Pré-checagens: `index.html` do beta `03cecfb7…` e da produção `780cd403…` (Release 2.4).
+- Reversão: restaurar `index.html` de `oper-radar-frontend-release2.5-*`.
+
 ## Release 2.4 — frontend (beta e produção): Minha Loja no layout da DEMO — 25/09/2026 (PUBLICADO ~10h40 e conferido ao vivo)
 
 - Origem: commit `f0e58ee` (PR #63). Só frontend: API, banco, cron e credenciais não mudam. Codex adversarial em 3 rodadas; achados corrigidos: corte de 5% com desvio exato (4,96% não vira "acima"), painel do veículo e painel regional só mostram mediana com amostra mínima (5), DEMO abre o veículo pelo id. CUSTODIA: bloqueou `0e3741a` por teste Python de contrato desatualizado (CI vermelho), corrigido e **aprovou `f0e58ee`** (CI Python 3.9/3.13 verde; app 106/106, lint 0, PHP 16/16, Python 68/68).
