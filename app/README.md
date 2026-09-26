@@ -54,6 +54,7 @@ alterar o bundle do build normal (conferir com `cmp` do `dist` antes e depois). 
 ```text
 npm install
 npm test
+npm run lint
 npm run build
 ```
 
@@ -118,7 +119,7 @@ revendas ainda não coletadas aparecem separados e nunca são apresentados como 
 `desvioFipeExibivel` em `src/mercadoModel.js` só mostra o desvio **mediano** (`resumo.desvio_fipe_mediano_pct`; a média antiga
 não é fallback) com ao menos 5 preços válidos com FIPE (`resumo.desvio_fipe_amostra`); abaixo disso o KPI diz "Amostra insuf." e a evidência traz a
 amostra e a confiança reais (`desvio_fipe_confianca`). Servidor antigo, sem esses campos, não mostra
-número ("Sem amostra verificável"): publique a API 1.2 antes do frontend para o KPI aparecer. Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
+número ("Sem amostra verificável"): a API precisa fornecer esses campos para o KPI aparecer (contrato introduzido na API 1.2). Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
 helper `fmt*` usado sem definição (regressão do beta de 24/09/2026).
 
 ## Taxonomia (segmento Pesado)
@@ -130,7 +131,7 @@ lado, mude o outro. Testes em `tests/marketTaxonomy.test.js`.
 ## Ofertas de um modelo (Mercado)
 
 Com um modelo selecionado no painel (marca + modelo + ano no contexto), `PageMercado` envia `marca`, `modelo` e
-`ano_modelo` a `anuncios.php`, então "Ver N ofertas disponíveis" abre exatamente as N ofertas contadas.
+`ano_modelo` a `anuncios.php`, então "Ver N ofertas disponíveis" abre o mesmo recorte factual de modelo e ano do painel; filtros adicionais da lista podem reduzir a quantidade exibida.
 Teste de contrato: `tests/queryBackendContract.test.js`.
 Filtros próprios da lista (preço, revenda, carroceria, tração, fila FIPE) continuam somando ao recorte do modelo: a
 contagem do botão é a do modelo/ano no recorte geográfico do painel, e a lista mostra seus filtros ativos.

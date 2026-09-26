@@ -128,10 +128,12 @@ As regras puras ficam em `lib/concorrencia_metricas.php`, cobertas por
 
 ## Regras de confiança da FIPE (revisão adversarial de 24/09/2026)
 
-- `mercado_estatisticas_por_fipe($conn, $ids, $apenasConfiancaAlta = false)`: com `true`, a mediana e a
+- `mercado_estatisticas_por_fipe($conn, $fipeIds, $apenasConfiancaAlta = false, $anoMinimo = null, $semImplemento = false)`: com `true`, a mediana e a
   amostra contam só anúncios com `fipe_match_confianca='alto'`. O insight "abaixo da FIPE" de
   `hoje_stats.php` usa `true`, para a mediana obedecer ao mesmo critério dos candidatos. Os demais
-  chamadores mantêm o comportamento anterior (o filtro é opt-in via `mercado_sql_confianca_fipe`).
+  chamadores mantêm o comportamento anterior (o filtro é opt-in via `mercado_sql_confianca_fipe`). Os filtros de ano mínimo e de caminhão sem
+  implemento são opcionais (`$anoMinimo` e `$semImplemento`); os chamadores precisam ativá-los quando o
+  recorte exigir essas regras.
 - `mercado_desvio_fipe_medio_pct` devolve `null` com menos de 5 preços válidos
   (`OPER_RADAR_AMOSTRA_MINIMA`); `mercado_desvio_fipe_amostra` conta esses preços.
   `mercado_painel.php` expõe `resumo.desvio_fipe_amostra` e `resumo.desvio_fipe_confianca`.
