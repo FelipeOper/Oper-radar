@@ -1,7 +1,7 @@
 # "O que comprar": anúncio ideal por região (proposta)
 
 Ideia do Felipe (26/09/2026): a parte "o que comprar" (hoje a tela Oportunidades) deveria também indicar, para cada região,
-qual é o anúncio ideal. Este documento é a proposta técnica; nada foi implementado.
+qual é o anúncio ideal. Este documento é a proposta técnica; Decisão do Felipe (26/09/2026): opção (c), as duas camadas. Implementado na Release 2.6 (`oportunidades_compra.php`, `lib/oportunidade_compra.php`, `ComprarBlocos.jsx`); a Fase 1 sem backend foi pulada.
 
 ## Hoje
 - **Oportunidades** lista (a) anúncios observados há mais tempo e (b) anúncios abaixo da FIPE (`anuncios.php`, `ordem=desvio_fipe`),
@@ -43,6 +43,6 @@ negociação"; toda linha mostra evidência (amostra, confiança, base) e o avis
 - Frete/distância não estão no dado: a comparação é por região do anúncio, não por custo de trazer o veículo.
 
 ## Decisões pendentes do Felipe
-1. "Anúncio ideal por região" = (a) **qual modelo comprar em cada região** (demanda), (b) **qual anúncio comprar dentro de cada região**
+1. ~~"Anúncio ideal por região" =~~ **(c), decidido.** Opções originais: (a) **qual modelo comprar em cada região** (demanda), (b) **qual anúncio comprar dentro de cada região**
    (melhor candidato), ou (c) os dois em camadas, como proposto acima? Recomendação: (c).
 2. Perfil de quem compra: só revenda de caminhão seminovo do segmento Pesado (padrão) ou também implementos rodoviários?
