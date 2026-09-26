@@ -52,6 +52,13 @@ esquema de `xml_estoque.php` (`url_anuncio`), hoje sem `href` que o leia: fica p
 `VITE_DEMO=1 npm run build` gera um build com dados fictícios (`src/demoFixtures.js`) só para
 verificação visual; sem a variável o app usa a API real.
 
+Relógio da fixture: os dados nascem no instante fixo `today` (23/09/2026 12:00, Brasília). A cada resposta,
+`demoGet` desloca todo texto de data e hora (`AAAA-MM-DD HH:MM:SS`, ISO com `-03:00` e `DD/MM/AAAA HH:MM`) em horas
+inteiras até o relógio real, sem passar do "agora". Assim a pílula da coleta, o alerta de frescor (SC 41 h, SP 5 h,
+PR 5 h) e o feed concordam em qualquer dia. Datas só com dia (histórico de preço) ficam fixas. O deslocamento vive
+em funções (`demoDeslocamentoMs`, `demoDesloca`); não use `Date.now()` na carga do módulo, para não
+alterar o bundle do build normal (conferir com `cmp` do `dist` antes e depois). Teste: `tests/demoRelogio.test.js` (relógio injetado).
+
 ## Desenvolvimento
 
 ```text
@@ -86,6 +93,8 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Oportunidades abre com "O que comprar em cada região" (`src/ComprarBlocos.jsx`, textos em `src/comprarModel.js`, dados de `oportunidades_compra.php`):
   por UF, os modelos com melhor índice regional e os anúncios candidatos à negociação, cada um com selos (desvio vs mediana da UF e vs FIPE, preço caiu em
   30 dias, dias no radar) e "Por que esta nota" com os componentes e pesos efetivos. Linguagem de candidato, nunca "ideal"; sem base mostra o motivo.
+  No mobile (<= 760 px) as abas de UF, "Ver anúncio", "Criar ação", o botão de evidência e o resumo "Por que esta nota" têm altura >= 44 px (`--hit-min`),
+  em regras com escopo `.oc-compra` no fim de `src/theme.css` (o Comparador e o padrão global de alvos ficam para a T04); medidas em `docs/oper-radar-redesign/T02-oportunidades-mobile.md`.
 - Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com
   os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo) e ano-modelo, janela de
   movimento, comparação automática quando os dois lados estão completos, veredito e métricas lado a lado. A API
