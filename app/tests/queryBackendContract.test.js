@@ -151,6 +151,11 @@ test('oportunidades_compra.php restringe o SQL ao universo comparável, cacheia 
   assert.match(api, /mercado_sql_carroceria_comparavel\(\) \. mercado_sql_ano_minimo\(OPER_RADAR_ANO_MINIMO_FIPE\)/);
   assert.equal((api.match(/\. \$universo/g) || []).length, 3, 'anúncios, reduções e saídas usam o mesmo universo');
   assert.match(api, /time\(\) - \(int\)filemtime\(\$cacheArquivo\) < 600/);
+  assert.match(api, /'modelos_por_uf' => max\(1, min\(10,/);
+  assert.match(api, /'anuncios_por_modelo' => max\(1, min\(20,/);
+  assert.match(api, /\$opcoes\['modelos_por_uf'\] \. 'x' \. \$opcoes\['anuncios_por_modelo'\]/);
+  assert.doesNotMatch(api, /md5\(/);
+  assert.match(api, /compra_recorta_ufs\(/);
   const lib = read('oper-radar-api/lib/oportunidade_compra.php');
   assert.match(lib, /oper_compra_no_universo\(\$a\)/);
   assert.match(lib, /oper_compra_url_segura\(\$a\['url'\] \?\? null\)/);

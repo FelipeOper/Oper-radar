@@ -31,20 +31,32 @@ function compra_linhas(mysqli $conn, string $sql): array {
 }
 
 $ufs = painel_normaliza_ufs((string)($_GET['uf'] ?? ''), OPER_COMPRA_UF_REGIAO);
+// Limites canônicos ANTES de qualquer chave de cache: entradas extremas não geram arquivos nem consultas novas.
 $opcoes = [
-    'ufs' => $ufs,
-    'modelos_por_uf' => (int)($_GET['modelos_por_uf'] ?? 3),
-    'anuncios_por_modelo' => (int)($_GET['anuncios_por_modelo'] ?? 5),
+    'modelos_por_uf' => max(1, min(10, (int)($_GET['modelos_por_uf'] ?? 3))),
+    'anuncios_por_modelo' => max(1, min(20, (int)($_GET['anuncios_por_modelo'] ?? 5))),
 ];
 
-// Cache de 10 min no servidor (o dado é o mesmo para todos os usuários e a montagem varre o estoque inteiro).
-$cacheArquivo = rtrim(sys_get_temp_dir(), '/\\') . '/oper_radar_compra_' . md5(json_encode($opcoes)) . '.json';
+/** Recorta o resultado (calculado para TODAS as UFs) às UFs pedidas; o índice de cada UF não depende do filtro. */
+function compra_recorta_ufs(array $payload, array $ufs): array {
+    $payload['escopo']['ufs'] = $ufs;
+    if ($ufs) $payload['ufs'] = array_values(array_filter($payload['ufs'], fn($u) => in_array($u['uf'], $ufs, true)));
+    return $payload;
+}
+
+// Cache de 10 min no servidor (o dado é o mesmo para todos os usuários e a montagem varre o estoque inteiro). A chave só varia
+// com os dois limites canônicos (no máximo 200 arquivos); o filtro de UF é aplicado depois. Arquivos com mais de 1 h são removidos.
+$cacheBase = rtrim(sys_get_temp_dir(), '/\\') . '/oper_radar_compra_';
+$cacheArquivo = $cacheBase . $opcoes['modelos_por_uf'] . 'x' . $opcoes['anuncios_por_modelo'] . '.json';
 if (is_file($cacheArquivo) && time() - (int)filemtime($cacheArquivo) < 600) {
     $emCache = json_decode((string)@file_get_contents($cacheArquivo), true);
-    if (is_array($emCache) && isset($emCache['ufs'])) {
+    if (is_array($emCache) && isset($emCache['ufs'], $emCache['escopo'])) {
         $emCache['em_cache'] = true;
-        envia_json($emCache);
+        envia_json(compra_recorta_ufs($emCache, $ufs));
     }
+}
+foreach ((array)@glob($cacheBase . '*.json') as $antigo) {
+    if (is_file($antigo) && time() - (int)filemtime($antigo) > 3600) @unlink($antigo);
 }
 $conn = conecta();
 
@@ -101,7 +113,7 @@ try {
     }
     unset($a);
 
-    $ufsResultado = oper_compra_monta($anuncios, $saidasPorGrupoUf, $temEventos, $coberturaDias, $opcoes);
+    $ufsResultado = oper_compra_monta($anuncios, $saidasPorGrupoUf, $temEventos, $coberturaDias, $opcoes); // todas as UFs; o recorte vem depois
 } catch (Throwable $e) {
     error_log('oportunidades_compra: ' . $e->getMessage());
     http_response_code(500);
@@ -110,7 +122,7 @@ try {
 $conn->close();
 
 $payload = [
-    'escopo' => ['segmento' => 'Pesado (caminhões sem implemento, 2006 em diante)', 'ufs' => $ufs, 'modelos_por_uf' => $opcoes['modelos_por_uf'], 'anuncios_por_modelo' => $opcoes['anuncios_por_modelo']],
+    'escopo' => ['segmento' => 'Pesado (caminhões sem implemento, 2006 em diante)', 'ufs' => [], 'modelos_por_uf' => $opcoes['modelos_por_uf'], 'anuncios_por_modelo' => $opcoes['anuncios_por_modelo']],
     'ufs' => $ufsResultado,
     'pesos' => OPER_COMPRA_PESOS,
     'historico_eventos' => ['disponivel' => $temEventos, 'cobertura_dias' => $coberturaDias],
@@ -118,4 +130,4 @@ $payload = [
     'gerado_em' => date(DATE_ATOM),
 ];
 @file_put_contents($cacheArquivo, json_encode($payload, JSON_UNESCAPED_UNICODE), LOCK_EX);
-envia_json($payload);
+envia_json(compra_recorta_ufs($payload, $ufs));
