@@ -58,6 +58,9 @@ export function resumoLoja(itens) {
   };
 }
 
+/* Sem FIPE utilizável: sem ID, referência não encontrada ou vínculo incompatível (a API zera o preço FIPE nesses casos). */
+export const semReferenciaFipe = item => !item?.fipe_preco_id || ['sem_vinculo', 'incompativel', 'referencia_nao_encontrada'].includes(item?.fipe_vinculo_status);
+
 /* Evidência do cartão: de onde vem a mediana e por que pode não existir. */
 export function evidenciaItem(item, posicao = posicaoItem(item)) {
   const amostra = num(item.anuncios_comparaveis);
@@ -91,7 +94,7 @@ export function alertasLoja(resumo) {
       texto: `${resumo.acima.slice(0, 5).map(i => `${nomeVeiculo(i)} (${pct(posicaoItem(i).vsMediana)})`).join(' · ')}${resumo.acima.length > 5 ? ` e mais ${resumo.acima.length - 5}` : ''}. Vale revisar o preço ou destacar diferenciais; confira versão e condição antes de decidir.`,
     });
   }
-  const semFipe = resumo.insuf.filter(i => !i.fipe_preco_id);
+  const semFipe = resumo.insuf.filter(semReferenciaFipe);
   const poucos = resumo.insuf.length - semFipe.length;
   // Causas diferentes pedem ações diferentes: sem vínculo se resolve no cadastro; poucos anúncios só o mercado resolve.
   if (semFipe.length) {

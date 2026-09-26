@@ -97,3 +97,9 @@ test('alerta de sem amostra separa "sem vínculo FIPE" de "poucos anúncios equi
   const titulos = alertasLoja(resumoLoja(lista)).map(a => a.titulo);
   assert.deepEqual(titulos, ['2 sem vínculo com a FIPE', '1 com poucos anúncios equivalentes']);
 });
+
+test('vínculo FIPE incompatível ou não encontrado conta como sem referência, não como poucos anúncios', () => {
+  const lista = ['incompativel', 'referencia_nao_encontrada', 'sem_vinculo'].map((st, i) => item({ id: i + 1, fipe_preco_id: 90 + i, fipe_vinculo_status: st, mercado_amostra_suficiente: false }))
+    .concat(item({ id: 9, fipe_preco_id: 77, fipe_vinculo_status: 'compativel', mercado_amostra_suficiente: false }));
+  assert.deepEqual(alertasLoja(resumoLoja(lista)).map(a => a.titulo), ['3 sem vínculo com a FIPE', '1 com poucos anúncios equivalentes']);
+});

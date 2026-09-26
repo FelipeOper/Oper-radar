@@ -152,6 +152,7 @@ export function PageComparador({ contexto, onContexto }) {
   useEffect(() => {
     if (!prontos) { setResultado(null); setErro(''); setCarregando(false); return undefined; }
     const c = new AbortController();
+    let vigente = true; // o adaptador DEMO ignora o signal: resposta de uma escolha anterior nunca sobrescreve a atual
     const p = new URLSearchParams({ periodo });
     for (const [prefixo, lado] of [['a', ladoA], ['b', ladoB]]) {
       p.set(`${prefixo}_modo`, lado.modo);
@@ -161,9 +162,9 @@ export function PageComparador({ contexto, onContexto }) {
     }
     setCarregando(true); setErro(''); setResultado(null);
     apiGet(`comparador.php?${p}`, { ttlMs: 0, useCache: false, signal: c.signal })
-      .then(dados => { setResultado(dados); setCarregando(false); })
-      .catch(e => { if (e.name !== 'AbortError') { setErro(e.message); setCarregando(false); } });
-    return () => c.abort();
+      .then(dados => { if (vigente) { setResultado(dados); setCarregando(false); } })
+      .catch(e => { if (vigente && e.name !== 'AbortError') { setErro(e.message); setCarregando(false); } });
+    return () => { vigente = false; c.abort(); };
   }, [prontos, periodo, ladoA, ladoB]);
 
   const alteraPeriodo = valor => {

@@ -31,9 +31,21 @@ const facetasComparador = {
   periodos: [{ codigo: '7d', rotulo: '7 dias' }, { codigo: '30d', rotulo: '30 dias' }, { codigo: '90d', rotulo: '90 dias' }, { codigo: '180d', rotulo: '180 dias' }, { codigo: '12m', rotulo: '12 meses' }],
 };
 const PERFIL_COMPARADOR = { 'Volvo|FH 540|2021': [42, 38, 498000, 'alta'], 'Volvo|FH 540|2020': [14, 12, 455000, 'media'], 'Scania|R 450|2021': [36, 33, 471000, 'alta'], 'Scania|R 450|2020': [9, 6, 418000, 'baixa'], 'DAF|XF 530|2022': [3, 3, 536000, 'insuficiente'] };
+// Modos "marca inteira" e "modelo, qualquer marca" só enviam parte da chave: agrega os perfis que combinam com o que veio.
+function perfilComparador(marca, modelo, ano) {
+  const achados = Object.entries(PERFIL_COMPARADOR).filter(([chave]) => {
+    const [m, mod, a] = chave.split('|');
+    return (!marca || m === marca) && (!modelo || mod === modelo) && (!ano || a === String(ano));
+  }).map(([, perfil]) => perfil);
+  if (!achados.length) return [4, 2, 400000, 'insuficiente'];
+  const ordem = ['insuficiente', 'baixa', 'media', 'alta'];
+  const ativos = achados.reduce((t, p) => t + p[0], 0), validos = achados.reduce((t, p) => t + p[1], 0);
+  const mediana = Math.round(achados.reduce((t, p) => t + p[2] * p[1], 0) / Math.max(1, validos));
+  return [ativos, validos, mediana, achados.map(p => p[3]).sort((x, y) => ordem.indexOf(x) - ordem.indexOf(y))[0]];
+}
 function ladoComparador(params, prefixo, periodo) {
   const marca = params.get(`${prefixo}_marca`) || '', modelo = params.get(`${prefixo}_modelo`) || '', ano = params.get(`${prefixo}_ano`) || '';
-  const [ativos, validos, mediana, confianca] = PERFIL_COMPARADOR[`${marca}|${modelo}|${ano}`] || [4, 2, 400000, 'insuficiente'];
+  const [ativos, validos, mediana, confianca] = perfilComparador(marca, modelo, ano);
   return {
     seletor: { modo: params.get(`${prefixo}_modo`) || 'marca_modelo', marca, modelo, ano: Number(ano) },
     rotulo: [marca, modelo, ano].filter(Boolean).join(' · '),

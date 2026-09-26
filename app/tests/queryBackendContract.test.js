@@ -124,3 +124,9 @@ test('Comparador: tela nova usa o contrato de comparador.php e impõe o mínimo 
   assert.match(read('app/src/App.jsx'), /<PageComparador contexto=/);
   assert.doesNotMatch(read('app/src/ComparadorBlocos.jsx'), /precos\.media|Preço médio/, 'média bruta não entra no comparador');
 });
+
+test('DEMO do Comparador cobre os três modos de recorte e a tela ignora respostas de escolhas anteriores', () => {
+  assert.match(read('app/src/demoFixtures.js'), /function perfilComparador\(marca, modelo, ano\)/);
+  assert.match(read('app/src/ComparadorBlocos.jsx'), /let vigente = true;/);
+  assert.match(read('app/src/ComparadorBlocos.jsx'), /return \(\) => \{ vigente = false; c\.abort\(\); \};/);
+});
