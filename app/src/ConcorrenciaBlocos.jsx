@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, ChevronRight, ExternalLink, Search, X } from './icons.jsx';
 import { apiGet } from './apiClient.js';
 import { Evidencia } from './Evidencia.jsx';
+import { LinkExterno } from './LinkExterno.js';
 import { CATEGORIAS_MERCADO } from './marketTaxonomy.js';
 import { cidadesDisponiveis, contagemPorCategoria, contagemPorUf, filtraRevendas, leituraRevenda, linhasRevenda, panoramaConcorrencia } from './concorrenciaModel.js';
 
@@ -70,7 +71,7 @@ function PainelRevenda({ revenda, categoria = 'todas', onClose }) {
             <label className="oc-conc__sort">Ordenar por <select value={ordem} onChange={e => setOrdem(e.target.value)}><option value="idade">Mais antigos</option><option value="preco_asc">Menor preço</option><option value="preco_desc">Maior preço</option></select></label>
             <div className="oc-conc__rows">{estoque.slice(0, mostrarTodos ? 150 : 20).map(a => <div className="or-listrow or-listrow--static" key={a.anuncio_id}>
               <span className="or-listrow__body"><strong className="or-listrow__t">{a.titulo}</strong><span className="or-listrow__s">{brl(a.preco)} · {inteiro(a.dias_observados)} dias observados · {a.modelo}</span></span>
-              {a.url && <a href={a.url} target="_blank" rel="noreferrer" aria-label={`Ver ${a.titulo} no portal`}><ExternalLink size={16} /></a>}
+              <LinkExterno href={a.url} aria-label={`Ver ${a.titulo} no portal`}><ExternalLink size={16} /></LinkExterno>
             </div>)}</div>
             {estoque.length > 20 && <button type="button" className="or-btn or-btn--secondary" onClick={() => setMostrarTodos(v => !v)}>{mostrarTodos ? 'Mostrar menos' : `Mostrar até 150 (${inteiro(resumo.ativos)} no total)`}</button>}
             {resumo.ativos > estoque.length && <p className="or-card__sub">A API lista até 150 anúncios; o total acima considera todo o estoque.</p>}
@@ -79,12 +80,12 @@ function PainelRevenda({ revenda, categoria = 'todas', onClose }) {
             <div className="or-card__head"><div><h3 className="or-card__title">Saídas observadas</h3><p className="or-card__sub">{inteiro(resumo.saidas_observadas)} episódios no histórico · ausência confirmada, não venda. O preço exibido é o último preço publicado, não o valor de venda</p></div></div>
             <div className="oc-conc__rows">{(dados.saidas_observadas || []).map((a, i) => <div className="or-listrow or-listrow--static" key={`${a.evento_id || a.anuncio_id}-${i}`}>
               <span className="or-listrow__body"><strong className="or-listrow__t">{a.titulo}</strong><span className="or-listrow__s">{brl(a.preco_saida ?? a.preco)} · {inteiro(a.dias_observados)} dias até a saída{a.reapareceu ? ' · reapareceu' : ''}</span></span>
-              {a.url && <a href={a.url} target="_blank" rel="noreferrer" aria-label={`Ver ${a.titulo} no portal`}><ExternalLink size={16} /></a>}
+              <LinkExterno href={a.url} aria-label={`Ver ${a.titulo} no portal`}><ExternalLink size={16} /></LinkExterno>
             </div>)}</div>
             {!dados.saidas_observadas?.length && <p className="or-card__sub">Nenhuma saída observada neste histórico.</p>}
             {resumo.saidas_observadas > (dados.saidas_observadas?.length || 0) && <p className="or-card__sub">A API lista até 150 episódios; o total acima considera todo o histórico.</p>}
           </section>
-          {dados.lojista?.url_perfil && <a className="or-btn or-btn--secondary" href={dados.lojista.url_perfil} target="_blank" rel="noreferrer">Ver estoque no portal <ExternalLink size={14} /></a>}
+          <LinkExterno className="or-btn or-btn--secondary" href={dados.lojista?.url_perfil}>Ver estoque no portal <ExternalLink size={14} /></LinkExterno>
         </>}
       </div>
     </aside>

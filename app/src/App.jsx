@@ -43,6 +43,7 @@ import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
 import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
 import { DEMO_SESSION } from './demoFixtures.js';
+import { LinkExterno } from './LinkExterno.js';
 
 /* ============================================================
    OPER RADAR — design system "instrumento de precisão"
@@ -422,7 +423,7 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
                 <div style={{ fontFamily: T.fontDisplay, fontSize: 19, fontWeight: 650, marginTop: 10 }}>{a.titulo}</div>
                 <div style={{ color: T.inkMuted, fontSize: 12, marginTop: 5 }}><MapPin size={12} style={{ verticalAlign: -2 }} /> {a.revenda} · {a.cidade}/{a.uf}</div>
               </div>
-              {a.url && <a href={a.url} target="_blank" rel="noreferrer" style={{ ...inputStyle, color: T.signal, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}><ExternalLink size={14} /> Ver original</a>}
+              <LinkExterno href={a.url} style={{ ...inputStyle, color: T.signal, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}><ExternalLink size={14} /> Ver original</LinkExterno>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: 8, marginTop: 14 }}>
               {[
@@ -554,10 +555,10 @@ function PainelAnuncio({ anuncio, sessao, onClose, onAtualizado }) {
           <div>
             <SectionTitle sub="Ofertas ativas ligadas à mesma referência">Produtos comparáveis</SectionTitle>
             {dados.similares.length > 0 ? <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {dados.similares.map(item => <a key={item.id} href={item.url} target="_blank" rel="noreferrer" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, padding: 11, borderRadius: 9, border: `1px solid ${T.line}`, background: `var(--or-zebra-bg, ${T.surface})`, color: T.ink, textDecoration: 'none' }}>
+              {dados.similares.map(item => <LinkExterno key={item.id} href={item.url} semLink="div" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, padding: 11, borderRadius: 9, border: `1px solid ${T.line}`, background: `var(--or-zebra-bg, ${T.surface})`, color: T.ink, textDecoration: 'none' }}>
                 <span style={{ minWidth: 0 }}><strong style={{ display: 'block', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.titulo}</strong><small style={{ color: T.inkMuted }}>{item.revenda} · {item.cidade}/{item.uf}{item.quilometragem ? ` · ${item.quilometragem}` : ''}</small></span>
                 <span style={{ fontFamily: T.fontMono, fontSize: 12 }}>{fmtBRL(item.preco)}</span>
-              </a>)}
+              </LinkExterno>)}
             </div> : <div style={{ color: T.inkMuted, fontSize: 12 }}>Vincule uma referência FIPE para encontrar produtos realmente comparáveis.</div>}
           </div>
 
@@ -1602,7 +1603,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div style={{ fontFamily: T.fontMono, fontSize: 17, fontWeight: 600, color: a.preco ? T.ink : T.inkMuted }}>{fmtBRL(a.preco)}</div>
-                {a.url && <a href={a.url} onClick={e => e.stopPropagation()} target="_blank" rel="noreferrer" style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal"><ExternalLink size={15} /></a>}
+                <LinkExterno href={a.url} onClick={e => e.stopPropagation()} style={{ color: T.signal, display: 'flex' }} title="Abrir anúncio no portal"><ExternalLink size={15} /></LinkExterno>
               </div>
               <ComparativoAnuncio anuncio={a} />
             </Card>

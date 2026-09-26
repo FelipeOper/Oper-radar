@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Plus, Radar, Timer, TrendingDown } from './icons.jsx';
 import { Evidencia } from './Evidencia.jsx';
+import { LinkExterno } from './LinkExterno.js';
 import { formataItemFeed, linhasUfsSaidas, navegacaoDoInsight, resumoFrescor, rotuloQuando } from './hojeModel.js';
 
 /* Blocos da tela Hoje, montados com as classes do design system (or-card, or-alert,
@@ -79,7 +80,7 @@ export function FeedMovimento({ itens, renderDetalhe }) {
                 <small>{item.detalhe}</small>
               </span>
               <span className="oc-feed__quando">{rotuloQuando(item.quando)}</span>
-              {item.url && <a className="oc-feed__link" href={item.url} target="_blank" rel="noreferrer" aria-label={`Ver ${item.titulo} no portal`}><ExternalLink size={14} /></a>}
+              <LinkExterno className="oc-feed__link" href={item.url} aria-label={`Ver ${item.titulo} no portal`}><ExternalLink size={14} /></LinkExterno>
               {detalhe && (
                 <button type="button" className="oc-feed__abrir" aria-expanded={expandido} aria-label={`${expandido ? 'Ocultar' : 'Ver'} detalhes de ${item.titulo}`}
                   onClick={() => setAberto(expandido ? null : indice)}><Seta size={16} /></button>
