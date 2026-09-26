@@ -6,6 +6,7 @@ export const AMOSTRA_MINIMA = 5; // mesmo mínimo de preços válidos do backend
 export const CORTE_ACIMA_PCT = 5; // % acima da mediana a partir do qual o veículo é "Acima do mercado" (mesmo corte da DEMO)
 
 const num = valor => {
+  if (valor == null || valor === '') return null;
   const n = Number(valor);
   return Number.isFinite(n) ? n : null;
 };
@@ -90,11 +91,21 @@ export function alertasLoja(resumo) {
       texto: `${resumo.acima.slice(0, 5).map(i => `${nomeVeiculo(i)} (${pct(posicaoItem(i).vsMediana)})`).join(' · ')}${resumo.acima.length > 5 ? ` e mais ${resumo.acima.length - 5}` : ''}. Vale revisar o preço ou destacar diferenciais; confira versão e condição antes de decidir.`,
     });
   }
-  if (resumo.insuf.length) {
+  const semFipe = resumo.insuf.filter(i => !i.fipe_preco_id);
+  const poucos = resumo.insuf.length - semFipe.length;
+  // Causas diferentes pedem ações diferentes: sem vínculo se resolve no cadastro; poucos anúncios só o mercado resolve.
+  if (semFipe.length) {
     lista.push({
       tom: 'info',
-      titulo: `${resumo.insuf.length} sem amostra suficiente`,
-      texto: 'Abaixo de 5 preços válidos não há comparação com o mercado; a FIPE segue como referência de tabela quando existe.',
+      titulo: `${semFipe.length} sem vínculo com a FIPE`,
+      texto: 'Sem a referência FIPE vinculada não há comparação com o mercado. Abra o cadastro do veículo e escolha a versão correta para comparar.',
+    });
+  }
+  if (poucos > 0) {
+    lista.push({
+      tom: 'info',
+      titulo: `${poucos} com poucos anúncios equivalentes`,
+      texto: `A FIPE está vinculada, mas há menos de ${AMOSTRA_MINIMA} preços válidos do mesmo veículo no mercado. Não comparo abaixo disso; a FIPE segue como referência de tabela.`,
     });
   }
   return lista;

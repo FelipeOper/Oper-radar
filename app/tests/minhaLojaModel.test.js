@@ -85,3 +85,15 @@ test('corte de 5% usa o desvio exato: 4,96% continua competitivo mesmo exibindo 
   assert.equal(posicaoItem(item({ preco_mediana_mercado: 100000, preco_anunciado: 105000 })).status, 'acima');
   assert.equal(posicaoItem(item({ preco_mediana_mercado: 100000, preco_anunciado: 104999 })).status, 'comp');
 });
+
+test('vendidos vão por último na ordenação por posição', () => {
+  const lista = [item({ id: 1, status: 'vendido', preco_anunciado: 900000 }), item({ id: 2, preco_anunciado: 480000 }), item({ id: 3, mercado_amostra_suficiente: false })];
+  assert.deepEqual(filtraOrdenaEstoque(lista, '', 'todos', 'posicao').map(i => i.id), [2, 3, 1]);
+});
+
+test('alerta de sem amostra separa "sem vínculo FIPE" de "poucos anúncios equivalentes"', () => {
+  const lista = [item({ id: 1, fipe_preco_id: null, mercado_amostra_suficiente: false }), item({ id: 2, fipe_preco_id: null, mercado_amostra_suficiente: false }),
+    item({ id: 3, fipe_preco_id: 77, mercado_amostra_suficiente: false })];
+  const titulos = alertasLoja(resumoLoja(lista)).map(a => a.titulo);
+  assert.deepEqual(titulos, ['2 sem vínculo com a FIPE', '1 com poucos anúncios equivalentes']);
+});

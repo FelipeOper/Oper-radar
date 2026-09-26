@@ -73,6 +73,11 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Tempo no Radar é apresentado como tempo observado, nunca como data garantida de publicação.
 - Mercado equivalente usa mediana e faixa central somente com pelo menos cinco ofertas
   qualificadas; amostras menores são identificadas como insuficientes.
+- Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com
+  os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo) e ano-modelo, janela de
+  movimento, comparação automática quando os dois lados estão completos, veredito e métricas lado a lado. A API
+  devolve a mediana mesmo com amostra pequena; a tela impõe o mínimo de 5 preços válidos por lado: abaixo disso
+  não mostra valor de preço nem veredito ("Insuficiente"). Volume, movimento e tempo observado aparecem sempre.
 - Minha Loja possui busca, filtro, ordenação, salvamento otimista com reversão em erro e
   ação de desfazer a última mudança de status. No layout da DEMO: resumo de posição (acima do
   mercado, competitivos, sem comparação), alertas e um cartão por veículo com preço próprio,

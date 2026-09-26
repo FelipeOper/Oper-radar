@@ -7,7 +7,7 @@ import {
   ShieldCheck, Store, LogOut, UserRound, LockKeyhole,
   Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
-  Pencil, History, Undo2, Ruler, Check, Scale, ArrowLeft, ChevronRight,
+  Pencil, History, Undo2, Ruler, Check, ArrowLeft, ChevronRight,
   SlidersHorizontal, BarChart3
 } from './icons.jsx';
 import {
@@ -35,6 +35,7 @@ import { evidenciaKpis } from './hojeModel.js';
 import { OportunidadeRegional } from './MercadoBlocos.jsx';
 import { PageConcorrencia } from './ConcorrenciaBlocos.jsx';
 import { ResumoLoja, CartaoVeiculo } from './MinhaLojaBlocos.jsx';
+import { PageComparador } from './ComparadorBlocos.jsx';
 import { resumoLoja, AMOSTRA_MINIMA as AMOSTRA_MINIMA_LOJA } from './minhaLojaModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
@@ -807,184 +808,6 @@ function PageHoje({ kpis, anuncios, usandoReais, layout: layoutInput, onPersonal
    MERCADO — busca paginada no servidor (todos os 7k+ anuncios)
    ============================================================ */
 const PAGINA = 60;
-
-const MODOS_COMPARADOR = [
-  ['marca', 'Marca inteira'],
-  ['modelo', 'Modelo, qualquer marca'],
-  ['marca_modelo', 'Marca + modelo'],
-];
-
-function seletorComparadorValido(lado) {
-  if (!lado.ano) return false;
-  if (lado.modo === 'marca') return Boolean(lado.marca);
-  if (lado.modo === 'modelo') return Boolean(lado.modelo);
-  return Boolean(lado.marca && lado.modelo);
-}
-
-function rotuloModeloComparador(modelo, marca) {
-  const prefixo = `${marca || ''} `.trimStart();
-  return prefixo && modelo.startsWith(prefixo) ? modelo.slice(prefixo.length) : modelo;
-}
-
-function SeletorComparador({ titulo, lado, onChange, facetas }) {
-  let modelos = (facetas?.modelos || []).filter(item => lado.modo !== 'marca_modelo' || !lado.marca || item.marca === lado.marca);
-  if (lado.modo === 'modelo') {
-    const agrupados = new Map();
-    modelos.forEach(item => {
-      const atual = agrupados.get(item.modelo) || { modelo: item.modelo, anuncios: 0, marcas: new Set() };
-      atual.anuncios += Number(item.anuncios || 0); atual.marcas.add(item.marca); agrupados.set(item.modelo, atual);
-    });
-    modelos = [...agrupados.values()].map(item => ({ ...item, marca: [...item.marcas].join('/') }));
-  }
-  const anosAgrupados = new Map();
-  (facetas?.anos || []).filter(item => {
-    if (lado.modo === 'marca') return lado.marca && item.marca === lado.marca;
-    if (lado.modo === 'modelo') return lado.modelo && item.modelo === lado.modelo;
-    return lado.marca && lado.modelo && item.marca === lado.marca && item.modelo === lado.modelo;
-  }).forEach(item => anosAgrupados.set(Number(item.ano), (anosAgrupados.get(Number(item.ano)) || 0) + Number(item.anuncios || 0)));
-  const anos = [...anosAgrupados.entries()].sort((a, b) => b[0] - a[0]);
-  const recortePronto = lado.modo === 'marca' ? Boolean(lado.marca) : lado.modo === 'modelo' ? Boolean(lado.modelo) : Boolean(lado.marca && lado.modelo);
-  const alteraModo = modo => onChange({ modo, marca: '', modelo: '', ano: '' });
-  return <Card style={{ padding: 16 }}>
-    <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 650, marginBottom: 12 }}>{titulo}</div>
-    <div role="radiogroup" aria-label={`Escopo ${titulo}`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-      {MODOS_COMPARADOR.map(([id, label]) => <button key={id} role="radio" aria-checked={lado.modo === id} onClick={() => alteraModo(id)} style={{
-        ...inputStyle, cursor: 'pointer', padding: '7px 9px', fontSize: 11,
-        borderColor: lado.modo === id ? T.signal : T.line,
-        color: lado.modo === id ? T.signal : T.inkMuted,
-        background: lado.modo === id ? `${T.signal}12` : T.surface,
-      }}>{label}</button>)}
-    </div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 8 }}>
-      {lado.modo !== 'modelo' && <select aria-label={`Marca ${titulo}`} value={lado.marca} onChange={e => onChange({ ...lado, marca: e.target.value, modelo: lado.modo === 'marca_modelo' ? '' : lado.modelo, ano: '' })} style={{ ...inputStyle, width: '100%' }}>
-        <option value="">Selecione a marca</option>
-        {(facetas?.marcas || []).map(item => <option key={item.marca} value={item.marca}>{item.marca} · {fmtN(item.anuncios)}</option>)}
-      </select>}
-      {lado.modo !== 'marca' && <select aria-label={`Modelo ${titulo}`} value={lado.modelo} disabled={lado.modo === 'marca_modelo' && !lado.marca} onChange={e => onChange({ ...lado, modelo: e.target.value, ano: '' })} style={{ ...inputStyle, width: '100%' }}>
-        <option value="">{lado.modo === 'marca_modelo' && !lado.marca ? 'Escolha a marca primeiro' : 'Selecione o modelo'}</option>
-        {modelos.map(item => <option key={`${item.marca}-${item.modelo}`} value={item.modelo}>{rotuloModeloComparador(item.modelo, lado.modo === 'modelo' ? item.marca.split('/')[0] : item.marca)}{lado.modo === 'modelo' ? ` · ${item.marca}` : ''} · {fmtN(item.anuncios)}</option>)}
-      </select>}
-      <select aria-label={`Ano-modelo ${titulo}`} value={lado.ano} disabled={!recortePronto} onChange={e => onChange({ ...lado, ano: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
-        <option value="">{recortePronto ? 'Selecione o ano-modelo' : 'Defina o recorte primeiro'}</option>
-        {anos.map(([ano, anuncios]) => <option key={ano} value={ano}>{ano} · {fmtN(anuncios)} anúncios</option>)}
-      </select>
-    </div>
-  </Card>;
-}
-
-function PainelComparado({ lado, destaque }) {
-  const m = lado.metricas;
-  const p = m.precos;
-  const janela = m.periodo?.rotulo || '30 dias';
-  return <Card style={{ padding: 18, borderTop: `3px solid ${destaque}` }}>
-    <div style={{ fontFamily: T.fontMono, fontSize: 10, color: destaque, letterSpacing: '0.06em' }}>RECORTE</div>
-    <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 20, margin: '5px 0 15px' }}>{lado.rotulo}</div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-      {[
-        ['Anúncios ativos', fmtN(m.ativos)],
-        ['Revendas', fmtN(m.revendas)],
-        ['Preço mediano', fmtBRL(p.mediana)],
-        ['Preço médio', fmtBRL(p.media)],
-        [`Entradas ${janela}`, fmtN(m.entradas_periodo ?? m.entradas_30d)],
-        [`Saídas ${janela}`, fmtN(m.saidas_periodo ?? m.saidas_30d)],
-        ['Média observada', m.dias_observados_media == null ? '—' : `${m.dias_observados_media.toLocaleString('pt-BR')} dias`],
-        ['Estados', fmtN(m.ufs)],
-      ].map(([label, value]) => <div key={label} style={{ padding: 10, background: T.surface2, borderRadius: 9 }}>
-        <div style={{ color: T.inkMuted, fontSize: 10.5 }}>{label}</div>
-        <strong style={{ display: 'block', fontFamily: T.fontMono, fontSize: 13, marginTop: 4 }}>{value}</strong>
-      </div>)}
-    </div>
-    <div style={{ marginTop: 12, fontSize: 11, color: T.inkMuted }}>
-      {fmtN(p.amostra_qualificada)} preços qualificados · confiança {p.confianca} · faixa central {fmtBRL(p.p25)}–{fmtBRL(p.p75)}
-      {p.excluidos > 0 ? ` · ${fmtN(p.excluidos)} valores excluídos por qualidade` : ''}
-    </div>
-    {m.top_modelos?.length > 1 && <div style={{ marginTop: 14 }}>
-      <div style={rotuloFiltroStyle}>MODELOS DENTRO DO RECORTE</div>
-      <div style={{ marginTop: 7, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {m.top_modelos.slice(0, 5).map(item => <div key={item.modelo} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}><span>{item.modelo}</span><span style={{ fontFamily: T.fontMono, color: T.inkMuted }}>{fmtN(item.anuncios)}</span></div>)}
-      </div>
-    </div>}
-  </Card>;
-}
-
-function PageComparador({ contexto, onContexto }) {
-  const { data: facetas, erro: erroFacetas } = useApi('comparador.php?facetas=1');
-  const [periodo, setPeriodo] = useState(contexto?.periodo || '30d');
-  const [ladoA, setLadoA] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
-  const [ladoB, setLadoB] = useState({ modo: 'marca_modelo', marca: '', modelo: '', ano: '' });
-  const [resultado, setResultado] = useState(null);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState('');
-
-  useEffect(() => setPeriodo(contexto?.periodo || '30d'), [contexto?.periodo]);
-
-  const alteraPeriodo = valor => {
-    setPeriodo(valor);
-    setResultado(null);
-    onContexto?.({ ...contexto, periodo: valor }, { replace: true, preserveScroll: true });
-  };
-
-  const comparar = async () => {
-    if (!seletorComparadorValido(ladoA) || !seletorComparadorValido(ladoB)) {
-      setErro('Complete os dois lados da comparação, incluindo o ano-modelo.'); return;
-    }
-    const p = new URLSearchParams();
-    p.set('periodo', periodo);
-    for (const [prefixo, lado] of [['a', ladoA], ['b', ladoB]]) {
-      p.set(`${prefixo}_modo`, lado.modo);
-      if (lado.marca) p.set(`${prefixo}_marca`, lado.marca);
-      if (lado.modelo) p.set(`${prefixo}_modelo`, lado.modelo);
-      p.set(`${prefixo}_ano`, lado.ano);
-    }
-    setCarregando(true); setErro('');
-    try {
-      const dados = await apiGet(`comparador.php?${p}`, { ttlMs: 0, useCache: false });
-      setResultado(dados);
-    } catch (e) { setErro(e.message); }
-    finally { setCarregando(false); }
-  };
-
-  const pct = valor => valor == null ? 'amostra indisponível' : `${valor > 0 ? '+' : ''}${valor.toLocaleString('pt-BR')}%`;
-  return <div>
-    <Card style={{ padding: 16, marginBottom: 14, borderLeft: `3px solid ${T.signal}` }}>
-      <strong style={{ display: 'block', fontFamily: T.fontDisplay }}>Compare dois recortes reais do mercado de caminhões</strong>
-      <span style={{ display: 'block', color: T.inkMuted, fontSize: 12, marginTop: 4 }}>Cada lado combina marca, modelo ou marca + modelo com seu próprio ano-modelo, evitando misturar gerações e faixas de preço diferentes.</span>
-      <label style={{ display: 'block', marginTop: 12, maxWidth: 220 }}>
-        <span style={rotuloFiltroStyle}>JANELA DE MOVIMENTO</span>
-        <select aria-label="Janela de movimento" value={periodo} onChange={e => alteraPeriodo(e.target.value)} style={{ ...inputStyle, width: '100%', marginTop: 5 }}>
-          {(facetas?.periodos || [
-            { codigo: '7d', rotulo: '7 dias' }, { codigo: '30d', rotulo: '30 dias' },
-            { codigo: '90d', rotulo: '90 dias' }, { codigo: '180d', rotulo: '180 dias' },
-            { codigo: '12m', rotulo: '12 meses' },
-          ]).map(item => <option key={item.codigo} value={item.codigo}>{item.rotulo}</option>)}
-        </select>
-      </label>
-    </Card>
-    {erroFacetas && <EmptyState icon={Scale} titulo="Catálogo indisponível" texto="Não foi possível carregar marcas e modelos para comparação." />}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', gap: 12 }}>
-      <SeletorComparador titulo="Lado A" lado={ladoA} onChange={setLadoA} facetas={facetas} />
-      <SeletorComparador titulo="Lado B" lado={ladoB} onChange={setLadoB} facetas={facetas} />
-    </div>
-    <div style={{ display: 'flex', justifyContent: 'center', margin: '14px 0' }}>
-      <button onClick={comparar} disabled={carregando || !facetas} style={{ ...inputStyle, minWidth: 210, cursor: carregando ? 'wait' : 'pointer', background: T.signal, color: T.signalInk, border: 'none', fontWeight: 700 }}>
-        {carregando ? 'Calculando…' : 'Comparar mercados'}
-      </button>
-    </div>
-    {erro && <div role="alert" style={{ color: T.alert, fontSize: 12.5, textAlign: 'center', marginBottom: 12 }}>{erro}</div>}
-    {resultado && <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', gap: 12 }}>
-        <PainelComparado lado={resultado.lado_a} destaque={T.signal} />
-        <PainelComparado lado={resultado.lado_b} destaque={T.steel} />
-      </div>
-      <SectionTitle sub="Lado A em relação ao lado B">Diferenças principais</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
-        <Kpi label="Preço mediano" value={pct(resultado.diferencas.preco_mediano_pct)} sub={`${resultado.lado_a.rotulo} vs ${resultado.lado_b.rotulo}`} />
-        <Kpi label="Oferta ativa" value={pct(resultado.diferencas.estoque_pct)} sub="diferença de volume anunciado" />
-        <Kpi label="Tempo observado" value={pct(resultado.diferencas.dias_observados_pct)} sub="diferença da média observada" />
-      </div>
-    </>}
-  </div>;
-}
 
 const PERIODO_ROTULOS = { '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', '90d': 'Últimos 90 dias', '180d': 'Últimos 180 dias', '12m': 'Últimos 12 meses' };
 

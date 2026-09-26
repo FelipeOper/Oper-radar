@@ -949,3 +949,21 @@ select {
 .oc-loja__dados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .oc-loja__dado { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .oc-loja__preco { font: var(--type-kpi); }
+
+/* Comparador: seletores dos dois lados, tabela lado a lado e diferenças de movimento. */
+.oc-cmp { display: flex; flex-direction: column; gap: 16px; }
+.oc-cmp__lados { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.oc-cmp__lado { display: flex; flex-direction: column; gap: 12px; }
+.oc-cmp__modos { display: flex; flex-wrap: wrap; gap: 6px; }
+.oc-cmp__modo { min-height: 34px; padding: 0 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.oc-cmp__modo.is-on { border-color: var(--accent); color: var(--text-accent); background: var(--accent-soft); }
+.oc-cmp__campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+.oc-cmp__select { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-primary); font: inherit; }
+.oc-cmp__resultado { display: flex; flex-direction: column; gap: 14px; }
+.oc-cmp__tabela { display: flex; flex-direction: column; gap: 0; padding: 4px 16px; }
+.oc-cmp__linha { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--border-subtle); align-items: baseline; overflow-wrap: anywhere; }
+.oc-cmp__linha--cab { border-top: 0; }
+.oc-cmp__rotulo { color: var(--text-secondary); font-size: var(--fs-sm, 13px); }
+.oc-cmp__difs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.oc-cmp__evidencias { display: flex; flex-wrap: wrap; gap: 16px; }
+@media (max-width: 560px) { .oc-cmp__linha { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .oc-cmp__linha > .oc-cmp__rotulo { grid-column: 1 / -1; } .oc-cmp__linha--cab > .oc-cmp__rotulo { display: none; } }

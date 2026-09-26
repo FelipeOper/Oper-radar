@@ -113,3 +113,14 @@ test('painel regional da Minha Loja não mostra mediana abaixo da amostra mínim
 test('DEMO: detalhe da Minha Loja devolve o veículo pedido pelo id, não sempre o primeiro', () => {
   assert.match(read('app/src/demoFixtures.js'), /estoque\.find\(i => String\(i\.id\) === String\(params\.get\('id'\)\)\)/);
 });
+
+test('Comparador: tela nova usa o contrato de comparador.php e impõe o mínimo de amostra no front', () => {
+  const api = read('oper-radar-api/comparador.php') + read('oper-radar-api/lib/market_comparator.php');
+  for (const campo of ['lado_a', 'lado_b', 'metricas', 'amostra_qualificada', 'entradas_periodo', 'saidas_periodo', 'dias_observados_media', 'estoque_pct', 'dias_observados_pct']) {
+    assert.match(api, new RegExp(campo), `${campo} deve existir no contrato de comparador.php`);
+  }
+  assert.match(read('app/src/comparadorModel.js'), /AMOSTRA_MINIMA = 5;/);
+  assert.match(read('oper-radar-api/lib/market_quality.php'), /OPER_RADAR_AMOSTRA_MINIMA = 5;/);
+  assert.match(read('app/src/App.jsx'), /<PageComparador contexto=/);
+  assert.doesNotMatch(read('app/src/ComparadorBlocos.jsx'), /precos\.media|Preço médio/, 'média bruta não entra no comparador');
+});

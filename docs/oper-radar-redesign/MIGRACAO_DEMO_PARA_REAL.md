@@ -89,7 +89,7 @@ Cada um ganha teste PHP em `oper-radar-api/tests/` no padrão atual (lógica pur
 ## Ordem de execução das telas
 
 1. ~~Shell (Fase B)~~ — feito.
-2. ~~Hoje~~ (feita) → ~~Mercado~~ (feito) → ~~Concorrência/Lojista~~ (feita) → ~~Minha Loja~~ (feita) → Comparador → Inteligência/Oportunidades
+2. ~~Hoje~~ (feita) → ~~Mercado~~ (feito) → ~~Concorrência/Lojista~~ (feita) → ~~Minha Loja~~ (feita) → ~~Comparador~~ (feito) → Inteligência/Oportunidades
    → Plano de ação → Dados e FIPE → Anúncio/Veículo → Configurações/Conta.
 
 Cada tela: portar visual, ligar ao dado real, testes, verificação no navegador (build `VITE_DEMO=1`
