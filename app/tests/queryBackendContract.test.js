@@ -156,6 +156,7 @@ test('oportunidades_compra.php restringe o SQL ao universo comparável, cacheia 
   assert.match(api, /\$opcoes\['modelos_por_uf'\] \. 'x' \. \$opcoes\['anuncios_por_modelo'\]/);
   assert.doesNotMatch(api, /md5\(/);
   assert.match(api, /compra_recorta_ufs\(/);
+  assert.ok(api.indexOf('@glob($cacheBase') > 0 && api.indexOf('@glob($cacheBase') < api.indexOf('is_file($cacheArquivo)'), 'limpeza de cache antes da leitura (cache hit retorna cedo)');
   const lib = read('oper-radar-api/lib/oportunidade_compra.php');
   assert.match(lib, /oper_compra_no_universo\(\$a\)/);
   assert.match(lib, /oper_compra_url_segura\(\$a\['url'\] \?\? null\)/);

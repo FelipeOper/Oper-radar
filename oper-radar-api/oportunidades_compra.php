@@ -48,15 +48,16 @@ function compra_recorta_ufs(array $payload, array $ufs): array {
 // com os dois limites canônicos (no máximo 200 arquivos); o filtro de UF é aplicado depois. Arquivos com mais de 1 h são removidos.
 $cacheBase = rtrim(sys_get_temp_dir(), '/\\') . '/oper_radar_compra_';
 $cacheArquivo = $cacheBase . $opcoes['modelos_por_uf'] . 'x' . $opcoes['anuncios_por_modelo'] . '.json';
+// Limpeza ANTES da leitura do cache: um cache hit retorna cedo e não pode deixar arquivos velhos para trás.
+foreach ((array)@glob($cacheBase . '*.json') as $antigo) {
+    if ($antigo !== $cacheArquivo && is_file($antigo) && time() - (int)filemtime($antigo) > 3600) @unlink($antigo);
+}
 if (is_file($cacheArquivo) && time() - (int)filemtime($cacheArquivo) < 600) {
     $emCache = json_decode((string)@file_get_contents($cacheArquivo), true);
     if (is_array($emCache) && isset($emCache['ufs'], $emCache['escopo'])) {
         $emCache['em_cache'] = true;
         envia_json(compra_recorta_ufs($emCache, $ufs));
     }
-}
-foreach ((array)@glob($cacheBase . '*.json') as $antigo) {
-    if (is_file($antigo) && time() - (int)filemtime($antigo) > 3600) @unlink($antigo);
 }
 $conn = conecta();
 
