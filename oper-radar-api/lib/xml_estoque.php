@@ -94,6 +94,32 @@ function xml_estoque_status(string $valor): string {
     return 'estoque';
 }
 
+/** Tamanho da coluna meu_estoque.url_anuncio / imagem_url. */
+const XML_ESTOQUE_URL_MAX = 500;
+
+/**
+ * Allowlist de link vindo do XML do lojista: so http e https, com host, sem credencial embutida, sem espaco nem
+ * caractere de controle e ate XML_ESTOQUE_URL_MAX caracteres (acima disso descarta; truncar geraria outro link).
+ * FILTER_VALIDATE_URL sozinho aceita javascript://host/..., file:///..., ftp:// e mailto:, entao ele so entra como
+ * segunda checagem, depois do esquema. Devolve o valor aparado como veio (sem normalizar nem prefixar esquema)
+ * ou null. Nao busca a URL em lugar nenhum: seguro para exibir como texto nao significa destino confiavel.
+ */
+function xml_estoque_url_http($valor): ?string {
+    if (!is_string($valor)) return null;
+    $valor = trim($valor, " \t\r\n");
+    if ($valor === '' || strlen($valor) > XML_ESTOQUE_URL_MAX) return null;
+    if (preg_match('/[\x00-\x20\x7f]/', $valor) === 1) return null;
+    if (preg_match('#^https?://#i', $valor) !== 1) return null;
+    if (filter_var($valor, FILTER_VALIDATE_URL) === false) return null;
+    $partes = parse_url($valor);
+    if (!is_array($partes)) return null;
+    $esquema = strtolower((string)($partes['scheme'] ?? ''));
+    if ($esquema !== 'http' && $esquema !== 'https') return null;
+    if (trim((string)($partes['host'] ?? '')) === '') return null;
+    if (array_key_exists('user', $partes) || array_key_exists('pass', $partes)) return null; // inclui user/pass vazios (https://:@host)
+    return $valor;
+}
+
 function xml_estoque_registro(SimpleXMLElement $no, int $indice): ?array {
     $c = xml_estoque_achata($no);
     $marca = xml_estoque_campo($c, ['marca', 'fabricante', 'make', 'brand']);

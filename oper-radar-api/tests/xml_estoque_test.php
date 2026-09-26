@@ -27,4 +27,41 @@ confirma_xml($itemPlacaA['origem_chave'] === $itemPlacaB['origem_chave'], 'mesma
 $placaAntiga = xml_estoque_registro(simplexml_load_string('<veiculo><placa>GHI1234</placa><modelo>FH 540</modelo></veiculo>'), 4);
 confirma_xml($placaAntiga['placa'] === 'GHI1234', 'placa antiga também é aceita');
 
+// T21: allowlist http/https para url_anuncio e imagem_url (xml_estoque_url_http).
+// URLs aceitas: devolve o valor aparado, sem normalizar (HTTP:// continua HTTP://).
+$urlsBoas = [
+    'https://a.com/x?y=1' => 'https://a.com/x?y=1',
+    'HTTP://a.com/x' => 'HTTP://a.com/x',
+    'HtTpS://a.com/x' => 'HtTpS://a.com/x',
+    '  https://a.com/x  ' => 'https://a.com/x',
+    "\thttps://a.com/x\n" => 'https://a.com/x',
+    'https://a.com:8080/x#y' => 'https://a.com:8080/x#y',
+    'https://a.com/javascript://x' => 'https://a.com/javascript://x', // esquema só vale no começo
+];
+foreach ($urlsBoas as $entrada => $esperada) {
+    confirma_xml(xml_estoque_url_http($entrada) === $esperada, 'URL http/https aceita: ' . json_encode($entrada));
+}
+$limite = XML_ESTOQUE_URL_MAX;
+$urlNoLimite = 'https://a.com/' . str_repeat('a', $limite - strlen('https://a.com/'));
+confirma_xml(strlen($urlNoLimite) === $limite && xml_estoque_url_http($urlNoLimite) === $urlNoLimite, 'URL com exatamente 500 caracteres é aceita');
+
+// URLs rejeitadas: esquemas perigosos ou não permitidos, relativas, credencial, controle e tamanho.
+$urlsRuins = [
+    'javascript://x.com/%0Aalert(1)', 'JaVaScRiPt://x.com/a', ' javascript://x.com/a',
+    'data:text/html,x', 'data:image/png;base64,AAA', 'vbscript:x',
+    'file:///etc/passwd', 'ftp://a.com/x', 'mailto:a@b.co',
+    '//a.com', '/relativo', 'www.a.com/x', 'a.com/x', 'https:x.com', 'https:/a.com', 'https://', 'http://',
+    'https://u:p@a.com/x', 'https://u@a.com/x', 'https://:@a.com/x', 'https://:p@a.com/x',
+    'https://a.com/x y', "https://a.com/x\ty", "https://a.com/x\ny", "https://a.com/x\ry",
+    "https://a.com/x\0y", "https://a.com/x\x7fy", "https://a.com/\0", "\0https://a.com/x", "https://a.com/x\x0b",
+    'https://a.com/' . str_repeat('a', $limite), // 514 caracteres: descarta, não trunca
+    '', '   ', 'texto qualquer',
+];
+foreach ($urlsRuins as $entrada) {
+    confirma_xml(xml_estoque_url_http($entrada) === null, 'URL rejeitada: ' . json_encode($entrada));
+}
+foreach ([null, 123, 1.5, true, [], ['https://a.com/x']] as $naoTexto) {
+    confirma_xml(xml_estoque_url_http($naoTexto) === null, 'valor que não é texto é rejeitado: ' . json_encode($naoTexto));
+}
+
 echo "xml_estoque_test=OK\n";
