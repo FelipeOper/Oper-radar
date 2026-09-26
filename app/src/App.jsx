@@ -37,6 +37,7 @@ import { PageConcorrencia } from './ConcorrenciaBlocos.jsx';
 import { ResumoLoja, CartaoVeiculo } from './MinhaLojaBlocos.jsx';
 import { PageComparador } from './ComparadorBlocos.jsx';
 import { ComprarPorRegiao } from './ComprarBlocos.jsx';
+import { novaAcaoLocal, textoAvaliarObservado, textoValidarFipe } from './acoesModel.js';
 import { resumoLoja, AMOSTRA_MINIMA as AMOSTRA_MINIMA_LOJA } from './minhaLojaModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
@@ -1668,7 +1669,7 @@ function PageOportunidades({ onCriarAcao }) {
                 <ComparativoAnuncio anuncio={a} compacto />
               </div>
               <Tag tone="alerta">OBSERVADO HÁ {a.dias} DIAS</Tag>
-              <button onClick={() => onCriarAcao(`Avaliar: ${a.titulo} (${a.revenda}, observado há ${a.dias}d)`)}
+              <button onClick={() => onCriarAcao(textoAvaliarObservado(a))}
                 style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
                 <Plus size={13} /> Criar ação
               </button>
@@ -1700,7 +1701,7 @@ function PageOportunidades({ onCriarAcao }) {
               <Tag tone={a.fipeConfianca === 'alto' ? 'positivo' : 'alerta'}>
                 MATCH {a.fipeConfianca?.toUpperCase() || '—'}
               </Tag>
-              <button onClick={() => onCriarAcao(`Validar oportunidade FIPE: ${a.titulo} (${a.revenda})`)}
+              <button onClick={() => onCriarAcao(textoValidarFipe(a))}
                 style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
                 <Plus size={13} /> Criar ação
               </button>
@@ -2957,7 +2958,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   }, [pagina]);
 
   const adicionarAcao = async (texto, origem = 'oportunidade') => {
-    const local = { id: `local-${Date.now()}`, texto, feita: false, origem, criadaEm: new Date().toISOString() };
+    const local = novaAcaoLocal(texto, origem);
     setAcoes(prev => [local, ...prev]);
     return local;
   };
