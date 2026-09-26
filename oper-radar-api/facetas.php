@@ -37,9 +37,9 @@ if (isset($MERCADO_TIPOS[$mercado])) {
 
 $categoriaAtributos = $_GET['categoria'] ?? 'todas';
 $condicaoCategoriaAtributos = '';
-if ($categoriaAtributos !== 'todas' && isset($CATEGORIA_TIPOS[$categoriaAtributos])) {
-    $tiposSeguros = array_map(fn($tipo) => "'" . $conn->real_escape_string($tipo) . "'", $CATEGORIA_TIPOS[$categoriaAtributos]);
-    $condicaoCategoriaAtributos = ' AND a.tipo IN (' . implode(',', $tiposSeguros) . ')';
+if ($categoriaAtributos !== 'todas' && ($filtroCategoriaAtributos = oper_taxonomia_filtro_categoria((string)$categoriaAtributos))) {
+    $tiposSeguros = array_map(fn($tipo) => "'" . $conn->real_escape_string($tipo) . "'", $filtroCategoriaAtributos['tipos']);
+    $condicaoCategoriaAtributos = ' AND ' . oper_taxonomia_sql_categoria('a.tipo', $filtroCategoriaAtributos, implode(',', $tiposSeguros));
 }
 
 // Contagem por tipo (uma consulta), depois soma nas categorias
@@ -59,6 +59,11 @@ foreach ($CATEGORIA_TIPOS as $cat => $tipos) {
 // Tipos que existem no banco mas nao estao mapeados caem em 'outros'
 $totalGeral = array_sum($porTipo);
 $categorias['outros'] += max(0, $totalGeral - $somaConhecida);
+// Anuncio sem tipo tambem e 'outros' (mesma regra do filtro de categoria e da contagem por UF).
+$semTipo = $conn->query("SELECT COUNT(*) n FROM anuncio$whereStatus AND tipo IS NULL")->fetch_assoc();
+$semTipo = (int)($semTipo['n'] ?? 0);
+$categorias['outros'] += $semTipo;
+$totalGeral += $semTipo; // o total exibido tem que bater com a soma das categorias
 
 // Subtipos por categoria (pro dropdown de subtipo respeitar a categoria escolhida)
 $subtipos = [];

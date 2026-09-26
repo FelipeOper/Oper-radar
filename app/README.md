@@ -1,11 +1,46 @@
 # OPER RADAR — frontend
 
+## Concorrência
+
+`PageConcorrencia` em `src/ConcorrenciaBlocos.jsx` usa `lojistas.php` para filtrar revendas
+por múltiplas UFs, cidade (só dentro das UFs escolhidas), segmento de atuação (revenda com ao menos
+um anúncio ativo da categoria, via `mix_categorias`), nome e indicador. Com segmento escolhido, o
+estoque exibido e a ordenação "maior estoque" usam os ativos da categoria; saídas e reduções seguem
+contando todo o estoque da revenda (a API não as separa) e a evidência avisa isso. O painel do lojista
+recebe o mesmo segmento (`lojista_detalhe.php?categoria=`). Com segmento escolhido, a linha da revenda
+não mostra idade média nem desvio FIPE (a lista traz só o total) e a ordenação por idade fica
+desabilitada; esses valores por segmento aparecem no painel do lojista. O painel do lojista usa `lojista_detalhe.php` e mostra
+estoque, saídas observadas, reduções, idade e desvio mediano vs FIPE com evidência.
+`src/concorrenciaModel.js` mantém as regras de ordenação e de dados indisponíveis, com testes
+em `tests/concorrenciaModel.test.js`. Em servidor antigo, redução ausente aparece como
+indisponível e desvio sem amostra como insuficiente. O modo `VITE_DEMO=1` tem fixtures apenas
+para conferência visual; o build normal consulta a API real.
+
 Aplicação React/Vite publicada em `agenciaoper.com.br/oper-radar/` e conectada à API PHP
 em `agenciaoper.com.br/oper-radar-api/`.
 
 O Mercado abre no universo principal de caminhões e implementos rodoviários; os demais
 segmentos ficam na aba "Outros mercados". A página Comparador cruza dois recortes de
 caminhões por marca, modelo ou marca + modelo usando métricas calculadas no servidor.
+
+## Identidade visual (design system)
+
+O app usa o design system em `../design-system/` como única identidade: `src/main.jsx` importa
+`design-system/styles.css` (tokens, fontes Inter/Manjari, ícones Phosphor, classes `.or-*`) e
+`src/theme.js` espelha os tokens semânticos em dois temas, `dark` (padrão) e `light`. Preferências
+salvas antes da troca migram sozinhas (`radar` → `dark`, `white` → `light`). O `Card` do app usa a
+classe `.oc-card` para não colidir com `.or-card` do design system. A casca do app (menu lateral, topbar, barra
+inferior no celular) está em `src/Shell.jsx`, com as classes `.or-sidebar`/`.or-topbar`/`.or-bottomnav`; a troca
+entre desktop e celular é por CSS (899px), sem largura em JS. Os ícones vêm de `src/icons.jsx`, um adaptador
+para a fonte Phosphor do design system (o `lucide-react` foi removido). A migração tela a tela está em
+`../docs/oper-radar-redesign/MIGRACAO_DEMO_PARA_REAL.md`.
+
+O Mercado usa `src/mercadoModel.js` (evidência e leitura da oportunidade regional) e `src/MercadoBlocos.jsx`.
+A tela Hoje usa `src/HojeBlocos.jsx`, `src/Evidencia.jsx` e `src/hojeModel.js` (regras puras, com
+testes). No modo demo, `localStorage['oper-demo-api-antiga']='1'` simula um servidor sem os campos novos.
+
+`VITE_DEMO=1 npm run build` gera um build com dados fictícios (`src/demoFixtures.js`) só para
+verificação visual; sem a variável o app usa a API real.
 
 ## Desenvolvimento
 
@@ -38,8 +73,23 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Tempo no Radar é apresentado como tempo observado, nunca como data garantida de publicação.
 - Mercado equivalente usa mediana e faixa central somente com pelo menos cinco ofertas
   qualificadas; amostras menores são identificadas como insuficientes.
+- Oportunidades abre com "O que comprar em cada região" (`src/ComprarBlocos.jsx`, textos em `src/comprarModel.js`, dados de `oportunidades_compra.php`):
+  por UF, os modelos com melhor índice regional e os anúncios candidatos à negociação, cada um com selos (desvio vs mediana da UF e vs FIPE, preço caiu em
+  30 dias, dias no radar) e "Por que esta nota" com os componentes e pesos efetivos. Linguagem de candidato, nunca "ideal"; sem base mostra o motivo.
+- Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com
+  os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo) e ano-modelo, janela de
+  movimento, comparação automática quando os dois lados estão completos, veredito e métricas lado a lado. A API
+  devolve a mediana mesmo com amostra pequena; a tela impõe o mínimo de 5 preços válidos por lado: abaixo disso
+  não mostra valor de preço nem veredito ("Insuficiente"). Volume, movimento e tempo observado aparecem sempre.
 - Minha Loja possui busca, filtro, ordenação, salvamento otimista com reversão em erro e
-  ação de desfazer a última mudança de status.
+  ação de desfazer a última mudança de status. No layout da DEMO: resumo de posição (acima do
+  mercado, competitivos, sem comparação), alertas e um cartão por veículo com preço próprio,
+  mediana do mercado nacional, desvio vs mediana e vs FIPE, e a evidência de cada número. Regra
+  em `src/minhaLojaModel.js`: "acima do mercado" = preço 5% ou mais acima da mediana qualificada;
+  sem 5 preços válidos vira "amostra insuficiente" (sem número inventado); veículo fora da base
+  comparativa e vínculo FIPE incompatível não geram desvio. Ordenação padrão "Posição no mercado".
+  Base atual da API: Brasil (`mercado_escopo`); a DEMO usa Paraná com queda para Brasil, então a
+  tela rotula "Mercado nacional" e não promete recorte por UF.
 
 As regras puras ficam em `src/domainRules.js`, `src/dataState.js` e `src/navigation.js`, com
 testes independentes na pasta `tests/`.
@@ -53,3 +103,38 @@ valide a API correspondente. O conteúdo deve ser enviado para
 
 O KPI de estoque mostra anúncios ativos revalidados no ciclo atual. Registros herdados de
 revendas ainda não coletadas aparecem separados e nunca são apresentados como atuais.
+
+## Desvio da FIPE no Panorama do Mercado
+
+`desvioFipeExibivel` em `src/mercadoModel.js` só mostra o desvio **mediano** (`resumo.desvio_fipe_mediano_pct`; a média antiga
+não é fallback) com ao menos 5 preços válidos com FIPE (`resumo.desvio_fipe_amostra`); abaixo disso o KPI diz "Amostra insuf." e a evidência traz a
+amostra e a confiança reais (`desvio_fipe_confianca`). Servidor antigo, sem esses campos, não mostra
+número ("Sem amostra verificável"): publique a API 1.2 antes do frontend para o KPI aparecer. Testes em `tests/mercadoModel.test.js`; `tests/helpersDefinidos.test.js` barra
+helper `fmt*` usado sem definição (regressão do beta de 24/09/2026).
+
+## Taxonomia (segmento Pesado)
+
+`src/marketTaxonomy.js` espelha `oper-radar-api/lib/market_taxonomy.php`. O mercado principal é só caminhão +
+implemento rodoviário (`Carreta` incluída); implemento agrícola e o restante ficam em "Outros". Ao mudar um
+lado, mude o outro. Testes em `tests/marketTaxonomy.test.js`.
+
+## Ofertas de um modelo (Mercado)
+
+Com um modelo selecionado no painel (marca + modelo + ano no contexto), `PageMercado` envia `marca`, `modelo` e
+`ano_modelo` a `anuncios.php`, então "Ver N ofertas disponíveis" abre exatamente as N ofertas contadas.
+Teste de contrato: `tests/queryBackendContract.test.js`.
+Filtros próprios da lista (preço, revenda, carroceria, tração, fila FIPE) continuam somando ao recorte do modelo: a
+contagem do botão é a do modelo/ano no recorte geográfico do painel, e a lista mostra seus filtros ativos.
+
+## Auditoria visual contra a DEMO
+
+`docs/oper-radar-redesign/AUDITORIA_BETA_VS_DEMO.md` registra, tela a tela, as divergências entre o app e a DEMO aprovada
+(corrigidas, decisões e telas ainda não portadas). Cartões de indicador seguem `or-stat` do design system (ícone, legenda,
+evidência); na Concorrência, o número de cada chip de UF vem de `contagemPorUf` (segmento e busca atuais) e o texto das
+linhas de `linhasRevenda`, ambos em `src/concorrenciaModel.js` com testes.
+
+Desvio da FIPE só considera modelos a partir de 2006 (`OPER_RADAR_ANO_MINIMO_FIPE` na API; F0c: mediana +77,8% até 2005): os textos de evidência
+do Mercado e da Concorrência dizem isso ao usuário (`tests/queryBackendContract.test.js`).
+
+O desvio da FIPE também só considera cavalo, chassi ou carroceria não informada (F0d: com implemento o preço inclui o equipamento e o desvio desloca para cima);
+os textos de evidência dizem isso ao usuário (`tests/queryBackendContract.test.js`).

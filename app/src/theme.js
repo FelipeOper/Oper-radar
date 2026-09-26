@@ -2,104 +2,93 @@ import { DEFAULT_DASHBOARD_LAYOUT, normalizeDashboardLayout } from './dashboardL
 
 const STORAGE_KEY = 'oper-radar-ui-preferences-v1';
 
+/* Identidade unica: design system Oper Radar (design-system/tokens/colors.css).
+   Os valores abaixo espelham os tokens semanticos do design system; o app le
+   `T.*` em runtime e as classes `.or-*` de theme.css leem `--or-*`.
+   - dark  = "cockpit" (padrao do design system)
+   - light = tema claro do design system
+   No tema claro o verde radar (#46F84B) nao tem contraste como texto sobre branco;
+   `signal` usa radar-800 (#007A22), o mesmo que o design system usa em --text-accent. */
 export const THEMES = {
-  radar: {
-    id: 'radar',
-    label: 'Tema Radar',
-    description: 'A identidade técnica original do Oper Radar.',
-    mode: 'dark',
-    tokens: {
-      bg: '#0B0E13',
-      surface: '#141922',
-      surface2: '#1B212C',
-      surface3: '#242C39',
-      ink: '#EDEFF3',
-      inkMuted: '#8A94A6',
-      signal: '#F5A623',
-      signalInk: '#14171C',
-      positive: '#3DD68C',
-      alert: '#FF6B4A',
-      steel: '#5B8AA6',
-      line: 'rgba(255,255,255,0.07)',
-      lineStrong: 'rgba(255,255,255,0.16)',
-      overlay: 'rgba(0,0,0,0.48)',
-      nav: 'rgba(11,14,19,0.94)',
-      shadow: '0 20px 60px rgba(0,0,0,0.45)',
-    },
-  },
   dark: {
     id: 'dark',
-    label: 'Dark',
-    description: 'Escuro neutro, discreto e corporativo.',
+    label: 'Escuro',
+    description: 'Cockpit escuro do Oper Radar. É o padrão.',
     mode: 'dark',
     tokens: {
-      bg: '#101114',
-      surface: '#191C21',
-      surface2: '#22262D',
-      surface3: '#2A3039',
-      ink: '#F4F6F8',
-      inkMuted: '#9CA6B3',
-      signal: '#7FA8C9',
-      signalInk: '#0C1822',
-      positive: '#48C78E',
-      alert: '#FF765F',
-      steel: '#7FA8C9',
-      line: 'rgba(255,255,255,0.08)',
-      lineStrong: 'rgba(255,255,255,0.18)',
-      overlay: 'rgba(0,0,0,0.52)',
-      nav: 'rgba(16,17,20,0.95)',
-      shadow: '0 20px 60px rgba(0,0,0,0.42)',
+      bg: '#0A0A0A',
+      surface: '#141414',
+      surface2: '#1A1A1A',
+      surface3: '#262626',
+      ink: '#FFFFFF',
+      inkMuted: '#A3A3A3',
+      signal: '#46F84B',
+      signalInk: '#0A0A0A',
+      positive: '#46F84B',
+      alert: '#FF6B6B',
+      warning: '#FF9A2E',
+      steel: '#5AA9FF',
+      line: 'rgba(255,255,255,0.10)',
+      lineStrong: 'rgba(255,255,255,0.22)',
+      overlay: 'rgba(0,0,0,0.64)',
+      nav: 'rgba(10,10,10,0.94)',
+      shadow: '0 20px 60px rgba(0,0,0,0.55)',
     },
   },
-  white: {
-    id: 'white',
-    label: 'White Clean',
-    description: 'Claro, limpo e confortável para uso diurno.',
+  light: {
+    id: 'light',
+    label: 'Claro',
+    description: 'Claro e limpo para uso diurno.',
     mode: 'light',
     tokens: {
-      bg: '#F4F6F8',
+      bg: '#F2F2F2',
       surface: '#FFFFFF',
-      surface2: '#EEF1F5',
-      surface3: '#E4E9EF',
-      ink: '#101828',
-      inkMuted: '#667085',
-      signal: '#2563EB',
+      surface2: '#F2F2F2',
+      surface3: '#ECECEC',
+      ink: '#0F0F0F',
+      inkMuted: '#555555',
+      signal: '#007A22',
       signalInk: '#FFFFFF',
-      positive: '#087A55',
-      alert: '#C53B2C',
-      steel: '#466B85',
-      line: 'rgba(16,24,40,0.10)',
-      lineStrong: 'rgba(16,24,40,0.20)',
-      overlay: 'rgba(16,24,40,0.34)',
+      positive: '#007A22',
+      alert: '#C62828',
+      warning: '#B35C00',
+      steel: '#1F6FD1',
+      line: 'rgba(15,15,15,0.10)',
+      lineStrong: 'rgba(15,15,15,0.24)',
+      overlay: 'rgba(15,15,15,0.40)',
       nav: 'rgba(255,255,255,0.94)',
-      shadow: '0 20px 60px rgba(16,24,40,0.16)',
+      shadow: '0 20px 60px rgba(15,15,15,0.16)',
     },
   },
 };
 
-export const COMING_THEMES = [
-  { id: 'silver', label: 'Silver', colors: ['#E8EDF1', '#F8FAFC', '#5B8AA6'] },
-  { id: 'future', label: 'Future', colors: ['#07111F', '#0C1B2E', '#38BDF8'] },
-  { id: 'neon', label: 'Neon', colors: ['#05080C', '#0D141B', '#00E5C4'] },
-];
+/* Preferencias salvas antes do design system usavam radar/dark/white. */
+const LEGACY_THEME_IDS = { radar: 'dark', white: 'light' };
+
+export function migrateThemeId(themeId) {
+  if (themeId === 'auto' || THEMES[themeId]) return themeId;
+  return LEGACY_THEME_IDS[themeId] || null;
+}
 
 export const DEFAULT_UI_PREFERENCES = {
-  theme: 'radar',
+  theme: 'dark',
   density: 'standard',
   reduceMotion: false,
   dashboardHoje: DEFAULT_DASHBOARD_LAYOUT,
 };
 
+/* Manjari so em titulos de pagina; Inter no restante (design-system/tokens/typography.css).
+   O design system nao usa fonte mono: numeros usam Inter com algarismos tabulares. */
 const FONT_TOKENS = {
-  fontDisplay: "'Noto Sans', sans-serif",
-  fontBody: "'Noto Sans', sans-serif",
-  fontMono: "'JetBrains Mono', monospace",
+  fontDisplay: "'Manjari', 'Inter', system-ui, sans-serif",
+  fontBody: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  fontMono: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
 };
 
-let activeTheme = THEMES.radar;
+let activeTheme = THEMES.dark;
 
 export const T = {};
-Object.keys({ ...THEMES.radar.tokens, ...FONT_TOKENS }).forEach(key => {
+Object.keys({ ...THEMES.dark.tokens, ...FONT_TOKENS }).forEach(key => {
   Object.defineProperty(T, key, {
     enumerable: true,
     get: () => activeTheme.tokens[key] ?? FONT_TOKENS[key],
@@ -113,7 +102,7 @@ export function loadUiPreferences() {
     return {
       ...DEFAULT_UI_PREFERENCES,
       ...stored,
-      theme: stored.theme === 'auto' || THEMES[stored.theme] ? stored.theme : DEFAULT_UI_PREFERENCES.theme,
+      theme: migrateThemeId(stored.theme) || DEFAULT_UI_PREFERENCES.theme,
       dashboardHoje: normalizeDashboardLayout(stored.dashboardHoje),
     };
   } catch {
@@ -129,12 +118,13 @@ export function saveUiPreferences(preferences) {
 }
 
 export function resolveTheme(themePreference, systemDark = true) {
-  if (themePreference === 'auto') return systemDark ? 'dark' : 'white';
-  return THEMES[themePreference] ? themePreference : DEFAULT_UI_PREFERENCES.theme;
+  if (themePreference === 'auto') return systemDark ? 'dark' : 'light';
+  const migrated = migrateThemeId(themePreference);
+  return migrated && migrated !== 'auto' ? migrated : DEFAULT_UI_PREFERENCES.theme;
 }
 
 export function activateTheme(themeId) {
-  activeTheme = THEMES[themeId] || THEMES.radar;
+  activeTheme = THEMES[migrateThemeId(themeId)] || THEMES.dark;
   return activeTheme;
 }
 

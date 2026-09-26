@@ -6,8 +6,10 @@
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_quality.php';
+require_once __DIR__ . '/lib/market_scope.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
 require_once __DIR__ . '/lib/query_contract.php';
+require_once __DIR__ . '/lib/regional_modelo.php';
 
 $conn = conecta();
 $periodo = oper_periodo_contrato($_GET['periodo'] ?? null);
@@ -79,26 +81,34 @@ function painel_resumo_grupo(array $grupo, int $saidas, array $periodo): array {
     ];
 }
 
-$categorias = oper_taxonomia_tipos_por_categoria();
 $mercados = oper_taxonomia_tipos_por_mercado();
 $segmento = (string)($_GET['segmento'] ?? 'todas');
-$tipos = $segmento !== 'todas' && isset($categorias[$segmento])
-    ? $categorias[$segmento]
-    : $mercados['principal'];
+$filtroSegmento = $segmento !== 'todas' ? oper_taxonomia_filtro_categoria($segmento) : null;
+$tipos = $filtroSegmento ? $filtroSegmento['tipos'] : $mercados['principal'];
 
-$baseWhere = ['a.tipo IN (' . painel_placeholders($tipos) . ')'];
+$baseWhere = [$filtroSegmento
+    ? oper_taxonomia_sql_categoria('a.tipo', $filtroSegmento, painel_placeholders($tipos))
+    : 'a.tipo IN (' . painel_placeholders($tipos) . ')'];
 $baseParams = array_values($tipos);
 $baseTypes = str_repeat('s', count($tipos));
 
 $regiao = trim((string)($_GET['regiao'] ?? 'todas'));
-$uf = strtoupper(trim((string)($_GET['uf'] ?? 'todas')));
+// Multisseleção de UF (item 3/redesign): aceita "uf=PR,SC" (várias) ou "uf=PR" (uma só,
+// compatível com o formato anterior). "ufs" no retorno é a lista real; "uf" continua sendo a
+// primeira UF (ou 'todas') só para não quebrar quem já lia esse campo como string única
+// (ex.: o drill-down de cidade, que só faz sentido com exatamente uma UF selecionada).
+$ufParametro = (string)($_GET['uf'] ?? 'todas');
+$ufsSelecionadas = painel_normaliza_ufs($ufParametro, $UF_REGIAO);
 $cidade = trim((string)($_GET['cidade'] ?? 'todas'));
 $scopeWhere = $baseWhere;
 $scopeParams = $baseParams;
 $scopeTypes = $baseTypes;
-if ($uf !== 'TODAS' && isset($UF_REGIAO[$uf])) {
-    $scopeWhere[] = 'r.uf=?'; $scopeParams[] = $uf; $scopeTypes .= 's';
-    $regiao = $UF_REGIAO[$uf];
+if ($ufsSelecionadas) {
+    $scopeWhere[] = 'r.uf IN (' . painel_placeholders($ufsSelecionadas) . ')';
+    foreach ($ufsSelecionadas as $sigla) { $scopeParams[] = $sigla; $scopeTypes .= 's'; }
+    $regiao = painel_regiao_unica($ufsSelecionadas, $UF_REGIAO);
+    $uf = $ufsSelecionadas[0];
+    if (count($ufsSelecionadas) > 1) $cidade = 'todas'; // drill-down de cidade exige UF única
 } elseif ($regiao !== 'todas' && isset($REGIOES[$regiao])) {
     $scopeWhere[] = 'r.uf IN (' . painel_placeholders($REGIOES[$regiao]) . ')';
     foreach ($REGIOES[$regiao] as $sigla) { $scopeParams[] = $sigla; $scopeTypes .= 's'; }
@@ -114,17 +124,32 @@ if ($cidade !== '' && strtolower($cidade) !== 'todas') {
 $scopeSql = implode(' AND ', $scopeWhere);
 
 $ativos = painel_rows($conn, "SELECT a.preco, a.preco_texto_bruto, a.titulo, f.preco preco_fipe,
-        r.id revenda_id, r.uf, r.cidade
+        COALESCE(a.ano_final,a.ano_inicial) ano, a.carroceria, a.tipo, r.id revenda_id, r.uf, r.cidade
     FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
     LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE a.status='ativo' AND $scopeSql", $scopeTypes, $scopeParams);
 $statsGeral = mercado_calcula_estatisticas($ativos);
+$desvioFipeMedioPct = mercado_desvio_fipe_medio_pct($ativos);
+$desvioFipeAmostra = mercado_desvio_fipe_amostra($ativos);
+$desvioFipeMedianoPct = mercado_desvio_fipe_mediano_pct($ativos);
 $lojistasSet = []; $cidadesSet = []; $ufsSet = [];
 foreach ($ativos as $item) {
     $lojistasSet[(int)$item['revenda_id']] = true;
     $cidadesSet[$item['uf'] . "\0" . $item['cidade']] = true;
     $ufsSet[$item['uf']] = true;
 }
+
+// Movimento do recorte inteiro (Panorama do redesign) — não confundir com o movimento por
+// modelo (grupos abaixo): aqui é a contagem total de anúncios que entraram/saíram no recorte
+// selecionado (segmento + UF/cidade), no mesmo período já escolhido pelo usuário no topo.
+$entradasPeriodoGeral = (int)(painel_rows($conn, "SELECT COUNT(*) n FROM anuncio a
+    JOIN revenda r ON r.id=a.revenda_id
+    WHERE a.status='ativo' AND $scopeSql
+      AND a.primeira_vez_visto>=DATE_SUB(NOW(), INTERVAL $dias DAY)", $scopeTypes, $scopeParams)[0]['n'] ?? 0);
+$saidasPeriodoGeral = (int)(painel_rows($conn, "SELECT COUNT(*) n FROM anuncio a
+    JOIN revenda r ON r.id=a.revenda_id
+    WHERE a.status='removido_confirmado' AND a.data_remocao>=DATE_SUB(NOW(), INTERVAL $dias DAY)
+      AND $scopeSql", $scopeTypes, $scopeParams)[0]['n'] ?? 0);
 
 $geoWhere = implode(' AND ', $baseWhere);
 $geografia = painel_rows($conn, "SELECT r.uf, COUNT(*) anuncios, COUNT(DISTINCT r.id) lojistas,
@@ -188,8 +213,12 @@ foreach ($saidaRows as $row) {
     $saidasPorGrupo[painel_chave_grupo($row['marca'], $row['modelo'], (int)$row['ano'])] = (int)$row['saidas'];
 }
 
+// Limite ampliado de 10 para 30 (decisão registrada no CLAUDE.md, item 5): o agrupamento por
+// marca+modelo+ano (item 4) satura o top-10 com variações de ano do mesmo modelo, então o
+// frontend busca mais e mostra as 10 primeiras com um "Ver mais" para expandir sem nova consulta.
+$LIMITE_MODELOS = 30;
 $modelos = [];
-foreach (array_slice($grupos, 0, 10, true) as $chave => $grupo) {
+foreach (array_slice($grupos, 0, $LIMITE_MODELOS, true) as $chave => $grupo) {
     $modelos[] = painel_resumo_grupo($grupo, $saidasPorGrupo[$chave] ?? 0, $periodo);
 }
 
@@ -205,6 +234,7 @@ $selecionado = $chaveSelecionada && isset($grupos[$chaveSelecionada])
 
 $serie = [];
 $regioesSelecionado = [];
+$oportunidadeRegional = null;
 $lojistasSelecionado = [];
 $temSnapshots = false;
 if ($selecionado) {
@@ -253,6 +283,48 @@ if ($selecionado) {
     arsort($regiaoMapa);
     foreach ($regiaoMapa as $nome => $n) $regioesSelecionado[] = ['regiao' => $nome, 'anuncios' => $n];
 
+    // Oportunidade regional do modelo (mesma regra da Minha Loja). Tolerante: se algo falhar,
+    // o painel segue sem este bloco em vez de derrubar a resposta.
+    try {
+        $nacionalSql = implode(' AND ', $nacionalWhere);
+        $linhasRegiao = painel_rows($conn, "SELECT r.uf, r.id AS revenda_id, a.preco, a.preco_texto_bruto, a.titulo, f.preco AS preco_fipe
+            FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
+            LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
+            WHERE a.status='ativo' AND $nacionalSql", $nacionalTypes, $nacionalParams);
+        $porUfModelo = [];
+        foreach ($linhasRegiao as $linha) $porUfModelo[strtoupper((string)$linha['uf'])][] = $linha;
+
+        $tabelaEventos = painel_rows($conn, "SELECT COUNT(*) n FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='anuncio_evento'");
+        $eventosDisponiveis = (int)($tabelaEventos[0]['n'] ?? 0) > 0;
+        $coberturaDias = 0;
+        $saidasPorUfModelo = [];
+        if ($eventosDisponiveis) {
+            $cobertura = painel_rows($conn, "SELECT MIN(e.dia_referencia) inicio, MAX(e.dia_referencia) fim
+                FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id JOIN revenda r ON r.id=a.revenda_id
+                WHERE e.origem='anuncio_snapshot' AND $nacionalSql", $nacionalTypes, $nacionalParams)[0] ?? [];
+            if (!empty($cobertura['inicio']) && !empty($cobertura['fim'])) {
+                $coberturaDias = max(1, (int)((strtotime($cobertura['fim']) - strtotime($cobertura['inicio'])) / 86400) + 1);
+            }
+            $saidasRows = painel_rows($conn, "SELECT r.uf,
+                    GREATEST(0, DATEDIFF(e.dia_referencia, COALESCE(
+                      (SELECT MAX(origem.dia_referencia) FROM anuncio_evento origem
+                       WHERE origem.anuncio_id=e.anuncio_id
+                         AND origem.tipo_evento IN ('primeira_observacao','reaparecimento')
+                         AND origem.ocorrido_em<=e.ocorrido_em), DATE(a.primeira_vez_visto)))) AS dias_observados
+                FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id JOIN revenda r ON r.id=a.revenda_id
+                WHERE e.tipo_evento='saida_detectada' AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 180 DAY)
+                  AND $nacionalSql", $nacionalTypes, $nacionalParams);
+            foreach ($saidasRows as $saida) {
+                $saidasPorUfModelo[strtoupper((string)$saida['uf'])][] =
+                    $saida['dias_observados'] !== null ? (int)$saida['dias_observados'] : null;
+            }
+        }
+        $oportunidadeRegional = oper_regioes_do_modelo($porUfModelo, $saidasPorUfModelo, $eventosDisponiveis, $coberturaDias);
+    } catch (Throwable $e) {
+        $oportunidadeRegional = null;
+    }
+
     $lojistaRows = painel_rows($conn, "SELECT r.id, r.nome, r.cidade, r.uf, a.preco,
             a.preco_texto_bruto, a.titulo, f.preco preco_fipe
         FROM anuncio a JOIN revenda r ON r.id=a.revenda_id
@@ -281,17 +353,28 @@ $ultima = painel_rows($conn, "SELECT MAX(a.ultima_vez_ativo) atualizado_em FROM 
 
 envia_json([
     'periodo' => $periodo,
-    'escopo' => ['regiao' => $regiao, 'uf' => $uf, 'cidade' => $cidade, 'segmento' => $segmento],
+    'escopo' => [
+        'regiao' => $regiao, 'uf' => $uf, 'ufs' => $ufsSelecionadas, 'cidade' => $cidade,
+        'segmento' => $segmento,
+    ],
     'resumo' => [
         'anuncios' => count($ativos), 'lojistas' => count($lojistasSet),
         'cidades' => count($cidadesSet), 'ufs' => count($ufsSet),
         'ticket_mediano' => $statsGeral['mediana'], 'amostra_qualificada' => $statsGeral['amostra_qualificada'],
         'confianca' => $statsGeral['confianca'],
+        'desvio_fipe_medio_pct' => $desvioFipeMedioPct,
+        'desvio_fipe_mediano_pct' => $desvioFipeMedianoPct,
+        'desvio_fipe_amostra' => $desvioFipeAmostra,
+        'desvio_fipe_confianca' => mercado_confianca($desvioFipeAmostra),
+        'entradas_periodo' => $entradasPeriodoGeral, 'saidas_periodo' => $saidasPeriodoGeral,
+        'saldo_periodo' => $entradasPeriodoGeral - $saidasPeriodoGeral,
     ],
     'geografia' => ['ufs' => $ufsGeo, 'cidades' => $cidades],
     'modelos' => $modelos,
+    'modelos_total' => count($grupos),
     'selecionado' => $selecionado ? $selecionado + [
         'serie' => $serie, 'regioes' => $regioesSelecionado, 'lojistas_destaque' => $lojistasSelecionado,
+        'oportunidade_regional' => $oportunidadeRegional,
     ] : null,
     'fonte' => [
         'atualizado_em' => $ultima, 'historico_snapshot' => $temSnapshots,
