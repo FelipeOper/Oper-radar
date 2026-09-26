@@ -72,6 +72,34 @@ Durante a publicação gradual, campos antigos como `preco_medio_mercado`,
 `giro_por_revenda` e `giro_confiavel` continuam presentes como aliases. As telas novas
 preferem mediana, `movimento_por_revenda` e `idade_observada_confiavel`.
 
+## Importação de XML de estoque (Minha Loja)
+
+`minha_loja_xml.php` lê o feed do lojista com `lib/xml_estoque.php`. Os links `url_anuncio` e
+`imagem_url` vêm de terceiros e só são gravados se passarem por `xml_estoque_url_http()`:
+
+- só `http` e `https` (esquema em qualquer caixa), com host, sem credencial embutida
+  (`https://usuario:senha@host`, inclusive usuário ou senha vazios), sem espaço nem caractere de
+  controle no meio e com no máximo 500 caracteres. Acima disso o link é descartado, nunca
+  truncado, porque um link cortado aponta para outro lugar;
+- `FILTER_VALIDATE_URL` sozinho não serve: aceita `javascript://host/...`, `file:///...`,
+  `ftp://` e `mailto:`. Ele só entra como segunda checagem, depois do esquema;
+- link inválido vira `null` e o veículo continua válido (a linha do feed não é rejeitada). O item
+  ganha `avisos` (`url_anuncio` e/ou `imagem_url`, com texto genérico, sem o motivo detalhado) e a
+  pré-visualização traz `resumo.urls_descartadas`, a contagem desses campos anulados nos veículos
+  que seriam importados. `xml_estoque_ler()` devolve o mesmo total do arquivo inteiro, antes de
+  descartar duplicados;
+- o valor não é normalizado nem ganha `https://` na frente, e a API nunca busca a URL: link
+  seguro para exibir não significa destino confiável;
+- a identidade do veículo (`origem_chave`, usada quando não há referência nem placa) continua
+  derivada do valor cru do XML, mesmo quando o link não é gravado. Trocar isso faria o próximo
+  import duplicar os itens;
+- registros já gravados em `meu_estoque` não são alterados por esta regra. Limpar ou filtrar na
+  saída os links antigos é tarefa separada, primeiro só de leitura.
+
+O front tem a própria checagem de href (`urlSegura` em `app/src/comprarModel.js`; a T09 a consolida em
+um helper único). As duas regras seguem a mesma ideia, sem equivalência literal: o JavaScript
+normaliza a URL e o PHP rejeita alguns formatos a mais.
+
 ## Atualidade do estoque
 
 `kpis.php` mantém `anuncios_ativos` para compatibilidade e expõe também o total, os ativos
