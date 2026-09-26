@@ -147,6 +147,14 @@ function xml_estoque_registro(SimpleXMLElement $no, int $indice): ?array {
     $imagem = xml_estoque_campo($c, ['imagemPrincipal', 'imageUrl', 'foto', 'image', 'imagem']);
     $codigoFipe = preg_replace('/[^0-9-]/', '', xml_estoque_campo($c, ['codigoFipe', 'fipeCode', 'fipe']));
 
+    // Só os campos gravados passam pela allowlist http/https; campo inválido vira null com aviso e o item continua válido.
+    // A identidade abaixo segue usando o $url CRU, como antes: trocar por $urlAnuncio mudaria a origem_chave e o próximo import duplicaria itens.
+    $urlAnuncio = xml_estoque_url_http($url);
+    $imagemUrl = xml_estoque_url_http($imagem);
+    $avisos = [];
+    if ($url !== '' && $urlAnuncio === null) $avisos['url_anuncio'] = 'campo descartado: somente http/https';
+    if ($imagem !== '' && $imagemUrl === null) $avisos['imagem_url'] = 'campo descartado: somente http/https';
+
     $identidadeOrigem = $referencia !== '' ? 'codigo_referencia'
         : ($placa !== '' ? 'placa' : ($url !== '' ? 'url' : 'composicao'));
     $origemBase = $referencia ?: ($placa ?: ($url ?: implode('|', [$marca, $modelo, $anoTexto])));
@@ -165,9 +173,10 @@ function xml_estoque_registro(SimpleXMLElement $no, int $indice): ?array {
         'status' => xml_estoque_status(xml_estoque_campo($c, ['status', 'situacao', 'availability'])),
         'placa' => $placa ?: null,
         'quilometragem' => $km !== null ? (int)$km : null,
-        'url_anuncio' => filter_var($url, FILTER_VALIDATE_URL) ? mb_substr($url, 0, 500) : null,
-        'imagem_url' => filter_var($imagem, FILTER_VALIDATE_URL) ? mb_substr($imagem, 0, 500) : null,
+        'url_anuncio' => $urlAnuncio,
+        'imagem_url' => $imagemUrl,
         'codigo_fipe' => $codigoFipe ?: null,
+        'avisos' => $avisos,
     ];
 }
 
@@ -208,11 +217,12 @@ function xml_estoque_ler(string $conteudo, int $limite = 10000): array {
 
     $itens = [];
     $ignorados = 0;
+    $urlsDescartadas = 0; // campos url_anuncio/imagem_url anulados pela allowlist (o veículo entra sem o link)
     foreach (xml_estoque_nos($xml) as $indice => $no) {
         if (count($itens) >= $limite) throw new RuntimeException("O XML possui mais de $limite veiculos.");
         $item = xml_estoque_registro($no, (int)$indice);
-        if ($item) $itens[] = $item; else $ignorados++;
+        if ($item) { $itens[] = $item; $urlsDescartadas += count($item['avisos']); } else $ignorados++;
     }
     if (!$itens) throw new RuntimeException('Nenhum veiculo reconhecido. Envie um exemplo do XML para ajustarmos o mapeamento.');
-    return ['itens' => $itens, 'ignorados' => $ignorados, 'hash' => hash('sha256', $conteudo)];
+    return ['itens' => $itens, 'ignorados' => $ignorados, 'urls_descartadas' => $urlsDescartadas, 'hash' => hash('sha256', $conteudo)];
 }

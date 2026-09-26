@@ -54,6 +54,8 @@ if ($acao === 'analisar') {
             'com_id_estavel' => $comIdEstavel,
             'sem_id_estavel' => count($itens) - $comIdEstavel,
             'com_preco' => $comPreco,
+            // Links (url_anuncio/imagem_url) anulados por não serem http/https; o veículo entra sem o link.
+            'urls_descartadas' => array_sum(array_map(fn($i) => count($i['avisos']), $itens)),
         ],
         'amostra' => array_slice(array_map(function ($i) {
             return array_intersect_key($i, array_flip(['referencia_interna','titulo','marca','modelo','ano','preco_anunciado','cidade','uf','status','placa','identidade_origem']));
