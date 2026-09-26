@@ -76,13 +76,44 @@ const oportunidadesCompra = {
   historico_eventos: { disponivel: true, cobertura_dias: 120 },
   nota: 'Candidatos à negociação, não recomendação de compra. Preço é anunciado, não de venda. Redução de preço e tempo observado são sinais, não prova de disposição para negociar. UFs ou modelos sem amostra e histórico suficientes não aparecem.',
 };
-export function demoGet(input) {
+// Relogio da fixture: os dados nascem no instante fixo `today`; a resposta desloca todo texto de data e hora
+// (nao o historico de so data) em horas inteiras ate o relogio real, mantendo as idades relativas (frescor, feed).
+// Tudo dentro de funcoes: nenhum Date.now() na carga do modulo, para o build normal continuar sem a fixture.
+const HORA_MS = 3600000;
+const dois = n => String(n).padStart(2, '0');
+export function demoDeslocamentoMs(agora) {
+  return Math.max(0, Math.floor((agora - Date.parse(today)) / HORA_MS)) * HORA_MS;
+}
+function deslocaTexto(texto, deltaMs) {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})([ T])(\d{2}):(\d{2}):(\d{2})(-03:00)?$/.exec(texto);
+  if (iso) {
+    const t = new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3], +iso[5], +iso[6], +iso[7]) + deltaMs);
+    return `${t.getUTCFullYear()}-${dois(t.getUTCMonth() + 1)}-${dois(t.getUTCDate())}${iso[4]}${dois(t.getUTCHours())}:${dois(t.getUTCMinutes())}:${dois(t.getUTCSeconds())}${iso[8] || ''}`;
+  }
+  const br = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(texto);
+  if (br) {
+    const t = new Date(Date.UTC(+br[3], +br[2] - 1, +br[1], +br[4], +br[5]) + deltaMs);
+    return `${dois(t.getUTCDate())}/${dois(t.getUTCMonth() + 1)}/${t.getUTCFullYear()} ${dois(t.getUTCHours())}:${dois(t.getUTCMinutes())}`;
+  }
+  return texto;
+}
+export function demoDesloca(valor, deltaMs) {
+  if (!deltaMs) return valor;
+  if (typeof valor === 'string') return deslocaTexto(valor, deltaMs);
+  if (Array.isArray(valor)) return valor.map(item => demoDesloca(item, deltaMs));
+  if (valor && typeof valor === 'object') return Object.fromEntries(Object.entries(valor).map(([chave, item]) => [chave, demoDesloca(item, deltaMs)]));
+  return valor;
+}
+export function demoGet(input, agora = Date.now()) {
+  return demoDesloca(demoGetBase(input), demoDeslocamentoMs(agora));
+}
+function demoGetBase(input) {
   const { path: caminho, params } = endpoint(input);
   const path = caminho === 'hoje_stats.php.novo' ? 'hoje_stats.php' : caminho;
   // Simula um servidor ainda sem os campos/endpoints novos da tela Hoje (localStorage 'oper-demo-api-antiga' = '1').
   const apiAntiga = typeof localStorage !== 'undefined' && localStorage.getItem('oper-demo-api-antiga') === '1';
   if (apiAntiga && caminho === 'frescor_coleta.php') return { erro: 'Nao encontrado.', codigo: 'NAO_ENCONTRADO' };
-  if (apiAntiga && caminho === 'hoje_stats.php') { const antigo = { ...demoGet('hoje_stats.php.novo') }; ['feed', 'ufs_saidas', 'insights', 'atualizado_em', 'parciais_indisponiveis'].forEach(chave => delete antigo[chave]); return antigo; }
+  if (apiAntiga && caminho === 'hoje_stats.php') { const antigo = { ...demoGetBase('hoje_stats.php.novo') }; ['feed', 'ufs_saidas', 'insights', 'atualizado_em', 'parciais_indisponiveis'].forEach(chave => delete antigo[chave]); return antigo; }
   if (path === 'kpis.php') return kpis;
   if (path === 'hoje_stats.php') return { kpis, feed: [{ tipo: 'novo', anuncio_id: 101, url: 'https://exemplo.invalid/101', marca: 'Volvo', modelo: 'FH 540', ano: 2021, cidade: 'Curitiba', uf: 'PR', preco: 489900, quando: '2026-09-23 09:12:00' }, { tipo: 'preco', anuncio_id: 102, url: 'https://exemplo.invalid/102', marca: 'Scania', modelo: 'R 450', ano: 2020, cidade: 'Londrina', uf: 'PR', preco_anterior: 432000, preco_novo: 418000, variacao_pct: -3.2, quando: '2026-09-23 00:00:00' }, { tipo: 'saida', anuncio_id: 103, url: 'https://exemplo.invalid/103', marca: 'DAF', modelo: 'XF 530', ano: 2022, cidade: 'Campinas', uf: 'SP', quando: '2026-09-22 16:40:00' }, { tipo: 'verificacao', anuncio_id: 104, url: null, marca: 'Iveco', modelo: 'S-Way', ano: 2022, cidade: 'Joinville', uf: 'SC', quando: '2026-09-22 07:05:00' }], ufs_saidas: [{ uf: 'PR', saidas: 21, ativos: 422 }, { uf: 'SP', saidas: 9, ativos: 581 }, { uf: 'SC', saidas: 7, ativos: 281 }], insights: [{ id: 'saidas-uf', tipo: 'saidas', titulo: 'PR concentra as saídas observadas', texto: '21 dos 37 anúncios que saíram do radar em 30 dias eram de PR. Saída observada não comprova venda.', evidencia: { recorte: 'PR · caminhões e implementos', periodo: 'Últimos 30 dias', valor: '21 saídas', base: '37 saídas no total', amostra: '422 anúncios ativos', confianca: 'alta', atualizacao: '23/09/2026 12:00', explicacao: 'Anúncio ausente em verificações consecutivas do portal. Não confirma venda.' }, acao: { rotulo: 'Ver mercado da região', pagina: 'mercado', contexto: { uf: 'PR' } } }, { id: 'abaixo-fipe', tipo: 'preco', titulo: 'Volvo FH 540 2021 anunciado abaixo da FIPE', texto: 'A mediana qualificada (R$ 498.000) está 1,4% abaixo da FIPE (R$ 505.000). Pode indicar oportunidade de compra; confira estado e versão.', evidencia: { recorte: 'Volvo FH 540 2021 · todas as UFs', periodo: 'Estoque ativo', valor: 'R$ 498.000', base: 'FIPE R$ 505.000', amostra: '9 preços válidos · 6 revendas', confianca: 'baixa', atualizacao: '23/09/2026 12:00', explicacao: 'Mediana qualificada (sem valores extremos ou inválidos), não média bruta.' }, acao: { rotulo: 'Ver modelo no mercado', pagina: 'mercado', contexto: { marca: 'Volvo', modelo: 'FH 540', ano: 2021 } } }], atualizado_em: '2026-09-23 12:00:00', parciais_indisponiveis: [], top_modelos: [{ modelo: 'Volvo FH 540 2021', n: 42, preco_medio: 492000 }], regioes_saidas: [{ cidade: 'Curitiba', uf: 'PR', n: 14 }], top_lojas_novos: [{ nome: 'Rota Exemplo Caminhoes', n: 8 }], top_lojas_saidas: [{ nome: 'Patio Demonstracao', n: 3 }], regioes: [{ uf: 'PR', saidas: 14 }, { uf: 'SP', saidas: 11 }], modelos: [{ marca: 'Volvo', modelo: 'FH 540', ano: 2021, anuncios: 42, preco_mediano: 492000 }] };
   if (path === 'frescor_coleta.php') return { limite_horas: 24, resumo: { ufs: 3, severidade: 'alta', em_dia: 1, parcial: 1, atrasada: 1, sem_coleta: 0 }, itens: [{ uf: 'SC', ultima_coleta: '2026-09-21 19:00:00', horas: 41, revendas: 9, revendas_coletadas_24h: 0, cobertura_pct: 0, status: 'atrasada' }, { uf: 'SP', ultima_coleta: '2026-09-23 07:05:00', horas: 5, revendas: 15, revendas_coletadas_24h: 8, cobertura_pct: 53, status: 'parcial' }, { uf: 'PR', ultima_coleta: '2026-09-23 07:05:00', horas: 5, revendas: 18, revendas_coletadas_24h: 18, cobertura_pct: 100, status: 'em_dia' }], atualizado_em: '2026-09-23 12:00:00' };
