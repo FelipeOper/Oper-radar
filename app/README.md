@@ -76,6 +76,12 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Oportunidades abre com "O que comprar em cada região" (`src/ComprarBlocos.jsx`, textos em `src/comprarModel.js`, dados de `oportunidades_compra.php`):
   por UF, os modelos com melhor índice regional e os anúncios candidatos à negociação, cada um com selos (desvio vs mediana da UF e vs FIPE, preço caiu em
   30 dias, dias no radar) e "Por que esta nota" com os componentes e pesos efetivos. Linguagem de candidato, nunca "ideal"; sem base mostra o motivo.
+- "Criar ação" (nos cartões de "O que comprar" e nas listas de Oportunidades) não grava nada no servidor: a ação nasce em `adicionarAcao`
+  (`src/App.jsx`) e fica só neste navegador, em `localStorage['oper-radar-acoes']`, sem sincronização entre aparelhos. Os textos das três
+  chamadas e o objeto da ação (`id`, `texto`, `feita`, `origem`, `criadaEm`) são regras puras de `src/acoesModel.js`, com testes em
+  `tests/acoesModel.test.js` (inclui uma varredura de texto que falha se esses trechos passarem a usar `fetch`, `apiClient` ou POST/PUT/PATCH/DELETE;
+  ela não prova a ausência de toda escrita remota possível, só vigia esses arquivos). Para conferir o clique sem tocar em produção: `VITE_DEMO=1 npm run dev`,
+  abrir Oportunidades, clicar em "Criar ação" e ver o item na página Ações.
 - Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com
   os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo) e ano-modelo, janela de
   movimento, comparação automática quando os dois lados estão completos, veredito e métricas lado a lado. A API

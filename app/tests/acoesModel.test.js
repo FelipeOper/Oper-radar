@@ -86,3 +86,12 @@ test('criarAcao e adicionarAcao em App.jsx só mexem em estado local, sem rede',
   assert.ok(inicio > 0 && fim > inicio, 'trecho adicionarAcao...paginas não encontrado');
   assert.doesNotMatch(app.slice(inicio, fim), REDE);
 });
+
+test('os pontos de chamada de onCriarAcao (App.jsx e ComprarBlocos.jsx) só chamam funções de texto, sem rede', () => {
+  const linhas = [...src('App.jsx').split('\n'), ...src('ComprarBlocos.jsx').split('\n')].filter(l => /onCriarAcao\??\.?\(/.test(l));
+  assert.equal(linhas.length, 3, 'esperadas 3 chamadas de onCriarAcao(...)');
+  for (const linha of linhas) {
+    assert.match(linha, /onCriarAcao\??\.?\(texto(AvaliarOferta|AvaliarObservado|ValidarFipe)\(/);
+    assert.doesNotMatch(linha, REDE);
+  }
+});
