@@ -42,6 +42,13 @@ testes). No modo demo, `localStorage['oper-demo-api-antiga']='1'` simula um serv
 `VITE_DEMO=1 npm run build` gera um build com dados fictícios (`src/demoFixtures.js`) só para
 verificação visual; sem a variável o app usa a API real.
 
+Relógio da fixture: os dados nascem no instante fixo `today` (23/09/2026 12:00, Brasília). A cada resposta,
+`demoGet` desloca todo texto de data e hora (`AAAA-MM-DD HH:MM:SS`, ISO com `-03:00` e `DD/MM/AAAA HH:MM`) em horas
+inteiras até o relógio real, sem passar do "agora". Assim a pílula da coleta, o alerta de frescor (SC 41 h, SP 5 h,
+PR 5 h) e o feed concordam em qualquer dia. Datas só com dia (histórico de preço) ficam fixas. O deslocamento vive
+em funções (`demoDeslocamentoMs`, `demoDesloca`); não use `Date.now()` na carga do módulo, para não
+alterar o bundle do build normal (conferir com `cmp` do `dist` antes e depois). Teste: `tests/demoRelogio.test.js` (relógio injetado).
+
 ## Desenvolvimento
 
 ```text
