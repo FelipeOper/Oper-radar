@@ -25,8 +25,9 @@ export function pctAssinado(valor) {
   return `${arredondado > 0 ? '+' : ''}${arredondado.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 }
 
-/* O link vem de coleta de terceiros: só http/https vira href (a API também filtra; aqui é a segunda barreira). */
-export const urlSegura = url => (typeof url === 'string' && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
+/* O link vem de coleta de terceiros: só http/https vira href (a API também filtra; aqui é a segunda barreira).
+   A regra mora em urlSegura.js; reexportada aqui para não quebrar quem já importa de comprarModel. */
+export { urlSegura } from './urlSegura.js';
 
 export const nomeModelo = m => `${m.marca} ${m.modelo} · ${m.ano}`;
 
