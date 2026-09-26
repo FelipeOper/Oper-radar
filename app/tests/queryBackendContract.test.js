@@ -130,3 +130,18 @@ test('DEMO do Comparador cobre os três modos de recorte e a tela ignora respost
   assert.match(read('app/src/ComparadorBlocos.jsx'), /let vigente = true;/);
   assert.match(read('app/src/ComparadorBlocos.jsx'), /return \(\) => \{ vigente = false; c\.abort\(\); \};/);
 });
+
+test('"O que comprar" por região: front consome oportunidades_compra.php e a API só orquestra a lib testada', () => {
+  const api = read('oper-radar-api/oportunidades_compra.php');
+  assert.match(api, /oper_compra_monta\(/);
+  assert.match(api, /exige_autenticacao\(\)/);
+  assert.match(api, /a\.tipo='Caminhao'/);
+  assert.match(api, /e\.valor_novo_decimal>=e\.valor_anterior_decimal\*0\.5/);
+  const lib = read('oper-radar-api/lib/oportunidade_compra.php');
+  for (const campo of ['pontuacao', 'componentes', 'desvio_mediana_pct', 'desvio_fipe_pct', 'reduziu_30d', 'anuncios_elegiveis', 'indice']) {
+    assert.match(lib, new RegExp(campo), `${campo} deve existir na saída da lib`);
+  }
+  assert.match(read('app/src/ComprarBlocos.jsx'), /oportunidades_compra\.php/);
+  assert.match(read('app/src/App.jsx'), /<ComprarPorRegiao ufs=/);
+  assert.doesNotMatch(read('app/src/ComprarBlocos.jsx') + read('app/src/comprarModel.js'), /anúncio ideal|melhor negócio|compre agora/i, 'sem promessa de "ideal"');
+});

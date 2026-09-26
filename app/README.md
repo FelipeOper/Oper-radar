@@ -73,6 +73,9 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Tempo no Radar é apresentado como tempo observado, nunca como data garantida de publicação.
 - Mercado equivalente usa mediana e faixa central somente com pelo menos cinco ofertas
   qualificadas; amostras menores são identificadas como insuficientes.
+- Oportunidades abre com "O que comprar em cada região" (`src/ComprarBlocos.jsx`, textos em `src/comprarModel.js`, dados de `oportunidades_compra.php`):
+  por UF, os modelos com melhor índice regional e os anúncios candidatos à negociação, cada um com selos (desvio vs mediana da UF e vs FIPE, preço caiu em
+  30 dias, dias no radar) e "Por que esta nota" com os componentes e pesos efetivos. Linguagem de candidato, nunca "ideal"; sem base mostra o motivo.
 - Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com
   os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo) e ano-modelo, janela de
   movimento, comparação automática quando os dois lados estão completos, veredito e métricas lado a lado. A API

@@ -36,6 +36,7 @@ import { OportunidadeRegional } from './MercadoBlocos.jsx';
 import { PageConcorrencia } from './ConcorrenciaBlocos.jsx';
 import { ResumoLoja, CartaoVeiculo } from './MinhaLojaBlocos.jsx';
 import { PageComparador } from './ComparadorBlocos.jsx';
+import { ComprarPorRegiao } from './ComprarBlocos.jsx';
 import { resumoLoja, AMOSTRA_MINIMA as AMOSTRA_MINIMA_LOJA } from './minhaLojaModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
@@ -1647,6 +1648,7 @@ function PageOportunidades({ onCriarAcao }) {
     <div>
       <SeletorGeografico facetas={facetas} regiao={regiao} uf={uf}
         onRegiao={valor => { setRegiao(valor); setUf('todas'); }} onUf={setUf} />
+      <ComprarPorRegiao ufs={uf !== 'todas' ? [uf] : regiao !== 'todas' ? (REGIOES_UFS[regiao] || []) : []} onCriarAcao={onCriarAcao} />
       <SectionTitle sub="Tempo contado desde a primeira observação pelo Radar; não representa a data real de publicação nem garante disposição para negociar">
         Anúncios observados há mais tempo
       </SectionTitle>

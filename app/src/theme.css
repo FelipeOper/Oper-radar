@@ -967,3 +967,19 @@ select {
 .oc-cmp__difs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
 .oc-cmp__evidencias { display: flex; flex-wrap: wrap; gap: 16px; }
 @media (max-width: 560px) { .oc-cmp__linha { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .oc-cmp__linha > .oc-cmp__rotulo { grid-column: 1 / -1; } .oc-cmp__linha--cab > .oc-cmp__rotulo { display: none; } }
+
+/* "O que comprar" por região (Oportunidades): cartão por modelo e lista de anúncios candidatos. */
+.oc-compra { display: flex; flex-direction: column; gap: 14px; }
+.oc-compra__ufs { display: flex; flex-wrap: wrap; gap: 6px; }
+.oc-compra__modelo { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.oc-compra__modelo-topo, .oc-compra__anuncio-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.oc-compra__indice { display: flex; flex-wrap: wrap; gap: 6px; }
+.oc-compra__lista { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.oc-compra__anuncio { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); min-width: 0; }
+.oc-compra__titulo { display: block; overflow-wrap: anywhere; }
+.oc-compra__preco { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.oc-compra__selos, .oc-compra__acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.oc-compra__comp summary { cursor: pointer; color: var(--text-secondary); font-size: var(--fs-sm, 13px); }
+.oc-compra__comp ul { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.oc-compra__comp li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-sm, 13px); }
+@media (max-width: 560px) { .oc-compra__preco { align-items: flex-start; } }
