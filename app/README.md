@@ -39,6 +39,16 @@ O Mercado usa `src/mercadoModel.js` (evidência e leitura da oportunidade region
 A tela Hoje usa `src/HojeBlocos.jsx`, `src/Evidencia.jsx` e `src/hojeModel.js` (regras puras, com
 testes). No modo demo, `localStorage['oper-demo-api-antiga']='1'` simula um servidor sem os campos novos.
 
+Links externos (anúncio, perfil da revenda, sinal do feed) vêm de coleta de terceiros e **todo `href` passa por
+`src/LinkExterno.js`**, que usa `src/urlSegura.js`: só `http`/`https`, com host, sem credencial embutida e sem
+caractere de controle; qualquer outra coisa (`javascript:`, `data:`, relativa, vazia) não vira `<a>` (nem `#`).
+O link abre em nova aba com `rel="noopener noreferrer"`; `href`, `target` e `rel` não são sobrescrevíveis, e
+`style`, `className`, `title`, `aria-label` e `onClick` são repassados. Sem URL válida o componente não renderiza
+nada, ou, com `semLink="div"` (cartão de anúncios similares), o mesmo conteúdo sem link. Não escreva `<a href>`,
+`target="_blank"` nem `window.open` à mão: `tests/linksExternos.contract.test.js` falha se aparecerem em `src/`.
+`urlSegura` continua exportada por `src/comprarModel.js` por compatibilidade. A API PHP ainda não valida o
+esquema de `xml_estoque.php` (`url_anuncio`), hoje sem `href` que o leia: fica para a T09b.
+
 `VITE_DEMO=1 npm run build` gera um build com dados fictícios (`src/demoFixtures.js`) só para
 verificação visual; sem a variável o app usa a API real.
 
