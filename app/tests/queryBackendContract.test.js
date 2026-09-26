@@ -135,7 +135,7 @@ test('"O que comprar" por região: front consome oportunidades_compra.php e a AP
   const api = read('oper-radar-api/oportunidades_compra.php');
   assert.match(api, /oper_compra_monta\(/);
   assert.match(api, /exige_autenticacao\(\)/);
-  assert.match(api, /a\.tipo='Caminhao'/);
+  assert.match(api, /mercado_sql_carroceria_comparavel\(\)/); // inclui tipo Caminhao e a lista exata de carroceria
   assert.match(api, /e\.valor_novo_decimal>=e\.valor_anterior_decimal\*0\.5/);
   const lib = read('oper-radar-api/lib/oportunidade_compra.php');
   for (const campo of ['pontuacao', 'componentes', 'desvio_mediana_pct', 'desvio_fipe_pct', 'reduziu_30d', 'anuncios_elegiveis', 'indice']) {
@@ -144,4 +144,14 @@ test('"O que comprar" por região: front consome oportunidades_compra.php e a AP
   assert.match(read('app/src/ComprarBlocos.jsx'), /oportunidades_compra\.php/);
   assert.match(read('app/src/App.jsx'), /<ComprarPorRegiao ufs=/);
   assert.doesNotMatch(read('app/src/ComprarBlocos.jsx') + read('app/src/comprarModel.js'), /anúncio ideal|melhor negócio|compre agora/i, 'sem promessa de "ideal"');
+});
+
+test('oportunidades_compra.php restringe o SQL ao universo comparável, cacheia e não repassa URL insegura', () => {
+  const api = read('oper-radar-api/oportunidades_compra.php');
+  assert.match(api, /mercado_sql_carroceria_comparavel\(\) \. mercado_sql_ano_minimo\(OPER_RADAR_ANO_MINIMO_FIPE\)/);
+  assert.equal((api.match(/\. \$universo/g) || []).length, 3, 'anúncios, reduções e saídas usam o mesmo universo');
+  assert.match(api, /time\(\) - \(int\)filemtime\(\$cacheArquivo\) < 600/);
+  const lib = read('oper-radar-api/lib/oportunidade_compra.php');
+  assert.match(lib, /oper_compra_no_universo\(\$a\)/);
+  assert.match(lib, /oper_compra_url_segura\(\$a\['url'\] \?\? null\)/);
 });

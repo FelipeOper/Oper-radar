@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evidenciaModelo, linhasComponentes, ordenaUfs, pctAssinado, selosAnuncio, textoVazio } from '../src/comprarModel.js';
+import { evidenciaModelo, linhasComponentes, ordenaUfs, pctAssinado, selosAnuncio, textoVazio, urlSegura } from '../src/comprarModel.js';
 
 const anuncio = extra => ({ anuncio_id: 1, titulo: 'Volvo FH 540', preco: 440000, desvio_mediana_pct: -8.3, desvio_fipe_pct: -8.3, reduziu_30d: 1, dias_observados: 42,
   componentes: { preco_mediana: { indice: 82.5, peso: 35 }, preco_fipe: { indice: 70, peso: 20 }, negociacao: { indice: 100, peso: 20 }, liquidez: { indice: 71.4, peso: 15 }, qualidade: { indice: 100, peso: 10 } }, ...extra });
@@ -43,4 +43,9 @@ test('pctAssinado evita -0 e valores nulos', () => {
   assert.equal(pctAssinado(-3), '-3%');
   assert.equal(pctAssinado(0.01), '0%');
   assert.equal(pctAssinado(null), '—');
+});
+
+test('só http/https vira link do anúncio', () => {
+  assert.equal(urlSegura('https://exemplo.com/a'), 'https://exemplo.com/a');
+  for (const ruim of ['javascript:alert(1)', 'data:text/html,x', '//exemplo.com', '', null, undefined, 42]) assert.equal(urlSegura(ruim), null);
 });

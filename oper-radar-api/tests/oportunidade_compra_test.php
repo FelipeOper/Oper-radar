@@ -99,4 +99,29 @@ verifica(array_column($soSp, 'uf') === ['SP'], 'filtro por UF');
 // Sem historico de eventos nao ha praca publicavel: nada de recomendacao inventada.
 verifica(oper_compra_monta($anuncios, $saidas, false, 0, [], $agora) === [], 'sem trilha de eventos nao ha recomendacao');
 
+// Universo fechado: 5 anuncios com implemento/ano antigo + 4 validos NAO formam praca publicavel (a amostra minima so conta comparaveis).
+$id2 = 0;
+$mistos = array_merge(
+    gera_anuncios('Volvo', 'FH 460', 2020, 'MG', 4, 400000, $id2, 500),
+    array_map(fn($a) => array_merge($a, ['carroceria' => 'Baú']), gera_anuncios('Volvo', 'FH 460', 2020, 'MG', 3, 400000, $id2, 510)),
+    array_map(fn($a) => array_merge($a, ['ano' => 2004]), gera_anuncios('Volvo', 'FH 460', 2020, 'MG', 2, 400000, $id2, 520)),
+    gera_anuncios('Volvo', 'FH 460', 2020, 'SP', 12, 405000, $id2, 530)
+);
+$saidas2 = ["VOLVO\0FH 460\0" . 2020 => ['MG' => [30, 40, 50, 60], 'SP' => [30, 35, 40, 45, 50]]];
+$rm = oper_compra_monta($mistos, $saidas2, true, 120, [], $agora);
+verifica(!in_array('MG', array_column($rm, 'uf'), true), 'MG com 4 validos + 5 fora do universo nao e publicavel');
+verifica(in_array('SP', array_column($rm, 'uf'), true), 'SP com 12 validos publica');
+// Carreta e outros tipos ficam fora.
+verifica(oper_compra_monta(array_map(fn($a) => array_merge($a, ['tipo' => 'Carreta']), $anuncios), $saidas, true, 120, [], $agora) === [], 'so caminhao');
+
+// URL do anuncio: so http/https chega ao link.
+verifica(oper_compra_url_segura('https://exemplo.com/a') === 'https://exemplo.com/a', 'https passa');
+verifica(oper_compra_url_segura('HTTP://exemplo.com/a') === 'HTTP://exemplo.com/a', 'http passa');
+foreach (['javascript:alert(1)', 'data:text/html;base64,AAAA', '//exemplo.com', '', null, 'ftp://x'] as $ruim) {
+    verifica(oper_compra_url_segura($ruim) === null, 'esquema nao permitido: ' . var_export($ruim, true));
+}
+$comUrlRuim = array_map(fn($a) => array_merge($a, ['url' => 'javascript:alert(1)']), $anuncios);
+$rr = oper_compra_monta($comUrlRuim, $saidas, true, 120, [], $agora);
+foreach ($rr as $u) foreach ($u['modelos'] as $m) foreach ($m['anuncios'] as $a) verifica($a['url'] === null, 'url insegura descartada na saida');
+
 echo "oportunidade_compra_test=OK\n";

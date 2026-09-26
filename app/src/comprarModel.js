@@ -25,6 +25,9 @@ export function pctAssinado(valor) {
   return `${arredondado > 0 ? '+' : ''}${arredondado.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 }
 
+/* O link vem de coleta de terceiros: só http/https vira href (a API também filtra; aqui é a segunda barreira). */
+export const urlSegura = url => (typeof url === 'string' && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
+
 export const nomeModelo = m => `${m.marca} ${m.modelo} · ${m.ano}`;
 
 /* UF com o modelo de maior índice primeiro; UF sem nada some. */

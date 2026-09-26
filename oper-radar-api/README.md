@@ -16,7 +16,9 @@ repetir comparações de papel em cada endpoint.
 `oportunidades_compra.php` ("o que comprar" por região) monta duas camadas: por UF, os modelos (marca + modelo + ano) com melhor
 índice regional (`lib/regional_modelo.php`) e, em cada um, os anúncios candidatos da UF com pontuação explicável (`lib/oportunidade_compra.php`,
 testada em `tests/oportunidade_compra_test.php`). Aceita `uf` (lista), `modelos_por_uf` (1–10) e `anuncios_por_modelo` (1–20). Universo: caminhões
-ativos. Só entram grupos com 10+ anúncios no Brasil e praças publicáveis (5+ preços válidos e histórico de eventos); preço fora da faixa esperada,
+ativos **sem implemento** (carroceria vazia, cavalo ou chassi) de **2006 em diante** (com implemento o preço inclui o equipamento; até 2005 o preço
+anunciado e a FIPE divergem demais: F0c/F0d), aplicado no SQL e de novo na lib, de modo que a amostra mínima só conta anúncios comparáveis. Resposta
+em cache de arquivo por 10 minutos (o dado é o mesmo para todos e a montagem varre o estoque). O link do anúncio só sai se for http/https. Só entram grupos com 10+ anúncios no Brasil e praças publicáveis (5+ preços válidos e histórico de eventos); preço fora da faixa esperada,
 condição comercial especial ou sem mediana da UF ficam de fora. Pesos: preço vs mediana da UF 35, vs FIPE 20 (só ano ≥ 2006, caminhão,
 cavalo/chassi/vazio e vínculo `alto`; sem isso o peso é redistribuído), sinal de negociação 20 (redução de preço em 30 dias e tempo no radar), liquidez do
 modelo na UF 15, qualidade 10. São candidatos à negociação, não "ideais": preço é anunciado e redução/tempo são sinais. Somente leitura.

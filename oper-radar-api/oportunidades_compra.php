@@ -11,7 +11,7 @@ require_once __DIR__ . '/lib/market_scope.php';
 require_once __DIR__ . '/lib/oportunidade_compra.php';
 
 exige_autenticacao();
-$conn = conecta();
+@set_time_limit(60);
 
 const OPER_COMPRA_UF_REGIAO = [
     'PR' => 'Sul', 'SC' => 'Sul', 'RS' => 'Sul', 'SP' => 'Sudeste', 'RJ' => 'Sudeste', 'MG' => 'Sudeste', 'ES' => 'Sudeste',
@@ -37,15 +37,28 @@ $opcoes = [
     'anuncios_por_modelo' => (int)($_GET['anuncios_por_modelo'] ?? 5),
 ];
 
+// Cache de 10 min no servidor (o dado é o mesmo para todos os usuários e a montagem varre o estoque inteiro).
+$cacheArquivo = rtrim(sys_get_temp_dir(), '/\\') . '/oper_radar_compra_' . md5(json_encode($opcoes)) . '.json';
+if (is_file($cacheArquivo) && time() - (int)filemtime($cacheArquivo) < 600) {
+    $emCache = json_decode((string)@file_get_contents($cacheArquivo), true);
+    if (is_array($emCache) && isset($emCache['ufs'])) {
+        $emCache['em_cache'] = true;
+        envia_json($emCache);
+    }
+}
+$conn = conecta();
+
 try {
     $ano = 'COALESCE(a.ano_final,a.ano_inicial)';
+    // Universo comparável: caminhão sem implemento de 2006 em diante (mesmas regras do desvio FIPE; ver lib/oportunidade_compra.php).
+    $universo = mercado_sql_carroceria_comparavel() . mercado_sql_ano_minimo(OPER_RADAR_ANO_MINIMO_FIPE);
     $anuncios = compra_linhas($conn, "SELECT a.id, a.url, a.titulo, a.marca, a.modelo, $ano AS ano, a.preco, a.preco_texto_bruto,
             a.carroceria, a.tipo, f.preco AS preco_fipe, a.fipe_match_confianca,
             r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf, a.primeira_vez_visto
         FROM anuncio a
         JOIN revenda r ON r.id=a.revenda_id
         LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
-        WHERE a.status='ativo' AND a.tipo='Caminhao' AND a.preco>0");
+        WHERE a.status='ativo' AND a.preco>0" . $universo);
 
     $temEventos = (int)(compra_linhas($conn, "SELECT COUNT(*) n FROM information_schema.TABLES
         WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='anuncio_evento'")[0]['n'] ?? 0) > 0;
@@ -61,9 +74,9 @@ try {
         // Queda maior que 50% é erro de coleta, não sinal (mesma regra de hoje_stats.php e lojistas.php).
         foreach (compra_linhas($conn, "SELECT DISTINCT e.anuncio_id
             FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id
-            WHERE a.status='ativo' AND a.tipo='Caminhao' AND e.tipo_evento='mudanca_preco'
+            WHERE a.status='ativo' AND e.tipo_evento='mudanca_preco'
               AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-              AND e.valor_anterior_decimal>e.valor_novo_decimal AND e.valor_novo_decimal>=e.valor_anterior_decimal*0.5") as $linha) {
+              AND e.valor_anterior_decimal>e.valor_novo_decimal AND e.valor_novo_decimal>=e.valor_anterior_decimal*0.5" . $universo) as $linha) {
             $reduzidos[(int)$linha['anuncio_id']] = true;
         }
         foreach (compra_linhas($conn, "SELECT a.marca, a.modelo, $ano AS ano, r.uf,
@@ -72,8 +85,8 @@ try {
                    WHERE origem.anuncio_id=e.anuncio_id AND origem.tipo_evento IN ('primeira_observacao','reaparecimento')
                      AND origem.ocorrido_em<=e.ocorrido_em), DATE(a.primeira_vez_visto)))) AS dias_observados
             FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id JOIN revenda r ON r.id=a.revenda_id
-            WHERE e.tipo_evento='saida_detectada' AND a.tipo='Caminhao'
-              AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 180 DAY)") as $saida) {
+            WHERE e.tipo_evento='saida_detectada'
+              AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 180 DAY)" . $universo) as $saida) {
             $chave = oper_compra_chave_grupo(['marca' => $saida['marca'], 'modelo' => $saida['modelo'], 'ano' => $saida['ano']]);
             $saidasPorGrupoUf[$chave][strtoupper((string)$saida['uf'])][] = $saida['dias_observados'] !== null ? (int)$saida['dias_observados'] : null;
         }
@@ -96,11 +109,13 @@ try {
 }
 $conn->close();
 
-envia_json([
-    'escopo' => ['segmento' => 'Pesado (caminhões ativos)', 'ufs' => $ufs, 'modelos_por_uf' => $opcoes['modelos_por_uf'], 'anuncios_por_modelo' => $opcoes['anuncios_por_modelo']],
+$payload = [
+    'escopo' => ['segmento' => 'Pesado (caminhões sem implemento, 2006 em diante)', 'ufs' => $ufs, 'modelos_por_uf' => $opcoes['modelos_por_uf'], 'anuncios_por_modelo' => $opcoes['anuncios_por_modelo']],
     'ufs' => $ufsResultado,
     'pesos' => OPER_COMPRA_PESOS,
     'historico_eventos' => ['disponivel' => $temEventos, 'cobertura_dias' => $coberturaDias],
     'nota' => 'Candidatos à negociação, não recomendação de compra. Preço é anunciado, não de venda. Redução de preço e tempo observado são sinais, não prova de disposição para negociar. UFs ou modelos sem amostra e histórico suficientes não aparecem.',
     'gerado_em' => date(DATE_ATOM),
-]);
+];
+@file_put_contents($cacheArquivo, json_encode($payload, JSON_UNESCAPED_UNICODE), LOCK_EX);
+envia_json($payload);

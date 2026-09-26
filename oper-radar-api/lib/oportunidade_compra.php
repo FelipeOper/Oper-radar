@@ -24,6 +24,21 @@ function oper_compra_clamp($valor): float {
     return max(0.0, min(100.0, (float)$valor));
 }
 
+/**
+ * Universo comparável desta versão: caminhão sem implemento (carroceria vazia, cavalo ou chassi) de 2006 em diante.
+ * Com implemento o preço inclui o equipamento (F0d) e não é comparável com o do cavalo/chassi do mesmo modelo e ano; até 2005 a FIPE
+ * e o preço anunciado divergem demais (F0c). Filtro também no SQL; aqui é defesa em profundidade e falha fechada.
+ */
+function oper_compra_no_universo(array $a): bool {
+    return mercado_tipo_comparavel_fipe($a) && mercado_ano_comparavel_fipe($a) && mercado_carroceria_comparavel_fipe($a);
+}
+
+/** Só http/https: o campo vem de coleta de terceiros e vai para um link; qualquer outro esquema (javascript:, data:) é descartado. */
+function oper_compra_url_segura($url): ?string {
+    $url = trim((string)$url);
+    return preg_match('#^https?://#i', $url) === 1 ? $url : null;
+}
+
 function oper_compra_chave_grupo(array $a): string {
     return strtoupper(trim((string)($a['marca'] ?? ''))) . "\0" . strtoupper(trim((string)($a['modelo'] ?? ''))) . "\0" . (int)($a['ano'] ?? 0);
 }
@@ -122,6 +137,7 @@ function oper_compra_monta(array $anuncios, array $saidasPorGrupoUf, bool $event
     foreach ($anuncios as $a) {
         $uf = strtoupper((string)($a['uf'] ?? ''));
         if (!preg_match('/^[A-Z]{2}$/', $uf) || (int)($a['ano'] ?? 0) <= 0 || trim((string)($a['modelo'] ?? '')) === '') continue;
+        if (!oper_compra_no_universo($a)) continue; // a amostra mínima e a mediana só contam anúncios comparáveis
         $a['uf'] = $uf;
         $grupos[oper_compra_chave_grupo($a)]['por_uf'][$uf][] = $a;
         $grupos[oper_compra_chave_grupo($a)]['total'] = ($grupos[oper_compra_chave_grupo($a)]['total'] ?? 0) + 1;
@@ -150,7 +166,7 @@ function oper_compra_monta(array $anuncios, array $saidasPorGrupoUf, bool $event
                 $p = oper_compra_pontua_anuncio($a, $r['preco_mediano'] !== null ? (float)$r['preco_mediano'] : null, (float)$r['avaliacao']['pontuacao'], $agora);
                 if (empty($p['elegivel'])) continue;
                 $pontuados[] = [
-                    'anuncio_id' => (int)($a['id'] ?? 0), 'url' => $a['url'] ?? null, 'titulo' => $a['titulo'] ?? null,
+                    'anuncio_id' => (int)($a['id'] ?? 0), 'url' => oper_compra_url_segura($a['url'] ?? null), 'titulo' => $a['titulo'] ?? null,
                     'preco' => (float)$a['preco'], 'cidade' => $a['cidade'] ?? null, 'uf' => $uf, 'revenda' => $a['revenda'] ?? null,
                     'pontuacao' => $p['pontuacao'], 'componentes' => $p['componentes'],
                     'desvio_mediana_pct' => $p['desvio_mediana_pct'], 'desvio_fipe_pct' => $p['desvio_fipe_pct'],

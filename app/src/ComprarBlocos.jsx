@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { apiGet } from './apiClient.js';
 import { ConfiancaBadge, Evidencia } from './Evidencia.jsx';
 import { SecaoHoje } from './HojeBlocos.jsx';
-import { brl, evidenciaModelo, linhasComponentes, nomeModelo, ordenaUfs, selosAnuncio, textoVazio } from './comprarModel.js';
+import { brl, evidenciaModelo, linhasComponentes, nomeModelo, ordenaUfs, selosAnuncio, textoVazio, urlSegura } from './comprarModel.js';
 
 /* "O que comprar" por região: por UF, os modelos com melhor índice regional e, em cada um, os anúncios candidatos
    à negociação. Dados de oportunidades_compra.php; textos e regras de exibição em comprarModel.js. */
@@ -44,7 +44,7 @@ function LinhaAnuncio({ anuncio, onCriarAcao }) {
       <div className="oc-compra__selos">{selosAnuncio(anuncio).map(s => <Selo key={s.texto} {...s} />)}</div>
       <Componentes anuncio={anuncio} />
       <div className="oc-compra__acoes">
-        {anuncio.url && <a className="or-btn or-btn--secondary" href={anuncio.url} target="_blank" rel="noreferrer">Ver anúncio</a>}
+        {urlSegura(anuncio.url) && <a className="or-btn or-btn--secondary" href={urlSegura(anuncio.url)} target="_blank" rel="noreferrer">Ver anúncio</a>}
         <button type="button" className="or-btn or-btn--ghost" onClick={() => onCriarAcao?.(`Avaliar: ${anuncio.titulo || 'anúncio'} (${anuncio.revenda || 'revenda'}, ${brl(anuncio.preco)})`)}>Criar ação</button>
       </div>
     </li>
