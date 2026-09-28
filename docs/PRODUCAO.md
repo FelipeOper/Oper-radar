@@ -3,12 +3,13 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
-## Release 2.7 -- frontend (beta e producao): Plano de acao no layout da DEMO -- 28/09/2026 (PACOTE PRONTO e zips enviados; aguardando o comando)
+## Release 2.7 -- frontend (beta e producao): Plano de acao no layout da DEMO -- 28/09/2026 (PUBLICADO 28/09/2026 e conferido ao vivo)
 
 - Origem: commit `b447425` (PR #63). So frontend; API, banco, cron e credenciais nao mudam. Codex adversarial em 3 rodadas: perda silenciosa de acao quando localStorage falha (fallback em memoria por aba), href aceitava `//host` e `/\host` como caminho interno (base de resolucao passou a ser sorteada por carga, com rejeicao explicita de `//` apos normalizar `\`->`/`). app 141/141, PHP 17/17, Python 68/68, lint 0.
 - **O que e**: `PlanoAcaoBlocos.jsx`/`planoAcaoModel.js` substituem a `PageAcoes` antiga. KPIs pendentes/concluidas, formulario de nova acao, listas com origem (`Manual`, `Mercado`, `Minha Loja`, `Concorrencia`, `Oportunidades`, `Analise`, `FIPE`), evidencia e link de volta. Os 3 pontos de "Criar acao" em Oportunidades (observado ha mais tempo, abaixo da FIPE, "O que comprar") guardam evidencia real (revenda, preco, nota) em vez de texto solto. Badge de pendentes na sidebar via evento customizado (o `storage` nativo nao avisa a propria aba).
 - **Bug pego na checagem visual, corrigido antes de publicar**: `RadarApp` referenciava a variavel `acoes` removida junto do estado antigo -- `ReferenceError` em runtime, tela Plano de acao (e qualquer navegacao vinda de "Criar acao") quebrava com tela preta.
 - Zips em `/home1/pro93061/backups/` (`Downloads\OperRadar-Release2.1`, mesma pasta): beta `525dd01aae46b0df65244c839798e1e286039bf9afb73c3dafbdd4c375d3bed2` (`index.html` `32784726...`, `index-CK42djCJ.js` `a4ddcb1c...`); producao `222cbd6ac747f5444f1abdff513bd11698c5ad148cbf2c6a7be7e1607a065fe1` (`index.html` `6fca065b...`, `index-C-6DZgje.js` `cd6ed713...`). Pre-checagens: `index.html` do beta `57360710...` e da producao `e586d7d2...` (Release 2.6, conferidos ao vivo antes de empacotar).
+- **Publicado em 28/09/2026** (comando colado por Felipe no Terminal do cPanel). **Conferido ao vivo autenticado:** bundle `index-C-6DZgje.js` servindo, sem erro de console. Criada uma acao real a partir de Oportunidades ("Avaliar: MB 1635 2017/2018", Marka Veiculos Vw, Jau/SP, R$ 253.500, nota 37,9/100), origem "Oportunidades" e evidencia aparecem certas no cartao, badge de pendentes atualizou na sidebar (1). Removida em seguida para nao deixar dado de teste na conta real.
 - Reversao: restaurar `index.html` de `oper-radar-frontend-release2.7-*`.
 
 ## Release 2.6 — API 1.7 + frontend (beta e produção): "O que comprar" por região — 26/09/2026 (PUBLICADO 26/09/2026 e conferido ao vivo)
