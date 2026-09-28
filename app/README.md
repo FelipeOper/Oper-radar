@@ -80,9 +80,12 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
   formulário de nova ação e as listas, cada linha com origem (`Manual`, `Mercado`, `Minha Loja`, `Concorrência`, `Oportunidades`,
   `Análise`, `FIPE`), evidência e link de volta ao insight que a gerou. Ações criadas em Oportunidades ("Criar ação", nos três
   pontos: anúncios observados há mais tempo, abaixo da FIPE e "O que comprar") guardam a evidência real (revenda, preço, nota) em
-  vez de um texto solto. `href` só aceita http/https externo (sanitizado, mesma regra de `comprarModel.js`) ou caminho interno
-  começando com `/`; URL protocol-relative (`//host`, que o navegador resolve como externa) é rejeitada mesmo começando com `/`.
-  Estado só em localStorage (chave `oper-radar-acoes`, migra o formato antigo `{texto, feita}` automaticamente); o badge de
+  vez de um texto solto. `href` só aceita http/https externo (sanitizado, mesma regra de `comprarModel.js`) ou caminho que resolva
+  para a própria origem do app: `//host` (protocol-relative) e `/\host` (o navegador lê `\` como `/` ao resolver URL) mudam de
+  origem mesmo começando com `/` e são rejeitados — a checagem resolve com `new URL()` contra a origem, não por prefixo.
+  Estado só em localStorage (chave `oper-radar-acoes`, migra o formato antigo `{texto, feita}` automaticamente); se a gravação
+  falhar (modo privado, storage cheio), a lista fica num fallback em memória da aba em vez de a ação criada em Oportunidades
+  simplesmente desaparecer ao navegar para o Plano de ação. O badge de
   pendentes na sidebar (fora da página) escuta o evento customizado `oper-radar-acoes-mudou` disparado por `salvaAcoes()`, já que
   o evento nativo `storage` não avisa a própria aba.
 - Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com

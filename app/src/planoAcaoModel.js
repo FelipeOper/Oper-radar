@@ -8,16 +8,26 @@ export const CHAVE_ARMAZENAMENTO = 'oper-radar-acoes';
 export const ORIGENS = ['Manual', 'Mercado', 'Minha Loja', 'Concorrência', 'Oportunidades', 'Análise', 'FIPE'];
 const TITULO_MAX = 120;
 const EVIDENCIA_MAX = 400;
+const ORIGEM_INTERNA = 'http://oper-radar.internal'; // base fixa só pra resolver URL relativa; nunca é enviada nem exibida
 
 const novoId = () => `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-/* Só http/https (mesma regra do link do anúncio em comprarModel.js) ou um caminho interno do próprio app.
-   "//host" é protocol-relative (o navegador resolve para https://host, externo) — nunca é caminho interno
-   mesmo começando com "/"; exige um único "/" inicial. */
+/* Um "/" sozinho não basta: "//evil.example" (protocol-relative) e "/\evil.example" (o navegador trata "\" como "/" na
+   resolução de URL, WHATWG) também começam com "/" e abrem outro domínio. Resolve contra uma origem fixa e só aceita
+   se a origem resultante não mudar — é a mesma forma que o navegador usa pra decidir, não uma lista de prefixos proibidos. */
+function ehCaminhoInterno(v) {
+  try {
+    return new URL(v, ORIGEM_INTERNA).origin === ORIGEM_INTERNA;
+  } catch {
+    return false;
+  }
+}
+
+/* Só http/https (mesma regra do link do anúncio em comprarModel.js) ou um caminho interno do próprio app. */
 function hrefSeguro(href) {
   const v = typeof href === 'string' ? href.trim() : '';
   if (v === '') return '';
-  if (v.startsWith('/') && !v.startsWith('//')) return v;
+  if (v.startsWith('/') && ehCaminhoInterno(v)) return v;
   return urlSegura(v) || '';
 }
 
@@ -46,23 +56,38 @@ export function montaAcao({ titulo, origem = 'Manual', evidencia = '', href = ''
   return normalizaAcao({ id: novoId(), titulo, origem, evidencia, href, done: false, criadaEm: new Date().toISOString() });
 }
 
+// Fallback só em memória (dura a sessão da aba, nunca é persistido): quando localStorage falha (modo privado, storage
+// cheio), guarda aqui a última lista bem-sucedida NA INTENÇÃO. Sem isso, criarAcao() grava, navega para o Plano de
+// ação, a página remonta do zero lendo localStorage de novo — e a ação recém-criada simplesmente não existiria em
+// lugar nenhum (achado do Codex: perda silenciosa). Limpo assim que uma gravação real funciona de novo.
+let fallbackEmMemoria = null;
+
+export const EVENTO_MUDOU = 'oper-radar-acoes-mudou';
+
+/* Dispara EVENTO_MUDOU após salvar: o "storage" nativo do navegador só avisa outras abas, nunca a própria —
+   é assim que o badge de pendentes na sidebar (fora da página do Plano de ação) se atualiza na mesma aba.
+   Devolve false quando o localStorage falhou (o chamador pode avisar o usuário); a lista em si não se perde
+   graças ao fallback em memória usado por carregaAcoes(). */
+export function salvaAcoes(lista) {
+  let ok = true;
+  try {
+    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(lista));
+    fallbackEmMemoria = null;
+  } catch {
+    ok = false;
+    fallbackEmMemoria = lista;
+  }
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(EVENTO_MUDOU));
+  return ok;
+}
+
 export function carregaAcoes() {
+  if (fallbackEmMemoria !== null) return normalizaAcoes(fallbackEmMemoria);
   try {
     return normalizaAcoes(JSON.parse(localStorage.getItem(CHAVE_ARMAZENAMENTO) || '[]'));
   } catch {
     return [];
   }
-}
-
-export const EVENTO_MUDOU = 'oper-radar-acoes-mudou';
-
-/* Dispara EVENTO_MUDOU após salvar: o "storage" nativo do navegador só avisa outras abas, nunca a própria —
-   é assim que o badge de pendentes na sidebar (fora da página do Plano de ação) se atualiza na mesma aba. */
-export function salvaAcoes(lista) {
-  try {
-    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(lista));
-  } catch { /* localStorage indisponível (modo privado, storage cheio): a ação segue só na sessão atual. */ }
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(EVENTO_MUDOU));
 }
 
 export function separaPendentesFeitas(acoes) {

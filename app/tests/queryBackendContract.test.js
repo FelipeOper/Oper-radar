@@ -193,6 +193,10 @@ test('Plano de ação: badge de pendentes na sidebar escuta EVENTO_MUDOU, sem es
   assert.doesNotMatch(app, /acoes\.filter\(a => !a\.feita\)/);
 });
 
-test('href do Plano de ação rejeita URL protocol-relative ("//host"), que o navegador resolve como externa', () => {
-  assert.match(read('app/src/planoAcaoModel.js'), /!v\.startsWith\('\/\/'\)/);
+test('href do Plano de ação resolve contra a própria origem (rejeita "//host" e "/\\host", achados Codex), e falha de storage não perde a ação', () => {
+  const modelo = read('app/src/planoAcaoModel.js');
+  assert.match(modelo, /new URL\(v, ORIGEM_INTERNA\)\.origin === ORIGEM_INTERNA/);
+  assert.doesNotMatch(modelo, /!v\.startsWith\('\/\/'\)/, 'a checagem antiga por prefixo foi trocada pela resolução de URL');
+  assert.match(modelo, /fallbackEmMemoria/);
+  assert.match(modelo, /export function salvaAcoes\(lista\) \{/);
 });

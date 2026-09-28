@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ORIGENS, montaAcao, normalizaAcao, normalizaAcoes, separaPendentesFeitas } from '../src/planoAcaoModel.js';
+import { ORIGENS, carregaAcoes, montaAcao, normalizaAcao, normalizaAcoes, salvaAcoes, separaPendentesFeitas } from '../src/planoAcaoModel.js';
+
+/* Node não tem localStorage global; simula os dois casos que o Codex pediu para cobrir: gravação normal
+   e falha de gravação (modo privado, storage cheio). */
+function fakeLocalStorage({ falha = false } = {}) {
+  let bruto = null;
+  return {
+    getItem: () => bruto,
+    setItem: (_chave, valor) => { if (falha) throw new Error('quota excedida (simulado)'); bruto = valor; },
+  };
+}
 
 test('monta ação com título, origem e evidência; título vazio não vira ação', () => {
   const a = montaAcao({ titulo: 'Avaliar FH 540', origem: 'Oportunidades', evidencia: 'Curitiba/PR · R$ 440.000', href: 'https://exemplo.com/a' });
@@ -29,8 +39,39 @@ test('título e evidência têm limite de tamanho (nunca gravam texto sem fim no
 test('href só aceita http/https externo ou caminho interno começando com "/"; qualquer outro esquema é descartado', () => {
   assert.equal(montaAcao({ titulo: 'x', href: 'https://exemplo.com/a' }).href, 'https://exemplo.com/a');
   assert.equal(montaAcao({ titulo: 'x', href: '/mercado?modelo=FH540' }).href, '/mercado?modelo=FH540');
-  for (const ruim of ['javascript:alert(1)', 'data:text/html,x', '//exemplo.com', undefined, null]) {
-    assert.equal(montaAcao({ titulo: 'x', href: ruim }).href, '');
+  // "//host" (protocol-relative) e "/\host" (o navegador lê "\" como "/" na resolução de URL) mudam a origem mesmo
+  // começando com "/" — não são caminho interno. Achado do Codex: "/\evil.example" escapava do filtro antigo.
+  for (const ruim of ['javascript:alert(1)', 'data:text/html,x', '//exemplo.com', '/\\evil.example', '/\\\\evil.example', undefined, null]) {
+    assert.equal(montaAcao({ titulo: 'x', href: ruim }).href, '', `deveria rejeitar: ${ruim}`);
+  }
+});
+
+test('salvaAcoes: falha de localStorage não perde a ação — carregaAcoes() usa o fallback em memória (achado do Codex)', () => {
+  const original = globalThis.localStorage;
+  try {
+    globalThis.localStorage = fakeLocalStorage({ falha: true });
+    const nova = montaAcao({ titulo: 'Avaliar FH 540', origem: 'Oportunidades', evidencia: 'R$ 440.000' });
+    const ok = salvaAcoes([nova]);
+    assert.equal(ok, false, 'salvaAcoes avisa que a gravação falhou');
+    // simula a navegação real: PagePlanoAcao remonta e lê carregaAcoes() do zero — a ação não pode ter sumido
+    const relido = carregaAcoes();
+    assert.equal(relido.length, 1);
+    assert.equal(relido[0].titulo, 'Avaliar FH 540');
+  } finally {
+    globalThis.localStorage = original;
+  }
+});
+
+test('salvaAcoes: gravação bem-sucedida limpa o fallback em memória (não mascara uma falha futura de leitura real)', () => {
+  const original = globalThis.localStorage;
+  try {
+    globalThis.localStorage = fakeLocalStorage();
+    assert.equal(salvaAcoes([montaAcao({ titulo: 'a' })]), true);
+    assert.equal(carregaAcoes().length, 1);
+    globalThis.localStorage = fakeLocalStorage({ falha: true }); // storage novo, já sem o fallback do teste anterior
+    assert.equal(carregaAcoes().length, 0, 'sem fallback e sem dado gravado nesta instância, a lista é vazia');
+  } finally {
+    globalThis.localStorage = original;
   }
 });
 
