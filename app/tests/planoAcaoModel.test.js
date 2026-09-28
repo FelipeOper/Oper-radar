@@ -143,6 +143,23 @@ test('chave antiga sem escopo (de antes desta correção) NÃO migra automaticam
   }
 });
 
+test('primeira gravação de uma conta nova não apaga a chave legada (achado do Codex no round 3: PagePlanoAcao salva a lista vazia no mount)', () => {
+  const original = globalThis.localStorage;
+  try {
+    const armazem = fakeLocalStorageMultiChave();
+    globalThis.localStorage = armazem;
+    definirUsuarioAtivo(null);
+    salvaAcoes([montaAcao({ titulo: 'legado sem conta' })]); // grava sob a chave antiga, sem usuário ativo
+    definirUsuarioAtivo('7');
+    // reproduz o useEffect de PagePlanoAcao: monta lendo carregaAcoes() (vazio pra conta nova) e grava de volta.
+    salvaAcoes(carregaAcoes());
+    assert.notEqual(armazem.getItem(CHAVE_ARMAZENAMENTO), null, 'salvar a lista vazia da conta nova não pode apagar a única cópia do legado');
+  } finally {
+    definirUsuarioAtivo(null);
+    globalThis.localStorage = original;
+  }
+});
+
 test('separaPendentesFeitas divide pelas duas listas sem perder nem duplicar item', () => {
   const acoes = [montaAcao({ titulo: 'a' }), { ...montaAcao({ titulo: 'b' }), done: true }, montaAcao({ titulo: 'c' })];
   const { pendentes, feitas } = separaPendentesFeitas(acoes);

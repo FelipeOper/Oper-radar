@@ -94,10 +94,6 @@ export function salvaAcoes(lista) {
   let ok = true;
   try {
     localStorage.setItem(chaveAtual(), JSON.stringify(lista));
-    // Ninguém lê mais a chave antiga sem escopo (ver nota em carregaAcoes), mas limpa ela aqui mesmo assim:
-    // uma vez que esta conta já tem lista própria, a chave ambígua só serve pra vazar dado antigo se algum
-    // código futuro voltar a lê-la por engano — sem custo nenhum removê-la agora.
-    if (usuarioAtivo) localStorage.removeItem(CHAVE_ARMAZENAMENTO);
     fallbackEmMemoria = null;
   } catch {
     ok = false;
