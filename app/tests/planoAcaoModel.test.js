@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ORIGENS, carregaAcoes, montaAcao, normalizaAcao, normalizaAcoes, salvaAcoes, separaPendentesFeitas } from '../src/planoAcaoModel.js';
+import { CHAVE_ARMAZENAMENTO, ORIGENS, carregaAcoes, definirUsuarioAtivo, montaAcao, normalizaAcao, normalizaAcoes, salvaAcoes, separaPendentesFeitas } from '../src/planoAcaoModel.js';
 
 /* Node não tem localStorage global; simula os dois casos que o Codex pediu para cobrir: gravação normal
    e falha de gravação (modo privado, storage cheio). */
@@ -9,6 +9,18 @@ function fakeLocalStorage({ falha = false } = {}) {
   return {
     getItem: () => bruto,
     setItem: (_chave, valor) => { if (falha) throw new Error('quota excedida (simulado)'); bruto = valor; },
+    removeItem: () => { bruto = null; },
+  };
+}
+
+/* Versão com várias chaves de verdade (a de cima ignora a chave e serve só pros testes de fallback
+   em memória) — precisa pra testar o escopo por usuário, que grava chaves diferentes por conta. */
+function fakeLocalStorageMultiChave() {
+  const mapa = new Map();
+  return {
+    getItem: chave => (mapa.has(chave) ? mapa.get(chave) : null),
+    setItem: (chave, valor) => mapa.set(chave, valor),
+    removeItem: chave => mapa.delete(chave),
   };
 }
 
@@ -92,6 +104,45 @@ test('normalizaAcoes descarta lixo (não array, item sem título) sem lançar ex
   assert.deepEqual(normalizaAcoes(null), []);
   assert.deepEqual(normalizaAcoes('nao é lista'), []);
   assert.equal(normalizaAcoes([{ titulo: 'ok' }, {}, { titulo: '   ' }, null, 42]).length, 1);
+});
+
+test('definirUsuarioAtivo escopa leitura/escrita por conta; duas contas no mesmo navegador não leem a lista uma da outra (achado do Codex)', () => {
+  const original = globalThis.localStorage;
+  try {
+    globalThis.localStorage = fakeLocalStorageMultiChave();
+    definirUsuarioAtivo(null);
+    definirUsuarioAtivo('7');
+    salvaAcoes([montaAcao({ titulo: 'do usuário 7' })]);
+    definirUsuarioAtivo('9');
+    assert.equal(carregaAcoes().length, 0, 'usuário 9 não enxerga a lista gravada pelo usuário 7');
+    salvaAcoes([montaAcao({ titulo: 'do usuário 9' })]);
+    definirUsuarioAtivo('7');
+    assert.equal(carregaAcoes().length, 1);
+    assert.equal(carregaAcoes()[0].titulo, 'do usuário 7', 'voltar pro usuário 7 ainda vê a lista dele, não a do 9');
+  } finally {
+    definirUsuarioAtivo(null);
+    globalThis.localStorage = original;
+  }
+});
+
+test('chave antiga sem escopo (de antes desta correção) migra uma única vez para quem logar primeiro', () => {
+  const original = globalThis.localStorage;
+  try {
+    const armazem = fakeLocalStorageMultiChave();
+    globalThis.localStorage = armazem;
+    definirUsuarioAtivo(null);
+    salvaAcoes([montaAcao({ titulo: 'legado sem conta' })]); // grava sob a chave antiga, sem usuário ativo
+    definirUsuarioAtivo('7');
+    const lidas = carregaAcoes();
+    assert.equal(lidas.length, 1);
+    assert.equal(lidas[0].titulo, 'legado sem conta', 'assume que o legado pertence a quem logar primeiro');
+    assert.equal(armazem.getItem(CHAVE_ARMAZENAMENTO), null, 'chave antiga é removida depois de migrar (não pode mais vazar pra outra conta)');
+    definirUsuarioAtivo('9');
+    assert.equal(carregaAcoes().length, 0, 'segunda conta a logar não herda o legado de novo — já foi migrado pro usuário 7');
+  } finally {
+    definirUsuarioAtivo(null);
+    globalThis.localStorage = original;
+  }
 });
 
 test('separaPendentesFeitas divide pelas duas listas sem perder nem duplicar item', () => {

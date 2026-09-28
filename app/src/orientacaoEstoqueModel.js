@@ -37,3 +37,13 @@ export function tituloAcaoPlano(orientacao, nomeVeiculo) {
 export function precisaDeAcao(orientacao) {
   return orientacao?.acao === 'avaliar_reducao' || orientacao?.acao === 'avaliar_outra_praca';
 }
+
+/* A orientação vem calculada em cima de `itemAnalisado` (o que a API de fato leu). Se o rascunho em edição
+ * mudou preço ou UF sem salvar, a orientação exibida já não descreve o veículo que está na tela — criar uma
+ * ação nesse momento gravaria um motivo/desvio que não corresponde ao nome atual (achado do Codex). */
+export function orientacaoDesatualizada(rascunho, itemAnalisado) {
+  if (!rascunho || !itemAnalisado) return false;
+  const precoMudou = Number(rascunho.preco_anunciado || 0) !== Number(itemAnalisado.preco_anunciado || 0);
+  const ufMudou = String(rascunho.uf || '') !== String(itemAnalisado.uf || '');
+  return precoMudou || ufMudou;
+}

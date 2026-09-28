@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { precisaDeAcao, rotuloAcao, tituloAcaoPlano, tomAcao } from '../src/orientacaoEstoqueModel.js';
+import { orientacaoDesatualizada, precisaDeAcao, rotuloAcao, tituloAcaoPlano, tomAcao } from '../src/orientacaoEstoqueModel.js';
 
 test('rótulo e tom cobrem as quatro ações possíveis; ação desconhecida cai em "sem base"', () => {
   assert.equal(rotuloAcao('manter'), 'Manter preço');
@@ -26,4 +26,14 @@ test('botão "Criar ação" só aparece quando há algo a decidir — não em ma
   assert.equal(precisaDeAcao({ acao: 'manter' }), false);
   assert.equal(precisaDeAcao({ acao: 'sem_base' }), false);
   assert.equal(precisaDeAcao(null), false);
+});
+
+test('orientação fica desatualizada quando rascunho diverge do item analisado (preço ou UF), não com outros campos', () => {
+  const analisado = { preco_anunciado: 450000, uf: 'PR' };
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'PR' }, analisado), false, 'igual: não está desatualizada');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: '450000', uf: 'PR' }, analisado), false, 'string numérica igual (input controlado) não conta como mudança');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 460000, uf: 'PR' }, analisado), true, 'preço mudou');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'SP' }, analisado), true, 'UF mudou');
+  assert.equal(orientacaoDesatualizada(null, analisado), false, 'sem rascunho: não há o que comparar');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'PR' }, null), false, 'sem item analisado ainda (carregando): não sinaliza desatualizada');
 });

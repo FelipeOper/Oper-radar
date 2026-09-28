@@ -16,9 +16,8 @@ const OPER_ORIENTACAO_CORTE_PCT = 5.0; // mesmo corte de "acima do mercado" já 
  * @param array      $item        do meu_estoque: preco_anunciado, uf
  * @param array|null $nacional    bloco 'mercado_nacional' de minha_loja_detalhe.php (ou null)
  * @param array      $regioes     lista 'regioes' de minha_loja_detalhe.php (cada uma com uf, comparaveis, preco_mediano, avaliacao.publicavel)
- * @param array|null $melhorRegiao 'melhor_regiao_observada' (ou null)
  */
-function oper_loja_orienta_veiculo(array $item, ?array $nacional, array $regioes, ?array $melhorRegiao): array {
+function oper_loja_orienta_veiculo(array $item, ?array $nacional, array $regioes): array {
     $preco = (float)($item['preco_anunciado'] ?? 0);
     if ($preco <= 0) {
         return ['acao' => 'sem_base', 'motivo' => 'Informe o preço anunciado para orientar a venda deste veículo.'];
@@ -59,11 +58,17 @@ function oper_loja_orienta_veiculo(array $item, ?array $nacional, array $regioes
         ];
     }
 
-    // Acima da faixa: só sugere outra praça se ela for de fato diferente, publicável e sustentar um preço
-    // próximo do atual — senão a recomendação certa é revisar o preço, não mudar de lugar.
-    $melhorOutraPraca = ($melhorRegiao !== null && ($melhorRegiao['uf'] ?? null) !== $ufItem && !empty($melhorRegiao['avaliacao']['publicavel']))
-        ? $melhorRegiao : null;
-    if ($melhorOutraPraca !== null && (float)($melhorOutraPraca['preco_mediano'] ?? 0) >= $preco * (1 - OPER_ORIENTACAO_CORTE_PCT / 100)) {
+    // Acima da faixa: procura, entre TODAS as praças candidatas (não só a #1 do ranking geral, que pode ser
+    // a própria ou não sustentar este preço — achado do Codex), a primeira publicável, de UF diferente da
+    // atual, que sustente preço próximo do anunciado. $regioes já vem ordenada por publicável+pontuação
+    // (minha_loja_detalhe.php), então a primeira que passar nos três critérios é a melhor alternativa real.
+    $limiarPreco = $preco * (1 - OPER_ORIENTACAO_CORTE_PCT / 100);
+    $melhorOutraPraca = null;
+    foreach ($regioes as $candidata) {
+        if (($candidata['uf'] ?? null) === $ufItem || empty($candidata['avaliacao']['publicavel'])) continue;
+        if ((float)($candidata['preco_mediano'] ?? 0) >= $limiarPreco) { $melhorOutraPraca = $candidata; break; }
+    }
+    if ($melhorOutraPraca !== null) {
         return [
             'acao' => 'avaliar_outra_praca', 'origem_base' => $origemBase, 'desvio_pct' => $desvio, 'uf_sugerida' => $melhorOutraPraca['uf'],
             'motivo' => "Preço {$desvio}% acima da {$baseTexto}; {$melhorOutraPraca['uf']} sustenta preço mais próximo do seu, com melhor movimento observado.",

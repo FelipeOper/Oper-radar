@@ -6,6 +6,22 @@ import { urlSegura } from './comprarModel.js';
 
 export const CHAVE_ARMAZENAMENTO = 'oper-radar-acoes';
 export const ORIGENS = ['Manual', 'Mercado', 'Minha Loja', 'Concorrência', 'Oportunidades', 'Análise', 'FIPE'];
+
+// Escopo por usuário: sem isso, duas contas no mesmo navegador (dono/gerente/supervisor num computador
+// compartilhado) leem e escrevem a MESMA lista — inclusive dados reais de estoque que "Criar ação" da
+// Minha Loja passou a guardar (achado do Codex). definirUsuarioAtivo() é chamado por RadarApp toda vez que
+// a sessão muda, de forma síncrona no corpo do componente (não em useEffect: o efeito do pai só roda depois
+// do filho montar, tarde demais pro primeiro carregaAcoes() da própria página).
+let usuarioAtivo = null;
+export function definirUsuarioAtivo(usuarioId) {
+  const novo = usuarioId != null ? String(usuarioId) : null;
+  if (novo === usuarioAtivo) return;
+  usuarioAtivo = novo;
+  fallbackEmMemoria = null; // fallback é por sessão de uso, nunca deve atravessar pra outra conta
+}
+function chaveAtual() {
+  return usuarioAtivo ? `${CHAVE_ARMAZENAMENTO}:${usuarioAtivo}` : CHAVE_ARMAZENAMENTO;
+}
 const TITULO_MAX = 120;
 const EVIDENCIA_MAX = 400;
 // Sorteada a cada carga do módulo: se a base fosse um literal fixo, um href malicioso poderia embutir esse
@@ -77,7 +93,10 @@ export const EVENTO_MUDOU = 'oper-radar-acoes-mudou';
 export function salvaAcoes(lista) {
   let ok = true;
   try {
-    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(lista));
+    localStorage.setItem(chaveAtual(), JSON.stringify(lista));
+    // Uma vez que grava sob a chave do usuário, a versão antiga sem escopo não pode mais ser lida por
+    // ninguém (senão o próximo usuário sem dado próprio ainda enxergaria a lista de quem gravou primeiro).
+    if (usuarioAtivo) localStorage.removeItem(CHAVE_ARMAZENAMENTO);
     fallbackEmMemoria = null;
   } catch {
     ok = false;
@@ -90,7 +109,21 @@ export function salvaAcoes(lista) {
 export function carregaAcoes() {
   if (fallbackEmMemoria !== null) return normalizaAcoes(fallbackEmMemoria);
   try {
-    return normalizaAcoes(JSON.parse(localStorage.getItem(CHAVE_ARMAZENAMENTO) || '[]'));
+    const bruto = localStorage.getItem(chaveAtual());
+    if (bruto !== null) return normalizaAcoes(JSON.parse(bruto));
+    // Migração única: nada ainda sob a chave deste usuário, mas existe dado da versão antiga sem escopo
+    // (de antes desta correção). Assume que pertence a quem está logado agora — é a única sessão que já
+    // tinha acesso a ele antes de existir separação por conta — e move pra chave escopada.
+    if (usuarioAtivo) {
+      const legado = localStorage.getItem(CHAVE_ARMAZENAMENTO);
+      if (legado !== null) {
+        const migradas = normalizaAcoes(JSON.parse(legado));
+        localStorage.setItem(chaveAtual(), JSON.stringify(migradas));
+        localStorage.removeItem(CHAVE_ARMAZENAMENTO);
+        return migradas;
+      }
+    }
+    return [];
   } catch {
     return [];
   }

@@ -190,7 +190,7 @@ $nacionalOrientacao = [
     'amostra_suficiente' => (bool)$nacional['amostra_suficiente'],
     'preco_mediano' => $nacional['mediana'],
 ];
-$orientacao = oper_loja_orienta_veiculo($item, $nacionalOrientacao, $regioes, $melhor);
+$orientacao = oper_loja_orienta_veiculo($item, $nacionalOrientacao, $regioes);
 
 envia_json([
     'item' => $item,

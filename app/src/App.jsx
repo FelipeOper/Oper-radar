@@ -39,8 +39,8 @@ import { PageComparador } from './ComparadorBlocos.jsx';
 import { ComprarPorRegiao } from './ComprarBlocos.jsx';
 import { resumoLoja, AMOSTRA_MINIMA as AMOSTRA_MINIMA_LOJA } from './minhaLojaModel.js';
 import { PagePlanoAcao } from './PlanoAcaoBlocos.jsx';
-import { EVENTO_MUDOU as EVENTO_ACOES_MUDOU, carregaAcoes, montaAcao, salvaAcoes, separaPendentesFeitas } from './planoAcaoModel.js';
-import { precisaDeAcao, rotuloAcao, tituloAcaoPlano, tomAcao } from './orientacaoEstoqueModel.js';
+import { EVENTO_MUDOU as EVENTO_ACOES_MUDOU, carregaAcoes, definirUsuarioAtivo, montaAcao, salvaAcoes, separaPendentesFeitas } from './planoAcaoModel.js';
+import { orientacaoDesatualizada, precisaDeAcao, rotuloAcao, tituloAcaoPlano, tomAcao } from './orientacaoEstoqueModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
@@ -2093,7 +2093,7 @@ const TOM_ORIENTACAO_TAG = { success: 'positivo', warning: 'alerta', info: 'sina
 
 /* Decisão de venda pro veículo (Felipe, 28/09/2026: o Radar orienta a vender melhor o PRÓPRIO estoque, não a
    comprar). Fica visível acima das abas, não dentro de uma delas — é o motivo de abrir o painel. */
-function OrientacaoVenda({ orientacao, nomeVeiculo, onCriarAcao }) {
+function OrientacaoVenda({ orientacao, nomeVeiculo, desatualizada, onCriarAcao }) {
   if (!orientacao) return null;
   const tom = TOM_ORIENTACAO_TAG[tomAcao(orientacao.acao)];
   const cor = { positivo: T.positive, alerta: T.alert, sinal: T.signal, neutro: T.inkMuted }[tom];
@@ -2107,7 +2107,9 @@ function OrientacaoVenda({ orientacao, nomeVeiculo, onCriarAcao }) {
         <Tag tone={tom}>{orientacao.acao === 'sem_base' ? 'sem base' : `${orientacao.origem_base === 'nacional' ? 'nacional' : 'sua praça'} · ${orientacao.desvio_pct > 0 ? '+' : ''}${orientacao.desvio_pct}%`}</Tag>
       </div>
       <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>{orientacao.motivo}</div>
-      {precisaDeAcao(orientacao) && (
+      {/* Achado do Codex: rascunho editado (preço/UF) e não salvo não pode gerar ação com o número antigo. */}
+      {desatualizada && <div role="status" style={{ marginTop: 10, padding: 9, borderRadius: 8, color: T.inkMuted, background: `${T.signal}10`, border: `1px solid ${T.signal}30`, fontSize: 11 }}>Preço ou UF foram alterados nesta tela. Salve as alterações para recalcular esta orientação antes de criar uma ação.</div>}
+      {!desatualizada && precisaDeAcao(orientacao) && (
         <button onClick={() => onCriarAcao?.({
           titulo: tituloAcaoPlano(orientacao, nomeVeiculo), origem: 'Minha Loja',
           evidencia: `${nomeVeiculo} · ${orientacao.motivo}`,
@@ -2205,7 +2207,12 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }
   const deltaMercado = mercado?.amostra_suficiente && mercado?.preco_mediano > 0 && precoAtual > 0 ? Math.round((precoAtual / mercado.preco_mediano - 1) * 1000) / 10 : null;
   const abas = [['cadastro', 'Cadastro'], ['mercado', 'Mercado nacional'], ['regioes', `Regiões · ${regioes.length}`]];
   const campoStyle = { ...inputStyle, width: '100%' };
-  const nomeVeiculo = rascunho?.titulo || itemInicial.titulo || [rascunho?.marca || itemInicial.marca, rascunho?.modelo || itemInicial.modelo].filter(Boolean).join(' ') || 'veículo';
+  // Nome e flag de "desatualizada" usam dados.item (o veículo que a API de fato analisou), nunca o rascunho em
+  // edição — senão um preço/UF trocado na tela sem salvar criaria uma ação com o nome novo e o número antigo
+  // (achado do Codex). A orientação só é reativada depois de salvar, quando dados.item reflete o rascunho.
+  const itemAnalisado = dados?.item;
+  const nomeVeiculo = itemAnalisado?.titulo || itemInicial.titulo || [itemAnalisado?.marca || itemInicial.marca, itemAnalisado?.modelo || itemInicial.modelo].filter(Boolean).join(' ') || 'veículo';
+  const orientacaoEstaDesatualizada = orientacaoDesatualizada(rascunho, itemAnalisado);
 
   return <div onClick={onClose} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2, 6, 12, .68)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end' }}>
     <aside onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Análise de ${itemInicial.marca || ''} ${itemInicial.modelo || 'veículo'}`} style={{ width: 'min(760px, 100vw)', height: '100%', overflowY: 'auto', background: T.bg, borderLeft: `1px solid ${T.line}`, boxShadow: '-20px 0 60px rgba(0,0,0,.35)', color: T.ink }}>
@@ -2220,7 +2227,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }
         {!dados && !erro && <Card style={{ textAlign: 'center', color: T.inkMuted }}>Carregando análise do veículo…</Card>}
         {erro && <div role="alert" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}35` }}>{erro}</div>}
         {aviso && <div role="status" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.positive, background: `${T.positive}12`, border: `1px solid ${T.positive}35` }}>{aviso}</div>}
-        {dados && <div style={{ marginBottom: 14 }}><OrientacaoVenda orientacao={dados.orientacao} nomeVeiculo={nomeVeiculo} onCriarAcao={onCriarAcao} /></div>}
+        {dados && <div style={{ marginBottom: 14 }}><OrientacaoVenda orientacao={dados.orientacao} nomeVeiculo={nomeVeiculo} desatualizada={orientacaoEstaDesatualizada} onCriarAcao={onCriarAcao} /></div>}
 
         {dados && rascunho && aba === 'cadastro' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {rascunho.origem === 'xml' && <div role="note" style={{ padding: 11, borderRadius: 9, color: T.inkMuted, background: `${T.signal}10`, border: `1px solid ${T.signal}30`, fontSize: 11.5 }}>Este veículo veio do XML. Uma próxima sincronização pode substituir os campos também presentes no arquivo.</div>}
@@ -2916,6 +2923,12 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   const { page: pagina, context: contexto, navigate, updateContext, goBack } = useBrowserRoute(import.meta.env.BASE_URL);
   const setPagina = useCallback(page => navigate(page), [navigate]);
   const tituloRef = useRef(null);
+
+  // Síncrono no corpo do componente, não em useEffect: o efeito do PAI só roda depois do FILHO montar
+  // (PagePlanoAcao já teria lido carregaAcoes() com o usuário errado). Isola o Plano de ação por conta —
+  // sem isso, duas contas no mesmo navegador leriam a mesma lista, inclusive dado real de estoque que
+  // "Criar ação" da Minha Loja passou a guardar (achado do Codex).
+  definirUsuarioAtivo(sessao?.usuario?.id);
 
   // Badge de pendentes na sidebar: o Plano de ação lê/grava seu próprio localStorage (PlanoAcaoBlocos.jsx),
   // então este contador só se atualiza ouvindo o mesmo evento que salvaAcoes() dispara ao salvar.
