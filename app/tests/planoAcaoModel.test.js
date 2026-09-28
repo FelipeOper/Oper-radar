@@ -125,7 +125,7 @@ test('definirUsuarioAtivo escopa leitura/escrita por conta; duas contas no mesmo
   }
 });
 
-test('chave antiga sem escopo (de antes desta correção) migra uma única vez para quem logar primeiro', () => {
+test('chave antiga sem escopo (de antes desta correção) NÃO migra automaticamente para quem logar primeiro (achado do Codex no round 2: migração vazava titularidade errada)', () => {
   const original = globalThis.localStorage;
   try {
     const armazem = fakeLocalStorageMultiChave();
@@ -133,12 +133,10 @@ test('chave antiga sem escopo (de antes desta correção) migra uma única vez p
     definirUsuarioAtivo(null);
     salvaAcoes([montaAcao({ titulo: 'legado sem conta' })]); // grava sob a chave antiga, sem usuário ativo
     definirUsuarioAtivo('7');
-    const lidas = carregaAcoes();
-    assert.equal(lidas.length, 1);
-    assert.equal(lidas[0].titulo, 'legado sem conta', 'assume que o legado pertence a quem logar primeiro');
-    assert.equal(armazem.getItem(CHAVE_ARMAZENAMENTO), null, 'chave antiga é removida depois de migrar (não pode mais vazar pra outra conta)');
+    assert.equal(carregaAcoes().length, 0, 'primeira conta a logar não herda o legado — titularidade não pode ser assumida');
+    assert.notEqual(armazem.getItem(CHAVE_ARMAZENAMENTO), null, 'a simples leitura da conta 7 não apaga nem consome a chave antiga');
     definirUsuarioAtivo('9');
-    assert.equal(carregaAcoes().length, 0, 'segunda conta a logar não herda o legado de novo — já foi migrado pro usuário 7');
+    assert.equal(carregaAcoes().length, 0, 'segunda conta a logar também não herda o legado');
   } finally {
     definirUsuarioAtivo(null);
     globalThis.localStorage = original;

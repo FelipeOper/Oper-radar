@@ -94,8 +94,9 @@ export function salvaAcoes(lista) {
   let ok = true;
   try {
     localStorage.setItem(chaveAtual(), JSON.stringify(lista));
-    // Uma vez que grava sob a chave do usuário, a versão antiga sem escopo não pode mais ser lida por
-    // ninguém (senão o próximo usuário sem dado próprio ainda enxergaria a lista de quem gravou primeiro).
+    // Ninguém lê mais a chave antiga sem escopo (ver nota em carregaAcoes), mas limpa ela aqui mesmo assim:
+    // uma vez que esta conta já tem lista própria, a chave ambígua só serve pra vazar dado antigo se algum
+    // código futuro voltar a lê-la por engano — sem custo nenhum removê-la agora.
     if (usuarioAtivo) localStorage.removeItem(CHAVE_ARMAZENAMENTO);
     fallbackEmMemoria = null;
   } catch {
@@ -110,24 +111,19 @@ export function carregaAcoes() {
   if (fallbackEmMemoria !== null) return normalizaAcoes(fallbackEmMemoria);
   try {
     const bruto = localStorage.getItem(chaveAtual());
-    if (bruto !== null) return normalizaAcoes(JSON.parse(bruto));
-    // Migração única: nada ainda sob a chave deste usuário, mas existe dado da versão antiga sem escopo
-    // (de antes desta correção). Assume que pertence a quem está logado agora — é a única sessão que já
-    // tinha acesso a ele antes de existir separação por conta — e move pra chave escopada.
-    if (usuarioAtivo) {
-      const legado = localStorage.getItem(CHAVE_ARMAZENAMENTO);
-      if (legado !== null) {
-        const migradas = normalizaAcoes(JSON.parse(legado));
-        localStorage.setItem(chaveAtual(), JSON.stringify(migradas));
-        localStorage.removeItem(CHAVE_ARMAZENAMENTO);
-        return migradas;
-      }
-    }
-    return [];
+    return bruto !== null ? normalizaAcoes(JSON.parse(bruto)) : [];
   } catch {
     return [];
   }
 }
+
+// Sem migração automática da chave antiga sem escopo: a lista legada pode já ter sido escrita por MAIS de
+// uma conta num navegador compartilhado (era exatamente o problema — não existia separação antes desta
+// correção), então "atribuir pra quem logar primeiro" não restaura a titularidade certa, só congela a
+// mistura permanentemente numa conta que pode não ser a dona de tudo ali (achado do Codex no round 2: a
+// migração automática vazava ações/evidências de estoque de uma conta pra outra). A chave antiga fica
+// inerte — nenhuma conta volta a lê-la automaticamente; nada é apagado, então uma importação manual futura
+// continua possível se o responsável quiser decidir a titularidade caso a caso.
 
 export function separaPendentesFeitas(acoes) {
   return { pendentes: acoes.filter(a => !a.done), feitas: acoes.filter(a => a.done) };

@@ -28,12 +28,15 @@ test('botão "Criar ação" só aparece quando há algo a decidir — não em ma
   assert.equal(precisaDeAcao(null), false);
 });
 
-test('orientação fica desatualizada quando rascunho diverge do item analisado (preço ou UF), não com outros campos', () => {
-  const analisado = { preco_anunciado: 450000, uf: 'PR' };
-  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'PR' }, analisado), false, 'igual: não está desatualizada');
-  assert.equal(orientacaoDesatualizada({ preco_anunciado: '450000', uf: 'PR' }, analisado), false, 'string numérica igual (input controlado) não conta como mudança');
-  assert.equal(orientacaoDesatualizada({ preco_anunciado: 460000, uf: 'PR' }, analisado), true, 'preço mudou');
-  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'SP' }, analisado), true, 'UF mudou');
+test('orientação fica desatualizada quando rascunho diverge do item analisado (preço, UF ou referência FIPE), não com outros campos', () => {
+  const analisado = { preco_anunciado: 450000, uf: 'PR', fipe_preco_id: 900 };
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'PR', fipe_preco_id: 900 }, analisado), false, 'igual: não está desatualizada');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: '450000', uf: 'PR', fipe_preco_id: 900 }, analisado), false, 'string numérica igual (input controlado) não conta como mudança');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 460000, uf: 'PR', fipe_preco_id: 900 }, analisado), true, 'preço mudou');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'SP', fipe_preco_id: 900 }, analisado), true, 'UF mudou');
+  // achado do Codex (round 2): minha_loja_detalhe.php busca região/nacional pelo fipe_preco_id do item salvo —
+  // trocar a referência FIPE no rascunho muda o próprio conjunto de comparáveis, não só o desvio exibido.
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'PR', fipe_preco_id: 901 }, analisado), true, 'referência FIPE mudou');
   assert.equal(orientacaoDesatualizada(null, analisado), false, 'sem rascunho: não há o que comparar');
-  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'PR' }, null), false, 'sem item analisado ainda (carregando): não sinaliza desatualizada');
+  assert.equal(orientacaoDesatualizada({ preco_anunciado: 450000, uf: 'PR', fipe_preco_id: 900 }, null), false, 'sem item analisado ainda (carregando): não sinaliza desatualizada');
 });

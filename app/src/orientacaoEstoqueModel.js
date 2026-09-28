@@ -39,11 +39,15 @@ export function precisaDeAcao(orientacao) {
 }
 
 /* A orientação vem calculada em cima de `itemAnalisado` (o que a API de fato leu). Se o rascunho em edição
- * mudou preço ou UF sem salvar, a orientação exibida já não descreve o veículo que está na tela — criar uma
- * ação nesse momento gravaria um motivo/desvio que não corresponde ao nome atual (achado do Codex). */
+ * mudou preço, UF ou a referência FIPE sem salvar, a orientação exibida já não descreve o veículo que está
+ * na tela — minha_loja_detalhe.php busca região/nacional pelo fipe_preco_id do item salvo, então trocar a
+ * FIPE no rascunho muda o próprio conjunto de comparáveis usado pela orientação, não só o desvio (2º achado
+ * do Codex no round 2: a checagem original só olhava preço/UF e deixava o botão "Criar ação" ativo mesmo com
+ * a base de comparação divergente). */
 export function orientacaoDesatualizada(rascunho, itemAnalisado) {
   if (!rascunho || !itemAnalisado) return false;
   const precoMudou = Number(rascunho.preco_anunciado || 0) !== Number(itemAnalisado.preco_anunciado || 0);
   const ufMudou = String(rascunho.uf || '') !== String(itemAnalisado.uf || '');
-  return precoMudou || ufMudou;
+  const fipeMudou = String(rascunho.fipe_preco_id || '') !== String(itemAnalisado.fipe_preco_id || '');
+  return precoMudou || ufMudou || fipeMudou;
 }
