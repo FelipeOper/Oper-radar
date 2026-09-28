@@ -161,3 +161,38 @@ test('oportunidades_compra.php restringe o SQL ao universo comparável, cacheia 
   assert.match(lib, /oper_compra_no_universo\(\$a\)/);
   assert.match(lib, /oper_compra_url_segura\(\$a\['url'\] \?\? null\)/);
 });
+
+test('Plano de ação no layout da DEMO: ações de Oportunidades guardam origem, evidência e o link de volta', () => {
+  const app = read('app/src/App.jsx');
+  assert.match(app, /<PagePlanoAcao \/>/);
+  assert.doesNotMatch(app, /function PageAcoes/, 'a tela antiga foi substituída, não deve sobrar duplicada');
+  // os três pontos que criam ação hoje (observado há mais tempo, abaixo da FIPE, o que comprar) passam objeto, não string solta
+  const criaAcaoApp = [...app.matchAll(/onCriarAcao\(\{[\s\S]*?\}\)/g)];
+  assert.equal(criaAcaoApp.length, 2, 'os dois pontos de Oportunidades em App.jsx');
+  for (const m of criaAcaoApp) {
+    assert.match(m[0], /origem: 'Oportunidades'/);
+    assert.match(m[0], /evidencia: `/);
+    assert.match(m[0], /href: a\.url/);
+  }
+  assert.match(read('app/src/ComprarBlocos.jsx'), /origem: 'Oportunidades'/);
+  assert.match(read('app/src/ComprarBlocos.jsx'), /href: anuncio\.url/);
+  const modelo = read('app/src/planoAcaoModel.js');
+  assert.match(modelo, /ORIGENS = \[/);
+  assert.match(modelo, /CHAVE_ARMAZENAMENTO = 'oper-radar-acoes'/); // mesma chave do formato antigo: migra, não perde ação já salva
+  assert.match(modelo, /bruto\.titulo \?\? bruto\.texto/); // migra o formato antigo ({texto, feita}) sem perder a ação já salva
+  assert.match(read('app/src/PlanoAcaoBlocos.jsx'), /Remover/);
+});
+
+test('Plano de ação: badge de pendentes na sidebar escuta EVENTO_MUDOU, sem estado "acoes" morto em RadarApp (bug real: ReferenceError em runtime)', () => {
+  const app = read('app/src/App.jsx');
+  assert.match(app, /EVENTO_MUDOU as EVENTO_ACOES_MUDOU/);
+  assert.match(app, /window\.addEventListener\(EVENTO_ACOES_MUDOU, atualiza\)/);
+  assert.match(app, /separaPendentesFeitas\(carregaAcoes\(\)\)\.pendentes\.length/);
+  // guarda contra reintroduzir a variável de estado antiga (removida junto do PageAcoes legado)
+  assert.doesNotMatch(app, /const \[acoes, setAcoes\]/);
+  assert.doesNotMatch(app, /acoes\.filter\(a => !a\.feita\)/);
+});
+
+test('href do Plano de ação rejeita URL protocol-relative ("//host"), que o navegador resolve como externa', () => {
+  assert.match(read('app/src/planoAcaoModel.js'), /!v\.startsWith\('\/\/'\)/);
+});

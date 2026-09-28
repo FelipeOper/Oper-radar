@@ -983,3 +983,19 @@ select {
 .oc-compra__comp ul { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .oc-compra__comp li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-sm, 13px); }
 @media (max-width: 560px) { .oc-compra__preco { align-items: flex-start; } }
+
+/* Plano de ação: formulário de nova ação e listas de pendentes/concluídas. */
+.oc-acoes { display: flex; flex-direction: column; gap: 16px; }
+.oc-acoes__form { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; align-items: end; }
+.oc-acoes__form-acao { display: flex; align-items: center; gap: 10px; grid-column: 1 / -1; }
+.oc-acoes__grupos { display: flex; flex-direction: column; gap: 20px; }
+.oc-acoes__grupo { display: flex; flex-direction: column; gap: 10px; }
+.oc-acoes__lista { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.oc-acoes__item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); min-width: 0; }
+.oc-acoes__check { align-items: flex-start; }
+.oc-acoes__titulo { overflow-wrap: anywhere; }
+.oc-acoes__titulo.is-done { text-decoration: line-through; color: var(--text-tertiary); }
+.oc-acoes__meta { display: flex; flex-direction: column; gap: 8px; padding-left: 28px; }
+.oc-acoes__evidencia { margin: 0; overflow-wrap: anywhere; }
+.oc-acoes__acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 560px) { .oc-acoes__form { grid-template-columns: 1fr; } }

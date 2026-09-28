@@ -76,6 +76,15 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Oportunidades abre com "O que comprar em cada região" (`src/ComprarBlocos.jsx`, textos em `src/comprarModel.js`, dados de `oportunidades_compra.php`):
   por UF, os modelos com melhor índice regional e os anúncios candidatos à negociação, cada um com selos (desvio vs mediana da UF e vs FIPE, preço caiu em
   30 dias, dias no radar) e "Por que esta nota" com os componentes e pesos efetivos. Linguagem de candidato, nunca "ideal"; sem base mostra o motivo.
+- Plano de ação no layout da DEMO (`src/PlanoAcaoBlocos.jsx`, regras em `src/planoAcaoModel.js`): KPIs de pendentes/concluídas,
+  formulário de nova ação e as listas, cada linha com origem (`Manual`, `Mercado`, `Minha Loja`, `Concorrência`, `Oportunidades`,
+  `Análise`, `FIPE`), evidência e link de volta ao insight que a gerou. Ações criadas em Oportunidades ("Criar ação", nos três
+  pontos: anúncios observados há mais tempo, abaixo da FIPE e "O que comprar") guardam a evidência real (revenda, preço, nota) em
+  vez de um texto solto. `href` só aceita http/https externo (sanitizado, mesma regra de `comprarModel.js`) ou caminho interno
+  começando com `/`; URL protocol-relative (`//host`, que o navegador resolve como externa) é rejeitada mesmo começando com `/`.
+  Estado só em localStorage (chave `oper-radar-acoes`, migra o formato antigo `{texto, feita}` automaticamente); o badge de
+  pendentes na sidebar (fora da página) escuta o evento customizado `oper-radar-acoes-mudou` disparado por `salvaAcoes()`, já que
+  o evento nativo `storage` não avisa a própria aba.
 - Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com
   os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo) e ano-modelo, janela de
   movimento, comparação automática quando os dois lados estão completos, veredito e métricas lado a lado. A API

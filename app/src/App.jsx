@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  LayoutGrid, Settings, ListChecks,
+  LayoutGrid, Settings,
   MapPin, ExternalLink, Search,
   TrendingDown, ArrowDownRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Gauge, RotateCcw,
@@ -38,6 +38,8 @@ import { ResumoLoja, CartaoVeiculo } from './MinhaLojaBlocos.jsx';
 import { PageComparador } from './ComparadorBlocos.jsx';
 import { ComprarPorRegiao } from './ComprarBlocos.jsx';
 import { resumoLoja, AMOSTRA_MINIMA as AMOSTRA_MINIMA_LOJA } from './minhaLojaModel.js';
+import { PagePlanoAcao } from './PlanoAcaoBlocos.jsx';
+import { EVENTO_MUDOU as EVENTO_ACOES_MUDOU, carregaAcoes, montaAcao, salvaAcoes, separaPendentesFeitas } from './planoAcaoModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
@@ -1668,8 +1670,10 @@ function PageOportunidades({ onCriarAcao }) {
                 <ComparativoAnuncio anuncio={a} compacto />
               </div>
               <Tag tone="alerta">OBSERVADO HÁ {a.dias} DIAS</Tag>
-              <button onClick={() => onCriarAcao(`Avaliar: ${a.titulo} (${a.revenda}, observado há ${a.dias}d)`)}
-                style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
+              <button onClick={() => onCriarAcao({
+                titulo: `Avaliar: ${a.titulo}`, origem: 'Oportunidades', href: a.url,
+                evidencia: `${a.revenda} · ${a.cidade}/${a.uf} · ${fmtBRL(a.preco)} · observado há ${a.dias} dias pelo Radar (não é a data real de publicação nem prova disposição para negociar).`,
+              })} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
                 <Plus size={13} /> Criar ação
               </button>
             </Card>
@@ -1700,8 +1704,10 @@ function PageOportunidades({ onCriarAcao }) {
               <Tag tone={a.fipeConfianca === 'alto' ? 'positivo' : 'alerta'}>
                 MATCH {a.fipeConfianca?.toUpperCase() || '—'}
               </Tag>
-              <button onClick={() => onCriarAcao(`Validar oportunidade FIPE: ${a.titulo} (${a.revenda})`)}
-                style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
+              <button onClick={() => onCriarAcao({
+                titulo: `Validar oportunidade FIPE: ${a.titulo}`, origem: 'Oportunidades', href: a.url,
+                evidencia: `${a.revenda} · ${a.cidade}/${a.uf} · anunciado ${fmtBRL(a.preco)} · ${Math.abs(a.desvioFipePct ?? 0).toLocaleString('pt-BR')}% abaixo da FIPE · match ${a.fipeConfianca || '—'}.`,
+              })} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
                 <Plus size={13} /> Criar ação
               </button>
             </Card>
@@ -1716,69 +1722,6 @@ function PageOportunidades({ onCriarAcao }) {
   );
 }
 
-
-/* ============================================================
-   CONCORRENTES — players e sinais de movimento observados
-   ============================================================ */
-function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
-  const [novo, setNovo] = useState('');
-  const adicionar = async () => {
-    if (!novo.trim()) return;
-    await onAdicionar(novo.trim(), 'manual');
-    setNovo('');
-  };
-  const pendentes = acoes.filter(a => !a.feita);
-  const feitas = acoes.filter(a => a.feita);
-
-  return (
-    <div>
-      <div style={{ fontSize: 13, color: T.inkMuted, lineHeight: 1.6, maxWidth: 640, marginBottom: 20 }}>
-        Dado de mercado diz <em>o que</em> fazer; esta lista registra <em>se foi feito</em>. Crie ações a partir das
-        Oportunidades (botão "Criar ação") ou manualmente aqui. As ações ficam salvas com privacidade neste navegador.
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        <input value={novo} onChange={e => setNovo(e.target.value)} onKeyDown={e => e.key === 'Enter' && adicionar()}
-          aria-label="Descrição da nova ação" placeholder="Nova ação — ex: avaliar a carreta observada há 40 dias…" style={{ ...inputStyle, flex: 1 }} />
-        <button onClick={adicionar} disabled={salvando} style={{ ...inputStyle, cursor: salvando ? 'wait' : 'pointer', background: T.signal, color: T.signalInk, fontWeight: 600, border: 'none', display: 'flex', gap: 6, alignItems: 'center', opacity: salvando ? 0.6 : 1 }}>
-          <Plus size={14} /> Adicionar
-        </button>
-      </div>
-
-      {pendentes.length === 0 && feitas.length === 0 && (
-        <EmptyState icon={ListChecks} titulo="Nenhuma ação ainda"
-          texto="Quando o radar apontar uma oportunidade, transforme-a em ação aqui — assim o insight não morre no dashboard." />
-      )}
-
-      {pendentes.length > 0 && (
-        <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
-          {pendentes.map(a => (
-            <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
-              <Circle size={17} style={{ color: T.inkMuted, flexShrink: 0 }} />
-              <span style={{ fontSize: 14, flex: 1 }}>{a.texto}</span>
-              <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>
-                {new Date(a.criadaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-              </span>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {feitas.length > 0 && (
-        <>
-          <SectionTitle>Concluídas</SectionTitle>
-          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {feitas.map(a => (
-              <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center', opacity: 0.55 }}>
-                <CheckCircle2 size={17} style={{ color: T.positive, flexShrink: 0 }} />
-                <span style={{ fontSize: 14, flex: 1, textDecoration: 'line-through' }}>{a.texto}</span>
-              </Card>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 /* ============================================================
    CENTRAL FIPE — placa e catálogo local em fluxos separados
@@ -2938,10 +2881,16 @@ function PageAnalise() {
 function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
   const { page: pagina, context: contexto, navigate, updateContext, goBack } = useBrowserRoute(import.meta.env.BASE_URL);
   const setPagina = useCallback(page => navigate(page), [navigate]);
-  const [acoes, setAcoes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('oper-radar-acoes') || '[]'); } catch { return []; }
-  });
   const tituloRef = useRef(null);
+
+  // Badge de pendentes na sidebar: o Plano de ação lê/grava seu próprio localStorage (PlanoAcaoBlocos.jsx),
+  // então este contador só se atualiza ouvindo o mesmo evento que salvaAcoes() dispara ao salvar.
+  const [acoesPendentes, setAcoesPendentes] = useState(() => separaPendentesFeitas(carregaAcoes()).pendentes.length);
+  useEffect(() => {
+    const atualiza = () => setAcoesPendentes(separaPendentesFeitas(carregaAcoes()).pendentes.length);
+    window.addEventListener(EVENTO_ACOES_MUDOU, atualiza);
+    return () => window.removeEventListener(EVENTO_ACOES_MUDOU, atualiza);
+  }, []);
 
   const { data: kpis } = useApi('kpis.php');
   const { data: anunciosData } = useApi('anuncios.php?ordem=movimento&limit=200');
@@ -2949,26 +2898,14 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   const usandoReais = anuncios.length > 0;
 
   useEffect(() => {
-    try { localStorage.setItem('oper-radar-acoes', JSON.stringify(acoes)); } catch {}
-  }, [acoes]);
-
-  useEffect(() => {
     tituloRef.current?.focus({ preventScroll: true });
   }, [pagina]);
 
-  const adicionarAcao = async (texto, origem = 'oportunidade') => {
-    const local = { id: `local-${Date.now()}`, texto, feita: false, origem, criadaEm: new Date().toISOString() };
-    setAcoes(prev => [local, ...prev]);
-    return local;
-  };
-
-  const alternarAcao = acao => {
-    const feita = !acao.feita;
-    setAcoes(prev => prev.map(a => a.id === acao.id ? { ...a, feita } : a));
-  };
-
-  const criarAcao = async texto => {
-    await adicionarAcao(texto, 'oportunidade');
+  // Cria a ação direto no armazenamento do Plano de ação (mesma fonte que a página lê ao montar) e navega para lá;
+  // aceita string (compat) ou {titulo, origem, evidencia, href} para guardar a evidência de onde a ação nasceu.
+  const criarAcao = dados => {
+    const nova = montaAcao(typeof dados === 'string' ? { titulo: dados, origem: 'Oportunidades' } : dados);
+    if (nova) salvaAcoes([nova, ...carregaAcoes()]);
     setPagina('acoes');
   };
 
@@ -2981,13 +2918,12 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrencia />,
     analise: <PageAnalise />,
-    acoes: <PageAcoes acoes={acoes} onAdicionar={adicionarAcao} onAlternar={alternarAcao} salvando={false} />,
+    acoes: <PagePlanoAcao />,
     ajustes: <PageConfiguracoes preferencias={preferencias} onPreferencias={onPreferencias} onReset={onReset} temaResolvido={temaResolvido} />,
     conta: <PageConta sessao={sessao} onSessao={onSessao} onLogout={onLogout} />,
   };
 
   const tituloPagina = NAV.find(n => n.id === pagina)?.rotulo || '';
-  const acoesPendentes = acoes.filter(a => !a.feita).length;
   const breadcrumbs = breadcrumbsFor(pagina, contexto);
 
   return (

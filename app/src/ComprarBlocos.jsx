@@ -45,7 +45,10 @@ function LinhaAnuncio({ anuncio, onCriarAcao }) {
       <Componentes anuncio={anuncio} />
       <div className="oc-compra__acoes">
         {urlSegura(anuncio.url) && <a className="or-btn or-btn--secondary" href={urlSegura(anuncio.url)} target="_blank" rel="noreferrer">Ver anúncio</a>}
-        <button type="button" className="or-btn or-btn--ghost" onClick={() => onCriarAcao?.(`Avaliar: ${anuncio.titulo || 'anúncio'} (${anuncio.revenda || 'revenda'}, ${brl(anuncio.preco)})`)}>Criar ação</button>
+        <button type="button" className="or-btn or-btn--ghost" onClick={() => onCriarAcao?.({
+          titulo: `Avaliar: ${anuncio.titulo || 'anúncio'}`, origem: 'Oportunidades', href: anuncio.url,
+          evidencia: `${anuncio.revenda || 'revenda'} · ${[anuncio.cidade, anuncio.uf].filter(Boolean).join('/')} · ${brl(anuncio.preco)} · nota ${Number(anuncio.pontuacao).toLocaleString('pt-BR')}/100 (candidato à negociação, não recomendação de compra).`,
+        })}>Criar ação</button>
       </div>
     </li>
   );
