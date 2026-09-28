@@ -35,7 +35,16 @@ equivalência comercial nem publica recomendação numérica com confiança insu
 Loja e insights:
 
 - `minha_loja_detalhe.php?id=...`: detalhe pertencente ao usuário autenticado, edição pelo
-  fluxo existente e comparação nacional/estadual somente com a mesma referência FIPE;
+  fluxo existente e comparação nacional/estadual somente com a mesma referência FIPE; cada região
+  ganhou `desvio_preco_loja_pct` (preço próprio vs mediana daquela praça, não só a nacional) e um
+  campo `orientacao` (`lib/orientacao_estoque.php`, testado em `tests/orientacao_estoque_test.php`):
+  decide `manter`, `avaliar_reducao`, `avaliar_outra_praca` ou `sem_base` pra ESTE veículo — decisão
+  do Felipe (28/09/2026): o Radar orienta a vender melhor o próprio estoque, não a comprar. Usa a
+  própria praça (UF do veículo) como base quando ela tem amostra mínima, cai pro nacional só se a
+  própria praça não tiver; só sugere outra praça se ela for publicável, diferente da atual e sustentar
+  preço próximo do anunciado. Fail-closed: sem amostra em nenhuma das duas, `sem_base`. Ver
+  `docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md` pro piloto com dado real antes do frontend
+  ser publicado;
 - a análise regional combina ofertas qualificadas, revendas, saídas observadas e tempo
   observado. Recomendações ficam indisponíveis quando a amostra ou o histórico não sustentam
   o nível mínimo de confiança;

@@ -40,6 +40,7 @@ import { ComprarPorRegiao } from './ComprarBlocos.jsx';
 import { resumoLoja, AMOSTRA_MINIMA as AMOSTRA_MINIMA_LOJA } from './minhaLojaModel.js';
 import { PagePlanoAcao } from './PlanoAcaoBlocos.jsx';
 import { EVENTO_MUDOU as EVENTO_ACOES_MUDOU, carregaAcoes, montaAcao, salvaAcoes, separaPendentesFeitas } from './planoAcaoModel.js';
+import { precisaDeAcao, rotuloAcao, tituloAcaoPlano, tomAcao } from './orientacaoEstoqueModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
@@ -2088,7 +2089,38 @@ function CampoMeuVeiculo({ rotulo, children }) {
   return <label style={{ fontSize: 10.5, color: T.inkMuted }}>{rotulo}{children}</label>;
 }
 
-function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
+const TOM_ORIENTACAO_TAG = { success: 'positivo', warning: 'alerta', info: 'sinal', neutral: 'neutro' };
+
+/* Decisão de venda pro veículo (Felipe, 28/09/2026: o Radar orienta a vender melhor o PRÓPRIO estoque, não a
+   comprar). Fica visível acima das abas, não dentro de uma delas — é o motivo de abrir o painel. */
+function OrientacaoVenda({ orientacao, nomeVeiculo, onCriarAcao }) {
+  if (!orientacao) return null;
+  const tom = TOM_ORIENTACAO_TAG[tomAcao(orientacao.acao)];
+  const cor = { positivo: T.positive, alerta: T.alert, sinal: T.signal, neutro: T.inkMuted }[tom];
+  return (
+    <Card style={{ padding: 15, borderColor: `${cor}55`, background: `${cor}0B` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontFamily: T.fontMono, fontSize: 9.5, color: cor }}>O QUE FAZER COM ESTE VEÍCULO</div>
+          <strong style={{ display: 'block', fontSize: 17, marginTop: 5 }}>{rotuloAcao(orientacao.acao)}</strong>
+        </div>
+        <Tag tone={tom}>{orientacao.acao === 'sem_base' ? 'sem base' : `${orientacao.origem_base === 'nacional' ? 'nacional' : 'sua praça'} · ${orientacao.desvio_pct > 0 ? '+' : ''}${orientacao.desvio_pct}%`}</Tag>
+      </div>
+      <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>{orientacao.motivo}</div>
+      {precisaDeAcao(orientacao) && (
+        <button onClick={() => onCriarAcao?.({
+          titulo: tituloAcaoPlano(orientacao, nomeVeiculo), origem: 'Minha Loja',
+          evidencia: `${nomeVeiculo} · ${orientacao.motivo}`,
+        })} style={{ ...inputStyle, marginTop: 11, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', width: 'fit-content' }}>
+          <Plus size={13} /> Criar ação
+        </button>
+      )}
+      <div style={{ color: T.inkMuted, fontSize: 10, marginTop: 9 }}>Saída observada não é venda; a orientação não garante resultado, só aponta onde a evidência empurra.</div>
+    </Card>
+  );
+}
+
+function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }) {
   const [dados, setDados] = useState(null);
   const [rascunho, setRascunho] = useState(null);
   const [aba, setAba] = useState('cadastro');
@@ -2173,6 +2205,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
   const deltaMercado = mercado?.amostra_suficiente && mercado?.preco_mediano > 0 && precoAtual > 0 ? Math.round((precoAtual / mercado.preco_mediano - 1) * 1000) / 10 : null;
   const abas = [['cadastro', 'Cadastro'], ['mercado', 'Mercado nacional'], ['regioes', `Regiões · ${regioes.length}`]];
   const campoStyle = { ...inputStyle, width: '100%' };
+  const nomeVeiculo = rascunho?.titulo || itemInicial.titulo || [rascunho?.marca || itemInicial.marca, rascunho?.modelo || itemInicial.modelo].filter(Boolean).join(' ') || 'veículo';
 
   return <div onClick={onClose} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2, 6, 12, .68)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end' }}>
     <aside onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Análise de ${itemInicial.marca || ''} ${itemInicial.modelo || 'veículo'}`} style={{ width: 'min(760px, 100vw)', height: '100%', overflowY: 'auto', background: T.bg, borderLeft: `1px solid ${T.line}`, boxShadow: '-20px 0 60px rgba(0,0,0,.35)', color: T.ink }}>
@@ -2187,6 +2220,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
         {!dados && !erro && <Card style={{ textAlign: 'center', color: T.inkMuted }}>Carregando análise do veículo…</Card>}
         {erro && <div role="alert" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}35` }}>{erro}</div>}
         {aviso && <div role="status" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.positive, background: `${T.positive}12`, border: `1px solid ${T.positive}35` }}>{aviso}</div>}
+        {dados && <div style={{ marginBottom: 14 }}><OrientacaoVenda orientacao={dados.orientacao} nomeVeiculo={nomeVeiculo} onCriarAcao={onCriarAcao} /></div>}
 
         {dados && rascunho && aba === 'cadastro' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {rascunho.origem === 'xml' && <div role="note" style={{ padding: 11, borderRadius: 9, color: T.inkMuted, background: `${T.signal}10`, border: `1px solid ${T.signal}30`, fontSize: 11.5 }}>Este veículo veio do XML. Uma próxima sincronização pode substituir os campos também presentes no arquivo.</div>}
@@ -2230,7 +2264,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
   </div>;
 }
 
-function PageMinhaLoja({ sessao }) {
+function PageMinhaLoja({ sessao, onCriarAcao }) {
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -2448,7 +2482,7 @@ function PageMinhaLoja({ sessao }) {
       <div className="oc-loja__grade">
         {itensVisiveis.map(item => <CartaoVeiculo key={item.id} item={item} salvandoStatus={statusSalvandoId === item.id} onAbrir={setItemAberto} onStatus={alterarStatus} onExcluir={excluir} />)}
       </div>}
-    {itemAberto && <PainelMeuVeiculo itemInicial={itemAberto} sessao={sessao} onClose={() => setItemAberto(null)} onSalvo={carregar} />}
+    {itemAberto && <PainelMeuVeiculo itemInicial={itemAberto} sessao={sessao} onClose={() => setItemAberto(null)} onSalvo={carregar} onCriarAcao={onCriarAcao} />}
   </div>;
 }
 
@@ -2913,7 +2947,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} onNavegar={(page, context) => navigate(page, { context })} />,
     mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
     comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
-    'minha-loja': <PageMinhaLoja sessao={sessao} />,
+    'minha-loja': <PageMinhaLoja sessao={sessao} onCriarAcao={criarAcao} />,
     fipe: <PageFipe />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrencia />,

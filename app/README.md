@@ -76,6 +76,12 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
 - Oportunidades abre com "O que comprar em cada região" (`src/ComprarBlocos.jsx`, textos em `src/comprarModel.js`, dados de `oportunidades_compra.php`):
   por UF, os modelos com melhor índice regional e os anúncios candidatos à negociação, cada um com selos (desvio vs mediana da UF e vs FIPE, preço caiu em
   30 dias, dias no radar) e "Por que esta nota" com os componentes e pesos efetivos. Linguagem de candidato, nunca "ideal"; sem base mostra o motivo.
+- Minha Loja mostra "O que fazer com este veículo" (cartão fixo acima das abas do painel do veículo, visível
+  em qualquer aba): manter preço, avaliar redução ou avaliar outra praça, vindo pronto de
+  `minha_loja_detalhe.php` (`lib/orientacao_estoque.php` na API). Botão "Criar ação" só aparece quando há
+  algo a decidir (nunca em "manter" nem "sem base"); a ação nasce no Plano de ação com origem "Minha Loja"
+  e o motivo real. `orientacaoEstoqueModel.js` só traduz a ação em rótulo/tom/texto do botão — a decisão em
+  si é do backend, testada lá.
 - Plano de ação no layout da DEMO (`src/PlanoAcaoBlocos.jsx`, regras em `src/planoAcaoModel.js`): KPIs de pendentes/concluídas,
   formulário de nova ação e as listas, cada linha com origem (`Manual`, `Mercado`, `Minha Loja`, `Concorrência`, `Oportunidades`,
   `Análise`, `FIPE`), evidência e link de volta ao insight que a gerou. Ações criadas em Oportunidades ("Criar ação", nos três

@@ -201,3 +201,19 @@ test('href do Plano de ação resolve contra a própria origem (rejeita "//host"
   assert.match(modelo, /fallbackEmMemoria/);
   assert.match(modelo, /export function salvaAcoes\(lista\) \{/);
 });
+
+test('Orientação de venda (Minha Loja): minha_loja_detalhe.php orquestra a lib testada, front só exibe e cria ação', () => {
+  const endpoint = read('oper-radar-api/minha_loja_detalhe.php');
+  assert.match(endpoint, /require_once __DIR__ \. '\/lib\/orientacao_estoque\.php';/);
+  assert.match(endpoint, /\$orientacao = oper_loja_orienta_veiculo\(/);
+  assert.match(endpoint, /'orientacao' => \$orientacao,/);
+  assert.match(endpoint, /desvio_preco_loja_pct/); // cada região compara com o preço próprio, não só o nacional
+  const lib = read('oper-radar-api/lib/orientacao_estoque.php');
+  for (const acao of ['manter', 'avaliar_reducao', 'avaliar_outra_praca', 'sem_base']) {
+    assert.match(lib, new RegExp(`'acao' => '${acao}'`), `${acao} deve existir na lib`);
+  }
+  const app = read('app/src/App.jsx');
+  assert.match(app, /<OrientacaoVenda orientacao={dados\.orientacao}/);
+  assert.match(app, /origem: 'Minha Loja'/);
+  assert.match(app, /Saída observada não é venda; a orientação não garante resultado/, 'orientação avisa que não garante resultado');
+});
