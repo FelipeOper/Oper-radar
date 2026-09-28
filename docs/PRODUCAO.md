@@ -3,6 +3,14 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.7 -- frontend (beta e producao): Plano de acao no layout da DEMO -- 28/09/2026 (PACOTE PRONTO e zips enviados; aguardando o comando)
+
+- Origem: commit `b447425` (PR #63). So frontend; API, banco, cron e credenciais nao mudam. Codex adversarial em 3 rodadas: perda silenciosa de acao quando localStorage falha (fallback em memoria por aba), href aceitava `//host` e `/\host` como caminho interno (base de resolucao passou a ser sorteada por carga, com rejeicao explicita de `//` apos normalizar `\`->`/`). app 141/141, PHP 17/17, Python 68/68, lint 0.
+- **O que e**: `PlanoAcaoBlocos.jsx`/`planoAcaoModel.js` substituem a `PageAcoes` antiga. KPIs pendentes/concluidas, formulario de nova acao, listas com origem (`Manual`, `Mercado`, `Minha Loja`, `Concorrencia`, `Oportunidades`, `Analise`, `FIPE`), evidencia e link de volta. Os 3 pontos de "Criar acao" em Oportunidades (observado ha mais tempo, abaixo da FIPE, "O que comprar") guardam evidencia real (revenda, preco, nota) em vez de texto solto. Badge de pendentes na sidebar via evento customizado (o `storage` nativo nao avisa a propria aba).
+- **Bug pego na checagem visual, corrigido antes de publicar**: `RadarApp` referenciava a variavel `acoes` removida junto do estado antigo -- `ReferenceError` em runtime, tela Plano de acao (e qualquer navegacao vinda de "Criar acao") quebrava com tela preta.
+- Zips em `/home1/pro93061/backups/` (`Downloads\OperRadar-Release2.1`, mesma pasta): beta `525dd01aae46b0df65244c839798e1e286039bf9afb73c3dafbdd4c375d3bed2` (`index.html` `32784726...`, `index-CK42djCJ.js` `a4ddcb1c...`); producao `222cbd6ac747f5444f1abdff513bd11698c5ad148cbf2c6a7be7e1607a065fe1` (`index.html` `6fca065b...`, `index-C-6DZgje.js` `cd6ed713...`). Pre-checagens: `index.html` do beta `57360710...` e da producao `e586d7d2...` (Release 2.6, conferidos ao vivo antes de empacotar).
+- Reversao: restaurar `index.html` de `oper-radar-frontend-release2.7-*`.
+
 ## Release 2.6 — API 1.7 + frontend (beta e produção): "O que comprar" por região — 26/09/2026 (PUBLICADO 26/09/2026 e conferido ao vivo)
 
 - Origem: commit `1cbef99` (PR #63). API: **2 arquivos novos** (`oportunidades_compra.php`, `lib/oportunidade_compra.php`), nenhum arquivo existente sobrescrito. Sem mudança de banco, cron ou credencial. Codex adversarial em 4 rodadas (achados corrigidos: base de preço só com caminhão sem implemento de 2006 em diante, cache de arquivo com chave canônica e limpeza de antigos, URL do anúncio só http/https); NOVA (segurança): sem bloqueio (autenticação antes de conectar, sem entrada do usuário em SQL, erro genérico, sem PII). Débito pré-existente anotado pela NOVA: `href` de URL raspada sem checar esquema em outros 7 pontos do app. app 128/128, PHP 17/17, Python 68/68, lint 0.
