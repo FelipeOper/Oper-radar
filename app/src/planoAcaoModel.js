@@ -8,16 +8,22 @@ export const CHAVE_ARMAZENAMENTO = 'oper-radar-acoes';
 export const ORIGENS = ['Manual', 'Mercado', 'Minha Loja', 'Concorrência', 'Oportunidades', 'Análise', 'FIPE'];
 const TITULO_MAX = 120;
 const EVIDENCIA_MAX = 400;
-const ORIGEM_INTERNA = 'http://oper-radar.internal'; // base fixa só pra resolver URL relativa; nunca é enviada nem exibida
+// Sorteada a cada carga do módulo: se a base fosse um literal fixo, um href malicioso poderia embutir esse
+// mesmo texto ("//oper-radar.internal/x") e a comparação de origem abaixo bateria mesmo sendo externo na
+// origem REAL da página (achado do Codex). Ninguém de fora consegue adivinhar essa string pra forjar.
+const ORIGEM_INTERNA = `http://oper-radar-interno-${Math.random().toString(36).slice(2)}.invalid`;
 
 const novoId = () => `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 /* Um "/" sozinho não basta: "//evil.example" (protocol-relative) e "/\evil.example" (o navegador trata "\" como "/" na
-   resolução de URL, WHATWG) também começam com "/" e abrem outro domínio. Resolve contra uma origem fixa e só aceita
-   se a origem resultante não mudar — é a mesma forma que o navegador usa pra decidir, não uma lista de prefixos proibidos. */
+   resolução de URL, WHATWG) também começam com "/" e abrem outro domínio. Normaliza "\" pra "/" e rejeita "//" de cara —
+   isso sozinho já barra os dois casos, sem depender de a comparação de origem abaixo não ser burlável. A comparação
+   contra ORIGEM_INTERNA fica como segunda camada, pra qualquer outra forma de a resolução de URL mudar de origem. */
 function ehCaminhoInterno(v) {
+  const normalizado = v.replace(/\\/g, '/');
+  if (normalizado.startsWith('//')) return false;
   try {
-    return new URL(v, ORIGEM_INTERNA).origin === ORIGEM_INTERNA;
+    return new URL(normalizado, ORIGEM_INTERNA).origin === ORIGEM_INTERNA;
   } catch {
     return false;
   }

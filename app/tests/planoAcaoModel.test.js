@@ -41,7 +41,12 @@ test('href só aceita http/https externo ou caminho interno começando com "/"; 
   assert.equal(montaAcao({ titulo: 'x', href: '/mercado?modelo=FH540' }).href, '/mercado?modelo=FH540');
   // "//host" (protocol-relative) e "/\host" (o navegador lê "\" como "/" na resolução de URL) mudam a origem mesmo
   // começando com "/" — não são caminho interno. Achado do Codex: "/\evil.example" escapava do filtro antigo.
-  for (const ruim of ['javascript:alert(1)', 'data:text/html,x', '//exemplo.com', '/\\evil.example', '/\\\\evil.example', undefined, null]) {
+  for (const ruim of [
+    'javascript:alert(1)', 'data:text/html,x', '//exemplo.com', '/\\evil.example', '/\\\\evil.example',
+    // achado do Codex: um href malicioso não pode "adivinhar" a base interna e escapar da checagem de origem
+    '//oper-radar-interno-x.invalid/evil', '/\\/oper-radar-interno-x.invalid/evil',
+    undefined, null,
+  ]) {
     assert.equal(montaAcao({ titulo: 'x', href: ruim }).href, '', `deveria rejeitar: ${ruim}`);
   }
 });

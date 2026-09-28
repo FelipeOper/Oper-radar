@@ -195,8 +195,9 @@ test('Plano de ação: badge de pendentes na sidebar escuta EVENTO_MUDOU, sem es
 
 test('href do Plano de ação resolve contra a própria origem (rejeita "//host" e "/\\host", achados Codex), e falha de storage não perde a ação', () => {
   const modelo = read('app/src/planoAcaoModel.js');
-  assert.match(modelo, /new URL\(v, ORIGEM_INTERNA\)\.origin === ORIGEM_INTERNA/);
-  assert.doesNotMatch(modelo, /!v\.startsWith\('\/\/'\)/, 'a checagem antiga por prefixo foi trocada pela resolução de URL');
+  assert.match(modelo, /normalizado\.startsWith\('\/\/'\)/);
+  assert.match(modelo, /new URL\(normalizado, ORIGEM_INTERNA\)\.origin === ORIGEM_INTERNA/);
+  assert.match(modelo, /Math\.random\(\)\.toString\(36\)\.slice\(2\)/, 'a base interna não pode ser um literal adivinhável');
   assert.match(modelo, /fallbackEmMemoria/);
   assert.match(modelo, /export function salvaAcoes\(lista\) \{/);
 });
