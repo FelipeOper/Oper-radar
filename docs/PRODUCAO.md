@@ -3,6 +3,35 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.9 -- frontend: cartao "O que fazer com este veiculo" -- 01/10/2026 (PUBLICADO e conferido ao vivo)
+
+- Origem: mesmo HEAD de `agent/portar-demo-real` (commit `9d1af97`) do Release 2.8 -- so o frontend
+  que faltava para o campo `orientacao` (ja publicado na API) aparecer na tela. `npm test` 149/149,
+  lint oxlint 0 erros, `npm run build` local (sem binding Linux/Windows faltando desta vez -- build
+  rodou direto nesta sessao).
+- Pacote: `python scripts/empacotar_frontend.py --base oper-radar --saida <pasta>`; zip sha256
+  `3fed63210383531afd43c88294797b4c6f03be843e10e9397b67d33a1b903626`, 17 arquivos. Pre-checagem:
+  `index.html` de producao antes de publicar `6fca065b...` / bundle `index-C-6DZgje.js`
+  `cd6ed713...` (bate com o registrado no Release 2.7 -- confirma que nada mudou entre as duas
+  publicacoes).
+- Upload do zip (Gerenciador de Arquivos) e comando de backup/extracao/hash (Terminal) executados
+  por Claude nesta sessao, a pedido explicito do Felipe ("pode subir voce mesmo... Chrome que esta
+  logado ja no Cpanel") -- login do cPanel foi feito pelo Felipe; Claude nao digitou usuario/senha
+  em nenhum momento, so operou depois de autenticado.
+- Hashes publicados, conferidos no proprio Terminal: `index.html`
+  `e21dccd6676dc44a6030475b54782c491938697f458bfe9d5358bd1e6a314c17`; bundle principal
+  `assets/index-BDlQ99VQ.js` `e4ad5cb06c19bce89bd3e9bf56ec4e8ef72d3b106c2972b9c2f463463de16eb6`.
+  `HTTP 200` na pagina logo apos a extracao.
+- Backup: `/home1/pro93061/backups/oper-radar-frontend-release2.8-20261001-120552` (nome da pasta
+  ficou com "2.8" no comando, mas e o backup do estado de producao imediatamente anterior a este
+  release 2.9 -- index.html/assets/.htaccess de antes).
+- **Conferido ao vivo, autenticado**: abri o veiculo ID 7394895 (DAF XF 530, o mesmo id 19 do
+  piloto) em Minha Loja -- cartao "O QUE FAZER COM ESTE VEICULO" aparece com "Manter preco", badge
+  "nacional · 0%", motivo e o aviso fixo "Saida observada nao e venda; a orientacao nao garante
+  resultado, so aponta onde a evidencia empurra." Bate exatamente com o registrado no piloto
+  (`docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md`).
+- Reversao: restaurar `index.html`/`assets`/`.htaccess` do backup acima.
+
 ## Release 2.8 -- API somente: orientacao de venda por veiculo (piloto) -- 01/10/2026 (PUBLICADO e conferido ao vivo)
 
 - Origem: commits `c18f124`/`0312f20`/`036986d` em `agent/portar-demo-real` (4 rodadas Codex,
