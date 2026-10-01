@@ -21,3 +21,5 @@ Complemento VELOX: na minha branch, o caso exato `DAF XF FTT 530 SUPER SPACE 202
 - Os testes sintéticos da matriz `P0-DAF-IVECO-MATRIZ.md` passaram na composição offline. O ensaio não substitui comparação de vínculos por `anuncio_id` no F3 validado. O número 170/583 deslocadas não demonstra cobertura nem correção.
 
 Risco operacional: a regra de alta confiança pode reduzir vínculos automáticos DAF/IVECO; a interface manual por categoria da main deve receber esses casos. Não usar F4/produção para validar a integração.
+
+Complemento IVECO: o ramo de integração em 8581289 aceitava `IVECO TECTOR 240E25 8x2 2021/2021` com único FIPE `TECTOR 240E25 8x2 (diesel)` como alto (0,95) apesar de não haver cabine em nenhum lado. Corrigi em minha branch: código composto exato sem eixo e cabine igualmente explícitos pontua 0,90; com família+código+eixo+cabine coincidentes pontua 0,95. O portão ≥0,95 continua. O teste negativo exato usa os três modelos FIPE de `test_iveco_eixo_e_codigo_exatos_ainda_sem_confianca_alta`; na integração, o motivo textual pode ser `ambiguo eixo 8X2: confianca insuficiente` pelo portão de eixo anterior, sem mudar o resultado fail-closed.

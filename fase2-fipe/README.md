@@ -102,6 +102,9 @@ evidência suficiente ficam sem vínculo automático para revisão. Essas regras
 mudam a seleção em memória; não adicionam consultas, índices nem migração de dados.
 Se o anúncio DAF declara cabine, o modelo FIPE precisa declarar a mesma cabine;
 nome FIPE sem cabine não basta mesmo com score numérico alto.
+No IVECO, código composto exato recebe score alto somente com família, eixo e
+cabine explícitos e iguais nos dois lados; sem essa evidência o score fica abaixo
+do portão automático de 0,95.
 A matriz de interação e seus limites estão em [P0-DAF-IVECO-MATRIZ.md](P0-DAF-IVECO-MATRIZ.md).
 
 ## Instalação em banco existente
