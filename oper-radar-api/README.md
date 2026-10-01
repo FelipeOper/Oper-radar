@@ -180,3 +180,13 @@ contra 5% em cavalo/chassi; cauda >+90% de 4,96% contra 0,40%). Carroceria vazia
 (universo da F0d). Falha fechada: consulta sem `carroceria` ou `tipo` não é comparável. Aplica nos mesmos agregadores da regra de ano-modelo.
 
 `kpis.php`: o campo `desvio_medio_fipe` foi descontinuado (sempre `null`); o desvio da FIPE vem só de `mercado_painel.php`/`insights.php`/`lojistas.php`, com as mesmas regras de qualidade e comparabilidade.
+
+## Fila de vinculação FIPE por categoria (`fipe_fila_categorias.php`)
+
+Prioridade do Felipe (01/10/2026): sem vínculo FIPE não há mediana, sem mediana não há sistema —
+cobertura real em 01/10/2026 era de só 50,5% (5.956 de 11.798 caminhões ativos). Endpoint só
+leitura: agrupa `anuncio` por marca + modelo, contando os mesmos três estados que
+`anuncios.php?fipe_fila=` já usa por anúncio (`sem_sugestao`, `com_sugestao`, `vinculados`), pra
+mostrar onde a fila concentra e atacar as maiores categorias primeiro. A curadoria em si (buscar e
+confirmar a FIPE certa, com sugestões pré-calculadas em `anuncio_fipe_sugestao`) já existe por
+anúncio, dentro de Mercado — este endpoint só organiza a navegação até lá, nenhuma escrita.

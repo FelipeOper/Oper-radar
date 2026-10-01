@@ -8,7 +8,7 @@ import {
   Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
   Pencil, History, Undo2, Ruler, Check, ArrowLeft, ChevronRight,
-  SlidersHorizontal, BarChart3
+  SlidersHorizontal, BarChart3, LinkIcon
 } from './icons.jsx';
 import {
   T, THEMES, DEFAULT_UI_PREFERENCES,
@@ -1727,7 +1727,7 @@ function PageOportunidades({ onCriarAcao }) {
 /* ============================================================
    CENTRAL FIPE — placa e catálogo local em fluxos separados
    ============================================================ */
-function PageFipe() {
+function PageFipe({ onNavegar }) {
   const { data: statusPlaca } = useApi('placa_consulta.php?modo=status');
   const [modo, setModo] = useState('placa');
   const [placa, setPlaca] = useState('');
@@ -1761,10 +1761,11 @@ function PageFipe() {
       Consulte um veículo pela placa ou pesquise diretamente no catálogo nacional de caminhões. Os dois caminhos cruzam a FIPE com o mercado monitorado pelo radar.
     </div>
 
-    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18, maxWidth: 640 }}>
+    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 18, maxWidth: 940 }}>
       {[
         { id: 'placa', titulo: 'Consultar por placa', texto: 'Identifique o veículo e encontre a FIPE', icone: ScanLine },
         { id: 'catalogo', titulo: 'Catálogo FIPE', texto: 'Busque por marca, modelo, ano ou código', icone: Search },
+        { id: 'fila', titulo: 'Vinculação pendente', texto: 'Anúncios sem FIPE, por categoria', icone: LinkIcon },
       ].map(item => {
         const Icone = item.icone;
         const ativo = modo === item.id;
@@ -1782,7 +1783,7 @@ function PageFipe() {
       })}
     </div>
 
-    {modo === 'catalogo' ? <PageFipeCatalogo /> : <>
+    {modo === 'fila' ? <PageFipeFila onNavegar={onNavegar} /> : modo === 'catalogo' ? <PageFipeCatalogo /> : <>
       <Card style={{ padding: 18, maxWidth: 820 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
@@ -1844,6 +1845,59 @@ function PageFipe() {
         {resultado.fipes?.length === 0 && <EmptyState icon={Search} titulo="Veículo identificado, sem FIPE retornada" texto="Use o catálogo por marca e modelo para localizar a referência manualmente." />}
       </div>}
     </>}
+  </div>;
+}
+
+/* Fila de vinculação FIPE, agrupada por marca+modelo ("categoria"). Pedido do Felipe (01/10/2026):
+   sem vínculo FIPE não há mediana, sem mediana não há sistema — esta tela mostra ONDE a fila
+   concentra pra atacar as maiores categorias primeiro. A curadoria em si (buscar e confirmar a
+   FIPE certa, com sugestões inteligentes) já existe por anúncio, dentro de Mercado — "Resolver"
+   só leva pra lá já filtrado pela marca/modelo da categoria clicada. */
+function PageFipeFila({ onNavegar }) {
+  const { data, erro, status } = useApi('fipe_fila_categorias.php');
+  const resumo = data?.resumo;
+  const categorias = data?.categorias || [];
+
+  return <div style={{ maxWidth: 1100 }}>
+    <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-4px 0 16px', maxWidth: 820 }}>
+      Anúncios de caminhão ativos sem referência FIPE vinculada, agrupados por marca e modelo. Sem
+      vínculo não há mediana nem desvio pra esse anúncio em nenhuma tela do radar.
+    </div>
+
+    {status === 'loading' && <div style={{ color: T.inkMuted, fontSize: 12.5 }}>Carregando fila…</div>}
+    {erro && <div role="alert" style={{ color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}30`, borderRadius: 9, padding: 11, fontSize: 12.5 }}>Não foi possível carregar a fila agora.</div>}
+
+    {resumo && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 18, maxWidth: 820 }}>
+      {[
+        ['COBERTURA', resumo.cobertura_pct == null ? '—' : `${resumo.cobertura_pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`, `${fmtN(resumo.vinculados)} de ${fmtN(resumo.total)} vinculados`],
+        ['PENDENTES', fmtN(resumo.pendentes), 'sem referência FIPE'],
+        ['CATEGORIAS', fmtN(resumo.categorias_pendentes), 'marca + modelo com pendência'],
+      ].map(([label, valor, sub]) => <Card key={label} style={{ padding: 13 }}>
+        <div style={{ color: T.inkMuted, fontSize: 9.5, fontFamily: T.fontMono }}>{label}</div>
+        <div style={{ fontFamily: T.fontDisplay, fontSize: 20, fontWeight: 650, marginTop: 6 }}>{valor}</div>
+        <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{sub}</div>
+      </Card>)}
+    </div>}
+
+    {status === 'ready' && categorias.length === 0 && <EmptyState icon={LinkIcon} titulo="Nenhuma categoria pendente" texto="Todo o universo de caminhões ativos tem referência FIPE vinculada ou está marcado como sem base." />}
+
+    {categorias.length > 0 && <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      {categorias.map(cat => <div key={`${cat.marca}-${cat.modelo}`} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+        padding: 12, borderRadius: 10, background: `var(--or-zebra-bg, ${T.surface})`, border: `1px solid ${T.line}`,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <strong style={{ fontSize: 13 }}>{cat.marca} · {cat.modelo}</strong>
+          <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 3 }}>
+            {fmtN(cat.sem_sugestao)} sem sugestão · {fmtN(cat.com_sugestao)} com sugestão pronta · {fmtN(cat.vinculados)} já vinculados
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <Tag tone={cat.sem_sugestao > 0 ? 'alerta' : 'sinal'}>{fmtN(cat.revisar)} pendente{cat.revisar === 1 ? '' : 's'}</Tag>
+          <button onClick={() => onNavegar?.('mercado', { marca: cat.marca, busca: cat.modelo })} style={{ ...inputStyle, cursor: 'pointer', color: T.signal, flexShrink: 0 }}>Resolver</button>
+        </div>
+      </div>)}
+    </div>}
   </div>;
 }
 
@@ -2961,7 +3015,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
     mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
     comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} onCriarAcao={criarAcao} />,
-    fipe: <PageFipe />,
+    fipe: <PageFipe onNavegar={(page, context) => navigate(page, { context })} />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrencia />,
     analise: <PageAnalise />,

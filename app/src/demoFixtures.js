@@ -20,6 +20,19 @@ const estoque = [itemLoja({}),
   itemLoja({ id: 504, referencia_interna: 'EST-DEMO-004', titulo: 'DAF XF 480 2020', placa: 'DDD3D33', marca: 'DAF', modelo: 'XF 480', ano: 2020, preco_anunciado: 470000, usar_comparativo: 0, dias_estoque: 9 })];
 const fipes = [{ id: 'E001-001', marca: 'Volvo', modelo: 'FH 540', ano: 2021, codigo_fipe: 'E001-001', preco_fipe: 505000, mes_referencia: '2026-09', anuncios_comparaveis: 11, mercado_amostra_suficiente: 1, preco_mediano_mercado: 498000, mercado_confianca: 'media', abaixo_fipe: 7, ufs: ['PR', 'SP'] }, { id: 'E002-002', marca: 'Scania', modelo: 'R 450', ano: 2020, codigo_fipe: 'E002-002', preco_fipe: 431000, mes_referencia: '2026-09', anuncios_comparaveis: 9, mercado_amostra_suficiente: 1, preco_mediano_mercado: 425000, mercado_confianca: 'media', abaixo_fipe: 4, ufs: ['SP'] }];
 export const DEMO_SESSION = { autenticado: true, csrf: 'demo-csrf-token', usuario: { id: 1, nome: 'Pessoa Demo', email: 'demo@example.invalid', papel: 'demonstração' } };
+
+// Fila de vinculação FIPE por categoria (fipe_fila_categorias.php) — números fictícios, só pra visual.
+const fipeFilaCategorias = {
+  resumo: { pendentes: 5842, vinculados: 5956, total: 11798, categorias_pendentes: 342, cobertura_pct: 50.5 },
+  categorias: [
+    { marca: 'DAF', modelo: 'XF FTS 530', sem_sugestao: 120, com_sugestao: 45, revisar: 165, vinculados: 30, total: 195 },
+    { marca: 'Volvo', modelo: 'FH 540', sem_sugestao: 70, com_sugestao: 58, revisar: 128, vinculados: 85, total: 213 },
+    { marca: 'Scania', modelo: 'R 450', sem_sugestao: 40, com_sugestao: 51, revisar: 91, vinculados: 112, total: 203 },
+    { marca: 'Mercedes-Benz', modelo: 'Axor 2544', sem_sugestao: 38, com_sugestao: 22, revisar: 60, vinculados: 40, total: 100 },
+    { marca: 'Iveco', modelo: 'Tector 11-190', sem_sugestao: 15, com_sugestao: 12, revisar: 27, vinculados: 18, total: 45 },
+  ],
+  limite: 80,
+};
 // Contrato real de minha_loja_detalhe.php: item + mercado_nacional + regioes (com desvio_preco_loja_pct) + orientação
 // (manter/avaliar_reducao/avaliar_outra_praca/sem_base — lib/orientacao_estoque.php). Cobre os 4 estoque[] da demo:
 // 501 acima do mercado com praça melhor -> avaliar_outra_praca; 502 competitivo -> manter; 503 amostra insuficiente ->
@@ -141,6 +154,7 @@ export function demoGet(input) {
   if (path === 'fipe_status.php') return { disponivel: true, provedor: 'fixture local', atualizado_em: today, cobertura: 'catalogo demonstrativo' };
   if (path === 'placa_consulta.php') { if (params.get('modo') === 'status') return { disponivel: true, configurado: false, modo: 'demo' }; return { placa: params.get('placa'), veiculo: { marca: 'Volvo', modelo: 'FH 540', ano_modelo: 2021, cidade: 'Curitiba', uf: 'PR' }, fipes, mercado: fipes[0] }; }
   if (path === 'fipe_consulta.php') return { itens: fipes, fipes, total: fipes.length, resultado: fipes[0], consultado_em: today };
+  if (path === 'fipe_fila_categorias.php') return fipeFilaCategorias;
   if (path === 'insights.php') return { kpis: { fipe: { vinculados: 8, abaixo_fipe: 3, desvio_mediano_pct: -1.6 }, cobertura: { ufs: 3 } }, por_cidade: [{ cidade: 'Curitiba', uf: 'PR', anuncios: 322 }], lojistas: [{ revenda: 'Rota Exemplo Caminhoes', uf: 'PR', anuncios: 18 }], atualizado_em: today };
   if (path === 'analista_status.php') return { disponivel: true, configurado: true, modo: 'demo', aviso: 'Resposta local ficticia; sem contexto de backend.' };
   if (path === 'auth.php') return DEMO_SESSION;

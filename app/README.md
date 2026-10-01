@@ -156,3 +156,12 @@ do Mercado e da Concorrência dizem isso ao usuário (`tests/queryBackendContrac
 
 O desvio da FIPE também só considera cavalo, chassi ou carroceria não informada (F0d: com implemento o preço inclui o equipamento e o desvio desloca para cima);
 os textos de evidência dizem isso ao usuário (`tests/queryBackendContract.test.js`).
+
+## Fila de vinculação FIPE (aba "Vinculação pendente" em FIPE)
+
+`PageFipeFila` lê `fipe_fila_categorias.php` e lista marca+modelo por quantidade de anúncios ativos
+sem FIPE, maior pendência primeiro, com um resumo de cobertura no topo (01/10/2026: 50,5%). O botão
+"Resolver" de cada linha usa `onNavegar('mercado', { marca, busca: modelo })` — a mesma navegação
+com contexto que `PageHoje` já usava para os insights — e cai direto no Mercado já filtrado pra essa
+categoria, onde a curadoria por anúncio (sugestões inteligentes, busca livre, salvar) já existe.
+Esta aba não lê nem grava FIPE nenhuma, só organiza a navegação até quem já faz isso.

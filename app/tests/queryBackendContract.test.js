@@ -217,3 +217,19 @@ test('Orientação de venda (Minha Loja): minha_loja_detalhe.php orquestra a lib
   assert.match(app, /origem: 'Minha Loja'/);
   assert.match(app, /Saída observada não é venda; a orientação não garante resultado/, 'orientação avisa que não garante resultado');
 });
+
+test('Fila de vinculação FIPE (01/10/2026): fipe_fila_categorias.php agrupa os mesmos buckets de anuncios.php, front só lê e navega', () => {
+  const endpoint = read('oper-radar-api/fipe_fila_categorias.php');
+  assert.match(endpoint, /exige_autenticacao\(\)/);
+  // mesma definicao de pendente que anuncios.php?fipe_fila=: fipe_preco_id IS NULL, com/sem anuncio_fipe_sugestao
+  assert.match(endpoint, /a\.fipe_preco_id IS NULL AND NOT EXISTS \(SELECT 1 FROM anuncio_fipe_sugestao/);
+  assert.match(endpoint, /a\.fipe_preco_id IS NULL AND EXISTS \(SELECT 1 FROM anuncio_fipe_sugestao/);
+  assert.match(endpoint, /a\.tipo = 'Caminhao' AND a\.status = 'ativo'/);
+  assert.doesNotMatch(endpoint, /\bUPDATE\b|\bINSERT\b|\bDELETE\b/i, 'endpoint é só leitura, nenhuma escrita');
+  const app = read('app/src/App.jsx');
+  assert.match(app, /function PageFipeFila\({ onNavegar }\)/);
+  assert.match(app, /useApi\('fipe_fila_categorias\.php'\)/);
+  assert.match(app, /onNavegar\?\.\('mercado', \{ marca: cat\.marca, busca: cat\.modelo \}\)/);
+  assert.match(app, /<PageFipe onNavegar={\(page, context\) => navigate\(page, \{ context \}\)} \/>/);
+  assert.match(read('app/src/demoFixtures.js'), /fipe_fila_categorias\.php/);
+});
