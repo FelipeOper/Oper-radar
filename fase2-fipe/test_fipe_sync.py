@@ -359,6 +359,148 @@ class MatchingFipeTest(unittest.TestCase):
             candidatos, _ = escolhe(None, anuncio)
         self.assertEqual([day], candidatos)
 
+    # --- Uplift CF (decisao Master aprovada): familia CF, potencia, eixo e cabine batendo
+    # explicitamente dos dois lados (anuncio E FIPE) sobem o score de 0.90 pra 0.95 so pra essa
+    # combinacao; ausencia de qualquer evidencia (so um lado declara, candidato sem tag, potencia
+    # divergente) nunca vira "medio": fica sem vinculo. O ano-modelo nao e checado aqui (e so
+    # confirmado depois, na busca de preco por modelo_ano).
+
+    def test_cf_uplift_positivo_potencia_eixo_cabine_explicitos(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([day], candidatos)
+        self.assertEqual("alto", confianca)
+
+    def test_cf_uplift_positivo_com_emissao_explicita_batendo(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB EURO 5 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([day], candidatos)
+        self.assertEqual("alto", confianca)
+
+    def test_cf_uplift_negativo_eixo_divergente(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day_6x4 = {"id": 1, "modelo_fipe": "CF FAS 300 6x4 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day_6x4)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match eixo 6X2", motivo)
+
+    def test_cf_uplift_negativo_cabine_ausente_na_fipe(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        generico = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", generico)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine DAY", motivo)
+
+    def test_cf_uplift_negativo_cabine_ausente_no_anuncio(self):
+        anuncio = {
+            "titulo": "DAF CF 300 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_eixo_ausente_no_anuncio(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "marca": "DAF",
+            "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_potencia_divergente_defesa_em_profundidade(self):
+        """Mesmo que um candidato chegue com score>=0.5 por outro motivo que nao 'potencia' (o
+        upstream real nunca faria isso, mas esta funcao nao confia so no score herdado), a
+        potencia e reconferida: 450 no anuncio nao bate com 300 na FIPE, sem uplift."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        outra_potencia = {"id": 1, "modelo_fipe": "CF FAS 450 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", outra_potencia)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_anuncio_sem_potencia_detectavel(self):
+        anuncio = {
+            "titulo": "DAF CF DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", day)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_emissao_explicita_sem_tag_na_fipe(self):
+        """O fallback de emissao_preferida aceita candidato FIPE sem tag E5/E6 quando ninguem
+        contradiz; o uplift CF reconfere e exige a tag — sem ela, nao ha evidencia explicita."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB EURO 5 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        sem_tag = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", sem_tag)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_ano_ainda_e_conferido_no_fluxo_final_sem_vinculo_por_cache_vazio(self):
+        """O uplift CF sobe o SCORE (confianca 'alto'), mas nao prova o ano: escolhe() nunca ve
+        ano_codigo (so o nome do modelo FIPE). A conferencia real do ano-modelo e de
+        processa_anuncios() -> busca_preco_cache(candidato, modelo_ano, ...), SEM API (modo local).
+        Mesmo com uplift confirmando potencia+eixo+cabine, se o cache local nao tem preco pra esse
+        ano especifico, nao vincula (nao escreve nada): fica aguardando_cache, nao 'medio' nem
+        'vinculado' por confianca alta emprestada de outro sinal. Mesmo padrao de
+        test_modo_local_nao_chama_api_quando_cache_falta, exercitando escolhe() de verdade (nao
+        mockado) pra provar que o uplift nao contorna essa checagem."""
+        anuncio = {
+            "id": 42, "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "marca_fipe": "DAF", "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        conn = object()
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            # confirma que o uplift realmente disparou antes de chegar no cache (confianca alto, 1 candidato)
+            candidatos, confianca = escolhe(conn, anuncio)
+            self.assertEqual([day], candidatos)
+            self.assertEqual("alto", confianca)
+            with patch("fipe_sync.anuncios_pendentes", return_value=[anuncio]), \
+                 patch("fipe_sync.busca_preco_cache", return_value=None) as busca_cache, \
+                 patch("fipe_sync.api_get") as api_get, \
+                 patch("fipe_sync.registra_resultado") as registra:
+                resumo = processa_anuncios(conn, lote=1, permitir_api=False)
+        # mesmo assim, sem o ano no cache local, nada e gravado — nao substitui a conferencia do ano.
+        api_get.assert_not_called()
+        registra.assert_not_called()
+        busca_cache.assert_called_once_with(conn, day, 2022, None)
+        self.assertEqual(1, resumo["aguardando_cache"])
+        self.assertEqual(0, resumo["vinculados"])
+
     def test_backfill_daf_extrai_url_e_corrige_anos_pelo_titulo(self):
         dados = dados_derivados({
             "titulo": "DAF XF FTT 530 2022/2023",

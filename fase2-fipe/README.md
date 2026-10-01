@@ -38,6 +38,31 @@ cabine <TAG>`), mesmo que todos os candidatos do grupo sejam igualmente genéric
 `test_fipe_sync.py` (`test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo`,
 `test_daf_cabine_explicita_sem_nenhum_candidato_tagueado_nao_vincula` e vizinhos).
 
+### Uplift de confiança para a linha CF (decisão Master aprovada)
+
+A CF não tem letra de configuração (`FT`/`FTS`/`FTT`) para `avalia()` confirmar o modelo, então o
+score fica travado em 0,90 ("potência") mesmo quando o candidato é o único certo — e o gate geral
+de confiança (`>= 0,95`) rejeitaria esses casos por engano. `escolhe()` faz um uplift pontual para
+0,95 SOMENTE quando **família CF, potência, eixo e cabine batem explicitamente dos dois lados**
+(anúncio E FIPE, nenhum lado `None`) e sobra um único candidato:
+
+- a potência é reconferida por conta própria (`potencia_daf` nos dois lados), não herdada do score
+  que o candidato trouxe — defesa em profundidade contra um candidato que chegasse com score alto
+  por outro motivo;
+- emissão (E5/E6): o bloco de `emissao_preferida` mais acima tem um fallback que aceita um
+  candidato FIPE SEM a tag quando nada contradiz; o uplift reconfere e exige a tag igual quando o
+  ANÚNCIO declara a emissão explicitamente — sem a tag na FIPE, não há uplift;
+- o ano-modelo **não entra aqui**: `escolhe()` só recebe o nome do modelo FIPE, sem ano-código; a
+  conferência real do ano acontece depois, em `processa_anuncios()` →
+  `busca_ou_cria_preco`/`busca_preco_cache` por `modelo_ano`. Confiança "alto" pelo uplift não
+  dispensa essa etapa: sem o ano no cache local (modo `permitir_api=False`), nada é gravado, fica
+  em `aguardando_cache` — nunca "vinculado" por confiança emprestada de outro sinal
+  (`test_cf_uplift_ano_ainda_e_conferido_no_fluxo_final_sem_vinculo_por_cache_vazio`).
+
+Ausência de evidência em qualquer ponto (só um lado declara, candidato sem tag, potência
+divergente) nunca cai para confiança "média": fica sem vínculo. Testes em `test_fipe_sync.py`,
+prefixo `test_cf_uplift_*` (positivos e os negativos espelhados de cada sinal).
+
 ## Instalação em banco existente
 
 ```bash
