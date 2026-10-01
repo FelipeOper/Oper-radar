@@ -735,12 +735,10 @@ def escolhe(conn, anuncio):
     Regras, nesta ordem:
       1. Prioriza a geracao de emissoes explicita; sem ela, usa a fabricacao
          apenas como preferencia segura (2012-2022 E5; 2023+ E6).
-      2. Se o titulo informa o eixo ('R440 6X4'), filtra por ele.
+      2. Para 4x2/6x2/6x4/8x2 declarados, exige eixo FIPE igual.
       3. Linhas comerciais em conflito (Atego x Atron) -> nao vincula.
          Conjunto vazio nunca conflita: 'R-440 A 4x2 (diesel)' nao declara linha.
-      4. Eixos explicitos em conflito (6x2 x 8x2) -> tenta o nome base da FIPE,
-         aquele que nao declara eixo ('11-180 Delivery 2p'), que e o modelo padrao.
-         Se nao houver base, ai sim nao vincula.
+      4. Sem eixo no anuncio, variantes FIPE de eixos diferentes ficam ambiguas.
     """
     daf = normaliza(anuncio.get("marca", "")) == "DAF"
     validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=100) if s >= 0.5]
@@ -764,10 +762,13 @@ def escolhe(conn, anuncio):
     if conflito_eixo:
         return None, conflito_eixo
     if eixo_anuncio:
-        filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_anuncio, None)]
+        eixo_p0 = eixo_anuncio in {"4X2", "6X2", "6X4", "8X2"}
+        filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) == eixo_anuncio] if eixo_p0 else [
+            v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_anuncio, None)
+        ]
         if filtrados:
             validos = filtrados
-        elif daf:
+        elif daf or eixo_p0:
             return None, f"sem match eixo {eixo_anuncio}"
 
     emissoes_candidatas = {
@@ -832,13 +833,16 @@ def escolhe(conn, anuncio):
                 conflito = "/".join(sorted(nao_vazias[i_] | nao_vazias[j_]))[:26]
                 return None, f"ambiguo linha ({conflito})"
 
-    # 4) eixos conflitantes: prefere o nome base (sem eixo declarado)
+    # 4) sem eixo no anuncio, o nome base nao prova qual variante se aplica.
     eixos_expl = {e for e in (eixos(c["modelo_fipe"]) for _, _, c in validos) if e}
     if len(eixos_expl) > 1:
-        base = [v for v in validos if eixos(v[2]["modelo_fipe"]) is None]
-        if not base:
-            return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
-        validos = base
+        return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
+
+    if eixo_anuncio in {"4X2", "6X2", "6X4", "8X2"}:
+        if len(validos) != 1:
+            return None, f"ambiguo eixo {eixo_anuncio}: {len(validos)} candidatos"
+        if validos[0][0] < 0.95:
+            return None, f"ambiguo eixo {eixo_anuncio}: confianca insuficiente"
 
     confianca = "alto" if validos[0][0] >= 0.95 else "medio"
     return [c for _, _, c in validos], confianca

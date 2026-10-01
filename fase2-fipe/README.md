@@ -23,6 +23,12 @@ Existem três modos independentes:
 Ambiguidades de linha ou eixo continuam sem vínculo automático. Ausências do cache no modo
 local permanecem na fila, sem serem marcadas erroneamente como “sem ano”.
 
+Para eixo/tração 4x2, 6x2, 6x4 ou 8x2 explícito no anúncio, o matching automático
+exige o mesmo eixo no nome FIPE, um único candidato após os filtros e score de pelo
+menos 0,95 (`alto`). Um nome FIPE sem eixo não confirma a configuração. Se o anúncio
+não declara eixo e o catálogo traz variantes de eixos diferentes, o nome base não
+resolve a ambiguidade. Esses casos ficam sem vínculo automático para curadoria.
+
 ## Instalação em banco existente
 
 ```bash
