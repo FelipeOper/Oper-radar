@@ -23,6 +23,16 @@ Existem três modos independentes:
 Ambiguidades de linha ou eixo continuam sem vínculo automático. Ausências do cache no modo
 local permanecem na fila, sem serem marcadas erroneamente como “sem ano”.
 
+Na DAF, a FIPE também separa cabine (`Day`, `Sleeper`, `Space`, `Super Space Cab`; `cabine_daf`
+em `fipe_sync.py`). Sem a palavra no anúncio, o matcher não escolhe uma versão por conta própria:
+dois candidatos com cabines declaradas diferentes (ex.: `SPACE`/`SUPER SPACE`) ficam ambíguos, e o
+mesmo vale quando só UM dos candidatos declara a cabine e o outro não diz nada (`XF FTT530 6x4`
+genérico ao lado de `XF FTT530 6x4 Space Cab`) — um nome genérico na FIPE não é evidência de que
+aquela é a versão certa, então ele entra na ambiguidade junto com o declarado. Só vincula sem a
+palavra no anúncio quando TODOS os candidatos daquele número/série são igualmente genéricos (não
+há cabine para desambiguar). Testes em `test_fipe_sync.py`
+(`test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo` e vizinhos).
+
 ## Instalação em banco existente
 
 ```bash
