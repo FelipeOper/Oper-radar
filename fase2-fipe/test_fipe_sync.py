@@ -357,6 +357,133 @@ class MatchingFipeTest(unittest.TestCase):
             candidatos, _ = escolhe(None, anuncio)
         self.assertEqual([super_space], candidatos)
 
+    def test_daf_cabine_explicita_sem_nenhum_candidato_tagueado_nao_vincula(self):
+        """Achado da CUSTODIA/VELOX (28/09): anuncio diz 'Super Space' explicitamente, mas o
+        UNICO candidato FIPE disponivel e generico (sem nenhuma tag de cabine) e score 0,99 — alto
+        o bastante para vincular sozinho. Antes desta correcao, a rejeicao 'sem match cabine' so
+        disparava se EXISTISSE algum candidato com QUALQUER tag de cabine no grupo; com todos
+        genericos, o codigo nao tinha por onde rejeitar e aceitava o generico como se fosse a
+        Super Space, so por nao haver concorrente declarado. Confianca alta e candidato unico nao
+        bastam: cabine explicita no anuncio exige a tag correspondente em algum candidato, mesmo
+        que nenhum outro candidato exista para comparar."""
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SUPER SPACE 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        generico = {"id": 1, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", generico),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine SUPER SPACE", motivo)
+
+    def test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo(self):
+        """P0 cabine: achado da auditoria F1 (5 vinculados marcados em 251 ambiguos). Antes desta
+        correcao, um candidato generico ('XF FTT530 6x4', sem 'Space'/'Super Space'/'Day'/'Sleeper')
+        nao entrava no conjunto de cabines candidatas (cabine_daf devolve None e era filtrado), e o
+        par (generico, com-tag) passava como se so houvesse UMA cabine possivel — vinculando com
+        confianca 'alto' sem nenhuma evidencia no anuncio de qual das duas versoes era a certa.
+        A regra correta e: sem a palavra no anuncio, generico ao lado de uma tag explicita e tao
+        ambiguo quanto duas tags diferentes (SPACE/SUPER SPACE)."""
+        anuncio = {
+            "titulo": "DAF XF FTT 530 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        tagueado = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"}
+        generico = {"id": 2, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        for ordem in ([tagueado, generico], [generico, tagueado]):
+            with patch("fipe_sync.melhores_candidatos", return_value=[
+                (0.99, "potencia+configuracao", ordem[0]),
+                (0.99, "potencia+configuracao", ordem[1]),
+            ]):
+                candidatos, motivo = escolhe(None, anuncio)
+            self.assertIsNone(candidatos)
+            self.assertEqual("ambiguo cabine (SEM TAG/SPACE)", motivo)
+
+    def test_daf_so_candidatos_sem_tag_de_cabine_nao_fica_ambiguo_por_cabine(self):
+        """Quando NENHUM candidato declara Space/Super Space/Day/Sleeper, nao ha nada pra desambiguar
+        por cabine: o conjunto tem um so valor (None) e o candidato segue adiante normalmente."""
+        anuncio = {
+            "titulo": "DAF XF 440 2020/2020", "url": "https://portal/daf-xf-440/2020/1",
+            "marca": "DAF", "ano_inicial": 2020, "ano_final": 2020,
+        }
+        generico = {"id": 1, "modelo_fipe": "XF FT440 4x2 (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", generico),
+        ]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([generico], candidatos)
+        self.assertEqual("alto", confianca)
+
+    def test_daf_anuncio_com_cabine_explicita_ignora_candidato_generico(self):
+        """O anuncio dizendo 'Space Cab' e evidencia suficiente para descartar o candidato
+        generico (sem tag) e o candidato com outra tag, mesmo que ambos tenham o mesmo score."""
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SPACE CAB 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        tagueado = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"}
+        generico = {"id": 2, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", tagueado),
+            (0.99, "potencia+configuracao", generico),
+        ]):
+            candidatos, _ = escolhe(None, anuncio)
+        self.assertEqual([tagueado], candidatos)
+
+    def test_daf_cabine_conflitante_nao_vincula(self):
+        """O anuncio declara 'Day Cab' explicitamente, mas NENHUM candidato tem essa tag (so
+        Space e Super Space): a cabine do anuncio contradiz os candidatos, entao nao ha vinculo
+        — nunca inferir a cabine certa so porque sobrou alguma coisa."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        space = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Space Cab Aut (Die)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Super Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", space), (0.90, "potencia", super_space),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine DAY", motivo)
+
+    def test_daf_cabine_sleeper_vs_super_space_fica_ambiguo(self):
+        """Par SLEEPER/SUPER SPACE (nao testado antes nesta combinacao): sem a palavra no
+        anuncio, dois valores diferentes de cabine sao ambiguos, qualquer que seja o par."""
+        anuncio = {
+            "titulo": "DAF CF 300 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        sleeper = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Sleep. Cab Aut (Die)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Super Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", sleeper), (0.90, "potencia", super_space),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("ambiguo cabine (SLEEPER/SUPER SPACE)", motivo)
+
+    def test_daf_cabine_day_explicita_escolhe_entre_tres_versoes(self):
+        """Multiplas versoes FIPE (DAY/SLEEPER/SPACE) com o anuncio dizendo 'Day Cab'
+        explicitamente: escolhe so a DAY, nunca infere entre as outras duas."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        sleeper = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Sleep. Cab Aut (Die)(E5)"}
+        space = {"id": 3, "modelo_fipe": "CF FAS 300 6x2 Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", day), (0.90, "potencia", sleeper), (0.90, "potencia", space),
+        ]):
+            candidatos, _ = escolhe(None, anuncio)
+        self.assertEqual([day], candidatos)
+
     def test_backfill_daf_extrai_url_e_corrige_anos_pelo_titulo(self):
         dados = dados_derivados({
             "titulo": "DAF XF FTT 530 2022/2023",

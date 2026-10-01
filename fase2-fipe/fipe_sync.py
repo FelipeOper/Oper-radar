@@ -795,15 +795,24 @@ def escolhe(conn, anuncio):
     # A FIPE separa Space Cab, Super Space Cab e, em alguns anos, HR.
     # Sem evidencia no anuncio, escolher uma delas seria inventar uma versao.
     cabine_anuncio = cabine_daf(texto)
-    cabines_candidatas = {cabine_daf(c["modelo_fipe"]) for _, _, c in validos if cabine_daf(c["modelo_fipe"])}
     if cabine_anuncio:
         com_cabine = [v for v in validos if cabine_daf(v[2]["modelo_fipe"]) == cabine_anuncio]
         if com_cabine:
             validos = com_cabine
-        elif daf and cabines_candidatas:
+        elif daf:
+            # Mesmo que NENHUM candidato declare qualquer cabine (todos genericos), o anuncio deu
+            # evidencia explicita que nao foi confirmada por nenhum candidato — nao presumir que o
+            # generico e a versao certa so porque a FIPE nao marcou a palavra nessa linha.
             return None, f"sem match cabine {cabine_anuncio}"
-    elif len(cabines_candidatas) > 1:
-        return None, "ambiguo cabine (" + "/".join(sorted(cabines_candidatas)) + ")"
+    else:
+        # O conjunto SEM excluir None: um candidato que nao declara cabine ("XF FTT530 6x4")
+        # ao lado de um que declara ("XF FTT530 6x4 Space Cab") e tao ambiguo quanto dois
+        # declarados diferentes — o anuncio nao diz qual versao e, e nao da pra supor que o
+        # generico e a correta so porque a FIPE nao marcou a palavra "Space" naquela linha.
+        todas_as_cabines = {cabine_daf(c["modelo_fipe"]) for _, _, c in validos}
+        if len(todas_as_cabines) > 1:
+            rotulo = "/".join(sorted(c or "SEM TAG" for c in todas_as_cabines))
+            return None, f"ambiguo cabine ({rotulo})"
 
     hr_anuncio = tem_modificador_hr(texto)
     hr_candidatos = {tem_modificador_hr(c["modelo_fipe"]) for _, _, c in validos}
