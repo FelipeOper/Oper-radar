@@ -66,6 +66,42 @@ class MatchingFipeTest(unittest.TestCase):
         score, _ = avalia("SCANIA R440 2014", "G-440 A 6x4 Diesel")
         self.assertEqual(0.0, score)
 
+    def test_serie_explicita_exige_evidencia_dos_dois_lados(self):
+        for anuncio, fipe in (
+            ("SCANIA R440 2014", "440 A 6x4 Diesel"),
+            ("SCANIA 440 2014", "R-440 A 6x4 Diesel"),
+        ):
+            with self.subTest(anuncio=anuncio, fipe=fipe):
+                self.assertEqual(0.0, avalia(anuncio, fipe)[0])
+        self.assertEqual(0.95, avalia("SCANIA R440 2014", "R-440 A 6x4 Diesel")[0])
+
+    def test_geracao_daf_fipe_explicita_nao_se_inventa_no_anuncio(self):
+        self.assertEqual(0.0, avalia("DAF XF FTT 530 2021", "XF 105 FTT 530 6x4 Diesel")[0])
+        self.assertEqual(0.99, avalia("DAF XF105 FTT 530 2021", "XF 105 FTT 530 6x4 Diesel")[0])
+
+    def test_so_candidato_unico_de_serie_confirmada_e_alta_confianca(self):
+        anuncio = {"titulo": "SCANIA R440 2014", "marca": "SCANIA", "ano_inicial": 2014, "ano_final": 2014}
+        confirmado = {"id": 1, "modelo_fipe": "R-440 A 6x4 Diesel"}
+        sem_serie = {"id": 2, "modelo_fipe": "440 A 6x4 Diesel"}
+        with patch("fipe_sync.modelos_da_marca", return_value=[confirmado, sem_serie]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([confirmado], candidatos)
+        self.assertEqual("alto", confianca)
+
+        duplicado = {"id": 3, "modelo_fipe": "R-440 A 6x4 High. Diesel"}
+        with patch("fipe_sync.modelos_da_marca", return_value=[confirmado, duplicado]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertIn("ambiguo serie/geracao", motivo)
+
+    def test_geracao_explicita_sem_outra_evidencia_fica_sem_alta_confianca(self):
+        anuncio = {"titulo": "DAF XF105 530 2021", "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021}
+        candidato = {"id": 1, "modelo_fipe": "XF 105 FTT 530 6x4 Diesel"}
+        with patch("fipe_sync.modelos_da_marca", return_value=[candidato]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertIn("sem alta confianca", motivo)
+
     def test_iveco_nao_mistura_familias(self):
         self.assertEqual(
             0.0, avalia("IVECO STRALIS 410 2011", "TRAKKER 410-T48 6x4 2p")[0]
