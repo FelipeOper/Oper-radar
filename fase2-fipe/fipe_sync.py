@@ -410,14 +410,16 @@ def avalia(titulo: str, modelo_fipe: str):
 
     # Na DAF, 105 identifica a geracao XF105. A potencia e outro numero (460/510 etc.).
     if "DAF" in normaliza(titulo) or familia_comercial(titulo) in ("XF", "CF"):
+        geracao_t = geracao_daf(titulo)
+        geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
+        # A ausencia de 105/85 no anuncio nao confirma a geracao explicita da FIPE.
+        if ((geracao_t and geracao_f and geracao_t != geracao_f)
+                or (geracao_f in ("XF105", "CF85") and not geracao_t)):
+            return 0.0, f"geracao {geracao_t or 'ausente'}!={geracao_f}"
         potencia_t, potencia_f = potencia_daf(titulo), potencia_daf(modelo_fipe)
         if potencia_t and potencia_f:
             if potencia_t != potencia_f:
                 return 0.0, f"potencia {potencia_t}!={potencia_f}"
-            geracao_t = geracao_daf(titulo)
-            geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
-            if geracao_t and geracao_f and geracao_t != geracao_f:
-                return 0.0, f"geracao {geracao_t}!={geracao_f}"
             config_t, config_f = configuracao_daf(titulo), configuracao_daf(modelo_fipe)
             if config_t and config_f and config_t == config_f:
                 return 0.99, f"potencia+configuracao {potencia_t}/{config_t}"
@@ -427,8 +429,8 @@ def avalia(titulo: str, modelo_fipe: str):
     if not n_t or not n_f or n_t != n_f:
         return 0.0, "numero difere"
     s_t, s_f = serie(titulo), serie(modelo_fipe)
-    if s_t and s_f and s_t != s_f:
-        return 0.0, f"serie {s_t}!={s_f}"
+    if (s_t or s_f) and s_t != s_f:
+        return 0.0, f"serie {s_t or 'ausente'}!={s_f or 'ausente'}"
     if s_t and s_f:
         return 0.95, "numero+serie"
     return 0.60, "so numero"
@@ -839,6 +841,17 @@ def escolhe(conn, anuncio):
         if not base:
             return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
         validos = base
+
+    # Serie/geracao explicita so autoriza vinculo com um unico modelo confirmado.
+    exige_identidade = (
+        (normaliza(anuncio.get("marca", "")) == "SCANIA" and serie(texto))
+        or geracao_daf(texto) in ("XF105", "CF85")
+    )
+    if exige_identidade:
+        if len(validos) != 1:
+            return None, f"ambiguo serie/geracao ({len(validos)} candidatos)"
+        if validos[0][0] < 0.95:
+            return None, "sem match serie/geracao sem alta confianca"
 
     confianca = "alto" if validos[0][0] >= 0.95 else "medio"
     return [c for _, _, c in validos], confianca

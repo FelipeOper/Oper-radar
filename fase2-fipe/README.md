@@ -23,6 +23,34 @@ Existem três modos independentes:
 Ambiguidades de linha ou eixo continuam sem vínculo automático. Ausências do cache no modo
 local permanecem na fila, sem serem marcadas erroneamente como “sem ano”.
 
+### Diagnóstico isolado P0 — série/geração (01/10/2026)
+
+O matching automático antes aceitava número igual quando a série Scania aparecia só
+em um lado (`R440` × `440`), com score 0,60. Também aceitava `DAF XF 530` ×
+`XF105 530` com score 0,99 quando a configuração coincidia: a geração 105 estava
+explícita só na FIPE. Isso podia produzir vínculo de modelo incorreto mesmo com
+um único preço em cache. A correção exige série compatível nos dois lados quando
+ela for explícita e não atribui geração 105/85 a um anúncio que não a informa.
+Para série/geração explícita, só um candidato com score ≥ 0,95 pode seguir para
+a verificação de ano/preço; empate ou evidência insuficiente permanece sem vínculo.
+
+Matriz sintética, sem anúncios reais nem PII, medida pelos testes puros:
+
+| Caso | Antes | Depois |
+|---|---:|---:|
+| Scania R440 × FIPE 440 sem série | 0,60 | 0,00 |
+| Scania 440 sem série × FIPE R-440 | 0,60 | 0,00 |
+| DAF XF 530 × FIPE XF105 FTT530 | 0,99 | 0,00 |
+| DAF XF105 530 sem configuração × único XF105 FTT530 | 0,90, elegível | sem vínculo (confiança insuficiente) |
+| Scania R440 × FIPE R-440, único | 0,95 | 0,95, alto |
+| DAF XF105 FTT530 × FIPE XF105 FTT530, único | 0,99 | 0,99, alto |
+
+**Métrica do conjunto sintético:** 4/4 casos sem evidência suficiente eram
+elegíveis antes, 0/4 depois; 2/2 positivos de alta confiança preservados.
+Os testes de regressão locais somam 42/42. Não se mediu cobertura em banco real
+nem distribuição de scores de produção. Nenhum dado foi escrito e F4 segue bloqueada.
+Sugestões de curadoria humana (`pontua_sugestao`) não foram alteradas.
+
 ## Instalação em banco existente
 
 ```bash
