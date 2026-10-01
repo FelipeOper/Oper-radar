@@ -30,8 +30,13 @@ mesmo vale quando só UM dos candidatos declara a cabine e o outro não diz nada
 genérico ao lado de `XF FTT530 6x4 Space Cab`) — um nome genérico na FIPE não é evidência de que
 aquela é a versão certa, então ele entra na ambiguidade junto com o declarado. Só vincula sem a
 palavra no anúncio quando TODOS os candidatos daquele número/série são igualmente genéricos (não
-há cabine para desambiguar). Testes em `test_fipe_sync.py`
-(`test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo` e vizinhos).
+há cabine para desambiguar). Quando o ANÚNCIO declara a cabine explicitamente (ex.: "Super
+Space"), exige-se a tag correspondente em algum candidato — mesmo que exista um único candidato
+genérico com score alto (achado CUSTODIA/VELOX, 28/09): candidato único e confiança alta não
+substituem a confirmação da cabine; sem nenhum candidato com a tag pedida, não vincula (`sem match
+cabine <TAG>`), mesmo que todos os candidatos do grupo sejam igualmente genéricos. Testes em
+`test_fipe_sync.py` (`test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo`,
+`test_daf_cabine_explicita_sem_nenhum_candidato_tagueado_nao_vincula` e vizinhos).
 
 ## Instalação em banco existente
 

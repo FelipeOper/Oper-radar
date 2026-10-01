@@ -792,12 +792,14 @@ def escolhe(conn, anuncio):
     # A FIPE separa Space Cab, Super Space Cab e, em alguns anos, HR.
     # Sem evidencia no anuncio, escolher uma delas seria inventar uma versao.
     cabine_anuncio = cabine_daf(texto)
-    cabines_declaradas = {cabine_daf(c["modelo_fipe"]) for _, _, c in validos if cabine_daf(c["modelo_fipe"])}
     if cabine_anuncio:
         com_cabine = [v for v in validos if cabine_daf(v[2]["modelo_fipe"]) == cabine_anuncio]
         if com_cabine:
             validos = com_cabine
-        elif daf and cabines_declaradas:
+        elif daf:
+            # Mesmo que NENHUM candidato declare qualquer cabine (todos genericos), o anuncio deu
+            # evidencia explicita que nao foi confirmada por nenhum candidato — nao presumir que o
+            # generico e a versao certa so porque a FIPE nao marcou a palavra nessa linha.
             return None, f"sem match cabine {cabine_anuncio}"
     else:
         # O conjunto SEM excluir None: um candidato que nao declara cabine ("XF FTT530 6x4")

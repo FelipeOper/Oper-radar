@@ -232,6 +232,28 @@ class MatchingFipeTest(unittest.TestCase):
             candidatos, _ = escolhe(None, anuncio)
         self.assertEqual([super_space], candidatos)
 
+    def test_daf_cabine_explicita_sem_nenhum_candidato_tagueado_nao_vincula(self):
+        """Achado da CUSTODIA/VELOX (28/09): anuncio diz 'Super Space' explicitamente, mas o
+        UNICO candidato FIPE disponivel e generico (sem nenhuma tag de cabine) e score 0,99 — alto
+        o bastante para vincular sozinho. Antes desta correcao, a rejeicao 'sem match cabine' so
+        disparava se EXISTISSE algum candidato com QUALQUER tag de cabine no grupo; com todos
+        genericos, o codigo nao tinha por onde rejeitar e aceitava o generico como se fosse a
+        Super Space, so por nao haver concorrente declarado. Confianca alta e candidato unico nao
+        bastam: cabine explicita no anuncio exige a tag correspondente em algum candidato, mesmo
+        que nenhum outro candidato exista para comparar."""
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SUPER SPACE 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        generico = {"id": 1, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", generico),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine SUPER SPACE", motivo)
+
     def test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo(self):
         """P0 cabine: achado da auditoria F1 (5 vinculados marcados em 251 ambiguos). Antes desta
         correcao, um candidato generico ('XF FTT530 6x4', sem 'Space'/'Super Space'/'Day'/'Sleeper')
