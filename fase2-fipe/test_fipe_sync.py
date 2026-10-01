@@ -288,6 +288,55 @@ class MatchingFipeTest(unittest.TestCase):
             candidatos, _ = escolhe(None, anuncio)
         self.assertEqual([tagueado], candidatos)
 
+    def test_daf_cabine_conflitante_nao_vincula(self):
+        """O anuncio declara 'Day Cab' explicitamente, mas NENHUM candidato tem essa tag (so
+        Space e Super Space): a cabine do anuncio contradiz os candidatos, entao nao ha vinculo
+        — nunca inferir a cabine certa so porque sobrou alguma coisa."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        space = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Space Cab Aut (Die)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Super Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", space), (0.90, "potencia", super_space),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine DAY", motivo)
+
+    def test_daf_cabine_sleeper_vs_super_space_fica_ambiguo(self):
+        """Par SLEEPER/SUPER SPACE (nao testado antes nesta combinacao): sem a palavra no
+        anuncio, dois valores diferentes de cabine sao ambiguos, qualquer que seja o par."""
+        anuncio = {
+            "titulo": "DAF CF 300 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        sleeper = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Sleep. Cab Aut (Die)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Super Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", sleeper), (0.90, "potencia", super_space),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("ambiguo cabine (SLEEPER/SUPER SPACE)", motivo)
+
+    def test_daf_cabine_day_explicita_escolhe_entre_tres_versoes(self):
+        """Multiplas versoes FIPE (DAY/SLEEPER/SPACE) com o anuncio dizendo 'Day Cab'
+        explicitamente: escolhe so a DAY, nunca infere entre as outras duas."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        sleeper = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Sleep. Cab Aut (Die)(E5)"}
+        space = {"id": 3, "modelo_fipe": "CF FAS 300 6x2 Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", day), (0.90, "potencia", sleeper), (0.90, "potencia", space),
+        ]):
+            candidatos, _ = escolhe(None, anuncio)
+        self.assertEqual([day], candidatos)
+
     def test_backfill_daf_extrai_url_e_corrige_anos_pelo_titulo(self):
         dados = dados_derivados({
             "titulo": "DAF XF FTT 530 2022/2023",
