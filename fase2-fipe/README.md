@@ -51,6 +51,30 @@ Os testes de regressão locais somam 42/42. Não se mediu cobertura em banco rea
 nem distribuição de scores de produção. Nenhum dado foi escrito e F4 segue bloqueada.
 Sugestões de curadoria humana (`pontua_sugestao`) não foram alteradas.
 
+### Diagnóstico isolado P0 — eixo/tração (01/10/2026)
+
+Para eixo/tração 4x2, 6x2, 6x4 ou 8x2 explícito no anúncio, o matching automático
+exige o mesmo eixo no nome FIPE, um único candidato após os filtros e score de pelo
+menos 0,95 (`alto`). Um nome FIPE sem eixo não confirma a configuração. Se o anúncio
+não declara eixo e o catálogo traz variantes de eixos diferentes, o nome base não
+resolve a ambiguidade. Esses casos ficam sem vínculo automático para curadoria.
+
+Ensaio offline em `test_fipe_sync.py` (catálogo sintético, sem F3/banco):
+
+| Eixo do anúncio | FIPE igual | FIPE 4x2/6x2/6x4/8x2 diferente | FIPE sem eixo |
+|---|---|---|---|
+| 4x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 6x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 6x4 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 8x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+
+Dois modelos do eixo correto ou score menor que 0,95 ficam ambíguos; sem nenhum,
+`sem match eixo`. Série Scania divergente (R/G) é rejeitada mesmo com eixo igual;
+DAF XF FTT530 6x4 Super Space mantém somente cabine/configuração compatíveis.
+IVECO TECTOR 240E25 8x2 com código e eixo exatos ainda recebe score 0,60 da
+regra preexistente e **não** vira vínculo `alto`. A cobertura em anúncios reais
+não foi medida: as linhas deslocadas do F3 não permitem essa inferência.
+
 ## Instalação em banco existente
 
 ```bash
