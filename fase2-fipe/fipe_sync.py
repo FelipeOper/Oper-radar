@@ -884,6 +884,49 @@ def escolhe(conn, anuncio):
     if len(eixos_expl) > 1:
         return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
 
+    # DAF CF nao tem letra de configuracao (FT/FTS/FTT) pra avalia() confirmar o modelo: o score
+    # fica travado em 0.90 ("potencia") mesmo quando o candidato e o unico certo. Decisao aprovada:
+    # uplift pontual pra 0.95 SOMENTE quando familia CF, POTENCIA, EIXO e CABINE batem
+    # EXPLICITAMENTE dos dois lados (anuncio E FIPE, nenhum None) — e sobra um unico candidato.
+    #
+    # Potencia e reconferida por conta propria (nao herdada do score que validos[0] trouxe): em
+    # producao avalia() ja a exige pra dar score>0 no ramo DAF, mas esta funcao nao confia cegamente
+    # nisso — um candidato com score>=0.5 por outro motivo (ex.: "so numero", vindo de fora do ramo
+    # DAF) nao pode ganhar uplift so por familia/eixo/cabine coincidirem por acaso.
+    #
+    # Emissao: o bloco de emissao_preferida mais acima tem um fallback (`elif origem_emissao ==
+    # "explicita" and sem_emissao: validos = sem_emissao`) que aceita um candidato FIPE SEM tag
+    # E5/E6 quando nenhum candidato com a tag certa existe — ou seja, chegar aqui com emissao
+    # explicita no anuncio NAO prova que o candidato unico tem a tag confirmada; ele pode ter
+    # sobrevivido so por ausencia de contradicao. Por isso o uplift reconfere: se o ANUNCIO declara
+    # emissao explicitamente, exige a MESMA tag no nome FIPE do candidato (tag ausente = sem uplift).
+    #
+    # O ano-modelo NAO entra aqui: escolhe() recebe so o nome do modelo FIPE, sem ano; a conferencia
+    # real do ano acontece depois, na busca de preco (busca_ou_cria_preco/busca_preco_cache por
+    # modelo_ano) — esta funcao nunca declara o ano como confirmado.
+    #
+    # Ausencia de evidencia em qualquer um desses pontos (so um lado declara, ou nenhum lado
+    # declara, ou a FIPE nao tem a tag) NAO conta como coincidencia: nao ha uplift e o candidato
+    # fica sem vinculo (nunca cai pra "medio" por CF).
+    if daf and len(validos) == 1 and validos[0][0] < 0.95:
+        score_unico, motivo_unico, candidato_unico = validos[0]
+        modelo_f = candidato_unico["modelo_fipe"]
+        cf_anuncio = familia_comercial(texto) == "CF"
+        cf_fipe = familia_comercial(modelo_f) == "CF"
+        if cf_anuncio and cf_fipe:
+            potencia_t, potencia_f = potencia_daf(texto), potencia_daf(modelo_f)
+            potencia_bate = bool(potencia_t) and bool(potencia_f) and potencia_t == potencia_f
+            eixo_f = eixos(modelo_f)
+            cabine_f = cabine_daf(modelo_f)
+            eixo_bate = bool(eixo_anuncio) and bool(eixo_f) and eixo_anuncio == eixo_f
+            cabine_bate = bool(cabine_anuncio) and bool(cabine_f) and cabine_anuncio == cabine_f
+            emissao_f = emissao_no_texto(modelo_f)
+            emissao_bate = origem_emissao != "explicita" or (bool(emissao) and bool(emissao_f) and emissao == emissao_f)
+            if potencia_bate and eixo_bate and cabine_bate and emissao_bate:
+                validos = [(0.95, motivo_unico + "+cf_explicito", candidato_unico)]
+            else:
+                return None, "sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)"
+
     if eixo_anuncio in {"4X2", "6X2", "6X4", "8X2"} and not familia_restrita:
         # DAF/IVECO tem portao proprio mais abaixo (familia_restrita), com sua mensagem; aqui
         # so cobre as outras marcas, pra nao duplicar o mesmo motivo com texto diferente.
