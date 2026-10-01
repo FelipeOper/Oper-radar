@@ -3,6 +3,40 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.8 -- API somente: orientacao de venda por veiculo (piloto) -- 01/10/2026 (PUBLICADO e conferido ao vivo)
+
+- Origem: commits `c18f124`/`0312f20`/`036986d` em `agent/portar-demo-real` (4 rodadas Codex,
+  round 4 = approve). So API, aditiva; frontend NAO publicado ainda (o cartao "O que fazer com
+  este veiculo" so aparece quando o proximo release de frontend sair).
+- **O que e**: `lib/orientacao_estoque.php` (novo, `oper_loja_orienta_veiculo`) decide
+  manter/avaliar_reducao/avaliar_outra_praca/sem_base por veiculo do Meu Estoque, usando a propria
+  praca quando tem amostra, cai pro nacional senao. `minha_loja_detalhe.php` ganhou o campo
+  `orientacao` no payload (aditivo, nao quebra nada existente). Detalhe completo e registro do
+  piloto com dado real: `docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md`.
+- **Incidente durante a publicacao, corrigido na mesma sessao** (detalhe completo no piloto acima):
+  1a tentativa so subiu `orientacao_estoque.php`, mas `minha_loja_detalhe.php` ja exigia
+  `lib/fipe_compat.php` (DAT01, mesclado na `main` mas nunca publicado em producao) -- 500 em TODO
+  `minha_loja_detalhe.php?id=*`, nao so no veiculo do piloto. Revertido na hora (backup), 2a
+  tentativa publicou os 3 arquivos (`fipe_compat.php` + `orientacao_estoque.php` +
+  `minha_loja_detalhe.php`) com checagem de `require_once` + teste `curl` (401 esperado, nao 500)
+  antes de declarar concluido.
+- Hashes finais publicados (CRLF->LF ao colar no Terminal, conteudo identico -- conferido):
+  `lib/fipe_compat.php` `91b12d0756601590cf4360bbd66dc5a704d1cfa805e6073d0cc0fffa77dc48bd`;
+  `lib/orientacao_estoque.php` `6137a9e1d0ac84a00fa7c871975b258abfe1a71c82a625c5e0358e7f880b94a6`;
+  `minha_loja_detalhe.php` `3a8c151b714a2c9d36341c367df604898b5ec7ef8f1ae88884c32bcf91913910`.
+- Backup: `/home1/pro93061/backups/api-orientacao-piloto-v2-20261001-093849` (minha_loja_detalhe.php
+  pre-publicacao). Backup da tentativa revertida: `/home1/pro93061/backups/api-orientacao-piloto-<T>`.
+- **Efeito colateral, fora do escopo pedido**: publicar `fipe_compat.php` tambem liga o bloqueio
+  DAT01 pra todo o estoque do Felipe (vinculo FIPE incompativel suspende a comparacao), nao so pro
+  veiculo do piloto -- trabalho ja pronto e testado antes, so nunca publicado. Nenhum vinculo
+  alterado no banco.
+- **Conferido ao vivo, autenticado, 3 veiculos reais** (so leitura, GET): ids 19/71/49 -- `manter`,
+  `manter`, `sem_base` respectivamente, todos batendo com o numero mostrado no mesmo payload.
+  Detalhe completo e veredito do piloto em `docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md`.
+- Reversao: restaurar os 3 arquivos do backup acima (`.bak` tem so o `minha_loja_detalhe.php`
+  anterior; `fipe_compat.php`/`orientacao_estoque.php` novos, reversao = apagar os 2).
+- **Proximo passo**: publicar o frontend (cartao de orientacao visivel) no proximo release.
+
 ## Release 2.7 -- frontend (beta e producao): Plano de acao no layout da DEMO -- 28/09/2026 (PUBLICADO 28/09/2026 e conferido ao vivo)
 
 - Origem: commit `b447425` (PR #63). So frontend; API, banco, cron e credenciais nao mudam. Codex adversarial em 3 rodadas: perda silenciosa de acao quando localStorage falha (fallback em memoria por aba), href aceitava `//host` e `/\host` como caminho interno (base de resolucao passou a ser sorteada por carga, com rejeicao explicita de `//` apos normalizar `\`->`/`). app 141/141, PHP 17/17, Python 68/68, lint 0.
