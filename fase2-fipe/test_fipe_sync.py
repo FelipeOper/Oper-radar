@@ -187,6 +187,30 @@ class MatchingFipeTest(unittest.TestCase):
         ]):
             self.assertEqual((None, "ambiguo 2 candidatos"), escolhe(None, anuncio))
 
+    def test_daf_super_space_explicita_nao_aceita_fipe_sem_cabine(self):
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SUPER SPACE 2021/2021",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        sem_cabine = {"id": 1, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        self.assertEqual(0.99, avalia(anuncio["titulo"], sem_cabine["modelo_fipe"])[0])
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao 530/FTT", sem_cabine),
+        ]):
+            self.assertEqual((None, "sem match cabine SUPER SPACE"), escolhe(None, anuncio))
+
+    def test_daf_cabine_correta_com_score_medio_continua_bloqueada(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "marca": "DAF",
+            "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        self.assertEqual(0.90, avalia(texto_anuncio(anuncio), day["modelo_fipe"])[0])
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia 300", day),
+        ]):
+            self.assertEqual((None, "sem match de alta confianca"), escolhe(None, anuncio))
+
     def test_matriz_daf_geracao_eixo_cabine(self):
         eixos_por_codigo = {"FT": "4x2", "FTS": "6x2", "FTT": "6x4"}
         for geracao in ("XF", "XF 105"):

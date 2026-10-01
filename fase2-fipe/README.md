@@ -29,6 +29,8 @@ potência; FT, FTS e FTT não se cruzam quando ambos os códigos são explícito
 IVECO 240E25/240E28 e potências S44T/S48T distintas são incompatíveis. Casos sem
 evidência suficiente ficam sem vínculo automático para revisão. Essas regras só
 mudam a seleção em memória; não adicionam consultas, índices nem migração de dados.
+Se o anúncio DAF declara cabine, o modelo FIPE precisa declarar a mesma cabine;
+nome FIPE sem cabine não basta mesmo com score numérico alto.
 A matriz de interação e seus limites estão em [P0-DAF-IVECO-MATRIZ.md](P0-DAF-IVECO-MATRIZ.md).
 
 ## Instalação em banco existente

@@ -824,7 +824,7 @@ def escolhe(conn, anuncio):
         com_cabine = [v for v in validos if cabine_daf(v[2]["modelo_fipe"]) == cabine_anuncio]
         if com_cabine:
             validos = com_cabine
-        elif daf and cabines_candidatas:
+        elif daf:
             return None, f"sem match cabine {cabine_anuncio}"
     elif len(cabines_candidatas) > 1:
         return None, "ambiguo cabine (" + "/".join(sorted(cabines_candidatas)) + ")"

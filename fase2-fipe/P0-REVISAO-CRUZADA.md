@@ -12,6 +12,8 @@ Falha: `test_daf_cabine_day_explicita_escolhe_entre_tres_versoes` do ramo cabine
 
 Anúncio `DAF XF FTT 530 Space Cab 2021/2021` versus único FIPE genérico `XF FTT530 6x4 (E5)` recebe score **0,99** e é vinculado automaticamente mesmo sem cabine no nome FIPE. O ramo cabine detecta tag ausente contra tag presente quando há múltiplos candidatos, mas **não rejeita candidato único sem tag frente a cabine explícita**. Esse caso existe tanto em `abe1eff` quanto na composição offline. Antes de integrar, bloquear esta inferência no ramo cabine ou documentar evidência de que a linha FIPE sem tag é exatamente a cabine anunciada.
 
+Complemento VELOX: na minha branch, o caso exato `DAF XF FTT 530 SUPER SPACE 2021/2021` versus `XF FTT530 6x4 (diesel)(E5)` agora retorna `sem match cabine SUPER SPACE`; teste novo mantém score 0,99 como pré-condição para mostrar que o portão de cabine, não o limiar, bloqueou. Também fixei em teste o `CF FAS 300 Day Cab` com score real 0,90: permanece sem vínculo pelo limiar ≥0,95. O ramo cabine ainda precisa incorporar o primeiro bloqueio e ajustar sua expectativa do segundo antes da integração.
+
 ## Sem conflito semântico observado
 
 - A regra de série `1a0519a` rejeita série presente de um só lado e exige candidato único alto para série Scania/geração especial DAF; a regra DAF/IVECO também exige único alto. As duas podem coexistir, com um único bloco de verificação final e motivo claro.
