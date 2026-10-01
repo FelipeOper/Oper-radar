@@ -199,6 +199,12 @@ def codigo_modelo_iveco(s: str):
     return f"{m.group(1)}E{m.group(2)}" if m else None
 
 
+def potencia_iveco_s(s: str):
+    """S44T/S48T identificam potencias distintas na familia IVECO."""
+    m = re.search(r"\bS\s*(\d{2})\s*T\b", normaliza(texto_sem_anos(s)))
+    return m.group(1) + "0" if m else None
+
+
 def identificadores_modelo(s: str) -> set:
     """Formas equivalentes do número técnico: 29 480, 29.480 e 29-480."""
     base = unicodedata.normalize("NFD", texto_sem_anos(s) or "").encode("ascii", "ignore").decode().upper()
@@ -329,6 +335,11 @@ def pontua_sugestao(anuncio: dict, modelo: dict):
     if (codigo_iveco_anuncio and codigo_iveco_fipe
             and codigo_iveco_anuncio != codigo_iveco_fipe):
         return 0, []
+    if normaliza(anuncio.get("marca", "")) == "IVECO":
+        potencia_iveco_anuncio = potencia_iveco_s(titulo)
+        potencia_iveco_fipe = potencia_iveco_s(nome_fipe)
+        if potencia_iveco_anuncio and potencia_iveco_fipe and potencia_iveco_anuncio != potencia_iveco_fipe:
+            return 0, []
 
     if normaliza(anuncio.get("marca", "")) == "DAF":
         potencia_anuncio, potencia_fipe = potencia_daf(titulo), potencia_daf(nome_fipe)
@@ -407,28 +418,52 @@ def avalia(titulo: str, modelo_fipe: str):
     codigo_iveco_f = codigo_modelo_iveco(modelo_fipe)
     if codigo_iveco_t and codigo_iveco_f and codigo_iveco_t != codigo_iveco_f:
         return 0.0, f"codigo IVECO {codigo_iveco_t}!={codigo_iveco_f}"
+    if "IVECO" in normaliza(titulo).split() or familia_t in (
+            "TECTOR", "STRALIS", "EUROCARGO", "EUROTECH", "HI-WAY",
+            "S-WAY", "TRAKKER", "DAILY", "VERTIS"):
+        potencia_iveco_t = potencia_iveco_s(titulo)
+        potencia_iveco_f = potencia_iveco_s(modelo_fipe)
+        if potencia_iveco_t and potencia_iveco_f and potencia_iveco_t != potencia_iveco_f:
+            return 0.0, f"potencia IVECO {potencia_iveco_t}!={potencia_iveco_f}"
 
     # Na DAF, 105 identifica a geracao XF105. A potencia e outro numero (460/510 etc.).
     if "DAF" in normaliza(titulo) or familia_comercial(titulo) in ("XF", "CF"):
+        geracao_t = geracao_daf(titulo)
+        geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
+        # A ausencia de 105/85 no anuncio nao confirma a geracao explicita da FIPE.
+        if ((geracao_t and geracao_f and geracao_t != geracao_f)
+                or (geracao_f in ("XF105", "CF85") and not geracao_t)):
+            return 0.0, f"geracao {geracao_t or 'ausente'}!={geracao_f}"
         potencia_t, potencia_f = potencia_daf(titulo), potencia_daf(modelo_fipe)
+        geracao_t = geracao_daf(titulo)
+        geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
+        if geracao_f in ("XF105", "CF85") and geracao_t != geracao_f:
+            return 0.0, f"geracao {geracao_t or 'nao declarada'}!={geracao_f}"
+        if geracao_t and geracao_f and geracao_t != geracao_f:
+            return 0.0, f"geracao {geracao_t}!={geracao_f}"
         if potencia_t and potencia_f:
             if potencia_t != potencia_f:
                 return 0.0, f"potencia {potencia_t}!={potencia_f}"
-            geracao_t = geracao_daf(titulo)
-            geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
-            if geracao_t and geracao_f and geracao_t != geracao_f:
-                return 0.0, f"geracao {geracao_t}!={geracao_f}"
             config_t, config_f = configuracao_daf(titulo), configuracao_daf(modelo_fipe)
+            if config_t and config_f and config_t != config_f:
+                return 0.0, f"configuracao {config_t}!={config_f}"
             if config_t and config_f and config_t == config_f:
                 return 0.99, f"potencia+configuracao {potencia_t}/{config_t}"
             return 0.90, f"potencia {potencia_t}"
+
+    if codigo_iveco_t and codigo_iveco_t == codigo_iveco_f and familia_t and familia_t == familia_f:
+        eixo_t, eixo_f = eixos(titulo), eixos(modelo_fipe)
+        cabine_t, cabine_f = cabine_daf(titulo), cabine_daf(modelo_fipe)
+        if eixo_t and eixo_t == eixo_f and cabine_t and cabine_t == cabine_f:
+            return 0.95, f"codigo+eixo+cabine IVECO {codigo_iveco_t}"
+        return 0.90, f"codigo IVECO {codigo_iveco_t} sem eixo/cabine confirmados"
 
     n_t, n_f = numero_modelo(titulo), numero_modelo(modelo_fipe)
     if not n_t or not n_f or n_t != n_f:
         return 0.0, "numero difere"
     s_t, s_f = serie(titulo), serie(modelo_fipe)
-    if s_t and s_f and s_t != s_f:
-        return 0.0, f"serie {s_t}!={s_f}"
+    if (s_t or s_f) and s_t != s_f:
+        return 0.0, f"serie {s_t or 'ausente'}!={s_f or 'ausente'}"
     if s_t and s_f:
         return 0.95, "numero+serie"
     return 0.60, "so numero"
@@ -735,14 +770,14 @@ def escolhe(conn, anuncio):
     Regras, nesta ordem:
       1. Prioriza a geracao de emissoes explicita; sem ela, usa a fabricacao
          apenas como preferencia segura (2012-2022 E5; 2023+ E6).
-      2. Se o titulo informa o eixo ('R440 6X4'), filtra por ele.
+      2. Para 4x2/6x2/6x4/8x2 declarados, exige eixo FIPE igual.
       3. Linhas comerciais em conflito (Atego x Atron) -> nao vincula.
          Conjunto vazio nunca conflita: 'R-440 A 4x2 (diesel)' nao declara linha.
-      4. Eixos explicitos em conflito (6x2 x 8x2) -> tenta o nome base da FIPE,
-         aquele que nao declara eixo ('11-180 Delivery 2p'), que e o modelo padrao.
-         Se nao houver base, ai sim nao vincula.
+      4. Sem eixo no anuncio, variantes FIPE de eixos diferentes ficam ambiguas.
     """
-    daf = normaliza(anuncio.get("marca", "")) == "DAF"
+    marca = normaliza(anuncio.get("marca", ""))
+    daf = marca == "DAF"
+    familia_restrita = marca in ("DAF", "IVECO")
     validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=100) if s >= 0.5]
     if not validos:
         return None, "sem match"
@@ -764,10 +799,13 @@ def escolhe(conn, anuncio):
     if conflito_eixo:
         return None, conflito_eixo
     if eixo_anuncio:
-        filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_anuncio, None)]
+        eixo_p0 = eixo_anuncio in {"4X2", "6X2", "6X4", "8X2"}
+        filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) == eixo_anuncio] if eixo_p0 else [
+            v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_anuncio, None)
+        ]
         if filtrados:
             validos = filtrados
-        elif daf:
+        elif familia_restrita or eixo_p0:
             return None, f"sem match eixo {eixo_anuncio}"
 
     emissoes_candidatas = {
@@ -792,15 +830,24 @@ def escolhe(conn, anuncio):
     # A FIPE separa Space Cab, Super Space Cab e, em alguns anos, HR.
     # Sem evidencia no anuncio, escolher uma delas seria inventar uma versao.
     cabine_anuncio = cabine_daf(texto)
-    cabines_candidatas = {cabine_daf(c["modelo_fipe"]) for _, _, c in validos if cabine_daf(c["modelo_fipe"])}
     if cabine_anuncio:
         com_cabine = [v for v in validos if cabine_daf(v[2]["modelo_fipe"]) == cabine_anuncio]
         if com_cabine:
             validos = com_cabine
-        elif daf and cabines_candidatas:
+        elif daf:
+            # Mesmo que NENHUM candidato declare qualquer cabine (todos genericos), o anuncio deu
+            # evidencia explicita que nao foi confirmada por nenhum candidato — nao presumir que o
+            # generico e a versao certa so porque a FIPE nao marcou a palavra nessa linha.
             return None, f"sem match cabine {cabine_anuncio}"
-    elif len(cabines_candidatas) > 1:
-        return None, "ambiguo cabine (" + "/".join(sorted(cabines_candidatas)) + ")"
+    else:
+        # O conjunto SEM excluir None: um candidato que nao declara cabine ("XF FTT530 6x4")
+        # ao lado de um que declara ("XF FTT530 6x4 Space Cab") e tao ambiguo quanto dois
+        # declarados diferentes — o anuncio nao diz qual versao e, e nao da pra supor que o
+        # generico e a correta so porque a FIPE nao marcou a palavra "Space" naquela linha.
+        todas_as_cabines = {cabine_daf(c["modelo_fipe"]) for _, _, c in validos}
+        if len(todas_as_cabines) > 1:
+            rotulo = "/".join(sorted(c or "SEM TAG" for c in todas_as_cabines))
+            return None, f"ambiguo cabine ({rotulo})"
 
     hr_anuncio = tem_modificador_hr(texto)
     hr_candidatos = {tem_modificador_hr(c["modelo_fipe"]) for _, _, c in validos}
@@ -832,14 +879,76 @@ def escolhe(conn, anuncio):
                 conflito = "/".join(sorted(nao_vazias[i_] | nao_vazias[j_]))[:26]
                 return None, f"ambiguo linha ({conflito})"
 
-    # 4) eixos conflitantes: prefere o nome base (sem eixo declarado)
+    # 4) sem eixo no anuncio, o nome base nao prova qual variante se aplica.
     eixos_expl = {e for e in (eixos(c["modelo_fipe"]) for _, _, c in validos) if e}
     if len(eixos_expl) > 1:
-        base = [v for v in validos if eixos(v[2]["modelo_fipe"]) is None]
-        if not base:
-            return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
-        validos = base
+        return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
 
+    # DAF CF nao tem letra de configuracao (FT/FTS/FTT) pra avalia() confirmar o modelo: o score
+    # fica travado em 0.90 ("potencia") mesmo quando o candidato e o unico certo. Decisao aprovada:
+    # uplift pontual pra 0.95 SOMENTE quando familia CF, POTENCIA, EIXO e CABINE batem
+    # EXPLICITAMENTE dos dois lados (anuncio E FIPE, nenhum None) — e sobra um unico candidato.
+    #
+    # Potencia e reconferida por conta propria (nao herdada do score que validos[0] trouxe): em
+    # producao avalia() ja a exige pra dar score>0 no ramo DAF, mas esta funcao nao confia cegamente
+    # nisso — um candidato com score>=0.5 por outro motivo (ex.: "so numero", vindo de fora do ramo
+    # DAF) nao pode ganhar uplift so por familia/eixo/cabine coincidirem por acaso.
+    #
+    # Emissao: o bloco de emissao_preferida mais acima tem um fallback (`elif origem_emissao ==
+    # "explicita" and sem_emissao: validos = sem_emissao`) que aceita um candidato FIPE SEM tag
+    # E5/E6 quando nenhum candidato com a tag certa existe — ou seja, chegar aqui com emissao
+    # explicita no anuncio NAO prova que o candidato unico tem a tag confirmada; ele pode ter
+    # sobrevivido so por ausencia de contradicao. Por isso o uplift reconfere: se o ANUNCIO declara
+    # emissao explicitamente, exige a MESMA tag no nome FIPE do candidato (tag ausente = sem uplift).
+    #
+    # O ano-modelo NAO entra aqui: escolhe() recebe so o nome do modelo FIPE, sem ano; a conferencia
+    # real do ano acontece depois, na busca de preco (busca_ou_cria_preco/busca_preco_cache por
+    # modelo_ano) — esta funcao nunca declara o ano como confirmado.
+    #
+    # Ausencia de evidencia em qualquer um desses pontos (so um lado declara, ou nenhum lado
+    # declara, ou a FIPE nao tem a tag) NAO conta como coincidencia: nao ha uplift e o candidato
+    # fica sem vinculo (nunca cai pra "medio" por CF).
+    if daf and len(validos) == 1 and validos[0][0] < 0.95:
+        score_unico, motivo_unico, candidato_unico = validos[0]
+        modelo_f = candidato_unico["modelo_fipe"]
+        cf_anuncio = familia_comercial(texto) == "CF"
+        cf_fipe = familia_comercial(modelo_f) == "CF"
+        if cf_anuncio and cf_fipe:
+            potencia_t, potencia_f = potencia_daf(texto), potencia_daf(modelo_f)
+            potencia_bate = bool(potencia_t) and bool(potencia_f) and potencia_t == potencia_f
+            eixo_f = eixos(modelo_f)
+            cabine_f = cabine_daf(modelo_f)
+            eixo_bate = bool(eixo_anuncio) and bool(eixo_f) and eixo_anuncio == eixo_f
+            cabine_bate = bool(cabine_anuncio) and bool(cabine_f) and cabine_anuncio == cabine_f
+            emissao_f = emissao_no_texto(modelo_f)
+            emissao_bate = origem_emissao != "explicita" or (bool(emissao) and bool(emissao_f) and emissao == emissao_f)
+            if potencia_bate and eixo_bate and cabine_bate and emissao_bate:
+                validos = [(0.95, motivo_unico + "+cf_explicito", candidato_unico)]
+            else:
+                return None, "sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)"
+
+    if eixo_anuncio in {"4X2", "6X2", "6X4", "8X2"} and not familia_restrita:
+        # DAF/IVECO tem portao proprio mais abaixo (familia_restrita), com sua mensagem; aqui
+        # so cobre as outras marcas, pra nao duplicar o mesmo motivo com texto diferente.
+        if len(validos) != 1:
+            return None, f"ambiguo eixo {eixo_anuncio}: {len(validos)} candidatos"
+        if validos[0][0] < 0.95:
+            return None, f"ambiguo eixo {eixo_anuncio}: confianca insuficiente"
+
+    # Serie/geracao explicita so autoriza vinculo com um unico modelo confirmado.
+    exige_identidade = (
+        (normaliza(anuncio.get("marca", "")) == "SCANIA" and serie(texto))
+        or geracao_daf(texto) in ("XF105", "CF85")
+    )
+    if exige_identidade:
+        if len(validos) != 1:
+            return None, f"ambiguo serie/geracao ({len(validos)} candidatos)"
+        if validos[0][0] < 0.95:
+            return None, "sem match serie/geracao sem alta confianca"
+
+    if familia_restrita and (len(validos) != 1 or validos[0][0] < 0.95):
+        return None, (f"ambiguo {len(validos)} candidatos" if len(validos) != 1
+                      else "sem match de alta confianca")
     confianca = "alto" if validos[0][0] >= 0.95 else "medio"
     return [c for _, _, c in validos], confianca
 
