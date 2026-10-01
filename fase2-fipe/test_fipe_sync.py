@@ -276,6 +276,10 @@ class MatchingFipeTest(unittest.TestCase):
             self.assertEqual(([correto], "alto"), escolhe(None, anuncio))
 
     def test_iveco_eixo_e_codigo_exatos_ainda_sem_confianca_alta(self):
+        # Mesmo cenario de test_iveco_240e25_8x2_sem_cabine_nao_vincula_alto (duplicata entre os
+        # ramos eixo-tracao e DAF/IVECO apos a integracao): IVECO e marca de familia_restrita, cujo
+        # portao final (com sua propria mensagem) passa a ter prioridade sobre o portao generico
+        # de eixo/tracao, para nao haver dois motivos de texto diferente para a mesma rejeicao.
         anuncio = {"titulo": "IVECO TECTOR 240E25 8x2 2021/2021", "marca": "IVECO"}
         modelos = [
             {"id": 1, "modelo_fipe": "TECTOR 240E25 8x2 (diesel)"},
@@ -284,7 +288,7 @@ class MatchingFipeTest(unittest.TestCase):
         ]
         with patch("fipe_sync.modelos_da_marca", return_value=modelos):
             self.assertEqual(
-                (None, "ambiguo eixo 8X2: confianca insuficiente"),
+                (None, "sem match de alta confianca"),
                 escolhe(None, anuncio),
             )
 

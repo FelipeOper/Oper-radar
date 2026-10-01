@@ -884,7 +884,9 @@ def escolhe(conn, anuncio):
     if len(eixos_expl) > 1:
         return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
 
-    if eixo_anuncio in {"4X2", "6X2", "6X4", "8X2"}:
+    if eixo_anuncio in {"4X2", "6X2", "6X4", "8X2"} and not familia_restrita:
+        # DAF/IVECO tem portao proprio mais abaixo (familia_restrita), com sua mensagem; aqui
+        # so cobre as outras marcas, pra nao duplicar o mesmo motivo com texto diferente.
         if len(validos) != 1:
             return None, f"ambiguo eixo {eixo_anuncio}: {len(validos)} candidatos"
         if validos[0][0] < 0.95:
