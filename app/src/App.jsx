@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  LayoutGrid, Settings, ListChecks,
+  LayoutGrid, Settings,
   MapPin, ExternalLink, Search,
   TrendingDown, ArrowDownRight, Plus, CheckCircle2, Circle,
   Timer, Flame, PackageOpen, Gauge, RotateCcw,
@@ -8,7 +8,7 @@ import {
   Monitor, Moon, Sun, Save, X, ScanLine, BadgeInfo,
   ChevronUp, ChevronDown, Smartphone, Eye, EyeOff, UploadCloud, FileText,
   Pencil, History, Undo2, Ruler, Check, ArrowLeft, ChevronRight,
-  SlidersHorizontal, BarChart3
+  SlidersHorizontal, BarChart3, LinkIcon
 } from './icons.jsx';
 import {
   T, THEMES, DEFAULT_UI_PREFERENCES,
@@ -38,6 +38,9 @@ import { ResumoLoja, CartaoVeiculo } from './MinhaLojaBlocos.jsx';
 import { PageComparador } from './ComparadorBlocos.jsx';
 import { ComprarPorRegiao } from './ComprarBlocos.jsx';
 import { resumoLoja, AMOSTRA_MINIMA as AMOSTRA_MINIMA_LOJA } from './minhaLojaModel.js';
+import { PagePlanoAcao } from './PlanoAcaoBlocos.jsx';
+import { EVENTO_MUDOU as EVENTO_ACOES_MUDOU, carregaAcoes, definirUsuarioAtivo, montaAcao, salvaAcoes, separaPendentesFeitas } from './planoAcaoModel.js';
+import { orientacaoDesatualizada, precisaDeAcao, rotuloAcao, tituloAcaoPlano, tomAcao } from './orientacaoEstoqueModel.js';
 import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostraModelo } from './mercadoModel.js';
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
@@ -1668,8 +1671,10 @@ function PageOportunidades({ onCriarAcao }) {
                 <ComparativoAnuncio anuncio={a} compacto />
               </div>
               <Tag tone="alerta">OBSERVADO HÁ {a.dias} DIAS</Tag>
-              <button onClick={() => onCriarAcao(`Avaliar: ${a.titulo} (${a.revenda}, observado há ${a.dias}d)`)}
-                style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
+              <button onClick={() => onCriarAcao({
+                titulo: `Avaliar: ${a.titulo}`, origem: 'Oportunidades', href: a.url,
+                evidencia: `${a.revenda} · ${a.cidade}/${a.uf} · ${fmtBRL(a.preco)} · observado há ${a.dias} dias pelo Radar (não é a data real de publicação nem prova disposição para negociar).`,
+              })} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
                 <Plus size={13} /> Criar ação
               </button>
             </Card>
@@ -1700,8 +1705,10 @@ function PageOportunidades({ onCriarAcao }) {
               <Tag tone={a.fipeConfianca === 'alto' ? 'positivo' : 'alerta'}>
                 MATCH {a.fipeConfianca?.toUpperCase() || '—'}
               </Tag>
-              <button onClick={() => onCriarAcao(`Validar oportunidade FIPE: ${a.titulo} (${a.revenda})`)}
-                style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
+              <button onClick={() => onCriarAcao({
+                titulo: `Validar oportunidade FIPE: ${a.titulo}`, origem: 'Oportunidades', href: a.url,
+                evidencia: `${a.revenda} · ${a.cidade}/${a.uf} · anunciado ${fmtBRL(a.preco)} · ${Math.abs(a.desvioFipePct ?? 0).toLocaleString('pt-BR')}% abaixo da FIPE · match ${a.fipeConfianca || '—'}.`,
+              })} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px' }}>
                 <Plus size={13} /> Criar ação
               </button>
             </Card>
@@ -1718,72 +1725,9 @@ function PageOportunidades({ onCriarAcao }) {
 
 
 /* ============================================================
-   CONCORRENTES — players e sinais de movimento observados
-   ============================================================ */
-function PageAcoes({ acoes, onAdicionar, onAlternar, salvando }) {
-  const [novo, setNovo] = useState('');
-  const adicionar = async () => {
-    if (!novo.trim()) return;
-    await onAdicionar(novo.trim(), 'manual');
-    setNovo('');
-  };
-  const pendentes = acoes.filter(a => !a.feita);
-  const feitas = acoes.filter(a => a.feita);
-
-  return (
-    <div>
-      <div style={{ fontSize: 13, color: T.inkMuted, lineHeight: 1.6, maxWidth: 640, marginBottom: 20 }}>
-        Dado de mercado diz <em>o que</em> fazer; esta lista registra <em>se foi feito</em>. Crie ações a partir das
-        Oportunidades (botão "Criar ação") ou manualmente aqui. As ações ficam salvas com privacidade neste navegador.
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        <input value={novo} onChange={e => setNovo(e.target.value)} onKeyDown={e => e.key === 'Enter' && adicionar()}
-          aria-label="Descrição da nova ação" placeholder="Nova ação — ex: avaliar a carreta observada há 40 dias…" style={{ ...inputStyle, flex: 1 }} />
-        <button onClick={adicionar} disabled={salvando} style={{ ...inputStyle, cursor: salvando ? 'wait' : 'pointer', background: T.signal, color: T.signalInk, fontWeight: 600, border: 'none', display: 'flex', gap: 6, alignItems: 'center', opacity: salvando ? 0.6 : 1 }}>
-          <Plus size={14} /> Adicionar
-        </button>
-      </div>
-
-      {pendentes.length === 0 && feitas.length === 0 && (
-        <EmptyState icon={ListChecks} titulo="Nenhuma ação ainda"
-          texto="Quando o radar apontar uma oportunidade, transforme-a em ação aqui — assim o insight não morre no dashboard." />
-      )}
-
-      {pendentes.length > 0 && (
-        <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
-          {pendentes.map(a => (
-            <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
-              <Circle size={17} style={{ color: T.inkMuted, flexShrink: 0 }} />
-              <span style={{ fontSize: 14, flex: 1 }}>{a.texto}</span>
-              <span style={{ fontFamily: T.fontMono, fontSize: 10.5, color: T.inkMuted }}>
-                {new Date(a.criadaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-              </span>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {feitas.length > 0 && (
-        <>
-          <SectionTitle>Concluídas</SectionTitle>
-          <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {feitas.map(a => (
-              <Card key={a.id} onClick={() => onAlternar(a)} style={{ padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'center', opacity: 0.55 }}>
-                <CheckCircle2 size={17} style={{ color: T.positive, flexShrink: 0 }} />
-                <span style={{ fontSize: 14, flex: 1, textDecoration: 'line-through' }}>{a.texto}</span>
-              </Card>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ============================================================
    CENTRAL FIPE — placa e catálogo local em fluxos separados
    ============================================================ */
-function PageFipe() {
+function PageFipe({ onNavegar }) {
   const { data: statusPlaca } = useApi('placa_consulta.php?modo=status');
   const [modo, setModo] = useState('placa');
   const [placa, setPlaca] = useState('');
@@ -1817,10 +1761,11 @@ function PageFipe() {
       Consulte um veículo pela placa ou pesquise diretamente no catálogo nacional de caminhões. Os dois caminhos cruzam a FIPE com o mercado monitorado pelo radar.
     </div>
 
-    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginBottom: 18, maxWidth: 640 }}>
+    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 18, maxWidth: 940 }}>
       {[
         { id: 'placa', titulo: 'Consultar por placa', texto: 'Identifique o veículo e encontre a FIPE', icone: ScanLine },
         { id: 'catalogo', titulo: 'Catálogo FIPE', texto: 'Busque por marca, modelo, ano ou código', icone: Search },
+        { id: 'fila', titulo: 'Vinculação pendente', texto: 'Anúncios sem FIPE, por categoria', icone: LinkIcon },
       ].map(item => {
         const Icone = item.icone;
         const ativo = modo === item.id;
@@ -1838,7 +1783,7 @@ function PageFipe() {
       })}
     </div>
 
-    {modo === 'catalogo' ? <PageFipeCatalogo /> : <>
+    {modo === 'fila' ? <PageFipeFila onNavegar={onNavegar} /> : modo === 'catalogo' ? <PageFipeCatalogo /> : <>
       <Card style={{ padding: 18, maxWidth: 820 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
@@ -1900,6 +1845,59 @@ function PageFipe() {
         {resultado.fipes?.length === 0 && <EmptyState icon={Search} titulo="Veículo identificado, sem FIPE retornada" texto="Use o catálogo por marca e modelo para localizar a referência manualmente." />}
       </div>}
     </>}
+  </div>;
+}
+
+/* Fila de vinculação FIPE, agrupada por marca+modelo ("categoria"). Pedido do Felipe (01/10/2026):
+   sem vínculo FIPE não há mediana, sem mediana não há sistema — esta tela mostra ONDE a fila
+   concentra pra atacar as maiores categorias primeiro. A curadoria em si (buscar e confirmar a
+   FIPE certa, com sugestões inteligentes) já existe por anúncio, dentro de Mercado — "Resolver"
+   só leva pra lá já filtrado pela marca/modelo da categoria clicada. */
+function PageFipeFila({ onNavegar }) {
+  const { data, erro, status } = useApi('fipe_fila_categorias.php');
+  const resumo = data?.resumo;
+  const categorias = data?.categorias || [];
+
+  return <div style={{ maxWidth: 1100 }}>
+    <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-4px 0 16px', maxWidth: 820 }}>
+      Anúncios de caminhão ativos sem referência FIPE vinculada, agrupados por marca e modelo. Sem
+      vínculo não há mediana nem desvio pra esse anúncio em nenhuma tela do radar.
+    </div>
+
+    {status === 'loading' && <div style={{ color: T.inkMuted, fontSize: 12.5 }}>Carregando fila…</div>}
+    {erro && <div role="alert" style={{ color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}30`, borderRadius: 9, padding: 11, fontSize: 12.5 }}>Não foi possível carregar a fila agora.</div>}
+
+    {resumo && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 18, maxWidth: 820 }}>
+      {[
+        ['COBERTURA', resumo.cobertura_pct == null ? '—' : `${resumo.cobertura_pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`, `${fmtN(resumo.vinculados)} de ${fmtN(resumo.total)} vinculados`],
+        ['PENDENTES', fmtN(resumo.pendentes), 'sem referência FIPE'],
+        ['CATEGORIAS', fmtN(resumo.categorias_pendentes), 'marca + modelo com pendência'],
+      ].map(([label, valor, sub]) => <Card key={label} style={{ padding: 13 }}>
+        <div style={{ color: T.inkMuted, fontSize: 9.5, fontFamily: T.fontMono }}>{label}</div>
+        <div style={{ fontFamily: T.fontDisplay, fontSize: 20, fontWeight: 650, marginTop: 6 }}>{valor}</div>
+        <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 4 }}>{sub}</div>
+      </Card>)}
+    </div>}
+
+    {status === 'ready' && categorias.length === 0 && <EmptyState icon={LinkIcon} titulo="Nenhuma categoria pendente" texto="Todo o universo de caminhões ativos tem referência FIPE vinculada ou está marcado como sem base." />}
+
+    {categorias.length > 0 && <div className="or-zebra-list" style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      {categorias.map(cat => <div key={`${cat.marca}-${cat.modelo}`} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+        padding: 12, borderRadius: 10, background: `var(--or-zebra-bg, ${T.surface})`, border: `1px solid ${T.line}`,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <strong style={{ fontSize: 13 }}>{cat.marca} · {cat.modelo}</strong>
+          <div style={{ color: T.inkMuted, fontSize: 10.5, marginTop: 3 }}>
+            {fmtN(cat.sem_sugestao)} sem sugestão · {fmtN(cat.com_sugestao)} com sugestão pronta · {fmtN(cat.vinculados)} já vinculados
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <Tag tone={cat.sem_sugestao > 0 ? 'alerta' : 'sinal'}>{fmtN(cat.revisar)} pendente{cat.revisar === 1 ? '' : 's'}</Tag>
+          <button onClick={() => onNavegar?.('mercado', { marca: cat.marca, busca: cat.modelo })} style={{ ...inputStyle, cursor: 'pointer', color: T.signal, flexShrink: 0 }}>Resolver</button>
+        </div>
+      </div>)}
+    </div>}
   </div>;
 }
 
@@ -2145,7 +2143,40 @@ function CampoMeuVeiculo({ rotulo, children }) {
   return <label style={{ fontSize: 10.5, color: T.inkMuted }}>{rotulo}{children}</label>;
 }
 
-function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
+const TOM_ORIENTACAO_TAG = { success: 'positivo', warning: 'alerta', info: 'sinal', neutral: 'neutro' };
+
+/* Decisão de venda pro veículo (Felipe, 28/09/2026: o Radar orienta a vender melhor o PRÓPRIO estoque, não a
+   comprar). Fica visível acima das abas, não dentro de uma delas — é o motivo de abrir o painel. */
+function OrientacaoVenda({ orientacao, nomeVeiculo, desatualizada, onCriarAcao }) {
+  if (!orientacao) return null;
+  const tom = TOM_ORIENTACAO_TAG[tomAcao(orientacao.acao)];
+  const cor = { positivo: T.positive, alerta: T.alert, sinal: T.signal, neutro: T.inkMuted }[tom];
+  return (
+    <Card style={{ padding: 15, borderColor: `${cor}55`, background: `${cor}0B` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontFamily: T.fontMono, fontSize: 9.5, color: cor }}>O QUE FAZER COM ESTE VEÍCULO</div>
+          <strong style={{ display: 'block', fontSize: 17, marginTop: 5 }}>{rotuloAcao(orientacao.acao)}</strong>
+        </div>
+        <Tag tone={tom}>{orientacao.acao === 'sem_base' ? 'sem base' : `${orientacao.origem_base === 'nacional' ? 'nacional' : 'sua praça'} · ${orientacao.desvio_pct > 0 ? '+' : ''}${orientacao.desvio_pct}%`}</Tag>
+      </div>
+      <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>{orientacao.motivo}</div>
+      {/* Achado do Codex: rascunho editado (preço/UF) e não salvo não pode gerar ação com o número antigo. */}
+      {desatualizada && <div role="status" style={{ marginTop: 10, padding: 9, borderRadius: 8, color: T.inkMuted, background: `${T.signal}10`, border: `1px solid ${T.signal}30`, fontSize: 11 }}>Preço ou UF foram alterados nesta tela. Salve as alterações para recalcular esta orientação antes de criar uma ação.</div>}
+      {!desatualizada && precisaDeAcao(orientacao) && (
+        <button onClick={() => onCriarAcao?.({
+          titulo: tituloAcaoPlano(orientacao, nomeVeiculo), origem: 'Minha Loja',
+          evidencia: `${nomeVeiculo} · ${orientacao.motivo}`,
+        })} style={{ ...inputStyle, marginTop: 11, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', width: 'fit-content' }}>
+          <Plus size={13} /> Criar ação
+        </button>
+      )}
+      <div style={{ color: T.inkMuted, fontSize: 10, marginTop: 9 }}>Saída observada não é venda; a orientação não garante resultado, só aponta onde a evidência empurra.</div>
+    </Card>
+  );
+}
+
+function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }) {
   const [dados, setDados] = useState(null);
   const [rascunho, setRascunho] = useState(null);
   const [aba, setAba] = useState('cadastro');
@@ -2230,6 +2261,12 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
   const deltaMercado = mercado?.amostra_suficiente && mercado?.preco_mediano > 0 && precoAtual > 0 ? Math.round((precoAtual / mercado.preco_mediano - 1) * 1000) / 10 : null;
   const abas = [['cadastro', 'Cadastro'], ['mercado', 'Mercado nacional'], ['regioes', `Regiões · ${regioes.length}`]];
   const campoStyle = { ...inputStyle, width: '100%' };
+  // Nome e flag de "desatualizada" usam dados.item (o veículo que a API de fato analisou), nunca o rascunho em
+  // edição — senão um preço/UF trocado na tela sem salvar criaria uma ação com o nome novo e o número antigo
+  // (achado do Codex). A orientação só é reativada depois de salvar, quando dados.item reflete o rascunho.
+  const itemAnalisado = dados?.item;
+  const nomeVeiculo = itemAnalisado?.titulo || itemInicial.titulo || [itemAnalisado?.marca || itemInicial.marca, itemAnalisado?.modelo || itemInicial.modelo].filter(Boolean).join(' ') || 'veículo';
+  const orientacaoEstaDesatualizada = orientacaoDesatualizada(rascunho, itemAnalisado);
 
   return <div onClick={onClose} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2, 6, 12, .68)', backdropFilter: 'blur(3px)', display: 'flex', justifyContent: 'flex-end' }}>
     <aside onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`Análise de ${itemInicial.marca || ''} ${itemInicial.modelo || 'veículo'}`} style={{ width: 'min(760px, 100vw)', height: '100%', overflowY: 'auto', background: T.bg, borderLeft: `1px solid ${T.line}`, boxShadow: '-20px 0 60px rgba(0,0,0,.35)', color: T.ink }}>
@@ -2244,6 +2281,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
         {!dados && !erro && <Card style={{ textAlign: 'center', color: T.inkMuted }}>Carregando análise do veículo…</Card>}
         {erro && <div role="alert" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}35` }}>{erro}</div>}
         {aviso && <div role="status" style={{ marginBottom: 12, padding: 11, borderRadius: 9, color: T.positive, background: `${T.positive}12`, border: `1px solid ${T.positive}35` }}>{aviso}</div>}
+        {dados && <div style={{ marginBottom: 14 }}><OrientacaoVenda orientacao={dados.orientacao} nomeVeiculo={nomeVeiculo} desatualizada={orientacaoEstaDesatualizada} onCriarAcao={onCriarAcao} /></div>}
 
         {dados && rascunho && aba === 'cadastro' && <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {rascunho.origem === 'xml' && <div role="note" style={{ padding: 11, borderRadius: 9, color: T.inkMuted, background: `${T.signal}10`, border: `1px solid ${T.signal}30`, fontSize: 11.5 }}>Este veículo veio do XML. Uma próxima sincronização pode substituir os campos também presentes no arquivo.</div>}
@@ -2287,7 +2325,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo }) {
   </div>;
 }
 
-function PageMinhaLoja({ sessao }) {
+function PageMinhaLoja({ sessao, onCriarAcao }) {
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -2505,7 +2543,7 @@ function PageMinhaLoja({ sessao }) {
       <div className="oc-loja__grade">
         {itensVisiveis.map(item => <CartaoVeiculo key={item.id} item={item} salvandoStatus={statusSalvandoId === item.id} onAbrir={setItemAberto} onStatus={alterarStatus} onExcluir={excluir} />)}
       </div>}
-    {itemAberto && <PainelMeuVeiculo itemInicial={itemAberto} sessao={sessao} onClose={() => setItemAberto(null)} onSalvo={carregar} />}
+    {itemAberto && <PainelMeuVeiculo itemInicial={itemAberto} sessao={sessao} onClose={() => setItemAberto(null)} onSalvo={carregar} onCriarAcao={onCriarAcao} />}
   </div>;
 }
 
@@ -2938,10 +2976,22 @@ function PageAnalise() {
 function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, onReset, temaResolvido }) {
   const { page: pagina, context: contexto, navigate, updateContext, goBack } = useBrowserRoute(import.meta.env.BASE_URL);
   const setPagina = useCallback(page => navigate(page), [navigate]);
-  const [acoes, setAcoes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('oper-radar-acoes') || '[]'); } catch { return []; }
-  });
   const tituloRef = useRef(null);
+
+  // Síncrono no corpo do componente, não em useEffect: o efeito do PAI só roda depois do FILHO montar
+  // (PagePlanoAcao já teria lido carregaAcoes() com o usuário errado). Isola o Plano de ação por conta —
+  // sem isso, duas contas no mesmo navegador leriam a mesma lista, inclusive dado real de estoque que
+  // "Criar ação" da Minha Loja passou a guardar (achado do Codex).
+  definirUsuarioAtivo(sessao?.usuario?.id);
+
+  // Badge de pendentes na sidebar: o Plano de ação lê/grava seu próprio localStorage (PlanoAcaoBlocos.jsx),
+  // então este contador só se atualiza ouvindo o mesmo evento que salvaAcoes() dispara ao salvar.
+  const [acoesPendentes, setAcoesPendentes] = useState(() => separaPendentesFeitas(carregaAcoes()).pendentes.length);
+  useEffect(() => {
+    const atualiza = () => setAcoesPendentes(separaPendentesFeitas(carregaAcoes()).pendentes.length);
+    window.addEventListener(EVENTO_ACOES_MUDOU, atualiza);
+    return () => window.removeEventListener(EVENTO_ACOES_MUDOU, atualiza);
+  }, []);
 
   const { data: kpis } = useApi('kpis.php');
   const { data: anunciosData } = useApi('anuncios.php?ordem=movimento&limit=200');
@@ -2949,26 +2999,14 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
   const usandoReais = anuncios.length > 0;
 
   useEffect(() => {
-    try { localStorage.setItem('oper-radar-acoes', JSON.stringify(acoes)); } catch {}
-  }, [acoes]);
-
-  useEffect(() => {
     tituloRef.current?.focus({ preventScroll: true });
   }, [pagina]);
 
-  const adicionarAcao = async (texto, origem = 'oportunidade') => {
-    const local = { id: `local-${Date.now()}`, texto, feita: false, origem, criadaEm: new Date().toISOString() };
-    setAcoes(prev => [local, ...prev]);
-    return local;
-  };
-
-  const alternarAcao = acao => {
-    const feita = !acao.feita;
-    setAcoes(prev => prev.map(a => a.id === acao.id ? { ...a, feita } : a));
-  };
-
-  const criarAcao = async texto => {
-    await adicionarAcao(texto, 'oportunidade');
+  // Cria a ação direto no armazenamento do Plano de ação (mesma fonte que a página lê ao montar) e navega para lá;
+  // aceita string (compat) ou {titulo, origem, evidencia, href} para guardar a evidência de onde a ação nasceu.
+  const criarAcao = dados => {
+    const nova = montaAcao(typeof dados === 'string' ? { titulo: dados, origem: 'Oportunidades' } : dados);
+    if (nova) salvaAcoes([nova, ...carregaAcoes()]);
     setPagina('acoes');
   };
 
@@ -2976,18 +3014,17 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
     hoje: <PageHoje kpis={kpis} anuncios={anuncios} usandoReais={usandoReais} layout={preferencias.dashboardHoje} onPersonalizar={() => setPagina('ajustes')} onNavegar={(page, context) => navigate(page, { context })} />,
     mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
     comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
-    'minha-loja': <PageMinhaLoja sessao={sessao} />,
-    fipe: <PageFipe />,
+    'minha-loja': <PageMinhaLoja sessao={sessao} onCriarAcao={criarAcao} />,
+    fipe: <PageFipe onNavegar={(page, context) => navigate(page, { context })} />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrencia />,
     analise: <PageAnalise />,
-    acoes: <PageAcoes acoes={acoes} onAdicionar={adicionarAcao} onAlternar={alternarAcao} salvando={false} />,
+    acoes: <PagePlanoAcao />,
     ajustes: <PageConfiguracoes preferencias={preferencias} onPreferencias={onPreferencias} onReset={onReset} temaResolvido={temaResolvido} />,
     conta: <PageConta sessao={sessao} onSessao={onSessao} onLogout={onLogout} />,
   };
 
   const tituloPagina = NAV.find(n => n.id === pagina)?.rotulo || '';
-  const acoesPendentes = acoes.filter(a => !a.feita).length;
   const breadcrumbs = breadcrumbsFor(pagina, contexto);
 
   return (

@@ -161,3 +161,75 @@ test('oportunidades_compra.php restringe o SQL ao universo comparável, cacheia 
   assert.match(lib, /oper_compra_no_universo\(\$a\)/);
   assert.match(lib, /oper_compra_url_segura\(\$a\['url'\] \?\? null\)/);
 });
+
+test('Plano de ação no layout da DEMO: ações de Oportunidades guardam origem, evidência e o link de volta', () => {
+  const app = read('app/src/App.jsx');
+  assert.match(app, /<PagePlanoAcao \/>/);
+  assert.doesNotMatch(app, /function PageAcoes/, 'a tela antiga foi substituída, não deve sobrar duplicada');
+  // os três pontos que criam ação hoje (observado há mais tempo, abaixo da FIPE, o que comprar) passam objeto, não string solta
+  const criaAcaoApp = [...app.matchAll(/onCriarAcao\(\{[\s\S]*?\}\)/g)];
+  assert.equal(criaAcaoApp.length, 2, 'os dois pontos de Oportunidades em App.jsx');
+  for (const m of criaAcaoApp) {
+    assert.match(m[0], /origem: 'Oportunidades'/);
+    assert.match(m[0], /evidencia: `/);
+    assert.match(m[0], /href: a\.url/);
+  }
+  assert.match(read('app/src/ComprarBlocos.jsx'), /origem: 'Oportunidades'/);
+  assert.match(read('app/src/ComprarBlocos.jsx'), /href: anuncio\.url/);
+  const modelo = read('app/src/planoAcaoModel.js');
+  assert.match(modelo, /ORIGENS = \[/);
+  assert.match(modelo, /CHAVE_ARMAZENAMENTO = 'oper-radar-acoes'/); // mesma chave do formato antigo: migra, não perde ação já salva
+  assert.match(modelo, /bruto\.titulo \?\? bruto\.texto/); // migra o formato antigo ({texto, feita}) sem perder a ação já salva
+  assert.match(read('app/src/PlanoAcaoBlocos.jsx'), /Remover/);
+});
+
+test('Plano de ação: badge de pendentes na sidebar escuta EVENTO_MUDOU, sem estado "acoes" morto em RadarApp (bug real: ReferenceError em runtime)', () => {
+  const app = read('app/src/App.jsx');
+  assert.match(app, /EVENTO_MUDOU as EVENTO_ACOES_MUDOU/);
+  assert.match(app, /window\.addEventListener\(EVENTO_ACOES_MUDOU, atualiza\)/);
+  assert.match(app, /separaPendentesFeitas\(carregaAcoes\(\)\)\.pendentes\.length/);
+  // guarda contra reintroduzir a variável de estado antiga (removida junto do PageAcoes legado)
+  assert.doesNotMatch(app, /const \[acoes, setAcoes\]/);
+  assert.doesNotMatch(app, /acoes\.filter\(a => !a\.feita\)/);
+});
+
+test('href do Plano de ação resolve contra a própria origem (rejeita "//host" e "/\\host", achados Codex), e falha de storage não perde a ação', () => {
+  const modelo = read('app/src/planoAcaoModel.js');
+  assert.match(modelo, /normalizado\.startsWith\('\/\/'\)/);
+  assert.match(modelo, /new URL\(normalizado, ORIGEM_INTERNA\)\.origin === ORIGEM_INTERNA/);
+  assert.match(modelo, /Math\.random\(\)\.toString\(36\)\.slice\(2\)/, 'a base interna não pode ser um literal adivinhável');
+  assert.match(modelo, /fallbackEmMemoria/);
+  assert.match(modelo, /export function salvaAcoes\(lista\) \{/);
+});
+
+test('Orientação de venda (Minha Loja): minha_loja_detalhe.php orquestra a lib testada, front só exibe e cria ação', () => {
+  const endpoint = read('oper-radar-api/minha_loja_detalhe.php');
+  assert.match(endpoint, /require_once __DIR__ \. '\/lib\/orientacao_estoque\.php';/);
+  assert.match(endpoint, /\$orientacao = oper_loja_orienta_veiculo\(/);
+  assert.match(endpoint, /'orientacao' => \$orientacao,/);
+  assert.match(endpoint, /desvio_preco_loja_pct/); // cada região compara com o preço próprio, não só o nacional
+  const lib = read('oper-radar-api/lib/orientacao_estoque.php');
+  for (const acao of ['manter', 'avaliar_reducao', 'avaliar_outra_praca', 'sem_base']) {
+    assert.match(lib, new RegExp(`'acao' => '${acao}'`), `${acao} deve existir na lib`);
+  }
+  const app = read('app/src/App.jsx');
+  assert.match(app, /<OrientacaoVenda orientacao={dados\.orientacao}/);
+  assert.match(app, /origem: 'Minha Loja'/);
+  assert.match(app, /Saída observada não é venda; a orientação não garante resultado/, 'orientação avisa que não garante resultado');
+});
+
+test('Fila de vinculação FIPE (01/10/2026): fipe_fila_categorias.php agrupa os mesmos buckets de anuncios.php, front só lê e navega', () => {
+  const endpoint = read('oper-radar-api/fipe_fila_categorias.php');
+  assert.match(endpoint, /exige_autenticacao\(\)/);
+  // mesma definicao de pendente que anuncios.php?fipe_fila=: fipe_preco_id IS NULL, com/sem anuncio_fipe_sugestao
+  assert.match(endpoint, /a\.fipe_preco_id IS NULL AND NOT EXISTS \(SELECT 1 FROM anuncio_fipe_sugestao/);
+  assert.match(endpoint, /a\.fipe_preco_id IS NULL AND EXISTS \(SELECT 1 FROM anuncio_fipe_sugestao/);
+  assert.match(endpoint, /a\.tipo = 'Caminhao' AND a\.status = 'ativo'/);
+  assert.doesNotMatch(endpoint, /\bUPDATE\b|\bINSERT\b|\bDELETE\b/i, 'endpoint é só leitura, nenhuma escrita');
+  const app = read('app/src/App.jsx');
+  assert.match(app, /function PageFipeFila\({ onNavegar }\)/);
+  assert.match(app, /useApi\('fipe_fila_categorias\.php'\)/);
+  assert.match(app, /onNavegar\?\.\('mercado', \{ marca: cat\.marca, busca: cat\.modelo \}\)/);
+  assert.match(app, /<PageFipe onNavegar={\(page, context\) => navigate\(page, \{ context \}\)} \/>/);
+  assert.match(read('app/src/demoFixtures.js'), /fipe_fila_categorias\.php/);
+});

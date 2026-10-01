@@ -35,7 +35,16 @@ equivalência comercial nem publica recomendação numérica com confiança insu
 Loja e insights:
 
 - `minha_loja_detalhe.php?id=...`: detalhe pertencente ao usuário autenticado, edição pelo
-  fluxo existente e comparação nacional/estadual somente com a mesma referência FIPE;
+  fluxo existente e comparação nacional/estadual somente com a mesma referência FIPE; cada região
+  ganhou `desvio_preco_loja_pct` (preço próprio vs mediana daquela praça, não só a nacional) e um
+  campo `orientacao` (`lib/orientacao_estoque.php`, testado em `tests/orientacao_estoque_test.php`):
+  decide `manter`, `avaliar_reducao`, `avaliar_outra_praca` ou `sem_base` pra ESTE veículo — decisão
+  do Felipe (28/09/2026): o Radar orienta a vender melhor o próprio estoque, não a comprar. Usa a
+  própria praça (UF do veículo) como base quando ela tem amostra mínima, cai pro nacional só se a
+  própria praça não tiver; só sugere outra praça se ela for publicável, diferente da atual e sustentar
+  preço próximo do anunciado. Fail-closed: sem amostra em nenhuma das duas, `sem_base`. Ver
+  `docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md` pro piloto com dado real antes do frontend
+  ser publicado;
 - a análise regional combina ofertas qualificadas, revendas, saídas observadas e tempo
   observado. Recomendações ficam indisponíveis quando a amostra ou o histórico não sustentam
   o nível mínimo de confiança;
@@ -171,3 +180,13 @@ contra 5% em cavalo/chassi; cauda >+90% de 4,96% contra 0,40%). Carroceria vazia
 (universo da F0d). Falha fechada: consulta sem `carroceria` ou `tipo` não é comparável. Aplica nos mesmos agregadores da regra de ano-modelo.
 
 `kpis.php`: o campo `desvio_medio_fipe` foi descontinuado (sempre `null`); o desvio da FIPE vem só de `mercado_painel.php`/`insights.php`/`lojistas.php`, com as mesmas regras de qualidade e comparabilidade.
+
+## Fila de vinculação FIPE por categoria (`fipe_fila_categorias.php`)
+
+Prioridade do Felipe (01/10/2026): sem vínculo FIPE não há mediana, sem mediana não há sistema —
+cobertura real em 01/10/2026 era de só 50,5% (5.956 de 11.798 caminhões ativos). Endpoint só
+leitura: agrupa `anuncio` por marca + modelo, contando os mesmos três estados que
+`anuncios.php?fipe_fila=` já usa por anúncio (`sem_sugestao`, `com_sugestao`, `vinculados`), pra
+mostrar onde a fila concentra e atacar as maiores categorias primeiro. A curadoria em si (buscar e
+confirmar a FIPE certa, com sugestões pré-calculadas em `anuncio_fipe_sugestao`) já existe por
+anúncio, dentro de Mercado — este endpoint só organiza a navegação até lá, nenhuma escrita.

@@ -3,6 +3,78 @@
 > Fonte operacional de verdade. Atualizar após cada publicação, migração ou mudança de cron.
 > Não registrar senhas, tokens, cookies ou conteúdo do arquivo `.oper-radar.env`.
 
+## Release 2.9 -- frontend: cartao "O que fazer com este veiculo" -- 01/10/2026 (PUBLICADO e conferido ao vivo)
+
+- Origem: mesmo HEAD de `agent/portar-demo-real` (commit `9d1af97`) do Release 2.8 -- so o frontend
+  que faltava para o campo `orientacao` (ja publicado na API) aparecer na tela. `npm test` 149/149,
+  lint oxlint 0 erros, `npm run build` local (sem binding Linux/Windows faltando desta vez -- build
+  rodou direto nesta sessao).
+- Pacote: `python scripts/empacotar_frontend.py --base oper-radar --saida <pasta>`; zip sha256
+  `3fed63210383531afd43c88294797b4c6f03be843e10e9397b67d33a1b903626`, 17 arquivos. Pre-checagem:
+  `index.html` de producao antes de publicar `6fca065b...` / bundle `index-C-6DZgje.js`
+  `cd6ed713...` (bate com o registrado no Release 2.7 -- confirma que nada mudou entre as duas
+  publicacoes).
+- Upload do zip (Gerenciador de Arquivos) e comando de backup/extracao/hash (Terminal) executados
+  por Claude nesta sessao, a pedido explicito do Felipe ("pode subir voce mesmo... Chrome que esta
+  logado ja no Cpanel") -- login do cPanel foi feito pelo Felipe; Claude nao digitou usuario/senha
+  em nenhum momento, so operou depois de autenticado.
+- Hashes publicados, conferidos no proprio Terminal: `index.html`
+  `e21dccd6676dc44a6030475b54782c491938697f458bfe9d5358bd1e6a314c17`; bundle principal
+  `assets/index-BDlQ99VQ.js` `e4ad5cb06c19bce89bd3e9bf56ec4e8ef72d3b106c2972b9c2f463463de16eb6`.
+  `HTTP 200` na pagina logo apos a extracao.
+- Backup: `/home1/pro93061/backups/oper-radar-frontend-release2.8-20261001-120552` (nome da pasta
+  ficou com "2.8" no comando, mas e o backup do estado de producao imediatamente anterior a este
+  release 2.9 -- index.html/assets/.htaccess de antes).
+- **Conferido ao vivo, autenticado**: abri o veiculo ID 7394895 (DAF XF 530, o mesmo id 19 do
+  piloto) em Minha Loja -- cartao "O QUE FAZER COM ESTE VEICULO" aparece com "Manter preco", badge
+  "nacional · 0%", motivo e o aviso fixo "Saida observada nao e venda; a orientacao nao garante
+  resultado, so aponta onde a evidencia empurra." Bate exatamente com o registrado no piloto
+  (`docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md`).
+- Reversao: restaurar `index.html`/`assets`/`.htaccess` do backup acima.
+
+## Release 2.8 -- API somente: orientacao de venda por veiculo (piloto) -- 01/10/2026 (PUBLICADO e conferido ao vivo)
+
+- Origem: commits `c18f124`/`0312f20`/`036986d` em `agent/portar-demo-real` (4 rodadas Codex,
+  round 4 = approve). So API, aditiva; frontend NAO publicado ainda (o cartao "O que fazer com
+  este veiculo" so aparece quando o proximo release de frontend sair).
+- **O que e**: `lib/orientacao_estoque.php` (novo, `oper_loja_orienta_veiculo`) decide
+  manter/avaliar_reducao/avaliar_outra_praca/sem_base por veiculo do Meu Estoque, usando a propria
+  praca quando tem amostra, cai pro nacional senao. `minha_loja_detalhe.php` ganhou o campo
+  `orientacao` no payload (aditivo, nao quebra nada existente). Detalhe completo e registro do
+  piloto com dado real: `docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md`.
+- **Incidente durante a publicacao, corrigido na mesma sessao** (detalhe completo no piloto acima):
+  1a tentativa so subiu `orientacao_estoque.php`, mas `minha_loja_detalhe.php` ja exigia
+  `lib/fipe_compat.php` (DAT01, mesclado na `main` mas nunca publicado em producao) -- 500 em TODO
+  `minha_loja_detalhe.php?id=*`, nao so no veiculo do piloto. Revertido na hora (backup), 2a
+  tentativa publicou os 3 arquivos (`fipe_compat.php` + `orientacao_estoque.php` +
+  `minha_loja_detalhe.php`) com checagem de `require_once` + teste `curl` (401 esperado, nao 500)
+  antes de declarar concluido.
+- Hashes finais publicados (CRLF->LF ao colar no Terminal, conteudo identico -- conferido):
+  `lib/fipe_compat.php` `91b12d0756601590cf4360bbd66dc5a704d1cfa805e6073d0cc0fffa77dc48bd`;
+  `lib/orientacao_estoque.php` `6137a9e1d0ac84a00fa7c871975b258abfe1a71c82a625c5e0358e7f880b94a6`;
+  `minha_loja_detalhe.php` `3a8c151b714a2c9d36341c367df604898b5ec7ef8f1ae88884c32bcf91913910`.
+- Backup: `/home1/pro93061/backups/api-orientacao-piloto-v2-20261001-093849` (minha_loja_detalhe.php
+  pre-publicacao). Backup da tentativa revertida: `/home1/pro93061/backups/api-orientacao-piloto-<T>`.
+- **Efeito colateral, fora do escopo pedido**: publicar `fipe_compat.php` tambem liga o bloqueio
+  DAT01 pra todo o estoque do Felipe (vinculo FIPE incompativel suspende a comparacao), nao so pro
+  veiculo do piloto -- trabalho ja pronto e testado antes, so nunca publicado. Nenhum vinculo
+  alterado no banco.
+- **Conferido ao vivo, autenticado, 3 veiculos reais** (so leitura, GET): ids 19/71/49 -- `manter`,
+  `manter`, `sem_base` respectivamente, todos batendo com o numero mostrado no mesmo payload.
+  Detalhe completo e veredito do piloto em `docs/oper-radar-redesign/PILOTO_ORIENTACAO_ESTOQUE.md`.
+- Reversao: restaurar os 3 arquivos do backup acima (`.bak` tem so o `minha_loja_detalhe.php`
+  anterior; `fipe_compat.php`/`orientacao_estoque.php` novos, reversao = apagar os 2).
+- **Proximo passo**: publicar o frontend (cartao de orientacao visivel) no proximo release.
+
+## Release 2.7 -- frontend (beta e producao): Plano de acao no layout da DEMO -- 28/09/2026 (PUBLICADO 28/09/2026 e conferido ao vivo)
+
+- Origem: commit `b447425` (PR #63). So frontend; API, banco, cron e credenciais nao mudam. Codex adversarial em 3 rodadas: perda silenciosa de acao quando localStorage falha (fallback em memoria por aba), href aceitava `//host` e `/\host` como caminho interno (base de resolucao passou a ser sorteada por carga, com rejeicao explicita de `//` apos normalizar `\`->`/`). app 141/141, PHP 17/17, Python 68/68, lint 0.
+- **O que e**: `PlanoAcaoBlocos.jsx`/`planoAcaoModel.js` substituem a `PageAcoes` antiga. KPIs pendentes/concluidas, formulario de nova acao, listas com origem (`Manual`, `Mercado`, `Minha Loja`, `Concorrencia`, `Oportunidades`, `Analise`, `FIPE`), evidencia e link de volta. Os 3 pontos de "Criar acao" em Oportunidades (observado ha mais tempo, abaixo da FIPE, "O que comprar") guardam evidencia real (revenda, preco, nota) em vez de texto solto. Badge de pendentes na sidebar via evento customizado (o `storage` nativo nao avisa a propria aba).
+- **Bug pego na checagem visual, corrigido antes de publicar**: `RadarApp` referenciava a variavel `acoes` removida junto do estado antigo -- `ReferenceError` em runtime, tela Plano de acao (e qualquer navegacao vinda de "Criar acao") quebrava com tela preta.
+- Zips em `/home1/pro93061/backups/` (`Downloads\OperRadar-Release2.1`, mesma pasta): beta `525dd01aae46b0df65244c839798e1e286039bf9afb73c3dafbdd4c375d3bed2` (`index.html` `32784726...`, `index-CK42djCJ.js` `a4ddcb1c...`); producao `222cbd6ac747f5444f1abdff513bd11698c5ad148cbf2c6a7be7e1607a065fe1` (`index.html` `6fca065b...`, `index-C-6DZgje.js` `cd6ed713...`). Pre-checagens: `index.html` do beta `57360710...` e da producao `e586d7d2...` (Release 2.6, conferidos ao vivo antes de empacotar).
+- **Publicado em 28/09/2026** (comando colado por Felipe no Terminal do cPanel). **Conferido ao vivo autenticado:** bundle `index-C-6DZgje.js` servindo, sem erro de console. Criada uma acao real a partir de Oportunidades ("Avaliar: MB 1635 2017/2018", Marka Veiculos Vw, Jau/SP, R$ 253.500, nota 37,9/100), origem "Oportunidades" e evidencia aparecem certas no cartao, badge de pendentes atualizou na sidebar (1). Removida em seguida para nao deixar dado de teste na conta real.
+- Reversao: restaurar `index.html` de `oper-radar-frontend-release2.7-*`.
+
 ## Release 2.6 — API 1.7 + frontend (beta e produção): "O que comprar" por região — 26/09/2026 (PUBLICADO 26/09/2026 e conferido ao vivo)
 
 - Origem: commit `1cbef99` (PR #63). API: **2 arquivos novos** (`oportunidades_compra.php`, `lib/oportunidade_compra.php`), nenhum arquivo existente sobrescrito. Sem mudança de banco, cron ou credencial. Codex adversarial em 4 rodadas (achados corrigidos: base de preço só com caminhão sem implemento de 2006 em diante, cache de arquivo com chave canônica e limpeza de antigos, URL do anúncio só http/https); NOVA (segurança): sem bloqueio (autenticação antes de conectar, sem entrada do usuário em SQL, erro genérico, sem PII). Débito pré-existente anotado pela NOVA: `href` de URL raspada sem checar esquema em outros 7 pontos do app. app 128/128, PHP 17/17, Python 68/68, lint 0.

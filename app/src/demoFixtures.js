@@ -20,6 +20,63 @@ const estoque = [itemLoja({}),
   itemLoja({ id: 504, referencia_interna: 'EST-DEMO-004', titulo: 'DAF XF 480 2020', placa: 'DDD3D33', marca: 'DAF', modelo: 'XF 480', ano: 2020, preco_anunciado: 470000, usar_comparativo: 0, dias_estoque: 9 })];
 const fipes = [{ id: 'E001-001', marca: 'Volvo', modelo: 'FH 540', ano: 2021, codigo_fipe: 'E001-001', preco_fipe: 505000, mes_referencia: '2026-09', anuncios_comparaveis: 11, mercado_amostra_suficiente: 1, preco_mediano_mercado: 498000, mercado_confianca: 'media', abaixo_fipe: 7, ufs: ['PR', 'SP'] }, { id: 'E002-002', marca: 'Scania', modelo: 'R 450', ano: 2020, codigo_fipe: 'E002-002', preco_fipe: 431000, mes_referencia: '2026-09', anuncios_comparaveis: 9, mercado_amostra_suficiente: 1, preco_mediano_mercado: 425000, mercado_confianca: 'media', abaixo_fipe: 4, ufs: ['SP'] }];
 export const DEMO_SESSION = { autenticado: true, csrf: 'demo-csrf-token', usuario: { id: 1, nome: 'Pessoa Demo', email: 'demo@example.invalid', papel: 'demonstração' } };
+
+// Fila de vinculação FIPE por categoria (fipe_fila_categorias.php) — números fictícios, só pra visual.
+const fipeFilaCategorias = {
+  resumo: { pendentes: 5842, vinculados: 5956, total: 11798, categorias_pendentes: 342, cobertura_pct: 50.5 },
+  categorias: [
+    { marca: 'DAF', modelo: 'XF FTS 530', sem_sugestao: 120, com_sugestao: 45, revisar: 165, vinculados: 30, total: 195 },
+    { marca: 'Volvo', modelo: 'FH 540', sem_sugestao: 70, com_sugestao: 58, revisar: 128, vinculados: 85, total: 213 },
+    { marca: 'Scania', modelo: 'R 450', sem_sugestao: 40, com_sugestao: 51, revisar: 91, vinculados: 112, total: 203 },
+    { marca: 'Mercedes-Benz', modelo: 'Axor 2544', sem_sugestao: 38, com_sugestao: 22, revisar: 60, vinculados: 40, total: 100 },
+    { marca: 'Iveco', modelo: 'Tector 11-190', sem_sugestao: 15, com_sugestao: 12, revisar: 27, vinculados: 18, total: 45 },
+  ],
+  limite: 80,
+};
+// Contrato real de minha_loja_detalhe.php: item + mercado_nacional + regioes (com desvio_preco_loja_pct) + orientação
+// (manter/avaliar_reducao/avaliar_outra_praca/sem_base — lib/orientacao_estoque.php). Cobre os 4 estoque[] da demo:
+// 501 acima do mercado com praça melhor -> avaliar_outra_praca; 502 competitivo -> manter; 503 amostra insuficiente ->
+// sem_base; 504 fora da base comparativa -> mesmo envelope "sem_base" que a API real devolve nesse caso.
+const regiaoDemo = (uf, precoAnunciado, precoMediano, extra = {}) => ({
+  uf, comparaveis: 9, amostra_total: 10, revendas: 4, preco_mediano: precoMediano, preco_p25: Math.round(precoMediano * 0.94), preco_p75: Math.round(precoMediano * 1.06),
+  saidas_observadas: 5, mediana_dias_saida: 34, cobertura_dias: 120,
+  desvio_preco_loja_pct: Math.round((precoAnunciado / precoMediano - 1) * 1000) / 10,
+  avaliacao: { pontuacao: 71.4, publicavel: true, confianca: 'media', motivo_confianca: 'amostra suficiente com cobertura regional' },
+  texto: `${uf}: concorrência moderada e movimento observado nos últimos 120 dias.`,
+  ...extra,
+});
+function minhaLojaDetalheDemo(item) {
+  if (item.id === 504) {
+    return { item, mercado_nacional: null, regioes: [], melhor_regiao_observada: null,
+      orientacao: { acao: 'sem_base', motivo: 'Este veículo está fora da base comparativa por opção da loja.' },
+      historico_eventos: { disponivel: true, cobertura_dias: 0 },
+      nota: 'Este veículo está fora da base comparativa por opção da loja.' };
+  }
+  if (item.id === 503) {
+    return { item, mercado_nacional: { comparaveis: 3, amostra_total: 3, amostra_suficiente: false, confianca: 'insuficiente', preco_mediano: null, preco_p25: null, preco_p75: null, desvio_preco_loja_pct: null },
+      regioes: [], melhor_regiao_observada: null,
+      orientacao: { acao: 'sem_base', motivo: 'Amostra insuficiente na sua praça e no Brasil para orientar o preço deste veículo.' },
+      historico_eventos: { disponivel: true, cobertura_dias: 120 },
+      nota: 'A análise usa anúncios ativos equivalentes e saídas observadas do portal. Não comprova venda nem garante desempenho futuro.' };
+  }
+  const preco = item.preco_anunciado;
+  if (item.id === 502) {
+    const pr = regiaoDemo('PR', preco, 455000);
+    return { item, mercado_nacional: { comparaveis: 32, amostra_total: 35, amostra_suficiente: true, confianca: 'alta', preco_mediano: 458000, preco_p25: 430000, preco_p75: 480000, desvio_preco_loja_pct: Math.round((preco / 458000 - 1) * 1000) / 10 },
+      regioes: [pr], melhor_regiao_observada: pr,
+      orientacao: { acao: 'manter', origem_base: 'propria_praca', desvio_pct: pr.desvio_preco_loja_pct, motivo: `Preço dentro da faixa competitiva da mediana da sua praça (${pr.desvio_preco_loja_pct}%).` },
+      historico_eventos: { disponivel: true, cobertura_dias: 120 },
+      nota: 'A análise usa anúncios ativos equivalentes e saídas observadas do portal. Não comprova venda nem garante desempenho futuro.' };
+  }
+  // 501: PR (própria praça) sustenta menos que o anunciado; SP sustenta preço bem mais próximo -> avaliar outra praça.
+  const pr = regiaoDemo('PR', preco, 490000);
+  const sp = regiaoDemo('SP', preco, 501000, { comparaveis: 12, avaliacao: { pontuacao: 78.2, publicavel: true, confianca: 'alta', motivo_confianca: 'amostra ampla e cobertura contínua' }, texto: 'SP: menor concorrência e saídas mais frequentes nos últimos 120 dias.' });
+  return { item, mercado_nacional: { comparaveis: 11, amostra_total: 14, amostra_suficiente: true, confianca: 'media', preco_mediano: 480000, preco_p25: 452000, preco_p75: 505000, desvio_preco_loja_pct: Math.round((preco / 480000 - 1) * 1000) / 10 },
+    regioes: [sp, pr], melhor_regiao_observada: sp,
+    orientacao: { acao: 'avaliar_outra_praca', origem_base: 'propria_praca', desvio_pct: pr.desvio_preco_loja_pct, uf_sugerida: 'SP', motivo: `Preço ${pr.desvio_preco_loja_pct}% acima da mediana da sua praça; SP sustenta preço mais próximo do seu, com melhor movimento observado.` },
+    historico_eventos: { disponivel: true, cobertura_dias: 120 },
+    nota: 'A análise usa anúncios ativos equivalentes e saídas observadas do portal. Não comprova venda nem garante desempenho futuro.' };
+}
 const jsonResponse = (payload, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => payload });
 const endpoint = input => { const u = new URL(String(input), 'https://demo.invalid'); return { path: u.pathname.split('/').pop(), params: u.searchParams }; };
 const anunciosPayload = (params) => ({ anuncios: baseAnuncios, total: baseAnuncios.length, pagina: 1, por_pagina: Number(params.get('limit') || 40), facetas, escopo: { periodo: params.get('periodo') || '30d', uf: params.get('uf') || 'todas' }, _meta: { demo: true, atualizado_em: today, cobertura: 'fixture local' } });
@@ -128,11 +185,13 @@ function demoGetBase(input) {
   if (path === 'fipe_status.php') return { disponivel: true, provedor: 'fixture local', atualizado_em: today, cobertura: 'catalogo demonstrativo' };
   if (path === 'placa_consulta.php') { if (params.get('modo') === 'status') return { disponivel: true, configurado: false, modo: 'demo' }; return { placa: params.get('placa'), veiculo: { marca: 'Volvo', modelo: 'FH 540', ano_modelo: 2021, cidade: 'Curitiba', uf: 'PR' }, fipes, mercado: fipes[0] }; }
   if (path === 'fipe_consulta.php') return { itens: fipes, fipes, total: fipes.length, resultado: fipes[0], consultado_em: today };
+  if (path === 'fipe_fila_categorias.php') return fipeFilaCategorias;
   if (path === 'insights.php') return { kpis: { fipe: { vinculados: 8, abaixo_fipe: 3, desvio_mediano_pct: -1.6 }, cobertura: { ufs: 3 } }, por_cidade: [{ cidade: 'Curitiba', uf: 'PR', anuncios: 322 }], lojistas: [{ revenda: 'Rota Exemplo Caminhoes', uf: 'PR', anuncios: 18 }], atualizado_em: today };
   if (path === 'analista_status.php') return { disponivel: true, configurado: true, modo: 'demo', aviso: 'Resposta local ficticia; sem contexto de backend.' };
   if (path === 'auth.php') return DEMO_SESSION;
   if (path === 'anuncio_detalhe.php') return { anuncio: baseAnuncios[0], historico: [{ data: '2026-09-21', preco: 499900 }, { data: '2026-09-23', preco: 489900 }], similares: baseAnuncios };
-  if (path === 'minha_loja.php' || path === 'minha_loja_detalhe.php') return path === 'minha_loja.php' ? { itens: estoque, total: estoque.length } : { item: estoque.find(i => String(i.id) === String(params.get('id'))) || estoque[0], mercado: fipes[0] };
+  if (path === 'minha_loja.php') return { itens: estoque, total: estoque.length };
+  if (path === 'minha_loja_detalhe.php') return minhaLojaDetalheDemo(estoque.find(i => String(i.id) === String(params.get('id'))) || estoque[0]);
   return { demo: true, _meta: { demo: true, endpoint: path, atualizado_em: today } };
 }
 export function demoPost(input) {

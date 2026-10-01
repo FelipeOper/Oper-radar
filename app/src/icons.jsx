@@ -65,3 +65,4 @@ export const ArrowLeft = phosphor('arrow-left', 'ArrowLeft');
 export const ChevronRight = phosphor('caret-right', 'ChevronRight');
 export const SlidersHorizontal = phosphor('sliders-horizontal', 'SlidersHorizontal');
 export const BarChart3 = phosphor('chart-bar', 'BarChart3');
+export const LinkIcon = phosphor('link', 'LinkIcon');

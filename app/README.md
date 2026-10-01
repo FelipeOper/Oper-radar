@@ -85,6 +85,24 @@ não são inferidos grupos equivalentes comerciais nem recomendações de preço
   30 dias, dias no radar) e "Por que esta nota" com os componentes e pesos efetivos. Linguagem de candidato, nunca "ideal"; sem base mostra o motivo.
   No mobile (<= 760 px) as abas de UF, "Ver anúncio", "Criar ação", o botão de evidência e o resumo "Por que esta nota" têm altura >= 44 px (`--hit-min`),
   em regras com escopo `.oc-compra` no fim de `src/theme.css` (o Comparador e o padrão global de alvos ficam para a T04); medidas em `docs/oper-radar-redesign/T02-oportunidades-mobile.md`.
+- Minha Loja mostra "O que fazer com este veículo" (cartão fixo acima das abas do painel do veículo, visível
+  em qualquer aba): manter preço, avaliar redução ou avaliar outra praça, vindo pronto de
+  `minha_loja_detalhe.php` (`lib/orientacao_estoque.php` na API). Botão "Criar ação" só aparece quando há
+  algo a decidir (nunca em "manter" nem "sem base"); a ação nasce no Plano de ação com origem "Minha Loja"
+  e o motivo real. `orientacaoEstoqueModel.js` só traduz a ação em rótulo/tom/texto do botão — a decisão em
+  si é do backend, testada lá.
+- Plano de ação no layout da DEMO (`src/PlanoAcaoBlocos.jsx`, regras em `src/planoAcaoModel.js`): KPIs de pendentes/concluídas,
+  formulário de nova ação e as listas, cada linha com origem (`Manual`, `Mercado`, `Minha Loja`, `Concorrência`, `Oportunidades`,
+  `Análise`, `FIPE`), evidência e link de volta ao insight que a gerou. Ações criadas em Oportunidades ("Criar ação", nos três
+  pontos: anúncios observados há mais tempo, abaixo da FIPE e "O que comprar") guardam a evidência real (revenda, preço, nota) em
+  vez de um texto solto. `href` só aceita http/https externo (sanitizado, mesma regra de `comprarModel.js`) ou caminho que resolva
+  para a própria origem do app: `//host` (protocol-relative) e `/\host` (o navegador lê `\` como `/` ao resolver URL) mudam de
+  origem mesmo começando com `/` e são rejeitados — a checagem resolve com `new URL()` contra a origem, não por prefixo.
+  Estado só em localStorage (chave `oper-radar-acoes`, migra o formato antigo `{texto, feita}` automaticamente); se a gravação
+  falhar (modo privado, storage cheio), a lista fica num fallback em memória da aba em vez de a ação criada em Oportunidades
+  simplesmente desaparecer ao navegar para o Plano de ação. O badge de
+  pendentes na sidebar (fora da página) escuta o evento customizado `oper-radar-acoes-mudou` disparado por `salvaAcoes()`, já que
+  o evento nativo `storage` não avisa a própria aba.
 - Comparador no layout da DEMO (`src/ComparadorBlocos.jsx`, regras em `src/comparadorModel.js`): dois lados com
   os três modos de recorte (marca inteira, modelo de qualquer marca, marca + modelo) e ano-modelo, janela de
   movimento, comparação automática quando os dois lados estão completos, veredito e métricas lado a lado. A API
@@ -147,3 +165,12 @@ do Mercado e da Concorrência dizem isso ao usuário (`tests/queryBackendContrac
 
 O desvio da FIPE também só considera cavalo, chassi ou carroceria não informada (F0d: com implemento o preço inclui o equipamento e o desvio desloca para cima);
 os textos de evidência dizem isso ao usuário (`tests/queryBackendContract.test.js`).
+
+## Fila de vinculação FIPE (aba "Vinculação pendente" em FIPE)
+
+`PageFipeFila` lê `fipe_fila_categorias.php` e lista marca+modelo por quantidade de anúncios ativos
+sem FIPE, maior pendência primeiro, com um resumo de cobertura no topo (01/10/2026: 50,5%). O botão
+"Resolver" de cada linha usa `onNavegar('mercado', { marca, busca: modelo })` — a mesma navegação
+com contexto que `PageHoje` já usava para os insights — e cai direto no Mercado já filtrado pra essa
+categoria, onde a curadoria por anúncio (sugestões inteligentes, busca livre, salvar) já existe.
+Esta aba não lê nem grava FIPE nenhuma, só organiza a navegação até quem já faz isso.
