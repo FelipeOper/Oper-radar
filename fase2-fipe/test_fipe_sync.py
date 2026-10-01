@@ -119,6 +119,38 @@ class MatchingFipeTest(unittest.TestCase):
             avalia("IVECO TECTOR 240E25", "TECTOR 240E25 6x2")[0], 0.5
         )
 
+    def test_iveco_s44t_e_s48t_nao_se_confundem(self):
+        self.assertEqual(0.0, avalia("IVECO STRALIS 490-S44T", "STRALIS 490-S48T")[0])
+        self.assertEqual(0, pontua_sugestao(
+            {"titulo": "IVECO STRALIS 490-S44T", "marca": "IVECO"},
+            {"modelo_fipe": "STRALIS 490-S48T"},
+        )[0])
+
+    def test_iveco_codigo_composto_exato_tem_confianca_alta(self):
+        anuncio = {"titulo": "IVECO TECTOR 240E25", "marca": "IVECO"}
+        correto = {"id": 1, "modelo_fipe": "TECTOR 240E25 6x2"}
+        errado = {"id": 2, "modelo_fipe": "TECTOR 240E28 6x2"}
+        self.assertGreaterEqual(avalia(anuncio["titulo"], correto["modelo_fipe"])[0], 0.95)
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.95, "codigo IVECO 240E25", correto),
+            (0.0, "codigo difere", errado),
+        ]):
+            self.assertEqual(([correto], "alto"), escolhe(None, anuncio))
+
+    def test_iveco_so_numero_nao_vincula_automaticamente(self):
+        anuncio = {"titulo": "IVECO STRALIS 490", "marca": "IVECO"}
+        candidato = {"id": 1, "modelo_fipe": "STRALIS 490-S44T"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", candidato)]):
+            self.assertEqual((None, "sem match de alta confianca"), escolhe(None, anuncio))
+
+    def test_iveco_codigo_exato_nao_ignora_eixo_contrario(self):
+        anuncio = {"titulo": "IVECO TECTOR 240E25 6x2", "marca": "IVECO"}
+        candidato = {"id": 1, "modelo_fipe": "TECTOR 240E25 4x2"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.95, "codigo IVECO 240E25", candidato),
+        ]):
+            self.assertEqual((None, "sem match eixo 6X2"), escolhe(None, anuncio))
+
     def test_nome_da_revenda_na_url_nao_vira_familia_do_caminhao(self):
         anuncio = {
             "titulo": "MB 2544 2020/2020",
@@ -252,6 +284,109 @@ class MatchingFipeTest(unittest.TestCase):
         score, motivo = avalia("DAF XF105 530 2021/2021", "XF FTT530 6x4 Space Cab (diesel)(E5)")
         self.assertEqual(0.0, score)
         self.assertIn("geracao", motivo)
+
+    def test_daf_xf105_nao_casa_sem_potencia_fipe(self):
+        score, motivo = avalia("DAF XF105 530", "XF FTT 6x4 Space Cab")
+        self.assertEqual(0.0, score)
+        self.assertIn("geracao", motivo)
+
+    def test_daf_ft_fts_ftt_exigem_mesma_configuracao(self):
+        for configuracao, distinta in (("FT", "FTS"), ("FTS", "FTT"), ("FTT", "FT")):
+            with self.subTest(configuracao=configuracao):
+                score, motivo = avalia(
+                    f"DAF XF {configuracao} 530", f"XF {distinta}530 Space Cab"
+                )
+                self.assertEqual(0.0, score)
+                self.assertIn("configuracao", motivo)
+
+    def test_daf_candidato_unico_de_alta_confianca(self):
+        anuncio = {"titulo": "DAF XF FTT 530 2021/2021", "marca": "DAF"}
+        candidato = {"id": 1, "modelo_fipe": "XF FTT530 Space Cab"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", candidato),
+        ]):
+            self.assertEqual(([candidato], "alto"), escolhe(None, anuncio))
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", candidato),
+            (0.99, "potencia+configuracao", {"id": 2, "modelo_fipe": "XF FTT530 Space Cab"}),
+        ]):
+            self.assertEqual((None, "ambiguo 2 candidatos"), escolhe(None, anuncio))
+
+    def test_daf_super_space_explicita_nao_aceita_fipe_sem_cabine(self):
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SUPER SPACE 2021/2021",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        sem_cabine = {"id": 1, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        self.assertEqual(0.99, avalia(anuncio["titulo"], sem_cabine["modelo_fipe"])[0])
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao 530/FTT", sem_cabine),
+        ]):
+            self.assertEqual((None, "sem match cabine SUPER SPACE"), escolhe(None, anuncio))
+
+    def test_daf_cabine_correta_com_score_medio_continua_bloqueada(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "marca": "DAF",
+            "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        self.assertEqual(0.90, avalia(texto_anuncio(anuncio), day["modelo_fipe"])[0])
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia 300", day),
+        ]):
+            self.assertEqual((None, "sem match de alta confianca"), escolhe(None, anuncio))
+
+    def test_matriz_daf_geracao_eixo_cabine(self):
+        eixos_por_codigo = {"FT": "4x2", "FTS": "6x2", "FTT": "6x4"}
+        for geracao in ("XF", "XF 105"):
+            for codigo, eixo in eixos_por_codigo.items():
+                for cabine in ("Space", "Super Space"):
+                    with self.subTest(geracao=geracao, codigo=codigo, cabine=cabine):
+                        titulo = f"DAF {geracao} {codigo} 460 {eixo} {cabine} Cab"
+                        anuncio = {"titulo": titulo, "marca": "DAF"}
+                        outro_codigo = next(c for c in eixos_por_codigo if c != codigo)
+                        outra_cabine = "Super Space" if cabine == "Space" else "Space"
+                        outra_geracao = "XF 105" if geracao == "XF" else "XF"
+                        nomes = [
+                            f"{geracao} {codigo}460 {eixo} {cabine} Cab",
+                            f"{outra_geracao} {codigo}460 {eixo} {cabine} Cab",
+                            f"{geracao} {outro_codigo}460 {eixos_por_codigo[outro_codigo]} {cabine} Cab",
+                            f"{geracao} {codigo}460 {eixo} {outra_cabine} Cab",
+                            f"CF {codigo}460 {eixo} {cabine} Cab",
+                        ]
+                        modelos = [{"id": i, "modelo_fipe": nome} for i, nome in enumerate(nomes)]
+                        pontuados = [(score, motivo, modelo) for modelo in modelos
+                                     for score, motivo in [avalia(titulo, modelo["modelo_fipe"])]]
+                        self.assertEqual(0.0, pontuados[1][0])
+                        self.assertEqual(0.0, pontuados[2][0])
+                        self.assertEqual(0.0, pontuados[4][0])
+                        with patch("fipe_sync.melhores_candidatos", return_value=pontuados):
+                            self.assertEqual(([modelos[0]], "alto"), escolhe(None, anuncio))
+
+    def test_matriz_iveco_codigo_eixo_cabine(self):
+        for codigo in ("240E25", "240E28"):
+            for eixo in ("4x2", "6x2"):
+                for cabine in ("Day", "Space"):
+                    with self.subTest(codigo=codigo, eixo=eixo, cabine=cabine):
+                        titulo = f"IVECO TECTOR {codigo} {eixo} {cabine} Cab"
+                        anuncio = {"titulo": titulo, "marca": "IVECO"}
+                        outro_codigo = "240E28" if codigo == "240E25" else "240E25"
+                        outro_eixo = "6x2" if eixo == "4x2" else "4x2"
+                        outra_cabine = "Space" if cabine == "Day" else "Day"
+                        nomes = [
+                            f"TECTOR {codigo} {eixo} {cabine} Cab",
+                            f"TECTOR {outro_codigo} {eixo} {cabine} Cab",
+                            f"TECTOR {codigo} {outro_eixo} {cabine} Cab",
+                            f"TECTOR {codigo} {eixo} {outra_cabine} Cab",
+                            f"STRALIS {codigo} {eixo} {cabine} Cab",
+                        ]
+                        modelos = [{"id": i, "modelo_fipe": nome} for i, nome in enumerate(nomes)]
+                        pontuados = [(score, motivo, modelo) for modelo in modelos
+                                     for score, motivo in [avalia(titulo, modelo["modelo_fipe"])]]
+                        self.assertEqual(0.0, pontuados[1][0])
+                        self.assertEqual(0.0, pontuados[4][0])
+                        with patch("fipe_sync.melhores_candidatos", return_value=pontuados):
+                            self.assertEqual(([modelos[0]], "alto"), escolhe(None, anuncio))
 
     def test_reconhece_cabines_daf(self):
         self.assertEqual("SPACE", cabine_daf("XF FTT530 6x4 Space Cab"))

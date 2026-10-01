@@ -92,6 +92,18 @@ cabine <TAG>`), mesmo que todos os candidatos do grupo sejam igualmente genéric
 `test_fipe_sync.py` (`test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo`,
 `test_daf_cabine_explicita_sem_nenhum_candidato_tagueado_nao_vincula` e vizinhos).
 
+### Diagnóstico isolado P0 — DAF/IVECO (01/10/2026)
+
+No matching DAF/IVECO, a vinculação automática exige um único modelo candidato com
+confiança alta. XF105 não se mistura à geração XF mesmo quando um nome FIPE omite
+potência; FT, FTS e FTT não se cruzam quando ambos os códigos são explícitos; códigos
+IVECO 240E25/240E28 e potências S44T/S48T distintas são incompatíveis. Casos sem
+evidência suficiente ficam sem vínculo automático para revisão. Essas regras só
+mudam a seleção em memória; não adicionam consultas, índices nem migração de dados.
+Se o anúncio DAF declara cabine, o modelo FIPE precisa declarar a mesma cabine;
+nome FIPE sem cabine não basta mesmo com score numérico alto.
+A matriz de interação e seus limites estão em [P0-DAF-IVECO-MATRIZ.md](P0-DAF-IVECO-MATRIZ.md).
+
 ## Instalação em banco existente
 
 ```bash
