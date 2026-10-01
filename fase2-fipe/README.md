@@ -29,6 +29,22 @@ menos 0,95 (`alto`). Um nome FIPE sem eixo não confirma a configuração. Se o 
 não declara eixo e o catálogo traz variantes de eixos diferentes, o nome base não
 resolve a ambiguidade. Esses casos ficam sem vínculo automático para curadoria.
 
+Ensaio offline em `test_fipe_sync.py` (catálogo sintético, sem F3/banco):
+
+| Eixo do anúncio | FIPE igual | FIPE 4x2/6x2/6x4/8x2 diferente | FIPE sem eixo |
+|---|---|---|---|
+| 4x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 6x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 6x4 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 8x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+
+Dois modelos do eixo correto ou score menor que 0,95 ficam ambíguos; sem nenhum,
+`sem match eixo`. Série Scania divergente (R/G) é rejeitada mesmo com eixo igual;
+DAF XF FTT530 6x4 Super Space mantém somente cabine/configuração compatíveis.
+IVECO TECTOR 240E25 8x2 com código e eixo exatos ainda recebe score 0,60 da
+regra preexistente e **não** vira vínculo `alto`. A cobertura em anúncios reais
+não foi medida: as linhas deslocadas do F3 não permitem essa inferência.
+
 ## Instalação em banco existente
 
 ```bash

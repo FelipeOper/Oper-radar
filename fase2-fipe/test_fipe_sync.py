@@ -165,6 +165,47 @@ class MatchingFipeTest(unittest.TestCase):
         with patch("fipe_sync.melhores_candidatos", return_value=eixos_fipe):
             self.assertEqual((None, "ambiguo eixo (4X2/6X2)"), escolhe(None, anuncio))
 
+    def test_matriz_eixos_p0_com_score_real_e_serie_scania(self):
+        modelos = [
+            {"id": i, "modelo_fipe": f"R-440 A {eixo} (diesel)"}
+            for i, eixo in enumerate(("4x2", "6x2", "6x4", "8x2"), 1)
+        ]
+        modelos.append({"id": 5, "modelo_fipe": "G-440 A 6x2 (diesel)"})
+        modelos.append({"id": 6, "modelo_fipe": "R-440 A (diesel)"})
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            for eixo, esperado in zip(("4x2", "6x2", "6x4", "8x2"), modelos):
+                with self.subTest(eixo=eixo):
+                    anuncio = {"titulo": f"SCANIA R440 {eixo} 2014/2014", "marca": "SCANIA"}
+                    self.assertEqual(([esperado], "alto"), escolhe(None, anuncio))
+
+    def test_daf_eixo_serie_e_cabine_integrados(self):
+        anuncio = {
+            "titulo": "DAF XF FTT530 6x4 SUPER SPACE 2021/2021",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        correto = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Super Space Cab (diesel)(E5)"}
+        modelos = [
+            correto,
+            {"id": 2, "modelo_fipe": "XF FTS530 6x2 Super Space Cab (diesel)(E5)"},
+            {"id": 3, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"},
+            {"id": 4, "modelo_fipe": "CF FTT530 6x4 Super Space Cab (diesel)(E5)"},
+        ]
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            self.assertEqual(([correto], "alto"), escolhe(None, anuncio))
+
+    def test_iveco_eixo_e_codigo_exatos_ainda_sem_confianca_alta(self):
+        anuncio = {"titulo": "IVECO TECTOR 240E25 8x2 2021/2021", "marca": "IVECO"}
+        modelos = [
+            {"id": 1, "modelo_fipe": "TECTOR 240E25 8x2 (diesel)"},
+            {"id": 2, "modelo_fipe": "TECTOR 240E28 8x2 (diesel)"},
+            {"id": 3, "modelo_fipe": "TECTOR 240E25 6x2 (diesel)"},
+        ]
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            self.assertEqual(
+                (None, "ambiguo eixo 8X2: confianca insuficiente"),
+                escolhe(None, anuncio),
+            )
+
     def test_daf_105_e_geracao_e_530_e_potencia(self):
         self.assertEqual("530", potencia_daf("DAF XF105 530 2021/2021"))
         score, motivo = avalia("DAF XF105 530 2021/2021", "XF 105 FTT 510 6x4 (diesel)(E5)")
