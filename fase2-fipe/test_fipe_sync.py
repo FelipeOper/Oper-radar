@@ -445,6 +445,34 @@ class MatchingFipeTest(unittest.TestCase):
         self.assertIsNone(candidatos)
         self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
 
+    def test_cf_uplift_negativo_potencia_ausente_na_fipe(self):
+        """Espelho do caso 'anuncio sem potencia': aqui e a FIPE que nao tem numero de 3 digitos
+        detectavel no nome do modelo (so numero != potencia, score 0.60, nao 'potencia')."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        sem_potencia_fipe = {"id": 1, "modelo_fipe": "CF FAS 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", sem_potencia_fipe)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_emissao_explicita_conflitante(self):
+        """Emissao declarada nos dois lados mas DIFERENTE (E5 no anuncio, E6 na FIPE): rejeitado
+        mais acima, no bloco de emissao_preferida ('sem match emissao'), antes de chegar no
+        uplift — nao e so 'tag ausente', e divergencia real. Garante que o gate geral continua
+        bloqueando esse caso sem depender so da checagem do uplift."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB EURO 5 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        cand_e6 = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E6)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", cand_e6)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match emissao E5", motivo)
+
     def test_cf_uplift_negativo_anuncio_sem_potencia_detectavel(self):
         anuncio = {
             "titulo": "DAF CF DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
