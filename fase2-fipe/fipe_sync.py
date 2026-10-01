@@ -446,7 +446,11 @@ def avalia(titulo: str, modelo_fipe: str):
             return 0.90, f"potencia {potencia_t}"
 
     if codigo_iveco_t and codigo_iveco_t == codigo_iveco_f and familia_t and familia_t == familia_f:
-        return 0.95, f"codigo IVECO {codigo_iveco_t}"
+        eixo_t, eixo_f = eixos(titulo), eixos(modelo_fipe)
+        cabine_t, cabine_f = cabine_daf(titulo), cabine_daf(modelo_fipe)
+        if eixo_t and eixo_t == eixo_f and cabine_t and cabine_t == cabine_f:
+            return 0.95, f"codigo+eixo+cabine IVECO {codigo_iveco_t}"
+        return 0.90, f"codigo IVECO {codigo_iveco_t} sem eixo/cabine confirmados"
 
     n_t, n_f = numero_modelo(titulo), numero_modelo(modelo_fipe)
     if not n_t or not n_f or n_t != n_f:

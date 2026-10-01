@@ -91,15 +91,29 @@ class MatchingFipeTest(unittest.TestCase):
         )[0])
 
     def test_iveco_codigo_composto_exato_tem_confianca_alta(self):
-        anuncio = {"titulo": "IVECO TECTOR 240E25", "marca": "IVECO"}
-        correto = {"id": 1, "modelo_fipe": "TECTOR 240E25 6x2"}
-        errado = {"id": 2, "modelo_fipe": "TECTOR 240E28 6x2"}
+        anuncio = {"titulo": "IVECO TECTOR 240E25 6x2 Day Cab", "marca": "IVECO"}
+        correto = {"id": 1, "modelo_fipe": "TECTOR 240E25 6x2 Day Cab"}
+        errado = {"id": 2, "modelo_fipe": "TECTOR 240E28 6x2 Day Cab"}
         self.assertGreaterEqual(avalia(anuncio["titulo"], correto["modelo_fipe"])[0], 0.95)
         with patch("fipe_sync.melhores_candidatos", return_value=[
-            (0.95, "codigo IVECO 240E25", correto),
+            (0.95, "codigo+eixo+cabine IVECO 240E25", correto),
             (0.0, "codigo difere", errado),
         ]):
             self.assertEqual(([correto], "alto"), escolhe(None, anuncio))
+
+    def test_iveco_240e25_8x2_sem_cabine_nao_vincula_alto(self):
+        anuncio = {
+            "titulo": "IVECO TECTOR 240E25 8x2 2021/2021", "url": "",
+            "marca": "IVECO", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        modelos = [
+            {"id": 1, "modelo_fipe": "TECTOR 240E25 8x2 (diesel)"},
+            {"id": 2, "modelo_fipe": "TECTOR 240E28 8x2 (diesel)"},
+            {"id": 3, "modelo_fipe": "TECTOR 240E25 6x2 (diesel)"},
+        ]
+        self.assertEqual(0.90, avalia(anuncio["titulo"], modelos[0]["modelo_fipe"])[0])
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            self.assertEqual((None, "sem match de alta confianca"), escolhe(None, anuncio))
 
     def test_iveco_so_numero_nao_vincula_automaticamente(self):
         anuncio = {"titulo": "IVECO STRALIS 490", "marca": "IVECO"}
