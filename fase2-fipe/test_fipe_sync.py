@@ -187,6 +187,58 @@ class MatchingFipeTest(unittest.TestCase):
         ]):
             self.assertEqual((None, "ambiguo 2 candidatos"), escolhe(None, anuncio))
 
+    def test_matriz_daf_geracao_eixo_cabine(self):
+        eixos_por_codigo = {"FT": "4x2", "FTS": "6x2", "FTT": "6x4"}
+        for geracao in ("XF", "XF 105"):
+            for codigo, eixo in eixos_por_codigo.items():
+                for cabine in ("Space", "Super Space"):
+                    with self.subTest(geracao=geracao, codigo=codigo, cabine=cabine):
+                        titulo = f"DAF {geracao} {codigo} 460 {eixo} {cabine} Cab"
+                        anuncio = {"titulo": titulo, "marca": "DAF"}
+                        outro_codigo = next(c for c in eixos_por_codigo if c != codigo)
+                        outra_cabine = "Super Space" if cabine == "Space" else "Space"
+                        outra_geracao = "XF 105" if geracao == "XF" else "XF"
+                        nomes = [
+                            f"{geracao} {codigo}460 {eixo} {cabine} Cab",
+                            f"{outra_geracao} {codigo}460 {eixo} {cabine} Cab",
+                            f"{geracao} {outro_codigo}460 {eixos_por_codigo[outro_codigo]} {cabine} Cab",
+                            f"{geracao} {codigo}460 {eixo} {outra_cabine} Cab",
+                            f"CF {codigo}460 {eixo} {cabine} Cab",
+                        ]
+                        modelos = [{"id": i, "modelo_fipe": nome} for i, nome in enumerate(nomes)]
+                        pontuados = [(score, motivo, modelo) for modelo in modelos
+                                     for score, motivo in [avalia(titulo, modelo["modelo_fipe"])]]
+                        self.assertEqual(0.0, pontuados[1][0])
+                        self.assertEqual(0.0, pontuados[2][0])
+                        self.assertEqual(0.0, pontuados[4][0])
+                        with patch("fipe_sync.melhores_candidatos", return_value=pontuados):
+                            self.assertEqual(([modelos[0]], "alto"), escolhe(None, anuncio))
+
+    def test_matriz_iveco_codigo_eixo_cabine(self):
+        for codigo in ("240E25", "240E28"):
+            for eixo in ("4x2", "6x2"):
+                for cabine in ("Day", "Space"):
+                    with self.subTest(codigo=codigo, eixo=eixo, cabine=cabine):
+                        titulo = f"IVECO TECTOR {codigo} {eixo} {cabine} Cab"
+                        anuncio = {"titulo": titulo, "marca": "IVECO"}
+                        outro_codigo = "240E28" if codigo == "240E25" else "240E25"
+                        outro_eixo = "6x2" if eixo == "4x2" else "4x2"
+                        outra_cabine = "Space" if cabine == "Day" else "Day"
+                        nomes = [
+                            f"TECTOR {codigo} {eixo} {cabine} Cab",
+                            f"TECTOR {outro_codigo} {eixo} {cabine} Cab",
+                            f"TECTOR {codigo} {outro_eixo} {cabine} Cab",
+                            f"TECTOR {codigo} {eixo} {outra_cabine} Cab",
+                            f"STRALIS {codigo} {eixo} {cabine} Cab",
+                        ]
+                        modelos = [{"id": i, "modelo_fipe": nome} for i, nome in enumerate(nomes)]
+                        pontuados = [(score, motivo, modelo) for modelo in modelos
+                                     for score, motivo in [avalia(titulo, modelo["modelo_fipe"])]]
+                        self.assertEqual(0.0, pontuados[1][0])
+                        self.assertEqual(0.0, pontuados[4][0])
+                        with patch("fipe_sync.melhores_candidatos", return_value=pontuados):
+                            self.assertEqual(([modelos[0]], "alto"), escolhe(None, anuncio))
+
     def test_reconhece_cabines_daf(self):
         self.assertEqual("SPACE", cabine_daf("XF FTT530 6x4 Space Cab"))
         self.assertEqual("SUPER SPACE", cabine_daf("XF FTT530 6x4 Super Space Cab"))

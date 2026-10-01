@@ -431,6 +431,8 @@ def avalia(titulo: str, modelo_fipe: str):
         potencia_t, potencia_f = potencia_daf(titulo), potencia_daf(modelo_fipe)
         geracao_t = geracao_daf(titulo)
         geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
+        if geracao_f in ("XF105", "CF85") and geracao_t != geracao_f:
+            return 0.0, f"geracao {geracao_t or 'nao declarada'}!={geracao_f}"
         if geracao_t and geracao_f and geracao_t != geracao_f:
             return 0.0, f"geracao {geracao_t}!={geracao_f}"
         if potencia_t and potencia_f:
