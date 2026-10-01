@@ -199,6 +199,12 @@ def codigo_modelo_iveco(s: str):
     return f"{m.group(1)}E{m.group(2)}" if m else None
 
 
+def potencia_iveco_s(s: str):
+    """S44T/S48T identificam potencias distintas na familia IVECO."""
+    m = re.search(r"\bS\s*(\d{2})\s*T\b", normaliza(texto_sem_anos(s)))
+    return m.group(1) + "0" if m else None
+
+
 def identificadores_modelo(s: str) -> set:
     """Formas equivalentes do número técnico: 29 480, 29.480 e 29-480."""
     base = unicodedata.normalize("NFD", texto_sem_anos(s) or "").encode("ascii", "ignore").decode().upper()
@@ -329,6 +335,11 @@ def pontua_sugestao(anuncio: dict, modelo: dict):
     if (codigo_iveco_anuncio and codigo_iveco_fipe
             and codigo_iveco_anuncio != codigo_iveco_fipe):
         return 0, []
+    if normaliza(anuncio.get("marca", "")) == "IVECO":
+        potencia_iveco_anuncio = potencia_iveco_s(titulo)
+        potencia_iveco_fipe = potencia_iveco_s(nome_fipe)
+        if potencia_iveco_anuncio and potencia_iveco_fipe and potencia_iveco_anuncio != potencia_iveco_fipe:
+            return 0, []
 
     if normaliza(anuncio.get("marca", "")) == "DAF":
         potencia_anuncio, potencia_fipe = potencia_daf(titulo), potencia_daf(nome_fipe)
@@ -407,21 +418,33 @@ def avalia(titulo: str, modelo_fipe: str):
     codigo_iveco_f = codigo_modelo_iveco(modelo_fipe)
     if codigo_iveco_t and codigo_iveco_f and codigo_iveco_t != codigo_iveco_f:
         return 0.0, f"codigo IVECO {codigo_iveco_t}!={codigo_iveco_f}"
+    if "IVECO" in normaliza(titulo).split() or familia_t in (
+            "TECTOR", "STRALIS", "EUROCARGO", "EUROTECH", "HI-WAY",
+            "S-WAY", "TRAKKER", "DAILY", "VERTIS"):
+        potencia_iveco_t = potencia_iveco_s(titulo)
+        potencia_iveco_f = potencia_iveco_s(modelo_fipe)
+        if potencia_iveco_t and potencia_iveco_f and potencia_iveco_t != potencia_iveco_f:
+            return 0.0, f"potencia IVECO {potencia_iveco_t}!={potencia_iveco_f}"
 
     # Na DAF, 105 identifica a geracao XF105. A potencia e outro numero (460/510 etc.).
     if "DAF" in normaliza(titulo) or familia_comercial(titulo) in ("XF", "CF"):
         potencia_t, potencia_f = potencia_daf(titulo), potencia_daf(modelo_fipe)
+        geracao_t = geracao_daf(titulo)
+        geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
+        if geracao_t and geracao_f and geracao_t != geracao_f:
+            return 0.0, f"geracao {geracao_t}!={geracao_f}"
         if potencia_t and potencia_f:
             if potencia_t != potencia_f:
                 return 0.0, f"potencia {potencia_t}!={potencia_f}"
-            geracao_t = geracao_daf(titulo)
-            geracao_f = geracao_daf(modelo_fipe, nome_fipe=True)
-            if geracao_t and geracao_f and geracao_t != geracao_f:
-                return 0.0, f"geracao {geracao_t}!={geracao_f}"
             config_t, config_f = configuracao_daf(titulo), configuracao_daf(modelo_fipe)
+            if config_t and config_f and config_t != config_f:
+                return 0.0, f"configuracao {config_t}!={config_f}"
             if config_t and config_f and config_t == config_f:
                 return 0.99, f"potencia+configuracao {potencia_t}/{config_t}"
             return 0.90, f"potencia {potencia_t}"
+
+    if codigo_iveco_t and codigo_iveco_t == codigo_iveco_f and familia_t and familia_t == familia_f:
+        return 0.95, f"codigo IVECO {codigo_iveco_t}"
 
     n_t, n_f = numero_modelo(titulo), numero_modelo(modelo_fipe)
     if not n_t or not n_f or n_t != n_f:
@@ -742,7 +765,9 @@ def escolhe(conn, anuncio):
          aquele que nao declara eixo ('11-180 Delivery 2p'), que e o modelo padrao.
          Se nao houver base, ai sim nao vincula.
     """
-    daf = normaliza(anuncio.get("marca", "")) == "DAF"
+    marca = normaliza(anuncio.get("marca", ""))
+    daf = marca == "DAF"
+    familia_restrita = marca in ("DAF", "IVECO")
     validos = [(s, m, c) for s, m, c in melhores_candidatos(conn, anuncio, quantos=100) if s >= 0.5]
     if not validos:
         return None, "sem match"
@@ -767,7 +792,7 @@ def escolhe(conn, anuncio):
         filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_anuncio, None)]
         if filtrados:
             validos = filtrados
-        elif daf:
+        elif familia_restrita:
             return None, f"sem match eixo {eixo_anuncio}"
 
     emissoes_candidatas = {
@@ -840,6 +865,9 @@ def escolhe(conn, anuncio):
             return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
         validos = base
 
+    if familia_restrita and (len(validos) != 1 or validos[0][0] < 0.95):
+        return None, (f"ambiguo {len(validos)} candidatos" if len(validos) != 1
+                      else "sem match de alta confianca")
     confianca = "alto" if validos[0][0] >= 0.95 else "medio"
     return [c for _, _, c in validos], confianca
 

@@ -23,6 +23,13 @@ Existem três modos independentes:
 Ambiguidades de linha ou eixo continuam sem vínculo automático. Ausências do cache no modo
 local permanecem na fila, sem serem marcadas erroneamente como “sem ano”.
 
+No matching DAF/IVECO, a vinculação automática exige um único modelo candidato com
+confiança alta. XF105 não se mistura à geração XF mesmo quando um nome FIPE omite
+potência; FT, FTS e FTT não se cruzam quando ambos os códigos são explícitos; códigos
+IVECO 240E25/240E28 e potências S44T/S48T distintas são incompatíveis. Casos sem
+evidência suficiente ficam sem vínculo automático para revisão. Essas regras só
+mudam a seleção em memória; não adicionam consultas, índices nem migração de dados.
+
 ## Instalação em banco existente
 
 ```bash

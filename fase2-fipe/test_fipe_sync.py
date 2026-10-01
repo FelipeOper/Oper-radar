@@ -83,6 +83,38 @@ class MatchingFipeTest(unittest.TestCase):
             avalia("IVECO TECTOR 240E25", "TECTOR 240E25 6x2")[0], 0.5
         )
 
+    def test_iveco_s44t_e_s48t_nao_se_confundem(self):
+        self.assertEqual(0.0, avalia("IVECO STRALIS 490-S44T", "STRALIS 490-S48T")[0])
+        self.assertEqual(0, pontua_sugestao(
+            {"titulo": "IVECO STRALIS 490-S44T", "marca": "IVECO"},
+            {"modelo_fipe": "STRALIS 490-S48T"},
+        )[0])
+
+    def test_iveco_codigo_composto_exato_tem_confianca_alta(self):
+        anuncio = {"titulo": "IVECO TECTOR 240E25", "marca": "IVECO"}
+        correto = {"id": 1, "modelo_fipe": "TECTOR 240E25 6x2"}
+        errado = {"id": 2, "modelo_fipe": "TECTOR 240E28 6x2"}
+        self.assertGreaterEqual(avalia(anuncio["titulo"], correto["modelo_fipe"])[0], 0.95)
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.95, "codigo IVECO 240E25", correto),
+            (0.0, "codigo difere", errado),
+        ]):
+            self.assertEqual(([correto], "alto"), escolhe(None, anuncio))
+
+    def test_iveco_so_numero_nao_vincula_automaticamente(self):
+        anuncio = {"titulo": "IVECO STRALIS 490", "marca": "IVECO"}
+        candidato = {"id": 1, "modelo_fipe": "STRALIS 490-S44T"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", candidato)]):
+            self.assertEqual((None, "sem match de alta confianca"), escolhe(None, anuncio))
+
+    def test_iveco_codigo_exato_nao_ignora_eixo_contrario(self):
+        anuncio = {"titulo": "IVECO TECTOR 240E25 6x2", "marca": "IVECO"}
+        candidato = {"id": 1, "modelo_fipe": "TECTOR 240E25 4x2"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.95, "codigo IVECO 240E25", candidato),
+        ]):
+            self.assertEqual((None, "sem match eixo 6X2"), escolhe(None, anuncio))
+
     def test_nome_da_revenda_na_url_nao_vira_familia_do_caminhao(self):
         anuncio = {
             "titulo": "MB 2544 2020/2020",
@@ -127,6 +159,33 @@ class MatchingFipeTest(unittest.TestCase):
         score, motivo = avalia("DAF XF105 530 2021/2021", "XF FTT530 6x4 Space Cab (diesel)(E5)")
         self.assertEqual(0.0, score)
         self.assertIn("geracao", motivo)
+
+    def test_daf_xf105_nao_casa_sem_potencia_fipe(self):
+        score, motivo = avalia("DAF XF105 530", "XF FTT 6x4 Space Cab")
+        self.assertEqual(0.0, score)
+        self.assertIn("geracao", motivo)
+
+    def test_daf_ft_fts_ftt_exigem_mesma_configuracao(self):
+        for configuracao, distinta in (("FT", "FTS"), ("FTS", "FTT"), ("FTT", "FT")):
+            with self.subTest(configuracao=configuracao):
+                score, motivo = avalia(
+                    f"DAF XF {configuracao} 530", f"XF {distinta}530 Space Cab"
+                )
+                self.assertEqual(0.0, score)
+                self.assertIn("configuracao", motivo)
+
+    def test_daf_candidato_unico_de_alta_confianca(self):
+        anuncio = {"titulo": "DAF XF FTT 530 2021/2021", "marca": "DAF"}
+        candidato = {"id": 1, "modelo_fipe": "XF FTT530 Space Cab"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", candidato),
+        ]):
+            self.assertEqual(([candidato], "alto"), escolhe(None, anuncio))
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", candidato),
+            (0.99, "potencia+configuracao", {"id": 2, "modelo_fipe": "XF FTT530 Space Cab"}),
+        ]):
+            self.assertEqual((None, "ambiguo 2 candidatos"), escolhe(None, anuncio))
 
     def test_reconhece_cabines_daf(self):
         self.assertEqual("SPACE", cabine_daf("XF FTT530 6x4 Space Cab"))
