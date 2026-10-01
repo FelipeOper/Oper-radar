@@ -984,6 +984,16 @@ select {
 .oc-compra__comp li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-sm, 13px); }
 @media (max-width: 560px) { .oc-compra__preco { align-items: flex-start; } }
 
+/* Mobile (T02): alvos de toque >= 44 px so em Oportunidades. Escopo em .oc-compra para nao alterar o Comparador (que
+   compartilha .oc-cmp__modo) nem o botao de evidencia das outras telas; o padrao global fica para a T04. */
+@media (max-width: 760px) {
+  .oc-compra__ufs .oc-cmp__modo,
+  .oc-compra .oc-evidencia__botao,
+  .oc-compra .or-btn { min-height: var(--hit-min); }
+  /* padding em vez de display:flex, que esconderia o marcador do <details>. */
+  .oc-compra__comp summary { padding-block: 13px; }
+}
+
 /* Plano de ação: formulário de nova ação e listas de pendentes/concluídas. */
 .oc-acoes { display: flex; flex-direction: column; gap: 16px; }
 .oc-acoes__form { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; align-items: end; }
