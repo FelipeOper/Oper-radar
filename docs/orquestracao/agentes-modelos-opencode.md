@@ -50,6 +50,45 @@ modelos gratuitos/baratos — o consumo do plano Go ($12/5h, $30/semana, $60/mê
 maior que o planejado. Decisão de rebalancear de volta para a tabela recomendada (ou manter
 DeepSeek V4 Pro em todos, se for escolha consciente) fica para o Felipe.
 
+## Rebalanceamento aplicado em 07/10/2026 (mesma noite)
+
+Felipe pediu para rebalancear de volta pro plano de custo original. Aplicado nos 13, sempre
+preferindo a entrada com sufixo **"OpenCode Go"** (nunca "Personal / OpenCode"/Zen):
+
+| Agente | Modelo final | Bate com a tabela recomendada original? |
+| --- | --- | --- |
+| NOVA | DeepSeek V4 Pro (New) | Sim |
+| LUNA | MiMo-V2.6-Flash | Sim |
+| TERRA | DeepSeek V4.1 Flash | Sim (nome real do catálogo; doc antiga dizia "V4 Flash") |
+| ANCORA | DeepSeek V4.1 Flash | Sim |
+| CUSTODIA | Qwen3.8 Max | Sim |
+| VELOX | Kimi K2.7 Code | Sim |
+| ATLAS | **Qwen3.7 Plus** | Mudou — ver nota abaixo |
+| Farol | DeepSeek V4.1 Flash | Sim |
+| MARE | MiMo-V2.6-Flash | Sim |
+| RUMO | DeepSeek V4.1 Flash | Sim |
+| PRISMA | MiMo-V2.6-Flash | Sim |
+| LASTRO | DeepSeek V4.1 Flash | Sim |
+| CORRENTE | GLM-5.2 | Sim |
+
+**Nota sobre ATLAS:** a tabela original (07/10, cedo) tinha posto Qwen3.6 Plus porque o
+catálogo da época não tinha "Qwen3.7 Plus". Ao refazer a busca agora, o catálogo **mudou**:
+Qwen3.6 Plus só existe no provider "Personal / OpenCode" (Zen, sem variante Go) — selecioná-lo
+teria reproduzido o mesmo erro de saldo insuficiente. Qwen3.7 Plus apareceu com variante Go
+disponível e é o nível "Plus" mais próximo do pedido original de GPT/CORRENTE ("Qwen3.7 Plus
+não existe no catálogo" não é mais verdade) — usado no lugar.
+
+**Confirmado:** todos os 13 testados com mensagem real (não `-m`) após o rebalanceamento, sem
+`Upstream request failed`.
+
+**Técnica usada (registrar para próximas trocas):** no `/models`, digitar `/models` sozinho só
+mostra autocomplete — precisa de um segundo Enter pra abrir o seletor de verdade. Depois, buscar
+`<nome do modelo> go` costuma afinar pra 1 resultado só com sufixo "OpenCode Go"; quando não
+afina (ex.: "qwen3.6 plus go" deu zero resultado porque esse modelo não tem variante Go),
+buscar só o nome do modelo pra ver todas as variantes disponíveis antes de escolher. Cada tecla
+raw precisa de ~2s de intervalo entre si (`maestri ask --raw`) pra não perder passo por causa do
+tempo de renderização do terminal.
+
 **Correção em relação à proposta original (mesma data):** o levantamento inicial do então
 Orquestrador-GPT citava "MiMo-V2.5", "MiMo-V2.5-Pro" e "Qwen3.7 Plus" a partir de busca na web.
 O catálogo real desta conta (`opencode models`) não tem essas versões exatas — tem
