@@ -5,6 +5,10 @@
 > armazenamento interno do Maestri) não encontrou nenhum rastro nem backup. Causa desconhecida.
 > O trabalho de CÓDIGO sobreviveu inteiro no git (branches e commits abaixo); só o rastreamento
 > (handoff, quadro de tarefas, formulários) se perdeu. Este arquivo é um recomeço mínimo.
+>
+> **07/10/2026:** o agente "Orquestrador-GPT" foi renomeado para **CORRENTE** (trocou de Codex
+> para OpenCode/GLM-5.2). Qualquer referência a "Orquestrador-GPT" abaixo, ou em notas/documentos
+> anteriores a essa data, significa CORRENTE.
 
 ## CARIMBO DE ESTADO (atualizado em 07/10/2026)
 - Este arquivo foi movido pra dentro do repositório em 07/10/2026 (PR #69, commit `98dfc3a`,
@@ -40,6 +44,20 @@ MiniMax M2.7, Qwen3.7 Max, Qwen3.7 Plus, Qwen3.6 Plus, DeepSeek V4 Pro, DeepSeek
 pediu uso mais frequente de DeepSeek V4 Flash e MiMo-V2.5. Preset "OpenCode" confirmado disponível
 no Maestri (`maestri preset list`). Pedido em andamento: Orquestrador-GPT monta a lista de agentes
 x modelo recomendado — ver tarefa ativa.
+
+## Mudança de 07/10/2026 — time migrado para OpenCode (aplicado)
+Aplicado (não só recomendado): os 13 agentes de execução agora rodam no preset "OpenCode" da
+Maestri, cada um com um modelo do plano Go. Claude segue só como orquestrador, sem modelo de
+execução. Lista completa, motivo por agente e nota técnica (caminho completo do `opencode.cmd`
+necessário no Windows, porque o PATH não tem `opencode` em todo terminal do Maestri) em
+`docs/orquestracao/agentes-modelos-opencode.md`.
+
+Renomeação: **Orquestrador-GPT → CORRENTE** (GLM-5.2), tema náutico como os demais nomes (ÂNCORA,
+MARÉ, RUMO, FAROL, LASTRO). Mesmo nó do canvas, mesmas conexões; contexto de conversa não migra ao
+trocar de agente (comportamento normal do Maestri — brief cada agente antes da próxima tarefa).
+
+Confirmado ao vivo: os 13 terminais inicializaram com o modelo correto (lido no rodapé de cada
+um, `Build · <modelo> OpenCode Zen`).
 
 ## Regras que continuam valendo
 - Nunca digitar senha/token/credencial; login do radar e do cPanel é sempre do Felipe.
