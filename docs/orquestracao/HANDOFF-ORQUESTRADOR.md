@@ -6,8 +6,11 @@
 > O trabalho de CÓDIGO sobreviveu inteiro no git (branches e commits abaixo); só o rastreamento
 > (handoff, quadro de tarefas, formulários) se perdeu. Este arquivo é um recomeço mínimo.
 
-## CARIMBO DE ESTADO (conferido em 06/10/2026, cruzado com git)
-- `main` = `18eb6e5` (merge do PR #67). Releases publicadas desde a última sessão registrada
+## CARIMBO DE ESTADO (atualizado em 07/10/2026)
+- Este arquivo foi movido pra dentro do repositório em 07/10/2026 (PR #69, commit `98dfc3a`,
+  merge `a0fe09e`). A cópia solta em `Downloads\OperRadar-Orquestracao` foi removida — daqui pra
+  frente qualquer edição é commit normal, nunca mais arquivo fora do git.
+- `main` = `a0fe09e` (merge do PR #69). Antes disso, `18eb6e5` (merge do PR #67). Releases publicadas desde a última sessão registrada
   (26/09): 2.7 (Plano de ação), 2.8 (orientação de venda, API only), 2.9 (orientação de venda no
   frontend) — todas conferidas ao vivo segundo `docs/PRODUCAO.md`.
 - PR #68 (`agent/fipe-p0-integracao`) aberto, MERGEABLE, CI verde — fila de vinculação FIPE por
