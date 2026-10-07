@@ -1,25 +1,54 @@
-# Modelos OpenCode recomendados para os agentes
+# Modelos OpenCode dos agentes
 
-Proposta para revisão de Felipe e do Claude (orquestrador), em 07/10/2026. Todos os modelos abaixo pertencem à lista informada do plano Go. **Nenhum preset foi alterado.** Claude coordena o time e não recebe modelo de execução nesta tabela.
+Aplicado em 07/10/2026 (autorizado pelo Felipe, plano Go). Todos os 13 agentes rodam como preset
+"OpenCode" via `maestri recruit --preset "OpenCode" --command "...\opencode.cmd -m <id>" --replace`.
+Confirmado ao vivo, lendo o rodapé de cada terminal (`Build · <modelo> OpenCode Zen`) depois do boot.
+Claude continua só orquestrador — não recebe modelo de execução nesta tabela.
 
-| Agente | Modelo no preset OpenCode | Motivo | Uso estimado |
+**Correção em relação à proposta original (mesma data):** o levantamento inicial do então
+Orquestrador-GPT citava "MiMo-V2.5", "MiMo-V2.5-Pro" e "Qwen3.7 Plus" a partir de busca na web.
+O catálogo real desta conta (`opencode models`) não tem essas versões exatas — tem
+`mimo-v2.6-flash-free` (mais novo, de graça) e `qwen3.6-plus`/`qwen3.8-max`. Os demais (DeepSeek V4
+Flash/Pro, Kimi K2.7 Code, GLM-5.2) bateram exatamente com o catálogo.
+
+| Agente | Modelo aplicado (`opencode/<id>`) | Motivo | Uso estimado |
 | --- | --- | --- | --- |
-| LUNA — backend PHP/Python | MiMo-V2.5 | Implementação e testes frequentes de regras de negócio com bom custo por iteração. | Pesado |
-| TERRA — frontend React | DeepSeek V4 Flash | Iteração rápida de componentes, estados e correções de interface. | Pesado |
-| ANCORA — Git, PRs e branches | DeepSeek V4 Flash | Tarefas operacionais curtas, com checagens explícitas de diff e CI. | Leve |
-| CUSTODIA — portões e verificação | MiMo-V2.5-Pro | Revisões críticas de regressão e de evidências exigem análise mais forte; usar sob demanda. | Médio |
-| NOVA — segurança | DeepSeek V4 Pro | Auditoria de superfícies de ataque e regras de bloqueio justifica modelo mais forte. | Médio |
-| VELOX — performance, SQL e EXPLAIN | Kimi K2.7 Code | Diagnóstico técnico de consultas e planos, com leitura cuidadosa de código e evidências. | Médio |
-| ATLAS — planejamento | Qwen3.7 Plus | Organiza dependências e critérios de aceite sem custo de modelo máximo. | Leve |
-| Farol — backlog | DeepSeek V4 Flash | Triagem e acompanhamento recorrentes pedem respostas rápidas e baratas. | Leve |
-| MARE — frontend DEMO | MiMo-V2.5 | Construção incremental de telas e componentes da demonstração. | Médio |
-| RUMO — frontend DEMO | DeepSeek V4 Flash | Correções pontuais de navegação e fluxos de interface. | Médio |
-| PRISMA — frontend DEMO | MiMo-V2.5 | Ajustes visuais iterativos com custo baixo por tentativa. | Médio |
-| LASTRO — frontend DEMO | DeepSeek V4 Flash | Fixtures e validações de demonstração em tarefas delimitadas. | Leve |
-| Orquestrador-GPT — fluxos de dados e FIPE | GLM-5.2 | Modelagem e revisão de fluxos críticos, matching e gates de dados; acionar só nesses marcos. | Médio |
+| LUNA — backend PHP/Python | `mimo-v2.6-flash-free` | Implementação e testes frequentes, custo zero. | Pesado |
+| TERRA — frontend React | `deepseek-v4-flash` | Iteração rápida de componentes e correções de UI. | Pesado |
+| ANCORA — Git, PRs e branches | `deepseek-v4-flash` | Tarefas operacionais curtas, com diff e CI explícitos. | Leve |
+| CUSTODIA — portões e verificação | `qwen3.8-max` | Sem "MiMo-V2.5-Pro" no catálogo; Qwen3.8 Max é o flagship disponível para revisão crítica de regressão/evidências. | Médio |
+| NOVA — segurança | `deepseek-v4-pro` | Auditoria de superfícies de ataque e regras de bloqueio. | Médio |
+| VELOX — performance, SQL e EXPLAIN | `kimi-k2.7-code` | Diagnóstico técnico de consultas e planos. | Médio |
+| ATLAS — planejamento | `qwen3.6-plus` | "Qwen3.7 Plus" não existe no catálogo; 3.6 Plus é o nível "Plus" real disponível. | Leve |
+| Farol — backlog | `deepseek-v4-flash` | Triagem e acompanhamento recorrentes. | Leve |
+| MARE — frontend DEMO | `mimo-v2.6-flash-free` | Construção incremental de telas, custo zero. | Médio |
+| RUMO — frontend DEMO | `deepseek-v4-flash` | Correções pontuais de navegação e fluxos. | Médio |
+| PRISMA — frontend DEMO | `mimo-v2.6-flash-free` | Ajustes visuais iterativos, custo zero. | Médio |
+| LASTRO — frontend DEMO | `deepseek-v4-flash` | Fixtures e validações de demonstração. | Leve |
+| **CORRENTE** (ex-Orquestrador-GPT) — fluxos de dados e FIPE | `glm-5.2` | Modelagem e revisão de fluxos críticos, matching e gates de dados. | Médio |
 
-**Uso estimado** descreve a frequência e o volume previstos para cada papel, não uma reserva de orçamento nem uma medição de consumo. A alocação privilegia DeepSeek V4 Flash e MiMo-V2.5 em 8 dos 13 agentes. Modelos de maior custo ficam restritos a verificação crítica, segurança e fluxos de dados; VELOX usa Kimi K2.7 Code quando a investigação de SQL justificar. Antes de aplicar, conferir consumo agregado do time nos limites do Go: **US$ 12 por 5 horas, US$ 30 por semana e US$ 60 por mês**. Se houver pressão no limite, executar tarefas rotineiras dos papéis críticos com DeepSeek V4 Flash ou MiMo-V2.5 e reservar o modelo indicado para a revisão decisiva.
+## Renomeação: Orquestrador-GPT → CORRENTE
 
-Esta é a lista de **papéis-alvo**, não uma afirmação de que todos os terminais estão conectados agora. Na consulta ao Maestri em 07/10/2026, LUNA, ANCORA, CUSTODIA, NOVA, VELOX, ATLAS, Farol e Orquestrador-GPT apareciam conectados; TERRA, MARE, RUMO, PRISMA e LASTRO não apareciam. Conferir presença antes de qualquer futura aplicação de preset.
+O agente que fazia fluxos de dados/FIPE rodava em Codex (GPT-6-Sol) e se chamava
+"Orquestrador-GPT" — nome que fazia sentido quando o modelo era literalmente GPT. Trocado o preset
+para OpenCode/GLM-5.2, o Felipe pediu para também trocar o nome, já que não é mais GPT. Escolhido
+**CORRENTE**, seguindo o tema náutico já usado nos outros nomes (ÂNCORA, MARÉ, RUMO, FAROL, LASTRO)
+— corrente de água carrega o sentido de "fluxo", o papel do agente. Trocado via
+`maestri recruit "CORRENTE" --preset "OpenCode" --command "...opencode.cmd -m opencode/glm-5.2" --replace "Orquestrador-GPT"`:
+mesmo nó do canvas, mesmas conexões e posição, histórico de conversa não migrou (comportamento
+normal de troca de agente). Qualquer referência antiga a "Orquestrador-GPT" em notas ou documentos
+passados passa a significar CORRENTE.
 
-Referências para disponibilidade e limites: [OpenCode Go](https://opencode.ai/v2/docs/console/go) e [documentação de modelos Go](https://dev.opencode.ai/docs/go/). Preços, disponibilidade e estimativas de requisições podem mudar; revisar no momento da configuração.
+## Nota operacional (troca em si)
+
+No Windows, o `opencode` do npm global não está no PATH de todo terminal do Maestri — a primeira
+tentativa com `--command "opencode -m ..."` falhou com `CommandNotFoundException` em 5 dos 13
+terminais. Corrigido usando o caminho completo:
+`C:\Users\aline\AppData\Roaming\npm\opencode.cmd -m <modelo>`. Guardar esse caminho para qualquer
+troca futura de preset/modelo nesta máquina.
+
+## Limites do plano Go (lembrete)
+US$ 12 por 5 horas, US$ 30 por semana, US$ 60 por mês. Se o time pressionar o limite, preferir os
+agentes de custo zero/baixo (MiMo-V2.6-Flash Free, DeepSeek V4 Flash) nas tarefas rotineiras e
+reservar Qwen3.8 Max, DeepSeek V4 Pro, Kimi K2.7 Code e GLM-5.2 para os marcos que realmente
+exigem o modelo mais forte.
