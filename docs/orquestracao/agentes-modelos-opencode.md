@@ -5,6 +5,51 @@ Aplicado em 07/10/2026 (autorizado pelo Felipe, plano Go). Todos os 13 agentes r
 Confirmado ao vivo, lendo o rodapé de cada terminal (`Build · <modelo> OpenCode Zen`) depois do boot.
 Claude continua só orquestrador — não recebe modelo de execução nesta tabela.
 
+## Estado real confirmado em 07/10/2026 (noite) — correção de provider Zen → Go
+
+O boot inicial (tabela abaixo) tinha os 13 agentes no provider certo por modelo, mas todos
+caindo por padrão em **"Personal / OpenCode" (Zen, pay-as-you-go, saldo $0)** em vez de
+**"OpenCode Go"** (a assinatura de $10/mês). Sintoma: `Upstream request failed: Insufficient
+account funds` em toda mensagem real (só `-m` direto no CLI mascarava o problema, por isso
+passou despercebido até then). NOVA teve um segundo problema, só dela: mesmo já no provider Go
+certo, batia em `This Go model requires Global regions` — causa raiz era
+**Settings → Privacy → Regions** do workspace (console.opencode.ai) em "Europe & United States"
+em vez de "Global"; corrigido lá (nível de workspace, vale para os 13).
+
+Correção aplicada nos 13 (sem trocar o modelo em si, só o provider): `/models` → buscar
+`<modelo atual> go` até sobrar 1 resultado com sufixo "OpenCode Go" → Enter → variante
+"Default" → Enter. Resultado real, testado com mensagem de verdade (não `-m`) em todos:
+
+| Agente | Modelo real hoje (confirmado) | Provider | Bate com a tabela "recomendada" abaixo? |
+| --- | --- | --- | --- |
+| NOVA | DeepSeek V4 Pro (New) | OpenCode Go | Sim (já era o recomendado) |
+| LUNA | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era MiMo-V2.6-Flash Free |
+| TERRA | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era DeepSeek V4 Flash |
+| ANCORA | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era DeepSeek V4 Flash |
+| CUSTODIA | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era Qwen3.8 Max |
+| VELOX | Kimi K2.7 Code | OpenCode Go | Sim (já era o recomendado) |
+| ATLAS | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era Qwen3.6 Plus |
+| Farol | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era DeepSeek V4 Flash |
+| MARE | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era MiMo-V2.6-Flash Free |
+| RUMO | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era DeepSeek V4 Flash |
+| PRISMA | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era MiMo-V2.6-Flash Free |
+| LASTRO | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era DeepSeek V4 Flash |
+| CORRENTE | DeepSeek V4 Pro (New) | OpenCode Go | **Não** — recomendado era GLM-5.2 |
+
+**Como isso aconteceu:** em algum ponto anterior a esta sessão (não documentado), 11 dos 13
+agentes já tinham sido trocados manualmente para DeepSeek V4 Pro (motivo não registrado). Esta
+correção de 07/10 resolveu só o problema imediato pedido pelo Felipe — provider Zen → Go, sem
+mexer no modelo em si (instrução explícita: "selecionar entrada com sufixo OpenCode Go, nao
+Personal/OpenCode nem provider direto" nos *mesmos* modelos já ativos) — então o desalinhamento
+com a tabela de custo original **não foi corrigido**, só preservado.
+
+**Pendência sinalizada, sem ação tomada:** DeepSeek V4 Pro é o nível mais caro usado nesta
+tabela (tier "Médio"/"Pesado" conforme o agente). Com 11 dos 13 agentes nele — inclusive os de
+uso "Pesado" como LUNA e os de frontend DEMO (MARE/RUMO/PRISMA/LASTRO) que deveriam estar nos
+modelos gratuitos/baratos — o consumo do plano Go ($12/5h, $30/semana, $60/mês) tende a ser bem
+maior que o planejado. Decisão de rebalancear de volta para a tabela recomendada (ou manter
+DeepSeek V4 Pro em todos, se for escolha consciente) fica para o Felipe.
+
 **Correção em relação à proposta original (mesma data):** o levantamento inicial do então
 Orquestrador-GPT citava "MiMo-V2.5", "MiMo-V2.5-Pro" e "Qwen3.7 Plus" a partir de busca na web.
 O catálogo real desta conta (`opencode models`) não tem essas versões exatas — tem
