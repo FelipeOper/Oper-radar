@@ -7,6 +7,7 @@
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_scope.php';
+require_once __DIR__ . '/lib/concorrencia_metricas.php';
 $conn = conecta();
 
 $REGIOES = [
@@ -68,6 +69,10 @@ while ($row = $res->fetch_assoc()) {
     // Alias temporário para clientes antigos.
     $row['giro_confiavel'] = $row['idade_observada_confiavel'];
     $row['mix_categorias'] = [];
+    $row['reducoes_30d'] = null;
+    $row['desvio_fipe_mediano_pct'] = null;
+    $row['desvio_fipe_amostra'] = 0;
+    $row['desvio_fipe_confianca'] = 'insuficiente';
     $mapaId[$row['id']] = count($lojistas);
     $lojistas[] = $row;
 }
@@ -84,6 +89,42 @@ if ($lojistas) {
     while ($m = $tr->fetch_assoc()) {
         $idx = $mapaId[$m['revenda_id']] ?? null;
         if ($idx !== null) $lojistas[$idx]['mix_categorias'][$m['tipo']] = (int)$m['n'];
+    }
+
+    $precos = $conn->prepare("SELECT a.revenda_id, a.preco, a.titulo, a.preco_texto_bruto,
+        a.fipe_match_status, COALESCE(a.ano_final,a.ano_inicial) ano, a.carroceria, a.tipo, f.preco preco_fipe FROM anuncio a
+        JOIN fipe_preco f ON f.id=a.fipe_preco_id
+        WHERE a.revenda_id IN ($placeholders) AND a.status='ativo'");
+    $precos->bind_param(str_repeat('i', count($ids)), ...$ids);
+    $precos->execute();
+    $gruposPreco = [];
+    $resultadoPrecos = $precos->get_result();
+    while ($linha = $resultadoPrecos->fetch_assoc()) $gruposPreco[(int)$linha['revenda_id']][] = $linha;
+    foreach ($ids as $id) {
+        $idx = $mapaId[$id];
+        $lojistas[$idx] = array_merge($lojistas[$idx], oper_concorrencia_desvio_fipe($gruposPreco[$id] ?? []));
+    }
+    $precos->close();
+
+    $tabelaEventos = $conn->query("SELECT COUNT(*) total FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='anuncio_evento'");
+    if ($tabelaEventos && (int)($tabelaEventos->fetch_assoc()['total'] ?? 0) > 0) {
+        $reducoes = $conn->prepare("SELECT a.revenda_id, COUNT(DISTINCT e.anuncio_id) quantidade
+            FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id
+            WHERE a.revenda_id IN ($placeholders) AND e.tipo_evento='mudanca_preco'
+              AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+              AND e.valor_anterior_decimal>e.valor_novo_decimal
+              AND e.valor_novo_decimal>=e.valor_anterior_decimal*0.5
+            GROUP BY a.revenda_id");
+        $reducoes->bind_param(str_repeat('i', count($ids)), ...$ids);
+        $reducoes->execute();
+        foreach ($lojistas as &$loja) $loja['reducoes_30d'] = 0;
+        unset($loja);
+        $resultadoReducoes = $reducoes->get_result();
+        while ($linha = $resultadoReducoes->fetch_assoc()) {
+            $lojistas[$mapaId[(int)$linha['revenda_id']]]['reducoes_30d'] = (int)$linha['quantidade'];
+        }
+        $reducoes->close();
     }
 }
 

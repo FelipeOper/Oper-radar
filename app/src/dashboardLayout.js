@@ -5,8 +5,13 @@ export const DASHBOARD_KPIS = [
   { id: 'movimento', label: 'Movimento 48h' },
 ];
 
+/* Versao do layout salvo. Layouts salvos antes da versao 2 ganham a secao 'insights'
+   uma unica vez, logo depois do feed, sem mexer no restante da ordem escolhida. */
+export const DASHBOARD_LAYOUT_VERSION = 2;
+
 export const DASHBOARD_SECTIONS = [
   { id: 'feed', label: 'Movimento do mercado' },
+  { id: 'insights', label: 'Insights do dia' },
   { id: 'modelos', label: 'Modelos mais anunciados' },
   { id: 'regioes', label: 'Regiões com mais saídas' },
   { id: 'lojas_novos', label: 'Lojas mais ativas' },
@@ -24,8 +29,9 @@ export const DASHBOARD_PRESETS = {
     kpis: ['revendas', 'anuncios', 'saidas', 'movimento'],
     sections: [
       { id: 'feed', size: 'wide' },
-      { id: 'modelos', size: 'half' },
+      { id: 'insights', size: 'half' },
       { id: 'regioes', size: 'half' },
+      { id: 'modelos', size: 'half' },
       { id: 'lojas_novos', size: 'half' },
       { id: 'lojas_saidas', size: 'half' },
     ],
@@ -37,6 +43,7 @@ export const DASHBOARD_PRESETS = {
     kpis: ['saidas', 'movimento', 'anuncios'],
     sections: [
       { id: 'feed', size: 'wide' },
+      { id: 'insights', size: 'half' },
       { id: 'regioes', size: 'half' },
       { id: 'lojas_saidas', size: 'half' },
       { id: 'lojas_novos', size: 'half' },
@@ -50,8 +57,9 @@ export const DASHBOARD_PRESETS = {
     kpis: ['anuncios', 'saidas', 'movimento'],
     sections: [
       { id: 'feed', size: 'wide' },
-      { id: 'modelos', size: 'half' },
+      { id: 'insights', size: 'half' },
       { id: 'regioes', size: 'half' },
+      { id: 'modelos', size: 'half' },
     ],
   },
 };
@@ -60,6 +68,7 @@ export const DEFAULT_DASHBOARD_LAYOUT = cloneLayout(DASHBOARD_PRESETS.executivo)
 
 function cloneLayout(layout) {
   return {
+    version: DASHBOARD_LAYOUT_VERSION,
     preset: layout.id || layout.preset || 'personalizado',
     kpis: [...layout.kpis],
     sections: layout.sections.map(item => ({ ...item })),
@@ -88,7 +97,13 @@ export function normalizeDashboardLayout(layout) {
     return cloneLayout(DASHBOARD_PRESETS.executivo);
   }
 
+  if (source.version !== DASHBOARD_LAYOUT_VERSION && selectedSections.length && !selectedSections.some(item => item.id === 'insights')) {
+    const depoisDoFeed = selectedSections.findIndex(item => item.id === 'feed') + 1;
+    selectedSections.splice(depoisDoFeed, 0, { id: 'insights', size: 'half' });
+  }
+
   return {
+    version: DASHBOARD_LAYOUT_VERSION,
     preset: DASHBOARD_PRESETS[source.preset] ? source.preset : 'personalizado',
     kpis: selectedKpis.length ? selectedKpis : [...DEFAULT_DASHBOARD_LAYOUT.kpis],
     sections: selectedSections.length ? selectedSections : DEFAULT_DASHBOARD_LAYOUT.sections.map(item => ({ ...item })),
