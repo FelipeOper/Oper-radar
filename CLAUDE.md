@@ -4,7 +4,7 @@
 > Atualizar ao final de cada bloco importante. Nunca registrar senhas, tokens, cookies ou
 > conteúdo de `.oper-radar.env`.
 
-Última atualização: 08/09/2026
+Última atualização: 08/10/2026 (só o registro do PR #54; o resto segue de 08/09)
 
 > ⚠️ As seções abaixo ("Estado atual" em diante) datam de 01/09/2026 e estão desatualizadas —
 > preservadas como histórico, não como estado corrente. Ver "08/09/2026 — retomada do Plano
@@ -213,8 +213,29 @@ continuidade entre sessões.
   que já é consumido.
 
 **Evidência:** commits na branch `fix/pacote1-dat04-saidas-lojista` (ver `git log`).
-**Decisão do gestor:** pendente — PR #54 aberta, aguardando revisão de Felipe antes de
-merge/deploy.
-**Próximo passo:** Felipe revisar o diff da PR #54 e decidir merge. Itens 5–6 do Pacote 1
+**Decisão do gestor:** Felipe autorizou o merge do PR #54 em 08/10/2026 (ver registro
+abaixo). Deploy em produção continua decisão separada.
+**Próximo passo:** ver registro de 08/10/2026. Itens 5–6 do Pacote 1
 (DAT02+DAT05+DAT06 — equivalência/confiança/período; GOV02+UX01–03 — fundação visual)
 seguem não iniciados.
+
+### 08/10/2026 — PR #54 (DAT04): conflito com o main resolvido e merge autorizado
+
+```text
+Data/hora: 08/10/2026, fim da tarde (America/Sao_Paulo)
+Agente: Claude (sessão na nuvem, só GitHub; sem acesso ao cPanel nem ao computador do Felipe)
+Bloco: M1, Pacote 1, item 4 (DAT04) — fechamento do PR #54
+Ação executada: main (e277802) mesclado na branch fix/pacote1-dat04-saidas-lojista. Único
+  conflito em oper-radar-api/lojistas.php: o main ganhou desvio FIPE por revenda
+  (lib/concorrencia_metricas.php) e reduções de preço em 30 dias no mesmo trecho da
+  reconciliação de saídas. As mudanças são independentes; ficaram as duas (primeiro a
+  reconciliação DAT04, depois desvio FIPE e reduções). lojista_detalhe.php e este arquivo
+  mesclaram sem conflito.
+Resultado: php -l limpo; 18 testes de oper-radar-api/tests/*_test.php passam (PHP 8.3.6).
+  Merge no main autorizado por Felipe em 08/10/2026, depois do CI do PR (Qualidade).
+  Coerente com o parecer do Farol registrado em docs/orquestracao (PR #76, não mesclado):
+  "aprovo merge após rebase, sem sobreposição; só lojistas.php conflita".
+Evidência: commit de merge na branch do PR #54; CI "Qualidade" do PR.
+Próximo passo: deploy manual (sem SSH) segue pendente e depende da confirmação do que
+  está publicado no cPanel (GOV01/OPS01). Nada foi publicado em produção nesta sessão.
+```
