@@ -87,6 +87,13 @@ $idadeAtual = concorrente_linhas($conn, "SELECT ROUND(AVG(GREATEST(0, DATEDIFF(C
     DATEDIFF(CURDATE(), MIN(DATE(a.primeira_vez_visto))) dias_coleta
     FROM anuncio a WHERE $where AND a.status='ativo'", $types, $params)[0];
 
+// DAT04 (auditoria 07/09, achado D03): "eventosDisponiveis" aqui significa só que a
+// tabela anuncio_evento existe no schema — não que ESTA revenda (com este filtro de
+// categoria) já tem eventos registrados. Tratar as duas coisas como iguais foi o que
+// fazia o cartão da lista (lojistas.php, decidindo por revenda) e este detalhe
+// (decidindo pelo schema inteiro) divergirem para o mesmo lojista. Por isso a decisão
+// final de qual fonte usar (`$usaEventos`) só é tomada depois de checar se a consulta
+// de eventos realmente devolveu cobertura para este recorte.
 $tabelaEventos = $conn->query("SELECT COUNT(*) total FROM information_schema.TABLES
     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='anuncio_evento'");
 $eventosDisponiveis = $tabelaEventos && (int)($tabelaEventos->fetch_assoc()['total'] ?? 0) > 0;
@@ -96,6 +103,7 @@ $coberturaFim = null;
 $saidas30d = 0;
 $reducoes30d = null;
 $duracoesSaida = [];
+$usaEventos = false;
 
 if ($eventosDisponiveis) {
     $reducoes = concorrente_linhas($conn, "SELECT COUNT(DISTINCT e.anuncio_id) quantidade
@@ -117,6 +125,13 @@ if ($eventosDisponiveis) {
         if ($coberturaInicio === null || $item['primeira_data'] < $coberturaInicio) $coberturaInicio = $item['primeira_data'];
         if ($coberturaFim === null || $item['ultima_data'] > $coberturaFim) $coberturaFim = $item['ultima_data'];
     }
+    // Sem nenhuma linha de evento para esta revenda/categoria, a tabela existir não
+    // ajuda: cai no mesmo fallback de status usado quando a tabela nem existe, em vez
+    // de reportar "0 saídas" como se fosse um histórico completo e limpo.
+    $usaEventos = $coberturaInicio !== null && $coberturaFim !== null;
+}
+
+if ($usaEventos) {
     $inicioEpisodio = "COALESCE(
         (SELECT MAX(origem.dia_referencia) FROM anuncio_evento origem
          WHERE origem.anuncio_id=e.anuncio_id
@@ -159,13 +174,17 @@ if ($eventosDisponiveis) {
     $saidas30d = (int)($resumoAtual['saidas_status_30d'] ?? 0);
 }
 
-$saidasTotal = $eventosDisponiveis
+$saidasTotal = $usaEventos
     ? (int)($contagensEventos['saida_detectada'] ?? 0)
     : (int)($resumoAtual['saidas_status'] ?? 0);
+// DAT04: mesmo vocabulário de lojistas.php ('eventos' | 'status_atual'), para que lista
+// e detalhe fiquem reconciliados quando têm a mesma cobertura, e nomeiem explicitamente
+// a métrica quando não têm (em vez de parecer só uma divergência de bug).
+$saidasFonte = $usaEventos ? 'eventos' : 'status_atual';
 $coberturaDias = ($coberturaInicio && $coberturaFim)
     ? max(1, (int)((strtotime($coberturaFim) - strtotime($coberturaInicio)) / 86400) + 1)
     : 0;
-$confianca = oper_concorrente_confianca($eventosDisponiveis, $coberturaDias, $saidasTotal);
+$confianca = oper_concorrente_confianca($usaEventos, $coberturaDias, $saidasTotal);
 
 envia_json([
     'lojista' => $lojista,
@@ -174,6 +193,7 @@ envia_json([
         'ativos' => $ativosTotal,
         'saidas_observadas' => $saidasTotal,
         'saidas_30d' => $saidas30d,
+        'saidas_fonte' => $saidasFonte,
         'reaparecimentos' => (int)($contagensEventos['reaparecimento'] ?? 0),
         'mediana_dias_ate_saida' => oper_mediana_numerica($duracoesSaida),
         'preco_mediano_ativo' => $estatisticasPrecoAtivo['mediana'],
