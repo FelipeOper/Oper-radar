@@ -61,19 +61,10 @@ Passos no cPanel:
 4. **Cron Jobs** → configurar os 2 horários usando `crontab-hostgator.example` como referência
    (ajustando usuário, senha do banco e caminho do Python).
 
-Duas coisas que só dá pra confirmar direto no seu painel ou com o suporte HostGator:
-- Se **SSH** está disponível pra essa conta (facilita instalar/testar antes de depender só do cron)
-- Qual **versão de Python** está disponível (os executores de produção suportam Python 3.9+)
-
-## O que ainda não pode ser executado a partir daqui
-
-Este ambiente de chat não tem acesso de rede ao portal (só a ferramentas de busca/leitura pontuais) nem um banco Postgres persistente rodando em segundo plano. Por isso, o que falta para o scraper rodar de verdade, 2x por dia, é:
-
-1. **Hospedar** este código em um ambiente com acesso à internet e execução agendada — uma VPS simples, um serviço tipo Railway/Render, ou o Claude Code rodando localmente na sua máquina/servidor.
-2. **Subir um Postgres** (gerenciado ou não) e rodar `schema.sql` nele.
-3. **Instalar as dependências**: `pip install -r requirements.txt`
-4. **Configurar o cron** com `crontab.example` (ajustando os caminhos).
-5. **Rodar o primeiro ciclo manualmente** para validar contra o banco real: `python scraper.py --janela 07h --uf PR`
+**Confirmado em produção**: SSH externo não funciona nesta conta HostGator — só o terminal web
+do cPanel. Python 3.9 está disponível em `/bin/python3` e é o que roda o cron oficial 2x/dia.
+A coleta já está hospedada e rodando desde agosto/2026 (ver `docs/PRODUCAO.md` e `CLAUDE.md`
+para o estado atual); não há mais etapa de "hospedar em VPS/Postgres" pendente.
 
 ## Taxonomia (marcas e modelos) — direto do portal
 
