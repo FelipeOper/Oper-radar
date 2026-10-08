@@ -1,0 +1,15 @@
+:root{
+--space-0:0;--space-0-5:2px;--space-1:4px;--space-1-5:6px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;--space-16:64px;
+
+/* Radii — soft, generous. Controls are pills; cards are 20; hero panels 28 */
+--radius-xs:6px;--radius-sm:10px;--radius-md:14px;--radius-lg:20px;--radius-xl:28px;--radius-pill:999px;--radius-round:50%;
+
+/* Control heights */
+--control-sm:32px;--control-md:40px;--control-lg:48px;--hit-min:44px;
+
+/* Layout */
+--sidebar-w:248px;--sidebar-w-collapsed:76px;--topbar-h:68px;--bottomnav-h:76px;--content-max:1440px;--gutter:24px;--gutter-mobile:16px;
+
+/* Breakpoints (reference — use in media queries) */
+--bp-sm:640px;--bp-md:900px;--bp-lg:1200px;--bp-xl:1440px;
+}

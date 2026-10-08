@@ -1,0 +1,27 @@
+<!-- @dsCard group="Components" viewport="700x640" name="Data display" subtitle="Cards, KPI tiles, charts, table, progress, list rows" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{padding:22px 24px}.g{display:flex;flex-direction:column;gap:14px}.r{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.l{font:500 11px/1 var(--font-sans);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;width:78px;flex:none}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.OperRadarDesignSystem_f1ea51;
+const { Card, StatCard, AreaChart, BarChart, DataTable, ProgressBar, ListRow, Badge, IconButton, Sparkline } = NS;
+const rows=[{id:1,m:'Scania R450 6x2',y:'2021',src:'OLX',p:'R$ 489.900',d:<Badge tone="warning">−4,2%</Badge>},{id:2,m:'Volvo FH 540',y:'2020',src:'Webmotors',p:'R$ 512.000',d:<Badge tone="success" dot>Novo</Badge>},{id:3,m:'MB Actros 2651',y:'2019',src:'Mercado Livre',p:'R$ 398.500',d:<Badge>Estável</Badge>}];
+function App(){return <div className="g">
+<div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+<StatCard label="Anúncios ativos" value="18.742" delta={4.8} deltaLabel="vs. semana ant." icon="tag" spark={[3,4,4,6,5,7,8,9]}/>
+<StatCard label="Preço médio" value="R$ 412" unit="mil" delta={-1.9} deltaLabel="30 dias" icon="currency-circle-dollar"/>
+<StatCard variant="accent" label="Oportunidades" value="37" delta={12} deltaLabel="abaixo da FIPE" icon="lightning"/>
+</div>
+<div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:12}}>
+<Card title="Novos anúncios por dia" subtitle="Setembro 2026" actions={<IconButton icon="dots-three" variant="ghost" size="sm" label="Mais"/>}><AreaChart height={120} labels={['01/09','08/09','15/09','22/09']} series={[{name:'Este mês',data:[120,180,160,240,210,280,260,320]},{name:'Mês anterior',data:[100,140,150,170,160,190,200,210],dashed:true,area:false}]}/></Card>
+<Card title="Por dia da semana"><BarChart height={110} data={[{label:'Seg',value:320},{label:'Ter',value:410},{label:'Qua',value:380},{label:'Qui',value:520},{label:'Sex',value:460},{label:'Sáb',value:210}]}/></Card>
+</div>
+<div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:12}}>
+<Card flush title="Anúncios recentes"><DataTable dense columns={[{key:'m',header:'Modelo'},{key:'y',header:'Ano',muted:true},{key:'src',header:'Fonte',muted:true},{key:'p',header:'Preço',align:'right',sortable:true},{key:'d',header:'Status',align:'right'}]} rows={rows} sort={{key:'p',dir:'desc'}}/></Card>
+<Card title="Participação" style={{gap:12}}><ProgressBar label="OLX" value={42} valueLabel="7.812"/><ProgressBar label="Mercado Livre" value={31} valueLabel="5.806" tone="neutral"/><ListRow variant="plain" icon="storefront" title="Rodobens" subtitle="214 anúncios · SP" arrow onClick={()=>{}}/></Card>
+</div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

@@ -19,6 +19,10 @@ O painel analítico de Mercado está publicado e validado em produção. A tela 
 funcional foram aprovados. O redesign visual refinado foi auditado, mas ainda não implementado.
 
 - `main` remoto: `1038b4f` (PR #51 mesclado).
+- Design system (tokens, componentes, guidelines, referências visuais): `design-system\` — ver
+  `design-system\README.md`. Triado e reorganizado em 22/09/2026 a partir de um export bruto do Claude
+  Design (`design-system-export.zip`, preservado em Downloads); a config de lint de aderência foi ligada
+  em `app\package.json` (`npm run lint`).
 - Branch funcional: `redesign-oper-radar-20260831`, commit `e6db6d1`.
 - Artefato de deploy: `deploy/redesign-oper-radar-20260901`, commit `fbed7ec`.
 - Produção frontend: `/home1/pro93061/agenciaoper.com.br/oper-radar/`.

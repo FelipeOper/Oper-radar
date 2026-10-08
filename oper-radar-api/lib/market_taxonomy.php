@@ -4,8 +4,10 @@
 function oper_taxonomia_tipo_categoria(): array {
     return [
         'Caminhao' => 'caminhoes',
-        'Implemento' => 'implementos', 'Carroceria-sobre-chassi' => 'implementos',
-        'Trailer' => 'implementos',
+        // Implementos rodoviarios: 'Carreta' e o tipo real da coleta (3,8 mil anuncios ativos em 24/09/2026);
+        // 'Implemento' e mantido por compatibilidade. Implemento agricola NAO entra aqui.
+        'Implemento' => 'implementos', 'Carreta' => 'implementos',
+        'Carroceria-sobre-chassi' => 'implementos', 'Trailer' => 'implementos',
         'Onibus' => 'onibus_vans', 'Micro-onibus' => 'onibus_vans',
         'Vans' => 'onibus_vans', 'Motorhome' => 'onibus_vans',
         'Carro' => 'leves', 'Utilitarios' => 'leves',
@@ -14,7 +16,7 @@ function oper_taxonomia_tipo_categoria(): array {
         'Colheitadeira' => 'agricolas', 'Plataforma-colheitadeira' => 'agricolas',
         'Pulverizador' => 'agricolas', 'Semeadeira' => 'agricolas',
         'Distribuidor-autopropelido' => 'agricolas', 'Forragem-e-feno' => 'agricolas',
-        'Florestal' => 'agricolas',
+        'Florestal' => 'agricolas', 'Implementos-agricolas' => 'agricolas',
         'Pa-carregadeira' => 'construcao', 'Escavadeira' => 'construcao',
         'Retro-escavadeira' => 'construcao', 'Motoniveladora' => 'construcao',
         'Rolo-compactador' => 'construcao', 'Guindaste' => 'construcao',
@@ -37,6 +39,29 @@ function oper_taxonomia_tipos_por_categoria(): array {
         $categorias[$categoria][] = $tipo;
     }
     return $categorias;
+}
+
+/**
+ * Filtro de tipo para uma categoria. 'outros' e o COMPLEMENTO das demais categorias: tipo que aparece no
+ * banco mas nao esta no mapa (ex.: Aviao, Sementes) cai em 'outros' tambem ao abrir a categoria, igual a
+ * contagem da faceta. Devolve ['operador' => 'IN'|'NOT IN', 'tipos' => [...]]. 'outros' inclui tipo NULL
+ * (anuncio sem tipo), como a contagem por UF e o mercado 'outros' ja faziam; use oper_taxonomia_sql_categoria().
+ */
+function oper_taxonomia_filtro_categoria(string $categoria): ?array {
+    $categorias = oper_taxonomia_tipos_por_categoria();
+    if (!isset($categorias[$categoria])) return null;
+    if ($categoria !== 'outros') return ['operador' => 'IN', 'tipos' => $categorias[$categoria]];
+    $conhecidos = [];
+    foreach ($categorias as $nome => $tipos) {
+        if ($nome !== 'outros') $conhecidos = array_merge($conhecidos, $tipos);
+    }
+    return ['operador' => 'NOT IN', 'tipos' => $conhecidos];
+}
+
+/** Condicao SQL de tipo para um filtro de categoria. $coluna e literal do codigo (ex.: 'a.tipo'), $ph os '?' ou literais. */
+function oper_taxonomia_sql_categoria(string $coluna, array $filtro, string $ph): string {
+    if ($filtro['operador'] === 'IN') return "$coluna IN ($ph)";
+    return "($coluna IS NULL OR $coluna NOT IN ($ph))";
 }
 
 function oper_taxonomia_tipos_por_mercado(): array {

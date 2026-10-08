@@ -1,0 +1,24 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Forms" subtitle="Inputs, select, checkbox, radio, switch" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{padding:22px 24px}.g{display:flex;flex-direction:column;gap:14px}.r{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.l{font:500 11px/1 var(--font-sans);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;width:78px;flex:none}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.OperRadarDesignSystem_f1ea51;
+const { Input, Select, Checkbox, Radio, Switch } = NS;
+function App(){return <div className="g">
+<div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14}}>
+<Input label="Modelo" placeholder="Ex.: Scania R450"/>
+<Select label="Marketplace" options={['Todos','OLX','Mercado Livre','Webmotors']}/>
+<Input label="Preço mínimo" defaultValue="R$ 80.000" error="Acima do preço máximo"/>
+</div>
+<div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:14}}>
+<Input icon="magnifying-glass" pill kbd="⌘K" placeholder="Buscar anúncio, lojista ou placa"/>
+<Select icon="calendar-blank" pill options={['Últimos 30 dias','Últimos 7 dias','Hoje']}/>
+</div>
+<div className="r" style={{gap:24}}><Checkbox label="Somente com foto" defaultChecked/><Checkbox label="Incluir vendidos"/><Radio name="f" label="Diário" defaultChecked/><Radio name="f" label="Semanal"/><Switch label="Coleta automática" defaultChecked/><Switch label="Resumo por e-mail"/><Checkbox label="Desabilitado" disabled/></div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

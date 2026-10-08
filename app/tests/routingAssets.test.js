@@ -8,7 +8,8 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 test('build usa base absoluta compatível com deep links aninhados', () => {
   const vite = readFileSync(resolve(appRoot, 'vite.config.js'), 'utf8');
-  assert.match(vite, /base:\s*['"]\/oper-radar\/['"]/);
+  // O padrao continua sendo a base de producao; VITE_BASE so serve para validar numa pasta paralela.
+  assert.match(vite, /base:\s*(process\.env\.VITE_BASE\s*\|\|\s*)?['"]\/oper-radar\/['"]/);
 });
 
 test('build publica fallback SPA restrito a /oper-radar/', () => {

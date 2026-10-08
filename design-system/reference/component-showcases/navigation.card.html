@@ -1,0 +1,24 @@
+<!-- @dsCard group="Components" viewport="700x520" name="Navigation" subtitle="Sidebar, topbar, tabs, bottom nav, pagination" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{padding:22px 24px}.g{display:flex;flex-direction:column;gap:14px}.r{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.l{font:500 11px/1 var(--font-sans);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;width:78px;flex:none}</style></head><body><div id="root"></div>
+<script type="text/babel">
+const NS = window.OperRadarDesignSystem_f1ea51;
+const { Sidebar, Topbar, Tabs, BottomNav, Pagination, Logo, IconButton, Input, Avatar } = NS;
+const secs=[{items:[{value:'overview',label:'Visão geral',icon:'gauge'},{value:'ads',label:'Anúncios',icon:'tag',badge:'1,2k'},{value:'prices',label:'Preços',icon:'chart-line-up'},{value:'dealers',label:'Lojistas',icon:'storefront'}]},{title:'Operação',items:[{value:'alerts',label:'Alertas',icon:'bell-simple',badge:4},{value:'sources',label:'Fontes',icon:'plugs-connected'},{value:'settings',label:'Configurações',icon:'gear-six'}]}];
+function App(){const [v,setV]=React.useState('overview');const [t,setT]=React.useState('Todos');const [b,setB]=React.useState('home');const [p,setP]=React.useState(3);return <div style={{display:'flex',gap:16,height:476}}>
+<Sidebar style={{height:'100%',borderRadius:20,border:'1px solid var(--border-subtle)'}} brand={<Logo base="../../assets/" height={20}/>} sections={secs} value={v} onNavigate={setV}/>
+<Sidebar collapsed style={{height:'100%',borderRadius:20,border:'1px solid var(--border-subtle)'}} brand={<Logo variant="mark" base="../../assets/" height={30}/>} sections={secs} value={v} onNavigate={setV}/>
+<div className="g" style={{flex:1,minWidth:0}}>
+<div style={{border:'1px solid var(--border-subtle)',borderRadius:20,overflow:'hidden'}}><Topbar style={{position:'relative',padding:'0 16px'}} breadcrumb="Mercado / Caminhões" title="Visão geral" actions={<><IconButton icon="bell-simple" label="Alertas" dot/><Avatar name="Felipe Souza" size={34}/></>}/></div>
+<Tabs items={['Todos','Novos','Preço caiu','Vendidos']} value={t} onChange={setT}/>
+<Tabs variant="segmented" items={['7d','30d','90d','12m']} value="30d"/>
+<Tabs variant="underline" items={[{value:'a',label:'Resumo'},{value:'b',label:'Histórico',count:24},{value:'c',label:'Concorrentes'}]} value="a"/>
+<Pagination page={p} pageCount={65} onChange={setP} info="41–60 de 1.284"/>
+<div style={{marginTop:'auto',borderRadius:20,overflow:'hidden',border:'1px solid var(--border-subtle)'}}><BottomNav value={b} onChange={setB} items={[{value:'home',label:'Início',icon:'house'},{value:'ads',label:'Anúncios',icon:'tag'},{value:'chart',label:'Preços',icon:'chart-line-up'},{value:'bell',label:'Alertas',icon:'bell-simple'},{value:'me',label:'Conta',icon:'user'}]}/></div>
+</div></div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

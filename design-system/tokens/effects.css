@@ -1,0 +1,42 @@
+:root{
+/* Elevation — on dark we separate with surface steps + hairline borders; shadows are deep and soft */
+--shadow-none:none;
+--shadow-sm:0 1px 2px rgba(0,0,0,.24);
+--shadow-md:0 8px 24px rgba(0,0,0,.28);
+--shadow-lg:0 24px 64px rgba(0,0,0,.40);
+--shadow-float:0 30px 80px rgba(0,0,0,.18);
+--glow-accent:0 0 0 1px rgba(70,248,75,.35),0 0 24px rgba(70,248,75,.30);
+--glow-dot:0 0 10px rgba(70,248,75,.8);
+--ring-focus:0 0 0 2px var(--bg-app),0 0 0 4px var(--border-focus);
+
+--blur-glass:saturate(140%) blur(16px); /* @kind other */
+
+
+/* Motion */
+--ease-out:cubic-bezier(.2,.8,.2,1); /* @kind other */
+
+--ease-in-out:cubic-bezier(.65,0,.35,1); /* @kind other */
+
+--dur-instant:80ms; /* @kind other */
+--dur-fast:140ms; /* @kind other */
+--dur-base:200ms; /* @kind other */
+--dur-slow:320ms; /* @kind other */
+--dur-sweep:4s; /* @kind other */
+
+
+--z-sidebar:20; /* @kind other */
+--z-topbar:30; /* @kind other */
+--z-dropdown:40; /* @kind other */
+--z-overlay:50; /* @kind other */
+--z-dialog:60; /* @kind other */
+--z-toast:70; /* @kind other */
+--z-tooltip:80; /* @kind other */
+
+}
+[data-theme="light"]{
+--shadow-sm:0 1px 2px rgba(15,15,15,.06);
+--shadow-md:0 8px 24px rgba(15,15,15,.08);
+--shadow-lg:0 24px 64px rgba(15,15,15,.12);
+--glow-accent:0 0 0 1px rgba(0,146,42,.35);
+--glow-dot:0 0 0 3px rgba(70,248,75,.25);
+}
