@@ -66,6 +66,42 @@ class MatchingFipeTest(unittest.TestCase):
         score, _ = avalia("SCANIA R440 2014", "G-440 A 6x4 Diesel")
         self.assertEqual(0.0, score)
 
+    def test_serie_explicita_exige_evidencia_dos_dois_lados(self):
+        for anuncio, fipe in (
+            ("SCANIA R440 2014", "440 A 6x4 Diesel"),
+            ("SCANIA 440 2014", "R-440 A 6x4 Diesel"),
+        ):
+            with self.subTest(anuncio=anuncio, fipe=fipe):
+                self.assertEqual(0.0, avalia(anuncio, fipe)[0])
+        self.assertEqual(0.95, avalia("SCANIA R440 2014", "R-440 A 6x4 Diesel")[0])
+
+    def test_geracao_daf_fipe_explicita_nao_se_inventa_no_anuncio(self):
+        self.assertEqual(0.0, avalia("DAF XF FTT 530 2021", "XF 105 FTT 530 6x4 Diesel")[0])
+        self.assertEqual(0.99, avalia("DAF XF105 FTT 530 2021", "XF 105 FTT 530 6x4 Diesel")[0])
+
+    def test_so_candidato_unico_de_serie_confirmada_e_alta_confianca(self):
+        anuncio = {"titulo": "SCANIA R440 2014", "marca": "SCANIA", "ano_inicial": 2014, "ano_final": 2014}
+        confirmado = {"id": 1, "modelo_fipe": "R-440 A 6x4 Diesel"}
+        sem_serie = {"id": 2, "modelo_fipe": "440 A 6x4 Diesel"}
+        with patch("fipe_sync.modelos_da_marca", return_value=[confirmado, sem_serie]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([confirmado], candidatos)
+        self.assertEqual("alto", confianca)
+
+        duplicado = {"id": 3, "modelo_fipe": "R-440 A 6x4 High. Diesel"}
+        with patch("fipe_sync.modelos_da_marca", return_value=[confirmado, duplicado]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertIn("ambiguo serie/geracao", motivo)
+
+    def test_geracao_explicita_sem_outra_evidencia_fica_sem_alta_confianca(self):
+        anuncio = {"titulo": "DAF XF105 530 2021", "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021}
+        candidato = {"id": 1, "modelo_fipe": "XF 105 FTT 530 6x4 Diesel"}
+        with patch("fipe_sync.modelos_da_marca", return_value=[candidato]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertIn("sem alta confianca", motivo)
+
     def test_iveco_nao_mistura_familias(self):
         self.assertEqual(
             0.0, avalia("IVECO STRALIS 410 2011", "TRAKKER 410-T48 6x4 2p")[0]
@@ -82,6 +118,52 @@ class MatchingFipeTest(unittest.TestCase):
         self.assertGreaterEqual(
             avalia("IVECO TECTOR 240E25", "TECTOR 240E25 6x2")[0], 0.5
         )
+
+    def test_iveco_s44t_e_s48t_nao_se_confundem(self):
+        self.assertEqual(0.0, avalia("IVECO STRALIS 490-S44T", "STRALIS 490-S48T")[0])
+        self.assertEqual(0, pontua_sugestao(
+            {"titulo": "IVECO STRALIS 490-S44T", "marca": "IVECO"},
+            {"modelo_fipe": "STRALIS 490-S48T"},
+        )[0])
+
+    def test_iveco_codigo_composto_exato_tem_confianca_alta(self):
+        anuncio = {"titulo": "IVECO TECTOR 240E25 6x2 Day Cab", "marca": "IVECO"}
+        correto = {"id": 1, "modelo_fipe": "TECTOR 240E25 6x2 Day Cab"}
+        errado = {"id": 2, "modelo_fipe": "TECTOR 240E28 6x2 Day Cab"}
+        self.assertGreaterEqual(avalia(anuncio["titulo"], correto["modelo_fipe"])[0], 0.95)
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.95, "codigo+eixo+cabine IVECO 240E25", correto),
+            (0.0, "codigo difere", errado),
+        ]):
+            self.assertEqual(([correto], "alto"), escolhe(None, anuncio))
+
+    def test_iveco_240e25_8x2_sem_cabine_nao_vincula_alto(self):
+        anuncio = {
+            "titulo": "IVECO TECTOR 240E25 8x2 2021/2021", "url": "",
+            "marca": "IVECO", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        modelos = [
+            {"id": 1, "modelo_fipe": "TECTOR 240E25 8x2 (diesel)"},
+            {"id": 2, "modelo_fipe": "TECTOR 240E28 8x2 (diesel)"},
+            {"id": 3, "modelo_fipe": "TECTOR 240E25 6x2 (diesel)"},
+        ]
+        self.assertEqual(0.90, avalia(anuncio["titulo"], modelos[0]["modelo_fipe"])[0])
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            self.assertEqual((None, "sem match de alta confianca"), escolhe(None, anuncio))
+
+    def test_iveco_so_numero_nao_vincula_automaticamente(self):
+        anuncio = {"titulo": "IVECO STRALIS 490", "marca": "IVECO"}
+        candidato = {"id": 1, "modelo_fipe": "STRALIS 490-S44T"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", candidato)]):
+            self.assertEqual((None, "sem match de alta confianca"), escolhe(None, anuncio))
+
+    def test_iveco_codigo_exato_nao_ignora_eixo_contrario(self):
+        anuncio = {"titulo": "IVECO TECTOR 240E25 6x2", "marca": "IVECO"}
+        candidato = {"id": 1, "modelo_fipe": "TECTOR 240E25 4x2"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.95, "codigo IVECO 240E25", candidato),
+        ]):
+            self.assertEqual((None, "sem match eixo 6X2"), escolhe(None, anuncio))
 
     def test_nome_da_revenda_na_url_nao_vira_familia_do_caminhao(self):
         anuncio = {
@@ -117,6 +199,99 @@ class MatchingFipeTest(unittest.TestCase):
         anuncio = {"titulo": "DAF XF FTS 530", "url": "https://portal/cavalo-6x4/1"}
         self.assertEqual((None, "conflito eixo (6X2/6X4)"), eixo_do_anuncio(anuncio))
 
+    def test_eixo_p0_explicito_exige_candidato_exato_unico_e_alto(self):
+        for eixo in ("4X2", "6X2", "6X4", "8X2"):
+            with self.subTest(eixo=eixo):
+                anuncio = {"titulo": f"VW 11.180 {eixo}", "marca": "VW"}
+                outro = "6X4" if eixo != "6X4" else "6X2"
+                exato = {"id": 1, "modelo_fipe": f"11-180 Delivery {eixo}"}
+                conflitante = {"id": 2, "modelo_fipe": f"11-180 Delivery {outro}"}
+                sem_eixo = {"id": 3, "modelo_fipe": "11-180 Delivery"}
+                with patch("fipe_sync.melhores_candidatos", return_value=[
+                    (0.95, "numero+serie", exato),
+                    (0.99, "numero+serie", conflitante),
+                    (0.99, "numero+serie", sem_eixo),
+                ]):
+                    self.assertEqual(([exato], "alto"), escolhe(None, anuncio))
+
+    def test_eixo_p0_nao_usa_nome_base_nem_candidato_de_outro_eixo(self):
+        anuncio = {"titulo": "VW 11.180 8x2", "marca": "VW"}
+        outros = [
+            (0.99, "numero+serie", {"id": 1, "modelo_fipe": "11-180 Delivery 6x2"}),
+            (0.99, "numero+serie", {"id": 2, "modelo_fipe": "11-180 Delivery"}),
+        ]
+        with patch("fipe_sync.melhores_candidatos", return_value=outros):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match eixo 8X2", motivo)
+
+    def test_eixo_p0_candidato_exato_multiplo_ou_medio_nao_vincula(self):
+        anuncio = {"titulo": "VW 11.180 6x2", "marca": "VW"}
+        a = {"id": 1, "modelo_fipe": "11-180 Delivery 6x2"}
+        b = {"id": 2, "modelo_fipe": "11-180 Delivery 6x2 2p"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "numero+serie", a), (0.95, "numero+serie", b),
+        ]):
+            self.assertEqual((None, "ambiguo eixo 6X2: 2 candidatos"), escolhe(None, anuncio))
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "so numero", a)]):
+            self.assertEqual((None, "ambiguo eixo 6X2: confianca insuficiente"), escolhe(None, anuncio))
+
+    def test_sem_eixo_no_anuncio_nao_inventa_variante_pelo_nome_base(self):
+        anuncio = {"titulo": "VW 11.180", "marca": "VW"}
+        base = {"id": 1, "modelo_fipe": "11-180 Delivery"}
+        eixos_fipe = [
+            (0.99, "numero+serie", base),
+            (0.95, "numero+serie", {"id": 2, "modelo_fipe": "11-180 Delivery 4x2"}),
+            (0.95, "numero+serie", {"id": 3, "modelo_fipe": "11-180 Delivery 6x2"}),
+        ]
+        with patch("fipe_sync.melhores_candidatos", return_value=eixos_fipe):
+            self.assertEqual((None, "ambiguo eixo (4X2/6X2)"), escolhe(None, anuncio))
+
+    def test_matriz_eixos_p0_com_score_real_e_serie_scania(self):
+        modelos = [
+            {"id": i, "modelo_fipe": f"R-440 A {eixo} (diesel)"}
+            for i, eixo in enumerate(("4x2", "6x2", "6x4", "8x2"), 1)
+        ]
+        modelos.append({"id": 5, "modelo_fipe": "G-440 A 6x2 (diesel)"})
+        modelos.append({"id": 6, "modelo_fipe": "R-440 A (diesel)"})
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            for eixo, esperado in zip(("4x2", "6x2", "6x4", "8x2"), modelos):
+                with self.subTest(eixo=eixo):
+                    anuncio = {"titulo": f"SCANIA R440 {eixo} 2014/2014", "marca": "SCANIA"}
+                    self.assertEqual(([esperado], "alto"), escolhe(None, anuncio))
+
+    def test_daf_eixo_serie_e_cabine_integrados(self):
+        anuncio = {
+            "titulo": "DAF XF FTT530 6x4 SUPER SPACE 2021/2021",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        correto = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Super Space Cab (diesel)(E5)"}
+        modelos = [
+            correto,
+            {"id": 2, "modelo_fipe": "XF FTS530 6x2 Super Space Cab (diesel)(E5)"},
+            {"id": 3, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"},
+            {"id": 4, "modelo_fipe": "CF FTT530 6x4 Super Space Cab (diesel)(E5)"},
+        ]
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            self.assertEqual(([correto], "alto"), escolhe(None, anuncio))
+
+    def test_iveco_eixo_e_codigo_exatos_ainda_sem_confianca_alta(self):
+        # Mesmo cenario de test_iveco_240e25_8x2_sem_cabine_nao_vincula_alto (duplicata entre os
+        # ramos eixo-tracao e DAF/IVECO apos a integracao): IVECO e marca de familia_restrita, cujo
+        # portao final (com sua propria mensagem) passa a ter prioridade sobre o portao generico
+        # de eixo/tracao, para nao haver dois motivos de texto diferente para a mesma rejeicao.
+        anuncio = {"titulo": "IVECO TECTOR 240E25 8x2 2021/2021", "marca": "IVECO"}
+        modelos = [
+            {"id": 1, "modelo_fipe": "TECTOR 240E25 8x2 (diesel)"},
+            {"id": 2, "modelo_fipe": "TECTOR 240E28 8x2 (diesel)"},
+            {"id": 3, "modelo_fipe": "TECTOR 240E25 6x2 (diesel)"},
+        ]
+        with patch("fipe_sync.modelos_da_marca", return_value=modelos):
+            self.assertEqual(
+                (None, "sem match de alta confianca"),
+                escolhe(None, anuncio),
+            )
+
     def test_daf_105_e_geracao_e_530_e_potencia(self):
         self.assertEqual("530", potencia_daf("DAF XF105 530 2021/2021"))
         score, motivo = avalia("DAF XF105 530 2021/2021", "XF 105 FTT 510 6x4 (diesel)(E5)")
@@ -127,6 +302,115 @@ class MatchingFipeTest(unittest.TestCase):
         score, motivo = avalia("DAF XF105 530 2021/2021", "XF FTT530 6x4 Space Cab (diesel)(E5)")
         self.assertEqual(0.0, score)
         self.assertIn("geracao", motivo)
+
+    def test_daf_xf105_nao_casa_sem_potencia_fipe(self):
+        score, motivo = avalia("DAF XF105 530", "XF FTT 6x4 Space Cab")
+        self.assertEqual(0.0, score)
+        self.assertIn("geracao", motivo)
+
+    def test_daf_ft_fts_ftt_exigem_mesma_configuracao(self):
+        for configuracao, distinta in (("FT", "FTS"), ("FTS", "FTT"), ("FTT", "FT")):
+            with self.subTest(configuracao=configuracao):
+                score, motivo = avalia(
+                    f"DAF XF {configuracao} 530", f"XF {distinta}530 Space Cab"
+                )
+                self.assertEqual(0.0, score)
+                self.assertIn("configuracao", motivo)
+
+    def test_daf_candidato_unico_de_alta_confianca(self):
+        anuncio = {"titulo": "DAF XF FTT 530 2021/2021", "marca": "DAF"}
+        candidato = {"id": 1, "modelo_fipe": "XF FTT530 Space Cab"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", candidato),
+        ]):
+            self.assertEqual(([candidato], "alto"), escolhe(None, anuncio))
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", candidato),
+            (0.99, "potencia+configuracao", {"id": 2, "modelo_fipe": "XF FTT530 Space Cab"}),
+        ]):
+            self.assertEqual((None, "ambiguo 2 candidatos"), escolhe(None, anuncio))
+
+    def test_daf_super_space_explicita_nao_aceita_fipe_sem_cabine(self):
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SUPER SPACE 2021/2021",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        sem_cabine = {"id": 1, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        self.assertEqual(0.99, avalia(anuncio["titulo"], sem_cabine["modelo_fipe"])[0])
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao 530/FTT", sem_cabine),
+        ]):
+            self.assertEqual((None, "sem match cabine SUPER SPACE"), escolhe(None, anuncio))
+
+    def test_daf_cabine_correta_com_score_medio_e_elegivel_pro_uplift_cf(self):
+        # Pre-decisao do Master, este cenario ficava bloqueado (score 0.90 < portao 0.95). Depois
+        # do uplift CF aprovado (familia+potencia+eixo+cabine explicitos e iguais, candidato
+        # unico), o mesmo caso passa a vincular com confianca alta -- ver test_cf_uplift_* e
+        # test_daf_cabine_day_explicita_escolhe_entre_tres_versoes (cenario equivalente, 3
+        # candidatos). Mantido aqui so para registrar a reconferencia direta de avalia() == 0.90
+        # antes do uplift elevar o score dentro de escolhe().
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "marca": "DAF",
+            "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        self.assertEqual(0.90, avalia(texto_anuncio(anuncio), day["modelo_fipe"])[0])
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia 300", day),
+        ]):
+            self.assertEqual(([day], "alto"), escolhe(None, anuncio))
+
+    def test_matriz_daf_geracao_eixo_cabine(self):
+        eixos_por_codigo = {"FT": "4x2", "FTS": "6x2", "FTT": "6x4"}
+        for geracao in ("XF", "XF 105"):
+            for codigo, eixo in eixos_por_codigo.items():
+                for cabine in ("Space", "Super Space"):
+                    with self.subTest(geracao=geracao, codigo=codigo, cabine=cabine):
+                        titulo = f"DAF {geracao} {codigo} 460 {eixo} {cabine} Cab"
+                        anuncio = {"titulo": titulo, "marca": "DAF"}
+                        outro_codigo = next(c for c in eixos_por_codigo if c != codigo)
+                        outra_cabine = "Super Space" if cabine == "Space" else "Space"
+                        outra_geracao = "XF 105" if geracao == "XF" else "XF"
+                        nomes = [
+                            f"{geracao} {codigo}460 {eixo} {cabine} Cab",
+                            f"{outra_geracao} {codigo}460 {eixo} {cabine} Cab",
+                            f"{geracao} {outro_codigo}460 {eixos_por_codigo[outro_codigo]} {cabine} Cab",
+                            f"{geracao} {codigo}460 {eixo} {outra_cabine} Cab",
+                            f"CF {codigo}460 {eixo} {cabine} Cab",
+                        ]
+                        modelos = [{"id": i, "modelo_fipe": nome} for i, nome in enumerate(nomes)]
+                        pontuados = [(score, motivo, modelo) for modelo in modelos
+                                     for score, motivo in [avalia(titulo, modelo["modelo_fipe"])]]
+                        self.assertEqual(0.0, pontuados[1][0])
+                        self.assertEqual(0.0, pontuados[2][0])
+                        self.assertEqual(0.0, pontuados[4][0])
+                        with patch("fipe_sync.melhores_candidatos", return_value=pontuados):
+                            self.assertEqual(([modelos[0]], "alto"), escolhe(None, anuncio))
+
+    def test_matriz_iveco_codigo_eixo_cabine(self):
+        for codigo in ("240E25", "240E28"):
+            for eixo in ("4x2", "6x2"):
+                for cabine in ("Day", "Space"):
+                    with self.subTest(codigo=codigo, eixo=eixo, cabine=cabine):
+                        titulo = f"IVECO TECTOR {codigo} {eixo} {cabine} Cab"
+                        anuncio = {"titulo": titulo, "marca": "IVECO"}
+                        outro_codigo = "240E28" if codigo == "240E25" else "240E25"
+                        outro_eixo = "6x2" if eixo == "4x2" else "4x2"
+                        outra_cabine = "Space" if cabine == "Day" else "Day"
+                        nomes = [
+                            f"TECTOR {codigo} {eixo} {cabine} Cab",
+                            f"TECTOR {outro_codigo} {eixo} {cabine} Cab",
+                            f"TECTOR {codigo} {outro_eixo} {cabine} Cab",
+                            f"TECTOR {codigo} {eixo} {outra_cabine} Cab",
+                            f"STRALIS {codigo} {eixo} {cabine} Cab",
+                        ]
+                        modelos = [{"id": i, "modelo_fipe": nome} for i, nome in enumerate(nomes)]
+                        pontuados = [(score, motivo, modelo) for modelo in modelos
+                                     for score, motivo in [avalia(titulo, modelo["modelo_fipe"])]]
+                        self.assertEqual(0.0, pontuados[1][0])
+                        self.assertEqual(0.0, pontuados[4][0])
+                        with patch("fipe_sync.melhores_candidatos", return_value=pontuados):
+                            self.assertEqual(([modelos[0]], "alto"), escolhe(None, anuncio))
 
     def test_reconhece_cabines_daf(self):
         self.assertEqual("SPACE", cabine_daf("XF FTT530 6x4 Space Cab"))
@@ -231,6 +515,303 @@ class MatchingFipeTest(unittest.TestCase):
         ]):
             candidatos, _ = escolhe(None, anuncio)
         self.assertEqual([super_space], candidatos)
+
+    def test_daf_cabine_explicita_sem_nenhum_candidato_tagueado_nao_vincula(self):
+        """Achado da CUSTODIA/VELOX (28/09): anuncio diz 'Super Space' explicitamente, mas o
+        UNICO candidato FIPE disponivel e generico (sem nenhuma tag de cabine) e score 0,99 — alto
+        o bastante para vincular sozinho. Antes desta correcao, a rejeicao 'sem match cabine' so
+        disparava se EXISTISSE algum candidato com QUALQUER tag de cabine no grupo; com todos
+        genericos, o codigo nao tinha por onde rejeitar e aceitava o generico como se fosse a
+        Super Space, so por nao haver concorrente declarado. Confianca alta e candidato unico nao
+        bastam: cabine explicita no anuncio exige a tag correspondente em algum candidato, mesmo
+        que nenhum outro candidato exista para comparar."""
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SUPER SPACE 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        generico = {"id": 1, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", generico),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine SUPER SPACE", motivo)
+
+    def test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo(self):
+        """P0 cabine: achado da auditoria F1 (5 vinculados marcados em 251 ambiguos). Antes desta
+        correcao, um candidato generico ('XF FTT530 6x4', sem 'Space'/'Super Space'/'Day'/'Sleeper')
+        nao entrava no conjunto de cabines candidatas (cabine_daf devolve None e era filtrado), e o
+        par (generico, com-tag) passava como se so houvesse UMA cabine possivel — vinculando com
+        confianca 'alto' sem nenhuma evidencia no anuncio de qual das duas versoes era a certa.
+        A regra correta e: sem a palavra no anuncio, generico ao lado de uma tag explicita e tao
+        ambiguo quanto duas tags diferentes (SPACE/SUPER SPACE)."""
+        anuncio = {
+            "titulo": "DAF XF FTT 530 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        tagueado = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"}
+        generico = {"id": 2, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        for ordem in ([tagueado, generico], [generico, tagueado]):
+            with patch("fipe_sync.melhores_candidatos", return_value=[
+                (0.99, "potencia+configuracao", ordem[0]),
+                (0.99, "potencia+configuracao", ordem[1]),
+            ]):
+                candidatos, motivo = escolhe(None, anuncio)
+            self.assertIsNone(candidatos)
+            self.assertEqual("ambiguo cabine (SEM TAG/SPACE)", motivo)
+
+    def test_daf_so_candidatos_sem_tag_de_cabine_nao_fica_ambiguo_por_cabine(self):
+        """Quando NENHUM candidato declara Space/Super Space/Day/Sleeper, nao ha nada pra desambiguar
+        por cabine: o conjunto tem um so valor (None) e o candidato segue adiante normalmente."""
+        anuncio = {
+            "titulo": "DAF XF 440 2020/2020", "url": "https://portal/daf-xf-440/2020/1",
+            "marca": "DAF", "ano_inicial": 2020, "ano_final": 2020,
+        }
+        generico = {"id": 1, "modelo_fipe": "XF FT440 4x2 (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", generico),
+        ]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([generico], candidatos)
+        self.assertEqual("alto", confianca)
+
+    def test_daf_anuncio_com_cabine_explicita_ignora_candidato_generico(self):
+        """O anuncio dizendo 'Space Cab' e evidencia suficiente para descartar o candidato
+        generico (sem tag) e o candidato com outra tag, mesmo que ambos tenham o mesmo score."""
+        anuncio = {
+            "titulo": "DAF XF FTT 530 SPACE CAB 2021/2021",
+            "url": "https://portal/daf-xf-ftt-530/2021/cavalo-6x4/1",
+            "marca": "DAF", "ano_inicial": 2021, "ano_final": 2021,
+        }
+        tagueado = {"id": 1, "modelo_fipe": "XF FTT530 6x4 Space Cab (diesel)(E5)"}
+        generico = {"id": 2, "modelo_fipe": "XF FTT530 6x4 (diesel)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.99, "potencia+configuracao", tagueado),
+            (0.99, "potencia+configuracao", generico),
+        ]):
+            candidatos, _ = escolhe(None, anuncio)
+        self.assertEqual([tagueado], candidatos)
+
+    def test_daf_cabine_conflitante_nao_vincula(self):
+        """O anuncio declara 'Day Cab' explicitamente, mas NENHUM candidato tem essa tag (so
+        Space e Super Space): a cabine do anuncio contradiz os candidatos, entao nao ha vinculo
+        — nunca inferir a cabine certa so porque sobrou alguma coisa."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        space = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Space Cab Aut (Die)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Super Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", space), (0.90, "potencia", super_space),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine DAY", motivo)
+
+    def test_daf_cabine_sleeper_vs_super_space_fica_ambiguo(self):
+        """Par SLEEPER/SUPER SPACE (nao testado antes nesta combinacao): sem a palavra no
+        anuncio, dois valores diferentes de cabine sao ambiguos, qualquer que seja o par."""
+        anuncio = {
+            "titulo": "DAF CF 300 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        sleeper = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Sleep. Cab Aut (Die)(E5)"}
+        super_space = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Super Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", sleeper), (0.90, "potencia", super_space),
+        ]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("ambiguo cabine (SLEEPER/SUPER SPACE)", motivo)
+
+    def test_daf_cabine_day_explicita_escolhe_entre_tres_versoes(self):
+        """Multiplas versoes FIPE (DAY/SLEEPER/SPACE) com o anuncio dizendo 'Day Cab'
+        explicitamente: escolhe so a DAY, nunca infere entre as outras duas."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        sleeper = {"id": 2, "modelo_fipe": "CF FAS 300 6x2 Sleep. Cab Aut (Die)(E5)"}
+        space = {"id": 3, "modelo_fipe": "CF FAS 300 6x2 Space Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[
+            (0.90, "potencia", day), (0.90, "potencia", sleeper), (0.90, "potencia", space),
+        ]):
+            candidatos, _ = escolhe(None, anuncio)
+        self.assertEqual([day], candidatos)
+
+    # --- Uplift CF (decisao Master aprovada): familia CF, potencia, eixo e cabine batendo
+    # explicitamente dos dois lados (anuncio E FIPE) sobem o score de 0.90 pra 0.95 so pra essa
+    # combinacao; ausencia de qualquer evidencia (so um lado declara, candidato sem tag, potencia
+    # divergente) nunca vira "medio": fica sem vinculo. O ano-modelo nao e checado aqui (e so
+    # confirmado depois, na busca de preco por modelo_ano).
+
+    def test_cf_uplift_positivo_potencia_eixo_cabine_explicitos(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([day], candidatos)
+        self.assertEqual("alto", confianca)
+
+    def test_cf_uplift_positivo_com_emissao_explicita_batendo(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB EURO 5 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, confianca = escolhe(None, anuncio)
+        self.assertEqual([day], candidatos)
+        self.assertEqual("alto", confianca)
+
+    def test_cf_uplift_negativo_eixo_divergente(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day_6x4 = {"id": 1, "modelo_fipe": "CF FAS 300 6x4 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day_6x4)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match eixo 6X2", motivo)
+
+    def test_cf_uplift_negativo_cabine_ausente_na_fipe(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        generico = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", generico)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match cabine DAY", motivo)
+
+    def test_cf_uplift_negativo_cabine_ausente_no_anuncio(self):
+        anuncio = {
+            "titulo": "DAF CF 300 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_eixo_ausente_no_anuncio(self):
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "marca": "DAF",
+            "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_potencia_divergente_defesa_em_profundidade(self):
+        """Mesmo que um candidato chegue com score>=0.5 por outro motivo que nao 'potencia' (o
+        upstream real nunca faria isso, mas esta funcao nao confia so no score herdado), a
+        potencia e reconferida: 450 no anuncio nao bate com 300 na FIPE, sem uplift."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        outra_potencia = {"id": 1, "modelo_fipe": "CF FAS 450 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", outra_potencia)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_potencia_ausente_na_fipe(self):
+        """Espelho do caso 'anuncio sem potencia': aqui e a FIPE que nao tem numero de 3 digitos
+        detectavel no nome do modelo (so numero != potencia, score 0.60, nao 'potencia')."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        sem_potencia_fipe = {"id": 1, "modelo_fipe": "CF FAS 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", sem_potencia_fipe)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_emissao_explicita_conflitante(self):
+        """Emissao declarada nos dois lados mas DIFERENTE (E5 no anuncio, E6 na FIPE): rejeitado
+        mais acima, no bloco de emissao_preferida ('sem match emissao'), antes de chegar no
+        uplift — nao e so 'tag ausente', e divergencia real. Garante que o gate geral continua
+        bloqueando esse caso sem depender so da checagem do uplift."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB EURO 5 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        cand_e6 = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E6)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", cand_e6)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem match emissao E5", motivo)
+
+    def test_cf_uplift_negativo_anuncio_sem_potencia_detectavel(self):
+        anuncio = {
+            "titulo": "DAF CF DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.60, "so numero", day)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_negativo_emissao_explicita_sem_tag_na_fipe(self):
+        """O fallback de emissao_preferida aceita candidato FIPE sem tag E5/E6 quando ninguem
+        contradiz; o uplift CF reconfere e exige a tag — sem ela, nao ha evidencia explicita."""
+        anuncio = {
+            "titulo": "DAF CF 300 DAY CAB EURO 5 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        sem_tag = {"id": 1, "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)"}
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", sem_tag)]):
+            candidatos, motivo = escolhe(None, anuncio)
+        self.assertIsNone(candidatos)
+        self.assertEqual("sem evidencia explicita suficiente para CF (potencia/eixo/cabine/emissao)", motivo)
+
+    def test_cf_uplift_ano_ainda_e_conferido_no_fluxo_final_sem_vinculo_por_cache_vazio(self):
+        """O uplift CF sobe o SCORE (confianca 'alto'), mas nao prova o ano: escolhe() nunca ve
+        ano_codigo (so o nome do modelo FIPE). A conferencia real do ano-modelo e de
+        processa_anuncios() -> busca_preco_cache(candidato, modelo_ano, ...), SEM API (modo local).
+        Mesmo com uplift confirmando potencia+eixo+cabine, se o cache local nao tem preco pra esse
+        ano especifico, nao vincula (nao escreve nada): fica aguardando_cache, nao 'medio' nem
+        'vinculado' por confianca alta emprestada de outro sinal. Mesmo padrao de
+        test_modo_local_nao_chama_api_quando_cache_falta, exercitando escolhe() de verdade (nao
+        mockado) pra provar que o uplift nao contorna essa checagem."""
+        anuncio = {
+            "id": 42, "titulo": "DAF CF 300 DAY CAB 2022/2022", "url": "https://portal/truck-6x2/1",
+            "marca": "DAF", "tracao": "6X2", "ano_inicial": 2022, "ano_final": 2022,
+        }
+        day = {"id": 1, "marca_fipe": "DAF", "modelo_fipe": "CF FAS 300 6x2 Day Cab Aut (Die)(E5)"}
+        conn = object()
+        with patch("fipe_sync.melhores_candidatos", return_value=[(0.90, "potencia", day)]):
+            # confirma que o uplift realmente disparou antes de chegar no cache (confianca alto, 1 candidato)
+            candidatos, confianca = escolhe(conn, anuncio)
+            self.assertEqual([day], candidatos)
+            self.assertEqual("alto", confianca)
+            with patch("fipe_sync.anuncios_pendentes", return_value=[anuncio]), \
+                 patch("fipe_sync.busca_preco_cache", return_value=None) as busca_cache, \
+                 patch("fipe_sync.api_get") as api_get, \
+                 patch("fipe_sync.registra_resultado") as registra:
+                resumo = processa_anuncios(conn, lote=1, permitir_api=False)
+        # mesmo assim, sem o ano no cache local, nada e gravado — nao substitui a conferencia do ano.
+        api_get.assert_not_called()
+        registra.assert_not_called()
+        busca_cache.assert_called_once_with(conn, day, 2022, None)
+        self.assertEqual(1, resumo["aguardando_cache"])
+        self.assertEqual(0, resumo["vinculados"])
 
     def test_backfill_daf_extrai_url_e_corrige_anos_pelo_titulo(self):
         dados = dados_derivados({
