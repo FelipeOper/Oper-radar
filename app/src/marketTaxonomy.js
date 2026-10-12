@@ -21,6 +21,7 @@ export function categoriasDoMercado(mercado) {
 export const TIPO_PARA_CATEGORIA = {
   Caminhao: 'caminhoes',
   Implemento: 'implementos',
+  Carreta: 'implementos',
   'Carroceria-sobre-chassi': 'implementos',
   Trailer: 'implementos',
   Onibus: 'onibus_vans',
@@ -40,6 +41,7 @@ export const TIPO_PARA_CATEGORIA = {
   'Distribuidor-autopropelido': 'agricolas',
   'Forragem-e-feno': 'agricolas',
   Florestal: 'agricolas',
+  'Implementos-agricolas': 'agricolas',
   'Pa-carregadeira': 'construcao',
   Escavadeira: 'construcao',
   'Retro-escavadeira': 'construcao',
@@ -63,6 +65,8 @@ export const TIPO_PARA_CATEGORIA = {
 const ROTULOS_TIPO = {
   Caminhao: 'Caminhões',
   Implemento: 'Implementos completos',
+  Carreta: 'Carretas',
+  'Implementos-agricolas': 'Implementos agrícolas',
   'Carroceria-sobre-chassi': 'Carrocerias sobre chassi',
   Trailer: 'Trailers',
   Onibus: 'Ônibus',

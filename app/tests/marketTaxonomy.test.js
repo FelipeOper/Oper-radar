@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CATEGORIAS_MERCADO,
+  TIPO_PARA_CATEGORIA,
   categoriasDoMercado,
   categoriaDeTipo,
   filtrosDaCategoria,
@@ -32,4 +33,18 @@ test('taxonomia oferece rótulos de negócio legíveis', () => {
   assert.equal(CATEGORIAS_MERCADO.onibus_vans.label, 'Ônibus, vans e motorhomes');
   assert.equal(rotuloTipo('Micro-onibus'), 'Micro-ônibus');
   assert.equal(rotuloTipo('Rolo-compactador'), 'Rolo Compactador');
+});
+
+test('segmento Pesado: carreta e implemento rodoviario; implemento agricola e o resto ficam fora do mercado principal', () => {
+  assert.equal(categoriaDeTipo('Carreta'), 'implementos');
+  assert.equal(categoriaDeTipo('Implementos-agricolas'), 'agricolas');
+  assert.equal(categoriaDeTipo('Aviao'), 'outros');
+  const principal = categoriasDoMercado('principal');
+  const doPrincipal = tipo => principal.includes(categoriaDeTipo(tipo));
+  assert.equal(doPrincipal('Carreta'), true);
+  assert.equal(doPrincipal('Implementos-agricolas'), false);
+  assert.equal(doPrincipal('Trator'), false);
+  const tiposPrincipais = Object.keys(TIPO_PARA_CATEGORIA).filter(doPrincipal).sort();
+  assert.deepEqual(tiposPrincipais, ['Caminhao', 'Carreta', 'Carroceria-sobre-chassi', 'Implemento', 'Trailer']);
+  assert.equal(rotuloTipo('Carreta'), 'Carretas');
 });

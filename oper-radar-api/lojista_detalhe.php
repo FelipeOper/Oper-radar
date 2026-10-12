@@ -4,6 +4,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/competitor_history.php';
 require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/market_taxonomy.php';
+require_once __DIR__ . '/lib/concorrencia_metricas.php';
 $conn = conecta();
 
 function concorrente_linhas(mysqli $conn, string $sql, string $types = '', array $params = []): array {
@@ -53,8 +54,9 @@ $where = 'a.revenda_id=?';
 $types = 'i';
 $params = [$lojistaId];
 if ($categoria !== 'todas') {
-    $tipos = $categorias[$categoria];
-    $where .= ' AND a.tipo IN (' . implode(',', array_fill(0, count($tipos), '?')) . ')';
+    $filtroCategoria = oper_taxonomia_filtro_categoria($categoria);
+    $tipos = $filtroCategoria['tipos'];
+    $where .= ' AND ' . oper_taxonomia_sql_categoria('a.tipo', $filtroCategoria, implode(',', array_fill(0, count($tipos), '?')));
     foreach ($tipos as $tipo) { $params[] = $tipo; $types .= 's'; }
 }
 
@@ -77,10 +79,21 @@ $estoqueAtivo = concorrente_linhas($conn, "SELECT $baseCampos,
 $estoqueAtivo = array_map('concorrente_normaliza_anuncio', $estoqueAtivo);
 
 $precosAtivos = concorrente_linhas($conn, "SELECT a.preco, a.titulo, a.preco_texto_bruto,
-    f.preco preco_fipe FROM anuncio a LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
+    a.fipe_match_status, COALESCE(a.ano_final,a.ano_inicial) ano, a.carroceria, a.tipo, f.preco preco_fipe FROM anuncio a LEFT JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE $where AND a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0", $types, $params);
 $estatisticasPrecoAtivo = mercado_calcula_estatisticas($precosAtivos);
+$desvioFipe = oper_concorrencia_desvio_fipe($precosAtivos);
+$idadeAtual = concorrente_linhas($conn, "SELECT ROUND(AVG(GREATEST(0, DATEDIFF(CURDATE(), DATE(a.primeira_vez_visto)))), 1) idade_media,
+    DATEDIFF(CURDATE(), MIN(DATE(a.primeira_vez_visto))) dias_coleta
+    FROM anuncio a WHERE $where AND a.status='ativo'", $types, $params)[0];
 
+// DAT04 (auditoria 07/09, achado D03): "eventosDisponiveis" aqui significa só que a
+// tabela anuncio_evento existe no schema — não que ESTA revenda (com este filtro de
+// categoria) já tem eventos registrados. Tratar as duas coisas como iguais foi o que
+// fazia o cartão da lista (lojistas.php, decidindo por revenda) e este detalhe
+// (decidindo pelo schema inteiro) divergirem para o mesmo lojista. Por isso a decisão
+// final de qual fonte usar (`$usaEventos`) só é tomada depois de checar se a consulta
+// de eventos realmente devolveu cobertura para este recorte.
 $tabelaEventos = $conn->query("SELECT COUNT(*) total FROM information_schema.TABLES
     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='anuncio_evento'");
 $eventosDisponiveis = $tabelaEventos && (int)($tabelaEventos->fetch_assoc()['total'] ?? 0) > 0;
@@ -88,9 +101,18 @@ $contagensEventos = [];
 $coberturaInicio = null;
 $coberturaFim = null;
 $saidas30d = 0;
+$reducoes30d = null;
 $duracoesSaida = [];
+$usaEventos = false;
 
 if ($eventosDisponiveis) {
+    $reducoes = concorrente_linhas($conn, "SELECT COUNT(DISTINCT e.anuncio_id) quantidade
+        FROM anuncio_evento e JOIN anuncio a ON a.id=e.anuncio_id
+        WHERE $where AND e.tipo_evento='mudanca_preco'
+          AND e.dia_referencia>=DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+          AND e.valor_anterior_decimal>e.valor_novo_decimal
+          AND e.valor_novo_decimal>=e.valor_anterior_decimal*0.5", $types, $params);
+    $reducoes30d = (int)($reducoes[0]['quantidade'] ?? 0);
     $eventosResumo = concorrente_linhas($conn, "SELECT e.tipo_evento, COUNT(*) quantidade,
         MIN(e.dia_referencia) primeira_data, MAX(e.dia_referencia) ultima_data,
         SUM(CASE WHEN e.tipo_evento='saida_detectada'
@@ -103,6 +125,13 @@ if ($eventosDisponiveis) {
         if ($coberturaInicio === null || $item['primeira_data'] < $coberturaInicio) $coberturaInicio = $item['primeira_data'];
         if ($coberturaFim === null || $item['ultima_data'] > $coberturaFim) $coberturaFim = $item['ultima_data'];
     }
+    // Sem nenhuma linha de evento para esta revenda/categoria, a tabela existir não
+    // ajuda: cai no mesmo fallback de status usado quando a tabela nem existe, em vez
+    // de reportar "0 saídas" como se fosse um histórico completo e limpo.
+    $usaEventos = $coberturaInicio !== null && $coberturaFim !== null;
+}
+
+if ($usaEventos) {
     $inicioEpisodio = "COALESCE(
         (SELECT MAX(origem.dia_referencia) FROM anuncio_evento origem
          WHERE origem.anuncio_id=e.anuncio_id
@@ -145,13 +174,17 @@ if ($eventosDisponiveis) {
     $saidas30d = (int)($resumoAtual['saidas_status_30d'] ?? 0);
 }
 
-$saidasTotal = $eventosDisponiveis
+$saidasTotal = $usaEventos
     ? (int)($contagensEventos['saida_detectada'] ?? 0)
     : (int)($resumoAtual['saidas_status'] ?? 0);
+// DAT04: mesmo vocabulário de lojistas.php ('eventos' | 'status_atual'), para que lista
+// e detalhe fiquem reconciliados quando têm a mesma cobertura, e nomeiem explicitamente
+// a métrica quando não têm (em vez de parecer só uma divergência de bug).
+$saidasFonte = $usaEventos ? 'eventos' : 'status_atual';
 $coberturaDias = ($coberturaInicio && $coberturaFim)
     ? max(1, (int)((strtotime($coberturaFim) - strtotime($coberturaInicio)) / 86400) + 1)
     : 0;
-$confianca = oper_concorrente_confianca($eventosDisponiveis, $coberturaDias, $saidasTotal);
+$confianca = oper_concorrente_confianca($usaEventos, $coberturaDias, $saidasTotal);
 
 envia_json([
     'lojista' => $lojista,
@@ -160,11 +193,16 @@ envia_json([
         'ativos' => $ativosTotal,
         'saidas_observadas' => $saidasTotal,
         'saidas_30d' => $saidas30d,
+        'saidas_fonte' => $saidasFonte,
         'reaparecimentos' => (int)($contagensEventos['reaparecimento'] ?? 0),
         'mediana_dias_ate_saida' => oper_mediana_numerica($duracoesSaida),
         'preco_mediano_ativo' => $estatisticasPrecoAtivo['mediana'],
         'preco_ativo_amostra' => (int)$estatisticasPrecoAtivo['amostra_qualificada'],
         'preco_ativo_confianca' => $estatisticasPrecoAtivo['confianca'],
+        'idade_media_estoque' => (int)($idadeAtual['dias_coleta'] ?? 0) >= 14 ? (float)$idadeAtual['idade_media'] : null,
+        'idade_observada_confiavel' => (int)($idadeAtual['dias_coleta'] ?? 0) >= 14,
+        'reducoes_30d' => $reducoes30d,
+        ...$desvioFipe,
     ],
     'historico_eventos' => [
         'disponivel' => $eventosDisponiveis,

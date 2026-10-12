@@ -39,10 +39,10 @@ if (!empty($_GET['mercado']) && isset($MERCADO_TIPOS[$_GET['mercado']])) {
     $where[] = $_GET['mercado'] === 'principal' ? "a.tipo IN ($ph)" : "COALESCE(a.tipo,'') NOT IN ($ph)";
     foreach ($tipos as $t) { $params[] = $t; $types .= 's'; }
 }
-if (!empty($_GET['categoria']) && isset($CATEGORIA_TIPOS[$_GET['categoria']])) {
-    $tipos = $CATEGORIA_TIPOS[$_GET['categoria']];
+if (!empty($_GET['categoria']) && ($filtroCategoria = oper_taxonomia_filtro_categoria((string)$_GET['categoria']))) {
+    $tipos = $filtroCategoria['tipos'];
     $ph = implode(',', array_fill(0, count($tipos), '?'));
-    $where[] = "a.tipo IN ($ph)";
+    $where[] = oper_taxonomia_sql_categoria('a.tipo', $filtroCategoria, $ph);
     foreach ($tipos as $t) { $params[] = $t; $types .= 's'; }
 }
 if (!empty($_GET['status']))    { $where[] = 'a.status = ?';    $params[] = $_GET['status']; $types .= 's'; }
@@ -69,7 +69,12 @@ if (!empty($_GET['regiao']) && isset($REGIOES[$_GET['regiao']])) {
 if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GET['revenda']; $types .= 's'; }
 if (!empty($_GET['revenda_id'])) { $where[] = 'r.id = ?'; $params[] = (int)$_GET['revenda_id']; $types .= 'i'; }
 if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
-if (!empty($_GET['marca']))     { $where[] = 'a.marca = ?';     $params[] = strtoupper($_GET['marca']); $types .= 's'; }
+// Com recorte exato de modelo, a marca usa a mesma chave normalizada do painel (UPPER(TRIM)); sem ele, mantem a comparacao simples.
+if (!empty($_GET['marca']))     { $where[] = !empty($_GET['modelo']) ? 'UPPER(TRIM(a.marca)) = ?' : 'a.marca = ?'; $params[] = strtoupper(trim((string)$_GET['marca'])); $types .= 's'; }
+// Recorte exato de modelo + ano-modelo (mesma chave do painel de Mercado: marca, modelo, COALESCE(ano_final, ano_inicial)).
+// Sem isso, o botao "Ver N ofertas" de um modelo/ano abria uma lista mais ampla que a contagem anunciada.
+if (!empty($_GET['modelo'])) { $where[] = 'UPPER(TRIM(a.modelo)) = ?'; $params[] = strtoupper(trim((string)$_GET['modelo'])); $types .= 's'; }
+if (!empty($_GET['ano_modelo']) && (int)$_GET['ano_modelo'] > 0) { $where[] = 'COALESCE(a.ano_final, a.ano_inicial) = ?'; $params[] = (int)$_GET['ano_modelo']; $types .= 'i'; }
 if (!empty($_GET['carroceria'])) { $where[] = 'TRIM(a.carroceria) = ?'; $params[] = trim($_GET['carroceria']); $types .= 's'; }
 if (!empty($_GET['preco_min'])) { $where[] = 'a.preco >= ?';    $params[] = (float)$_GET['preco_min']; $types .= 'd'; }
 if (!empty($_GET['preco_max'])) { $where[] = 'a.preco <= ?';    $params[] = (float)$_GET['preco_max']; $types .= 'd'; }
