@@ -1,9 +1,15 @@
-# OPER RADAR — Fase 1, caminho PHP (sem terminal/Python no HostGator)
+# OPER RADAR — Fase 1, caminho PHP (fallback não adotado)
 
-Esta pasta é a **versão alternativa** de `fase1-coleta/`, para o caso do seu Plano M não
-liberar terminal SSH completo nem "Setup Python App". PHP já vem pronto em qualquer
-hospedagem cPanel (cURL e MySQLi inclusos), então essa versão **não depende de instalar
-nada** — só precisa do banco de dados e do cron.
+**Decidido**: Python 3.9 está disponível em `/bin/python3` no HostGator, acessível pelo
+terminal web do cPanel (SSH externo não funciona, mas isso não impede rodar Python via cron ou
+terminal web). Por isso a versão Python (`fase1-coleta/`) é a que está em produção, e esta
+pasta PHP **nunca foi adotada** — fica só como fallback documentado, caso o acesso a Python
+alguma vez deixe de funcionar nesse plano de hospedagem.
+
+Esta pasta é a **versão alternativa** de `fase1-coleta/`, para o caso do Plano M não liberar
+terminal nem "Setup Python App". PHP já vem pronto em qualquer hospedagem cPanel (cURL e
+MySQLi inclusos), então essa versão **não depende de instalar nada** — só precisa do banco de
+dados e do cron.
 
 ## Por que não usar Python + MySQL remoto em vez disso
 
@@ -50,6 +56,6 @@ removido) é a mesma nas duas versões — só a linguagem de implementação mu
 - Se o cron do cPanel realmente encontra o `php` no PATH, ou se precisa do caminho completo
 - Permissões de escrita na pasta de log (`coleta.log`)
 
-Assim que tiver certeza sobre terminal/Python (resposta do suporte), me avisa — se vier
-positivo, seguimos com a versão Python (já mais testada em conjunto); se negativo, essa
-versão PHP já está pronta pra configurar.
+Terminal/Python já confirmados disponíveis (ver nota no topo deste arquivo) — a versão Python
+é a usada em produção. Esta versão PHP não precisou ser configurada, mas fica pronta caso
+alguma mudança futura no plano de hospedagem tire o acesso a Python.
