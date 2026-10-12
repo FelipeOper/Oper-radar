@@ -55,13 +55,16 @@ $faixas = consulta($conn, 'faixas_preco', "
 
 $fipeLinhas = consulta($conn, 'fipe', "
     SELECT a.id, a.fipe_preco_id, a.preco, a.titulo, a.preco_texto_bruto,
-           f.preco AS preco_fipe
+           COALESCE(a.ano_final,a.ano_inicial) AS ano, a.carroceria, a.tipo, f.preco AS preco_fipe
     FROM anuncio a JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
       AND f.preco IS NOT NULL AND f.preco>0");
 $estatisticasFipe = mercado_estatisticas_por_fipe(
     $conn,
-    array_column($fipeLinhas, 'fipe_preco_id')
+    array_column($fipeLinhas, 'fipe_preco_id'),
+    false,
+    OPER_RADAR_ANO_MINIMO_FIPE, // amostra e limites so com modelos a partir de 2006 (F0c)
+    true // e so cavalo/chassi/vazio: com implemento o preco inclui o equipamento (F0d)
 );
 $abaixoFipe = 0;
 $comparaveisFipe = 0;
@@ -74,20 +77,23 @@ foreach ($fipeLinhas as &$linhaFipe) {
         (float)$linhaFipe['preco_fipe']
     );
     if (!$linhaFipe['mercado_amostra_suficiente'] || $linhaFipe['preco_qualidade_status'] !== 'valido') continue;
+    if (!mercado_ano_comparavel_fipe($linhaFipe) || !mercado_carroceria_comparavel_fipe($linhaFipe) || !mercado_tipo_comparavel_fipe($linhaFipe)) continue; // F0c/F0d
     $comparaveisFipe++;
     if ((float)$linhaFipe['preco'] < (float)$linhaFipe['preco_fipe']) $abaixoFipe++;
     $desviosFipe[] = ((float)$linhaFipe['preco'] - (float)$linhaFipe['preco_fipe'])
         / (float)$linhaFipe['preco_fipe'] * 100;
 }
 unset($linhaFipe);
-$desvioMedianoFipe = mercado_percentil($desviosFipe, 0.50);
+// Amostra minima de 5 desvios AGREGADOS (nao so por grupo): 1 anuncio de um grupo suficiente nao vira indicador.
+$amostraDesvioFipe = count($desviosFipe);
+$desvioMedianoFipe = mercado_mediana_com_amostra_minima($desviosFipe);
 $fipe = [
     'vinculados'=>count($fipeLinhas),
     'comparaveis_qualificados'=>$comparaveisFipe,
     'abaixo_fipe'=>$abaixoFipe,
-    'desvio_mediano_pct'=>$desvioMedianoFipe !== null ? round($desvioMedianoFipe, 1) : null,
-    // Alias temporário para clientes antigos; o valor agora é a mediana qualificada.
-    'desvio_medio_pct'=>$desvioMedianoFipe !== null ? round($desvioMedianoFipe, 1) : null,
+    'desvio_mediano_pct'=>$desvioMedianoFipe,
+    'desvio_amostra'=>$amostraDesvioFipe,
+    'desvio_confianca'=>mercado_confianca($amostraDesvioFipe),
 ];
 
 $descobertas = [];

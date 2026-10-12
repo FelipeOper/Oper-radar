@@ -35,9 +35,12 @@ class MyStoreMarketContractTest(unittest.TestCase):
             "Salvar alterações",
             "Mercado nacional",
             "MELHOR REGIÃO OBSERVADA",
-            "ABRIR CADASTRO E ANÁLISE",
         ]:
             self.assertIn(fragmento, app)
+        # O cartão do veículo vive em MinhaLojaBlocos.jsx e abre o painel de PainelMeuVeiculo.
+        blocos = (ROOT / "app" / "src" / "MinhaLojaBlocos.jsx").read_text(encoding="utf-8")
+        self.assertIn("Abrir cadastro e análise", blocos)
+        self.assertIn("<CartaoVeiculo ", app)
 
 
 if __name__ == "__main__":
