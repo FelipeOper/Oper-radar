@@ -5,6 +5,7 @@ require_once __DIR__ . '/lib/market_quality.php';
 require_once __DIR__ . '/lib/regional_insight.php';
 require_once __DIR__ . '/lib/store_market.php';
 require_once __DIR__ . '/lib/fipe_compat.php';
+require_once __DIR__ . '/lib/orientacao_estoque.php';
 $usuario = exige_autenticacao();
 $conn = conecta();
 
@@ -81,6 +82,7 @@ if ($fipeId === 0 || $fipeIncompativel !== null || (int)($item['usar_comparativo
         'mercado_nacional' => null,
         'regioes' => [],
         'melhor_regiao_observada' => null,
+        'orientacao' => ['acao' => 'sem_base', 'motivo' => 'Sem referência FIPE compatível, não há base pra orientar o preço deste veículo.'],
         'historico_eventos' => ['disponivel' => loja_detalhe_tabela_existe($conn, 'anuncio_evento'), 'cobertura_dias' => 0],
         'fipe_vinculo_status' => $fipeIncompativel !== null ? 'incompativel' : ($fipeId === 0 ? 'sem_vinculo' : 'compativel'),
         'nota' => $fipeIncompativel !== null
@@ -153,6 +155,9 @@ foreach ($porUf as $uf => $linhas) {
         'saidas_observadas' => count($duracoes),
         'mediana_dias_saida' => oper_loja_mediana($duracoes),
         'cobertura_dias' => $coberturaDias,
+        'desvio_preco_loja_pct' => $estatisticas['mediana'] > 0 && (float)($item['preco_anunciado'] ?? 0) > 0
+            ? round(((float)$item['preco_anunciado'] - $estatisticas['mediana']) / $estatisticas['mediana'] * 100, 1)
+            : null,
     ];
 }
 
@@ -181,6 +186,12 @@ foreach ($regioes as $regiao) {
     if (!empty($regiao['avaliacao']['publicavel'])) { $melhor = $regiao; break; }
 }
 
+$nacionalOrientacao = [
+    'amostra_suficiente' => (bool)$nacional['amostra_suficiente'],
+    'preco_mediano' => $nacional['mediana'],
+];
+$orientacao = oper_loja_orienta_veiculo($item, $nacionalOrientacao, $regioes);
+
 envia_json([
     'item' => $item,
     'mercado_nacional' => [
@@ -195,6 +206,7 @@ envia_json([
     ],
     'regioes' => $regioes,
     'melhor_regiao_observada' => $melhor,
+    'orientacao' => $orientacao,
     'historico_eventos' => [
         'disponivel' => $eventosDisponiveis,
         'cobertura_inicio' => $coberturaInicio,

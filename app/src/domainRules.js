@@ -1,3 +1,4 @@
+import { posicaoItem } from './minhaLojaModel.js';
 const TIPOS_EMISSAO_PESADOS = new Set(['Caminhao', 'Onibus', 'Micro-onibus']);
 
 export function categoriaDeTipo(tipo, mapaCategorias) {
@@ -66,6 +67,14 @@ export function filtraOrdenaEstoque(itens, busca, status, ordem) {
     preco_asc: (a, b) => Number(a.preco_anunciado || Infinity) - Number(b.preco_anunciado || Infinity),
     preco_desc: (a, b) => Number(b.preco_anunciado || -Infinity) - Number(a.preco_anunciado || -Infinity),
     modelo: (a, b) => `${a.marca || ''} ${a.modelo || ''}`.localeCompare(`${b.marca || ''} ${b.modelo || ''}`, 'pt-BR'),
+    // Acima do mercado primeiro, depois competitivo, sem amostra e fora da base; dentro do grupo, maior desvio primeiro.
+    posicao: (a, b) => {
+      if ((a.status === 'vendido') !== (b.status === 'vendido')) return a.status === 'vendido' ? 1 : -1; // vendidos por último
+      const ordem = { acima: 0, comp: 1, insuf: 2, fora: 3 };
+      const pa = posicaoItem(a), pb = posicaoItem(b);
+      if (ordem[pa.status] !== ordem[pb.status]) return ordem[pa.status] - ordem[pb.status];
+      return (pb.vsMediana ?? -Infinity) - (pa.vsMediana ?? -Infinity);
+    },
   };
   return [...filtrados].sort(ordenadores[ordem] || ordenadores.recente);
 }
