@@ -1,5 +1,8 @@
 # HANDOFF DO ORQUESTRADOR — Oper Radar (recriado em 06/10/2026)
 
+> **Pausa de 08/10/2026:** o estado mais recente da onda (agentes, branches, PRs, decisões e lições)
+> está em `HANDOFF-08-10-2026-PAUSA.md`. Leia aquele primeiro.
+
 > A pasta original (com QUADRO-TAREFAS.md, tarefas/*, evidencias/*, graphify-oper-radar/*) sumiu do
 > disco entre 26/09 e 06/10/2026. Busca completa (disco C inteiro, Lixeira — 66 itens, OneDrive,
 > armazenamento interno do Maestri) não encontrou nenhum rastro nem backup. Causa desconhecida.
