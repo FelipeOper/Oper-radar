@@ -23,6 +23,115 @@ Existem três modos independentes:
 Ambiguidades de linha ou eixo continuam sem vínculo automático. Ausências do cache no modo
 local permanecem na fila, sem serem marcadas erroneamente como “sem ano”.
 
+### Diagnóstico isolado P0 — série/geração (01/10/2026)
+
+O matching automático antes aceitava número igual quando a série Scania aparecia só
+em um lado (`R440` × `440`), com score 0,60. Também aceitava `DAF XF 530` ×
+`XF105 530` com score 0,99 quando a configuração coincidia: a geração 105 estava
+explícita só na FIPE. Isso podia produzir vínculo de modelo incorreto mesmo com
+um único preço em cache. A correção exige série compatível nos dois lados quando
+ela for explícita e não atribui geração 105/85 a um anúncio que não a informa.
+Para série/geração explícita, só um candidato com score ≥ 0,95 pode seguir para
+a verificação de ano/preço; empate ou evidência insuficiente permanece sem vínculo.
+
+Matriz sintética, sem anúncios reais nem PII, medida pelos testes puros:
+
+| Caso | Antes | Depois |
+|---|---:|---:|
+| Scania R440 × FIPE 440 sem série | 0,60 | 0,00 |
+| Scania 440 sem série × FIPE R-440 | 0,60 | 0,00 |
+| DAF XF 530 × FIPE XF105 FTT530 | 0,99 | 0,00 |
+| DAF XF105 530 sem configuração × único XF105 FTT530 | 0,90, elegível | sem vínculo (confiança insuficiente) |
+| Scania R440 × FIPE R-440, único | 0,95 | 0,95, alto |
+| DAF XF105 FTT530 × FIPE XF105 FTT530, único | 0,99 | 0,99, alto |
+
+**Métrica do conjunto sintético:** 4/4 casos sem evidência suficiente eram
+elegíveis antes, 0/4 depois; 2/2 positivos de alta confiança preservados.
+Os testes de regressão locais somam 42/42. Não se mediu cobertura em banco real
+nem distribuição de scores de produção. Nenhum dado foi escrito e F4 segue bloqueada.
+Sugestões de curadoria humana (`pontua_sugestao`) não foram alteradas.
+
+### Diagnóstico isolado P0 — eixo/tração (01/10/2026)
+
+Para eixo/tração 4x2, 6x2, 6x4 ou 8x2 explícito no anúncio, o matching automático
+exige o mesmo eixo no nome FIPE, um único candidato após os filtros e score de pelo
+menos 0,95 (`alto`). Um nome FIPE sem eixo não confirma a configuração. Se o anúncio
+não declara eixo e o catálogo traz variantes de eixos diferentes, o nome base não
+resolve a ambiguidade. Esses casos ficam sem vínculo automático para curadoria.
+
+Ensaio offline em `test_fipe_sync.py` (catálogo sintético, sem F3/banco):
+
+| Eixo do anúncio | FIPE igual | FIPE 4x2/6x2/6x4/8x2 diferente | FIPE sem eixo |
+|---|---|---|---|
+| 4x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 6x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 6x4 | único + score ≥ 0,95: `alto` | excluído | excluído |
+| 8x2 | único + score ≥ 0,95: `alto` | excluído | excluído |
+
+Dois modelos do eixo correto ou score menor que 0,95 ficam ambíguos; sem nenhum,
+`sem match eixo`. Série Scania divergente (R/G) é rejeitada mesmo com eixo igual;
+DAF XF FTT530 6x4 Super Space mantém somente cabine/configuração compatíveis.
+IVECO TECTOR 240E25 8x2 com código e eixo exatos ainda recebe score 0,60 da
+regra preexistente e **não** vira vínculo `alto`. A cobertura em anúncios reais
+não foi medida: as linhas deslocadas do F3 não permitem essa inferência.
+
+### Diagnóstico isolado P0 — cabine DAF (01/10/2026)
+
+Na DAF, a FIPE também separa cabine (`Day`, `Sleeper`, `Space`, `Super Space Cab`; `cabine_daf`
+em `fipe_sync.py`). Sem a palavra no anúncio, o matcher não escolhe uma versão por conta própria:
+dois candidatos com cabines declaradas diferentes (ex.: `SPACE`/`SUPER SPACE`) ficam ambíguos, e o
+mesmo vale quando só UM dos candidatos declara a cabine e o outro não diz nada (`XF FTT530 6x4`
+genérico ao lado de `XF FTT530 6x4 Space Cab`) — um nome genérico na FIPE não é evidência de que
+aquela é a versão certa, então ele entra na ambiguidade junto com o declarado. Só vincula sem a
+palavra no anúncio quando TODOS os candidatos daquele número/série são igualmente genéricos (não
+há cabine para desambiguar). Quando o ANÚNCIO declara a cabine explicitamente (ex.: "Super
+Space"), exige-se a tag correspondente em algum candidato — mesmo que exista um único candidato
+genérico com score alto (achado CUSTODIA/VELOX, 28/09): candidato único e confiança alta não
+substituem a confirmação da cabine; sem nenhum candidato com a tag pedida, não vincula (`sem match
+cabine <TAG>`), mesmo que todos os candidatos do grupo sejam igualmente genéricos. Testes em
+`test_fipe_sync.py` (`test_daf_candidato_sem_tag_de_cabine_ao_lado_de_um_com_tag_fica_ambiguo`,
+`test_daf_cabine_explicita_sem_nenhum_candidato_tagueado_nao_vincula` e vizinhos).
+
+### Diagnóstico isolado P0 — DAF/IVECO (01/10/2026)
+
+No matching DAF/IVECO, a vinculação automática exige um único modelo candidato com
+confiança alta. XF105 não se mistura à geração XF mesmo quando um nome FIPE omite
+potência; FT, FTS e FTT não se cruzam quando ambos os códigos são explícitos; códigos
+IVECO 240E25/240E28 e potências S44T/S48T distintas são incompatíveis. Casos sem
+evidência suficiente ficam sem vínculo automático para revisão. Essas regras só
+mudam a seleção em memória; não adicionam consultas, índices nem migração de dados.
+Se o anúncio DAF declara cabine, o modelo FIPE precisa declarar a mesma cabine;
+nome FIPE sem cabine não basta mesmo com score numérico alto.
+No IVECO, código composto exato recebe score alto somente com família, eixo e
+cabine explícitos e iguais nos dois lados; sem essa evidência o score fica abaixo
+do portão automático de 0,95.
+A matriz de interação e seus limites estão em [P0-DAF-IVECO-MATRIZ.md](P0-DAF-IVECO-MATRIZ.md).
+
+### Uplift de confiança para a linha CF (decisão Master aprovada)
+
+A CF não tem letra de configuração (`FT`/`FTS`/`FTT`) para `avalia()` confirmar o modelo, então o
+score fica travado em 0,90 ("potência") mesmo quando o candidato é o único certo — e o gate geral
+de confiança (`>= 0,95`) rejeitaria esses casos por engano. `escolhe()` faz um uplift pontual para
+0,95 SOMENTE quando **família CF, potência, eixo e cabine batem explicitamente dos dois lados**
+(anúncio E FIPE, nenhum lado `None`) e sobra um único candidato:
+
+- a potência é reconferida por conta própria (`potencia_daf` nos dois lados), não herdada do score
+  que o candidato trouxe — defesa em profundidade contra um candidato que chegasse com score alto
+  por outro motivo;
+- emissão (E5/E6): o bloco de `emissao_preferida` mais acima tem um fallback que aceita um
+  candidato FIPE SEM a tag quando nada contradiz; o uplift reconfere e exige a tag igual quando o
+  ANÚNCIO declara a emissão explicitamente — sem a tag na FIPE, não há uplift;
+- o ano-modelo **não entra aqui**: `escolhe()` só recebe o nome do modelo FIPE, sem ano-código; a
+  conferência real do ano acontece depois, em `processa_anuncios()` →
+  `busca_ou_cria_preco`/`busca_preco_cache` por `modelo_ano`. Confiança "alto" pelo uplift não
+  dispensa essa etapa: sem o ano no cache local (modo `permitir_api=False`), nada é gravado, fica
+  em `aguardando_cache` — nunca "vinculado" por confiança emprestada de outro sinal
+  (`test_cf_uplift_ano_ainda_e_conferido_no_fluxo_final_sem_vinculo_por_cache_vazio`).
+
+Ausência de evidência em qualquer ponto (só um lado declara, candidato sem tag, potência
+divergente) nunca cai para confiança "média": fica sem vínculo. Testes em `test_fipe_sync.py`,
+prefixo `test_cf_uplift_*` (positivos e os negativos espelhados de cada sinal).
+
 ## Instalação em banco existente
 
 ```bash
