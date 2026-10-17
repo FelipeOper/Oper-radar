@@ -181,8 +181,9 @@ function RadarPulse({ ultimaColeta }) {
     ? Math.round((Date.now() - new Date(ultimaColeta)) / 3600000)
     : null;
   const ativo = horasAtras != null && horasAtras < 24;
+  const resumo = `${ativo ? 'Radar ativo' : 'Aguardando coleta'} · ${horasAtras != null ? `última varredura há ${horasAtras}h` : 'sem dados ainda'}`;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div className="oc-radar" role="status" aria-label={resumo} title={resumo} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span style={{ position: 'relative', width: 10, height: 10, flexShrink: 0 }}>
         <span style={{
           position: 'absolute', inset: 0, borderRadius: '50%',
@@ -194,7 +195,7 @@ function RadarPulse({ ultimaColeta }) {
           animation: 'radarPing 2.4s ease-out infinite',
         }} />}
       </span>
-      <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, lineHeight: 1.4 }}>
+      <div className="oc-radar__texto" aria-hidden="true" style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, lineHeight: 1.4 }}>
         {ativo ? 'RADAR ATIVO' : 'AGUARDANDO COLETA'}<br />
         <span style={{ color: ativo ? T.signal : T.inkMuted }}>
           {horasAtras != null ? `última varredura há ${horasAtras}h` : 'sem dados ainda'}
@@ -1037,14 +1038,18 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
   const maiorOferta = noEstado ? Math.max(1, ...(data.geografia?.cidades || []).map(item => item.anuncios)) : maxUf;
 
   return <section aria-label="Painel analítico do mercado" style={{ marginBottom: 28 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 14, padding: '12px 14px', marginBottom: 6 }}>
-      <span style={{ fontSize: 11.5, color: T.inkMuted, fontFamily: T.fontMono }}>Analisando:</span>
+    <div className="oc-contexto" style={{ background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 14, padding: '12px 14px', marginBottom: 6 }}>
+      <div className="oc-contexto__chips">
+      <span style={{ fontSize: 11.5, color: T.inkMuted, fontFamily: T.fontMono, flex: 'none' }}>Analisando:</span>
       <FiltroChip aria="remover filtro de tipo" onRemover={contexto?.segmento && contexto.segmento !== 'todas' ? () => atualiza({ segmento: 'todas' }) : undefined}>{segmentoRotulo}</FiltroChip>
       {ufsAtuais.map(sigla => <FiltroChip key={sigla} aria={`remover filtro de estado ${NOMES_UF[sigla] || sigla}`} onRemover={() => alternarUf(sigla)}>{NOMES_UF[sigla] || sigla}</FiltroChip>)}
       {temCidade && <FiltroChip aria="remover filtro de cidade" onRemover={() => atualiza({ cidade: 'todas' })}>{escopo.cidade}</FiltroChip>}
       <FiltroChip aria="voltar ao período padrão" onRemover={periodo !== '30d' ? () => atualiza({ periodo: '30d' }) : undefined}>{PERIODO_ROTULOS[periodo] || periodo}</FiltroChip>
+      </div>
+      <div className="oc-contexto__acoes">
       <button type="button" onClick={() => setRefinarAberto(v => !v)} aria-expanded={refinarAberto} aria-controls="or-refinar-painel" className="or-refine-btn" style={{ fontSize: 13, fontWeight: 600, color: T.signalInk, background: T.signal, border: 'none', borderRadius: 999, padding: '8px 16px', cursor: 'pointer' }}>Refinar resultados</button>
       <button onClick={onAlternar} style={{ ...inputStyle, cursor: 'pointer', background: 'none' }}>Ocultar painel</button>
+      </div>
     </div>
 
     {refinarAberto && <Card id="or-refinar-painel" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1127,7 +1132,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
                 const nome = noEstado ? item.cidade : `${NOMES_UF[item.uf] || item.uf} · ${item.uf}`;
                 const volume = Number(item.anuncios || 0);
                 return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })}
-                  style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(140px, 220px) 1fr 56px', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
+                  className="oc-oferta-linha" style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
                   <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: volume >= maiorOferta ? T.signal : 'color-mix(in srgb, var(--text-primary) 70%, transparent)', borderRadius: 999 }} /></span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 12.5, textAlign: 'right', color: T.inkMuted }}>{fmtN(volume)}</span>

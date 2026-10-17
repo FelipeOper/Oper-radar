@@ -1123,3 +1123,26 @@ select option {
 /* Analise: blocos agregados em 2 x 2 (sem card orfao). */
 .oc-analise-blocos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 900px) { .oc-analise-blocos { grid-template-columns: minmax(0, 1fr); } }
+
+/* Topbar do celular: so o ponto pulsante (texto completo no aria-label/title), como no UI kit.
+   Na sidebar do desktop o texto continua visivel. */
+.oc-topbar-status .oc-radar__texto { display: none; }
+.oc-topbar-status .oc-radar { padding: 0 8px; }
+
+/* Mercado: barra "Analisando". Chips de um lado, acoes do outro; no celular os chips rolam
+   numa linha so e os dois botoes ficam lado a lado. */
+.oc-contexto { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.oc-contexto__chips { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
+.oc-contexto__acoes { display: flex; align-items: center; gap: 10px; flex: none; }
+@media (max-width: 560px) {
+  .oc-contexto { flex-direction: column; align-items: stretch; }
+  .oc-contexto__chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .oc-contexto__chips::-webkit-scrollbar { display: none; }
+  .oc-contexto__chips > * { flex: none; }
+  .oc-contexto__acoes { display: grid; grid-template-columns: 1fr auto; }
+  .oc-contexto__acoes .or-refine-btn { width: 100%; }
+}
+
+/* Mercado: linha de "Onde ha mais ofertas". No celular o nome divide espaco com a barra. */
+.oc-oferta-linha { display: grid; grid-template-columns: minmax(140px, 220px) 1fr 56px; }
+@media (max-width: 560px) { .oc-oferta-linha { grid-template-columns: minmax(0, 1fr) 96px 44px; } }
