@@ -1756,12 +1756,12 @@ function PageFipe({ onNavegar }) {
     }
   };
 
-  return <div style={{ maxWidth: 1400 }}>
-    <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-8px 0 16px', maxWidth: 820 }}>
+  return <div>
+    <div className="oc-lede" style={{ margin: '-8px 0 16px' }}>
       Consulte um veículo pela placa ou pesquise diretamente no catálogo nacional de caminhões. Os dois caminhos cruzam a FIPE com o mercado monitorado pelo radar.
     </div>
 
-    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 18, maxWidth: 940 }}>
+    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
       {[
         { id: 'placa', titulo: 'Consultar por placa', texto: 'Identifique o veículo e encontre a FIPE', icone: ScanLine },
         { id: 'catalogo', titulo: 'Catálogo FIPE', texto: 'Busque por marca, modelo, ano ou código', icone: Search },
@@ -1784,7 +1784,7 @@ function PageFipe({ onNavegar }) {
     </div>
 
     {modo === 'fila' ? <PageFipeFila onNavegar={onNavegar} /> : modo === 'catalogo' ? <PageFipeCatalogo /> : <>
-      <Card style={{ padding: 18, maxWidth: 820 }}>
+      <Card style={{ padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
             <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 600 }}>Identificar veículo</div>
@@ -1858,8 +1858,8 @@ function PageFipeFila({ onNavegar }) {
   const resumo = data?.resumo;
   const categorias = data?.categorias || [];
 
-  return <div style={{ maxWidth: 1100 }}>
-    <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-4px 0 16px', maxWidth: 820 }}>
+  return <div>
+    <div className="oc-lede" style={{ margin: '-4px 0 16px' }}>
       Anúncios de caminhão ativos sem referência FIPE vinculada, agrupados por marca e modelo. Sem
       vínculo não há mediana nem desvio pra esse anúncio em nenhuma tela do radar.
     </div>
@@ -1867,7 +1867,7 @@ function PageFipeFila({ onNavegar }) {
     {status === 'loading' && <div style={{ color: T.inkMuted, fontSize: 12.5 }}>Carregando fila…</div>}
     {erro && <div role="alert" style={{ color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}30`, borderRadius: 9, padding: 11, fontSize: 12.5 }}>Não foi possível carregar a fila agora.</div>}
 
-    {resumo && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 18, maxWidth: 820 }}>
+    {resumo && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 18 }}>
       {[
         ['COBERTURA', resumo.cobertura_pct == null ? '—' : `${resumo.cobertura_pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`, `${fmtN(resumo.vinculados)} de ${fmtN(resumo.total)} vinculados`],
         ['PENDENTES', fmtN(resumo.pendentes), 'sem referência FIPE'],
@@ -1945,7 +1945,7 @@ function PageFipeCatalogo() {
   const temFiltros = busca || marca !== 'todas' || modeloId !== 'todos' || ano !== 'todos';
 
   return (
-    <div style={{ maxWidth: 1400 }}>
+    <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: 12 }}>
         <Kpi label="Modelos de caminhão" value={facetas ? fmtN(facetas.resumo?.modelos) : '—'} sub={`${fmtN(facetas?.resumo?.marcas)} marcas no catálogo`} />
         <Kpi label="Preços disponíveis" value={facetas ? fmtN(facetas.resumo?.precos) : '—'} sub="anos e versões consultáveis" />
@@ -2106,7 +2106,7 @@ function PageConta({ sessao, onSessao, onLogout }) {
     finally { setSalvando(false); }
   };
 
-  return <div style={{ maxWidth: 820 }}>
+  return <div>
     <SectionTitle sub="Seus dados, nível de acesso e segurança da conta">Área de membros</SectionTitle>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
       <Card>
@@ -2664,7 +2664,7 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
   const progressoFipe = fipeStatus?.elegiveis
     ? Math.min(100, Math.round((Number(fipeStatus.vinculados_ativos || 0) / Number(fipeStatus.elegiveis)) * 100)) : 0;
   return (
-    <div style={{ maxWidth: 980 }}>
+    <div>
       <SectionTitle sub="Modelos prontos, KPIs e ordem dos blocos para desktop e celular">Personalização do painel</SectionTitle>
       <DashboardLayoutEditor value={preferencias.dashboardHoje} onSave={onPreferencias} />
       <SectionTitle sub="Tema, densidade e conforto de uso — preferências salvas neste navegador">Aparência</SectionTitle>

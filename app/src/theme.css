@@ -1009,3 +1009,7 @@ select {
 .oc-acoes__evidencia { margin: 0; overflow-wrap: anywhere; }
 .oc-acoes__acoes { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 560px) { .oc-acoes__form { grid-template-columns: 1fr; } }
+
+/* Grid unico: o conteudo ocupa a area util inteira, ate --content-max (design-system/tokens/spacing.css). */
+.oc-main > * { max-width: var(--content-max); }
+.oc-lede { max-width: 72ch; color: var(--text-secondary); font-size: var(--fs-sm); line-height: 1.6; }

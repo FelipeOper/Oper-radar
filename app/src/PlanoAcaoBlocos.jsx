@@ -73,7 +73,7 @@ export function PagePlanoAcao() {
 
   return (
     <div className="oc-acoes">
-      <p className="or-card__sub" style={{ maxWidth: 640, margin: '0 0 16px' }}>
+      <p className="or-card__sub oc-lede" style={{ margin: '0 0 16px' }}>
         Dado de mercado diz <em>o que</em> fazer; esta lista registra <em>se foi feito</em>. Ações criadas a partir das
         evidências do radar (botão "Criar ação") guardam a origem e a métrica que motivou. Concluir ou remover não
         altera os dados do mercado; tudo fica salvo só neste navegador.
