@@ -1,0 +1,319 @@
+
+OPER RADAR
+PLANO MESTRE
+Redesign e evolução das telas
+Arquitetura, regras de produto, sequência aprovada e checklist vivo
+Versão
+1.0
+Data-base
+29 ago 2026
+Responsável
+Felipe Hilário
+Telas consolidadas
+3
+Etapa atual
+Mercado por estado
+Próxima tela
+Mercado por cidade
+REGRA DE GOVERNANÇA  Este arquivo é a fonte oficial do redesenho. Uma tela só muda para APROVADA depois da confirmação explícita do gestor. Cada aprovação atualiza status, decisões, imagem de referência, pendências e histórico de versões.
+Resumo executivo
+O Oper Radar é um sistema de inteligência comercial para monitorar o mercado de caminhões e os concorrentes em todo o Brasil. Ele não é um ambiente de compra. A experiência deve transformar anúncios monitorados em leitura de oferta, preço, pressão competitiva, posicionamento regional e ação comercial para a SVD Seminovos.
+Três telas estão consolidadas: Visão estratégica, Mercado nacional e Mercado filtrado em Minas Gerais.
+A hierarquia de exploração é Brasil → região → estado → cidade → lojista → anúncio.
+Análise por modelo, lista de anúncios e perfil de lojista são aprofundamentos integrados; não viram novas áreas principais do menu.
+Minha Loja — SVD Seminovos permanece como base fixa de comparação em todo recorte.
+1. Propósito e limites do produto
+Objetivo
+Dar ao gestor uma visão estratégica e comercial do mercado monitorado, permitindo entender onde estão os anúncios, quais modelos ganharam ou perderam preço, quem pressiona o mercado e como o estoque da SVD está posicionado diante de ofertas realmente comparáveis.
+O sistema deve
+Monitorar oferta, entrada, permanência, alteração de preço e saída detectada dos portais.
+Comparar Brasil, região, estado, cidade, lojista e anúncio sem perder o contexto do filtro anterior.
+Calcular preço de mercado por grupos de veículos equivalentes, com mediana como medida principal.
+Manter a SVD Seminovos como referência fixa para posicionamento e decisões comerciais.
+Gerar insights estratégicos com evidências, amostra, período, confiança e caminho para abrir os anúncios que sustentam a leitura.
+Permitir perguntas livres ao Radar IA sobre o mercado efetivamente monitorado.
+O sistema não deve
+Virar marketplace, catálogo de compra ou fluxo de negociação de veículos.
+Exibir fotos de veículos como elemento de navegação ou decisão.
+Comparar modelos diferentes como se pertencessem ao mesmo mercado.
+Tratar saída do portal como venda confirmada.
+Misturar FIPE com a mediana dos anúncios; FIPE é referência separada.
+Inventar causa, tendência, preço ideal ou recomendação sem dados históricos e amostra suficientes.
+2. Arquitetura oficial
+O menu principal permanece curto. Profundidade acontece dentro das áreas, por navegação contextual e breadcrumb.
+Área
+Objetivo
+Conteúdo principal
+Visão estratégica
+Responder o que merece atenção agora.
+Pulso do mercado, movimentos, prioridades e confiança.
+Mercado
+Explorar oferta, preço e concentração geográfica.
+Brasil, região, estado, cidade, modelo, lojista e anúncios.
+Concorrência
+Entender quem está movimentando e pressionando cada mercado.
+Ranking, perfis, estoque, preços, entradas, saídas e comparação.
+Minha Loja
+Posicionar a SVD contra grupos equivalentes.
+Estoque, modelos, faixa de preço, alcance geográfico e ação comercial.
+Radar IA
+Responder perguntas e explicar evidências.
+Camada global em balão; não é aba principal.
+Configurações
+Administrar conta, fontes, alertas e regras.
+Área secundária no rodapé do menu.
+Hierarquia de navegação
+Brasil: visão ampla e distribuição nacional.
+Região: concentração e comparação entre macrorregiões.
+Estado: modelos, cidades, faixas de preço e lojistas do estado.
+Cidade: recálculo completo do mercado local e concorrência da praça.
+Lojista: perfil, estoque, comportamento de preço, entradas e saídas detectadas.
+Anúncio: evidência individual e histórico monitorado, sem fotografia do veículo.
+DECISÃO CORRIGIDA  Depois da tela de Minas Gerais, a sequência linear continua em Mercado por cidade. A análise por modelo e a lista de anúncios são ramificações acionadas na própria tela, não uma sessão principal inventada.
+3. Regras globais de filtros e comparação
+Filtro
+Regra
+Comportamento
+País
+Brasil
+Cobertura nacional; não limitar a PR, SC, RS e SP.
+Geografia
+Todas as regiões / estados / cidades
+O filtro filho respeita a seleção do nível anterior.
+Período inicial
+Todo o período
+Usa todo o histórico disponível do recorte.
+Opções de período
+Data personalizada; 1 ano; 120; 90; 60 dias
+A lista é igual em todos os ambientes com filtro temporal.
+Comparação automática
+Período anterior equivalente
+Aplica-se aos períodos fixos e personalizados; o gestor pode alterar.
+Todo o período
+Sem comparação
+Não existe um período anterior completo equivalente.
+Base
+Minha Loja — SVD Seminovos
+Permanece visível e fixa como referência competitiva.
+Equivalência de mercado
+Uma média só é útil quando compara caminhões do mesmo mercado. O grupo comparável deve combinar:
+categoria e tipo do veículo;
+marca e modelo normalizados;
+configuração e tração;
+ano ou faixa curta de anos;
+condição do veículo;
+carroceria/implemento, quando relevante;
+quilometragem, quando houver cobertura suficiente.
+Mediana é a referência principal. Média, mínimo, máximo, P25–P75 e dispersão aparecem como contexto. O ticket geral é apenas leitura do mix e nunca substitui o preço de mercado do modelo.
+Semântica visual
+Azul-marinho e cinza: valores, posições e diferenças estáticas contra Brasil, estado ou Minha Loja.
+Verde e vermelho: somente movimentos no tempo, como preço subiu ou caiu no período.
+Laranja: destaque da Minha Loja, prioridade ou ação principal.
+FIPE: referência separada, com rótulo e fonte explícitos.
+4. Sistema visual
+Tipografia do aplicativo: Noto Sans, com no máximo dois pesos simultâneos por bloco.
+Dashboard claro, fundo branco/cinza quente, texto azul-marinho e laranja restrito.
+Grade de 12 colunas e alinhamentos contínuos entre filtros, indicadores e áreas analíticas.
+Ritmo de espaçamento baseado em 1,618: 8, 13, 21, 34 e 55 px.
+Divisórias finas, sombras mínimas, poucos cartões e nenhuma estética neon/glassmorphism.
+Desktop analítico como referência; adaptação mobile deve preservar filtros, contexto e retorno.
+Sem fotos de veículos em qualquer tela do produto.
+TELA 1
+Visão estratégica
+Entregar um briefing executivo do mercado monitorado e priorizar decisões comerciais.
+Situação
+Design consolidado e aprovado como primeira tela.
+Preservar
+Base Minha Loja, filtros globais, KPIs, movimentos e prioridades comerciais.
+Ainda validar
+Implementação, responsividade, estados vazios/erro e conexão real dos insights ainda não foram validados neste redesenho.
+TELA 2
+Mercado nacional
+Explorar oferta, preço e concentração dos anúncios monitorados em todo o Brasil.
+Situação
+Design consolidado e aprovado como segunda tela.
+Preservar
+Mapa nacional, seleção de estado, tabela por modelo, mediana por região e acesso aos anúncios equivalentes.
+Ainda validar
+Comportamento dos cliques, carregamento, filtros encadeados e dados de produção ainda precisam de teste funcional.
+TELA 3
+Mercado / Sudeste / Minas Gerais
+Recalcular a leitura para o estado selecionado e permitir aprofundar por cidade, modelo, lojista e anúncio.
+Situação
+Design consolidado e aprovado como terceira tela.
+Preservar
+Breadcrumb, estado selecionado, ranking de cidades, comparáveis por modelo, faixa estadual, Minha Loja externa e lojistas mineiros.
+Ainda validar
+Antes da implementação, diferenças estáticas contra Brasil/MG devem usar cor neutra; verde/vermelho ficam reservados ao movimento temporal.
+5. Sequência oficial de telas
+A sequência abaixo separa áreas principais de aprofundamentos. A ordem de prototipação só muda mediante decisão registrada neste documento.
+#
+Tela / módulo
+Status
+Objetivo ou próximo critério
+1
+Visão estratégica
+APROVADA
+Briefing executivo e prioridades.
+2
+Mercado nacional
+APROVADA
+Mapa Brasil, modelos e regiões.
+3
+Mercado por estado
+APROVADA
+Minas Gerais como estado demonstrativo.
+4
+Mercado por cidade
+EM ANDAMENTO
+Próxima tela: recalcular mercado ao selecionar uma cidade.
+5
+Análise integrada de modelo
+PLANEJADA
+Abrir a partir do modelo selecionado; não criar nova área do menu.
+6
+Navegador de anúncios
+PLANEJADA
+Listar evidências do recorte, com busca e filtros, sem fotos.
+7
+Detalhe do anúncio
+PLANEJADA
+Preço, especificações, lojista, localidade e histórico monitorado.
+8
+Concorrência — visão geral
+PLANEJADA
+Ranking e movimentos dos participantes por recorte.
+9
+Perfil do concorrente
+PLANEJADA
+Estoque, mix, preço, entradas e saídas detectadas.
+10
+Comparador de concorrentes
+PLANEJADA
+Comparar participantes e Minha Loja em mercados equivalentes.
+11
+Minha Loja — visão geral
+PLANEJADA
+Posicionamento do estoque da SVD contra o mercado.
+12
+Minha Loja — modelo/item
+PLANEJADA
+Recomendação comercial baseada em equivalentes e geografia.
+13
+Radar IA
+PLANEJADA
+Balão global, respostas com fonte, amostra e abertura da evidência.
+14
+Alertas estratégicos
+PLANEJADA
+Mudanças relevantes, regras e preferências do gestor.
+15
+Saúde dos dados
+PLANEJADA
+Cobertura, atualização, falhas, duplicidades e confiança.
+16
+Configurações e conta
+PLANEJADA
+Usuários, fontes, permissões, preferências e método.
+PRÓXIMO MARCO  Tela 4 — Mercado por cidade. Ela deve nascer do clique em uma cidade da Tela 3, preservar todos os filtros e recalcular KPIs, modelos, lojistas e anúncios apenas daquela praça.
+6. Checklist geral do projeto
+Entrega
+Situação
+Evidência / próximo passo
+Estratégia e escopo
+CONCLUÍDO
+Propósito, limites, áreas e base comparativa definidos.
+Sistema visual
+CONCLUÍDO
+Dashboard claro, Noto Sans, grade 12 colunas e ritmo 1,618.
+Regras de período
+CONCLUÍDO
+Todo o período, data personalizada, 1 ano, 120, 90 e 60 dias.
+Regra de equivalência
+CONCLUÍDO
+Modelo/configuração/ano/condição e demais atributos relevantes.
+Tela 1 — Visão estratégica
+CONCLUÍDO
+Referência visual anexada.
+Tela 2 — Mercado nacional
+CONCLUÍDO
+Referência visual anexada.
+Tela 3 — Mercado por estado
+CONCLUÍDO
+Referência visual anexada; ajuste de cor registrado.
+Tela 4 — Mercado por cidade
+EM ANDAMENTO
+Definir conteúdo antes de gerar a imagem.
+Demais telas
+PENDENTE
+Seguir a sequência oficial e revisar uma por vez.
+Estados loading/vazio/erro
+PENDENTE
+Especificar por tela antes da implementação.
+Responsividade
+PENDENTE
+Criar comportamento tablet/mobile após o desktop principal.
+Mapa de dados e APIs
+PENDENTE
+Associar cada KPI, filtro e ação a fonte e endpoint reais.
+Implementação frontend
+NÃO VALIDADO
+As imagens não comprovam que as telas existem no sistema.
+Validação funcional
+NÃO VALIDADO
+Testar cliques, filtros, navegação, performance e permissões.
+7. Gate de aprovação por tela
+Nenhuma tela avança para aprovada apenas porque a imagem ficou bonita. O gate mínimo é:
+Objetivo da tela descrito em uma frase e ligado a uma área do produto.
+Origem e destino da navegação definidos; o botão Voltar preserva filtros e posição.
+Filtros, estado inicial e comparação seguem as regras globais.
+KPIs e agrupamentos possuem definição e fonte; dados de exemplo são identificados como demonstração.
+Comparações usam grupos equivalentes e Minha Loja como base quando aplicável.
+Cores separam movimento temporal de posição estática.
+Sem fotos de veículos e sem ações de compra.
+Estados de carregamento, vazio, erro, ausência de amostra e baixa confiança definidos.
+Revisão visual em grade, alinhamento e espaçamentos concluída.
+Aprovação explícita do gestor registrada.
+Documento mestre, checklist e histórico de versões atualizados.
+8. Situação funcional real
+DISTINÇÃO OBRIGATÓRIA  As três imagens comprovam o planejamento visual. Elas não comprovam publicação, conexão com API, cálculo correto, permissões, responsividade ou funcionamento em produção.
+Camada
+Estado
+Comprovação necessária
+Planejamento visual
+Aprovado
+Três telas com referências anexadas.
+Protótipo clicável
+Não verificado
+Nenhum fluxo foi executado nesta etapa.
+Frontend implementado
+Não verificado
+Exige cruzamento com o repositório atual.
+APIs e banco
+Não verificado
+Exige mapa de dados e teste por endpoint.
+Publicação
+Não verificado
+Exige inspeção do ambiente publicado.
+Uso operacional
+Não verificado
+Exige validação com dados reais e gestor.
+9. Protocolo de atualização
+Antes de iniciar: consultar a última versão deste documento.
+Criar somente uma tela por ciclo.
+Revisar conteúdo, números, semântica visual e coerência com as telas aprovadas.
+Apresentar a tela ao gestor e aguardar decisão explícita.
+Se aprovada: anexar a imagem, atualizar status e registrar decisões e pendências.
+Se rejeitada: não contar a tela como realizada e registrar o motivo no histórico.
+Publicar uma nova versão do mesmo documento, preservando seu histórico.
+10. Histórico de versões
+Versão
+Data
+Responsável
+Alteração
+1.0
+29 ago 2026
+Felipe Hilário + Codex
+Consolidação das três telas, arquitetura oficial, regras globais, sequência corrigida e checklist vivo.
+Próxima atualização prevista
+Após a aprovação da Tela 4 — Mercado por cidade.

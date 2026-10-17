@@ -1,0 +1,601 @@
+From d96d430da0215a146b6a4226d9505b66ae06d8b2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 8 Sep 2026 03:13:05 +0000
+Subject: [PATCH] fix(pacote1): bloqueia vinculo FIPE incompativel e corrige
+ multi-UF em ofertas/lojistas
+
+DAT01 (auditoria 07/09, achado D01): minha_loja.php aceitava qualquer
+fipe_preco_id do cliente sem validar contra marca/modelo/ano do item. Casos
+#8252633 e #8318650 (ano e potencia DAF divergentes) agora sao bloqueados na
+escrita (HTTP 422) e isolados na leitura (fipe_vinculo_status=incompativel,
+campos derivados da FIPE zerados) via novo lib/fipe_compat.php, sem alterar o
+vinculo ja gravado no banco -- sem acesso a producao para corrigir os
+registros existentes diretamente.
+
+DAT03 (achado D02): anuncios.php e lojistas.php so aceitavam uma UF (`r.uf =
+?`), enquanto mercado_painel.php (branch redesign-oper-radar-20260831) ja
+aceita multisselecao (`uf=PR,SC`). A comparacao literal contra a string
+"PR,SC" zerava as ofertas mesmo com o painel mostrando milhares de anuncios
+no mesmo recorte. Os tres endpoints agora usam a mesma normalizacao de
+lib/market_scope.php (trazida da branch de redesign).
+
+GOV01 (parcial): CLAUDE.md atualizado com o baseline git real observado e a
+limitacao conhecida -- sem acesso a cPanel/SSH nesta sessao, a confirmacao do
+commit/bundle efetivamente publicado em producao (e OPS01, ambiente de
+teste/rollback) seguem pendentes de uma sessao com acesso ao servidor.
+
+12/12 testes PHP existentes + 2 novos (fipe_compat_test, market_scope_test)
+passam; php -l limpo em todos os .php do repositorio. Nada mesclado em main
+nem publicado -- branch aberta para revisao.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01154dSqxAYUYYb7wcsfiQ1u
+---
+ CLAUDE.md                                  | 85 ++++++++++++++++++-
+ oper-radar-api/anuncios.php                | 18 +++-
+ oper-radar-api/lib/fipe_compat.php         | 95 ++++++++++++++++++++++
+ oper-radar-api/lib/market_scope.php        | 32 ++++++++
+ oper-radar-api/lojistas.php                | 12 ++-
+ oper-radar-api/minha_loja.php              | 64 ++++++++++++++-
+ oper-radar-api/minha_loja_detalhe.php      | 24 +++++-
+ oper-radar-api/tests/fipe_compat_test.php  | 48 +++++++++++
+ oper-radar-api/tests/market_scope_test.php | 26 ++++++
+ 9 files changed, 395 insertions(+), 9 deletions(-)
+ create mode 100644 oper-radar-api/lib/fipe_compat.php
+ create mode 100644 oper-radar-api/lib/market_scope.php
+ create mode 100644 oper-radar-api/tests/fipe_compat_test.php
+ create mode 100644 oper-radar-api/tests/market_scope_test.php
+
+diff --git a/CLAUDE.md b/CLAUDE.md
+index b9564b0..d5714c0 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -4,7 +4,14 @@
+ > Atualizar ao final de cada bloco importante. Nunca registrar senhas, tokens, cookies ou
+ > conteúdo de `.oper-radar.env`.
+ 
+-Última atualização: 01/09/2026
++Última atualização: 08/09/2026
++
++> ⚠️ As seções abaixo ("Estado atual" em diante) datam de 01/09/2026 e estão desatualizadas —
++> preservadas como histórico, não como estado corrente. Ver "08/09/2026 — retomada do Plano
++> Mestre" no Registro de atualizações para o estado real conhecido nesta data e suas
++> limitações. Auditoria completa em 07/09, consolidada em 08/09; Plano Mestre de Evolução v1.0
++> também de 08/09 — ambos versionados no projeto Claude "OPER RADAR - PROJETO"
++> (`oper-radar-auditoria-20260907.md`, `oper-radar-plano-mestre-v1.md`).
+ 
+ ## Estado atual
+ 
+@@ -89,3 +96,79 @@ Próximo passo:
+ - Painel autenticado validado em desktop.
+ - Auditoria de design independente concluída.
+ - Documento de continuidade consolidado neste `CLAUDE.md`.
++
++### 08/09/2026 — retomada do Plano Mestre e Pacote 1 (baseline + DAT01 + DAT03)
++
++**Agente:** Claude (Cowork), a pedido de Felipe Hilario.
++**Bloco:** M0 (retomada) + início do M1, itens 1–3 do "Pacote 1" do Plano Mestre v1.0.
++
++**Baseline git observado nesta retomada (GOV01, parcial — ver limitação abaixo):**
++- `main` remoto real: `89952e3` (não `1038b4f` como o texto acima ainda registra; a
++  diferença é só o commit de docs `8ae664e`, sem mudança de código).
++- Branch `redesign-oper-radar-20260831` @ `57bbe6e` — é a branch citada na auditoria de
++  07/09 como "branch de redesign inspecionada"; contém o painel de Mercado com
++  multisseleção de UF (`lib/market_scope.php`) que NÃO existe em `main`.
++- Branch `deploy/painel-mercado-redesign-20260902` @ `97dd2a4` descende de `57bbe6e` e é,
++  pelas datas e pelo conteúdo, a candidata mais provável ao que está de fato publicado —
++  mas isso **não foi confirmado no cPanel** (ver limitação).
++- `docs/PRODUCAO.md` (em `main` e na branch acima) já registra que "o estado publicado
++  não é reproduzível apenas pelo commit Git" (arquivos não rastreados/modificados
++  direto no servidor). Ou seja, mesmo achando o commit certo, isso não substitui uma
++  leitura direta do cPanel.
++
++**⚠️ Limitação conhecida desta retomada:** este agente não tem acesso a SSH nem ao
++cPanel/HostGator (sem link com o computador do usuário nesta sessão) — só ao GitHub.
++Portanto GOV01 (baseline de produção) e OPS01 (ambiente de teste/rollback em produção)
++**não foram concluídos**, só o lado Git. Confirmar no cPanel qual commit/bundle está
++realmente publicado, testar restauração de backup e só então liberar merge/deploy desta
++branch é uma etapa que depende de Felipe ou de uma sessão com acesso ao servidor.
++
++**Branch de trabalho:** `fix/pacote1-fipe-multiuf-baseline`, criada a partir de `main`
++(`89952e3`), trazendo `lib/market_scope.php` + `tests/market_scope_test.php` de
++`redesign-oper-radar-20260831` (arquivo autocontido, sem dependência do resto do
++redesign visual).
++
++**DAT01 · Casos #8252633 e #8318650 (FIPE incompatível) — isolados com motivo, não
++"corrigidos" no banco (sem acesso a produção para isso):**
++- Causa exata de como esses dois vínculos específicos foram gravados **não foi
++  determinada** (a própria auditoria já registrava isso como pendente). O que se
++  confirmou lendo o código: `minha_loja.php` aceitava qualquer `fipe_preco_id` enviado
++  pelo cliente, sem validar contra marca/modelo/ano do item — diferente do algoritmo
++  cuidadoso de `fase2-fipe/fipe_sync.py`, que nunca produziria um vínculo com ano e
++  potência divergentes ao mesmo tempo.
++- Criado `oper-radar-api/lib/fipe_compat.php`: valida ano-modelo do item vs.
++  `fipe_preco.ano_codigo`, e (para DAF) o número de potência extraído do texto vs. o
++  nome do modelo FIPE — mesma regra de `fipe_sync.py:potencia_daf`, reimplementada em
++  PHP só para esta checagem pontual.
++- `minha_loja.php` (POST criar/atualizar): agora **bloqueia** gravar um `fipe_preco_id`
++  incompatível (HTTP 422 com o motivo). `minha_loja.php` (GET) e
++  `minha_loja_detalhe.php`: vínculo já gravado que reprova a checagem tem os campos
++  derivados da FIPE zerados e `fipe_vinculo_status=incompativel` com o motivo — sem
++  apagar nem alterar o vínculo em si.
++- Teste `oper-radar-api/tests/fipe_compat_test.php` reproduz os dois casos da auditoria
++  como fixtures e confirma reprovação; `php oper-radar-api/tests/fipe_compat_test.php`
++  → `fipe_compat_test=OK`.
++- **Pendente:** isso impede o vínculo ruim de continuar contaminando a análise, mas não
++  identifica nem corrige os registros já existentes no banco (não tenho acesso à
++  produção). Sugestão de próximo passo: rodar uma consulta de auditoria (usando esta
++  mesma função) sobre `meu_estoque` em produção para listar todos os vínculos
++  incompatíveis, não só os dois já conhecidos.
++
++**DAT03 · PR+SC retornando zero ofertas — corrigido:**
++- Causa confirmada: `mercado_painel.php` (na branch de redesign) já aceita
++  `uf=PR,SC` via `lib/market_scope.php`; `anuncios.php` e `lojistas.php` só entendiam
++  uma UF (`r.uf = ?`), então `uf=PR,SC` virava uma comparação literal contra a string
++  inteira e não batia com nenhuma linha.
++- `anuncios.php` e `lojistas.php` agora usam a mesma `painel_normaliza_ufs()` de
++  `market_scope.php` — os três endpoints enxergam o mesmo universo de UFs para o mesmo
++  parâmetro `uf`. Compatível com `uf=PR` (uma UF só, formato antigo).
++- Todos os 12 testes PHP de `oper-radar-api/tests/*_test.php` passam, incluindo os dois
++  novos (`fipe_compat_test`, `market_scope_test` trazido da branch de redesign); `php -l`
++  limpo em todos os `.php` do repositório.
++
++**Evidência:** commits na branch `fix/pacote1-fipe-multiuf-baseline` (ver `git log`).
++**Decisão do gestor:** pendente — nada foi mesclado em `main` nem publicado; aguardando
++revisão de Felipe antes de merge/deploy.
++**Próximo passo:** Felipe revisar o diff, confirmar baseline real de produção no cPanel
++(GOV01/OPS01) e decidir merge + plano de deploy manual (sem SSH). Documentos completos
++(auditoria + Plano Mestre v1.0) salvos no projeto Claude para continuidade entre sessões.
+diff --git a/oper-radar-api/anuncios.php b/oper-radar-api/anuncios.php
+index e7e46f2..8187190 100644
+--- a/oper-radar-api/anuncios.php
++++ b/oper-radar-api/anuncios.php
+@@ -12,6 +12,7 @@ require_once __DIR__ . '/lib/market_quality.php';
+ require_once __DIR__ . '/lib/market_taxonomy.php';
+ require_once __DIR__ . '/lib/vehicle_taxonomy.php';
+ require_once __DIR__ . '/lib/query_contract.php';
++require_once __DIR__ . '/lib/market_scope.php';
+ $conn = conecta();
+ 
+ $REGIOES = [
+@@ -20,6 +21,8 @@ $REGIOES = [
+     'Nordeste' => ['BA','PE','CE','MA','PB','RN','AL','PI','SE'],
+     'Norte' => ['AM','PA','RO','RR','AC','AP','TO'],
+ ];
++$UF_REGIAO = [];
++foreach ($REGIOES as $nomeRegiao => $ufsDaRegiao) foreach ($ufsDaRegiao as $sigla) $UF_REGIAO[$sigla] = $nomeRegiao;
+ 
+ $CATEGORIA_TIPOS = oper_taxonomia_tipos_por_categoria();
+ $MERCADO_TIPOS = oper_taxonomia_tipos_por_mercado();
+@@ -49,7 +52,20 @@ if (!empty($_GET['regiao']) && isset($REGIOES[$_GET['regiao']])) {
+     $ph = implode(',', array_fill(0, count($ufsR), '?'));
+     $where[] = "r.uf IN ($ph)";
+     foreach ($ufsR as $u) { $params[] = $u; $types .= 's'; }
+-} elseif (!empty($_GET['uf'])) { $where[] = 'r.uf = ?'; $params[] = strtoupper($_GET['uf']); $types .= 's'; }
++} else {
++    // DAT03 (auditoria 07/09, achado D02): o painel de Mercado aceita multisseleção de
++    // UF ("uf=PR,SC"), mas este endpoint só entendia uma única sigla — a comparação
++    // literal "r.uf = 'PR,SC'" não batia com nada e devolvia zero ofertas mesmo com o
++    // painel mostrando milhares de anúncios no mesmo recorte. Usa a mesma normalização
++    // de oper-radar-api/lib/market_scope.php (já testada em market_scope_test.php) para
++    // que os dois endpoints enxerguem exatamente o mesmo universo de UFs.
++    $ufsSelecionadas = painel_normaliza_ufs((string)($_GET['uf'] ?? ''), $UF_REGIAO);
++    if ($ufsSelecionadas) {
++        $ph = implode(',', array_fill(0, count($ufsSelecionadas), '?'));
++        $where[] = "r.uf IN ($ph)";
++        foreach ($ufsSelecionadas as $u) { $params[] = $u; $types .= 's'; }
++    }
++}
+ if (!empty($_GET['revenda']))   { $where[] = 'r.nome = ?';      $params[] = $_GET['revenda']; $types .= 's'; }
+ if (!empty($_GET['revenda_id'])) { $where[] = 'r.id = ?'; $params[] = (int)$_GET['revenda_id']; $types .= 'i'; }
+ if (!empty($_GET['tipo']))      { $where[] = 'a.tipo = ?';      $params[] = $_GET['tipo']; $types .= 's'; }
+diff --git a/oper-radar-api/lib/fipe_compat.php b/oper-radar-api/lib/fipe_compat.php
+new file mode 100644
+index 0000000..321af93
+--- /dev/null
++++ b/oper-radar-api/lib/fipe_compat.php
+@@ -0,0 +1,95 @@
++<?php
++/**
++ * Compatibilidade entre um item (Minha Loja) e o vínculo FIPE selecionado para ele.
++ *
++ * DAT01 (auditoria 07/09/2026, achado D01): "Minha Loja" aceitava qualquer
++ * fipe_preco_id enviado pelo cliente, sem validar se ele correspondia ao veículo
++ * cadastrado. Casos reais confirmados na auditoria:
++ *   - item #8252633: DAF XF 480 6x2 2024 vinculado a uma referência FIPE de outro ano.
++ *   - item #8318650: DAF XF105 460 8x2 2016 vinculado a "DAF 410 6x2" ano 2018.
++ *
++ * Este arquivo NÃO decide qual é o vínculo certo (isso é o algoritmo completo de
++ * fase2-fipe/fipe_sync.py, que roda em lote). Ele faz apenas duas checagens baratas e
++ * fortes, com o mesmo espírito de market_quality.php: um vínculo reprovado aqui
++ * continua gravado no banco, mas deixa de alimentar comparativos até revisão.
++ *
++ *   1) Ano-modelo do item vs. ano_codigo da referência FIPE (fipe_preco.ano_codigo vem
++ *      no formato "AAAA-N", ex. "2024-3" — N é o código de combustível da API FIPE).
++ *   2) Para a marca DAF, o número de potência (ex. "480", "460") extraído do
++ *      texto do item comparado ao nome do modelo FIPE — mesma regra usada pelo
++ *      matching automático (fipe_sync.py: potencia_daf), reimplementada aqui em PHP
++ *      só para esta validação pontual de leitura/gravação.
++ */
++
++/** Normaliza texto livre pra comparação: maiúsculas, sem acento, sem pontuação entre dígitos. */
++function oper_fipe_normaliza(?string $s): string {
++    $s = trim((string)$s);
++    if ($s === '') return '';
++    if (function_exists('iconv')) {
++        $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
++        if ($ascii !== false) $s = $ascii;
++    }
++    $s = strtoupper($s);
++    $s = preg_replace('/(?<=\d)[.,-](?=\d)/', '', $s) ?? $s; // "11.180" -> "11180"
++    $s = preg_replace('/[^A-Z0-9]+/', ' ', $s) ?? $s;
++    return trim($s);
++}
++
++/** Remove trechos de ano-modelo/fabricação (ex. "2023/2024") pra não confundir com potência. */
++function oper_fipe_texto_sem_anos(?string $s): string {
++    $s = (string)$s;
++    return preg_replace(
++        '/\b(?:19|20)\d{2}\s*\/\s*(?:\d{2}|(?:19|20)\d{2})\b(?:\s*\(\s*(?:19|20)\d{2}\s*\))?/',
++        ' ',
++        $s
++    ) ?? $s;
++}
++
++/**
++ * Último número de três dígitos do texto (ignora "105", que identifica a geração XF105,
++ * não a potência). Espelha fase2-fipe/fipe_sync.py:potencia_daf — mesma regra, mesma
++ * ressalva do 105, pra não divergir do que o matching automático já usa em lote.
++ */
++function oper_fipe_potencia_daf(?string $s): ?string {
++    if (!$s) return null;
++    $texto = oper_fipe_normaliza(oper_fipe_texto_sem_anos($s));
++    if (!preg_match_all('/(?<!\d)(\d{3})(?!\d)/', $texto, $m)) return null;
++    $encontradas = array_values(array_filter($m[1], fn($n) => $n !== '105'));
++    return $encontradas ? end($encontradas) : null;
++}
++
++/** Extrai o ano da referência FIPE a partir de "ano_codigo" (formato "AAAA-N"). */
++function oper_fipe_ano_da_referencia(?string $anoCodigo): ?int {
++    if (!$anoCodigo) return null;
++    if (!preg_match('/^(\d{4})/', trim($anoCodigo), $m)) return null;
++    return (int)$m[1];
++}
++
++/**
++ * Avalia se o vínculo FIPE (marca/modelo/ano_codigo já buscados no banco) é compatível
++ * com o item informado (marca/modelo/titulo/ano, no formato de meu_estoque ou anuncio).
++ * Devolve ['compativel' => bool, 'motivos' => string[]]. Ausência de dado em qualquer
++ * lado NUNCA é tratada como incompatibilidade — só divergência explícita bloqueia.
++ */
++function oper_fipe_vinculo_compativel(array $item, ?string $anoCodigoFipe, ?string $marcaFipe, ?string $modeloFipe): array {
++    $motivos = [];
++
++    $anoItem = isset($item['ano']) && $item['ano'] !== null && $item['ano'] !== ''
++        ? (int)$item['ano'] : null;
++    $anoFipe = oper_fipe_ano_da_referencia($anoCodigoFipe);
++    if ($anoItem && $anoFipe && $anoItem !== $anoFipe) {
++        $motivos[] = "ano-modelo do item ({$anoItem}) diverge do ano da referência FIPE vinculada ({$anoFipe})";
++    }
++
++    $marcaItem = oper_fipe_normaliza($item['marca'] ?? '');
++    if ($marcaItem === 'DAF') {
++        $textoItem = trim((string)($item['titulo'] ?? '') . ' ' . (string)($item['modelo'] ?? ''));
++        $potItem = oper_fipe_potencia_daf($textoItem);
++        $potFipe = oper_fipe_potencia_daf($modeloFipe);
++        if ($potItem && $potFipe && $potItem !== $potFipe) {
++            $motivos[] = "potência do item ({$potItem}) diverge do modelo FIPE vinculado ({$potFipe}: {$modeloFipe})";
++        }
++    }
++
++    return ['compativel' => empty($motivos), 'motivos' => $motivos];
++}
+diff --git a/oper-radar-api/lib/market_scope.php b/oper-radar-api/lib/market_scope.php
+new file mode 100644
+index 0000000..8173153
+--- /dev/null
++++ b/oper-radar-api/lib/market_scope.php
+@@ -0,0 +1,32 @@
++<?php
++/**
++ * Normalizacao de UF/regiao para o escopo do painel de Mercado.
++ * Funcoes puras (sem banco), extraidas de mercado_painel.php para permitir teste unitario.
++ */
++
++/**
++ * Recebe o parametro bruto "uf" da querystring ("todas", "PR" ou "PR,SC") e devolve a
++ * lista de siglas validas e unicas. Siglas desconhecidas (fora de $ufRegiao) sao ignoradas
++ * silenciosamente -- o mesmo tratamento que o codigo anterior dava a uma UF invalida.
++ */
++function painel_normaliza_ufs(string $ufParametro, array $ufRegiao): array {
++    $ufParametro = trim($ufParametro);
++    if ($ufParametro === '' || strtolower($ufParametro) === 'todas') return [];
++    $ufs = [];
++    foreach (explode(',', $ufParametro) as $pedaco) {
++        $sigla = strtoupper(trim($pedaco));
++        if (preg_match('/^[A-Z]{2}$/', $sigla) && isset($ufRegiao[$sigla])) $ufs[] = $sigla;
++    }
++    return array_values(array_unique($ufs));
++}
++
++/**
++ * Se todas as UFs selecionadas pertencerem a mesma regiao, devolve o nome dela; caso
++ * contrario (ou lista vazia), devolve 'todas' -- nao ha regiao unica para representar o
++ * escopo.
++ */
++function painel_regiao_unica(array $ufsSelecionadas, array $ufRegiao): string {
++    if (!$ufsSelecionadas) return 'todas';
++    $regioes = array_values(array_unique(array_map(fn($sigla) => $ufRegiao[$sigla] ?? null, $ufsSelecionadas)));
++    return count($regioes) === 1 && $regioes[0] !== null ? $regioes[0] : 'todas';
++}
+diff --git a/oper-radar-api/lojistas.php b/oper-radar-api/lojistas.php
+index f199e95..5cb7f31 100644
+--- a/oper-radar-api/lojistas.php
++++ b/oper-radar-api/lojistas.php
+@@ -6,6 +6,7 @@
+  * artificialmente — bug real detectado em 09/jul quando toda revenda mostrava "1d").
+  */
+ require_once __DIR__ . '/config.php';
++require_once __DIR__ . '/lib/market_scope.php';
+ $conn = conecta();
+ 
+ $REGIOES = [
+@@ -14,9 +15,14 @@ $REGIOES = [
+     'Nordeste' => ['BA','PE','CE','MA','PB','RN','AL','PI','SE'],
+     'Norte' => ['AM','PA','RO','RR','AC','AP','TO'],
+ ];
++$UF_REGIAO = [];
++foreach ($REGIOES as $nomeRegiao => $ufsDaRegiao) foreach ($ufsDaRegiao as $sigla) $UF_REGIAO[$sigla] = $nomeRegiao;
+ $uf = $_GET['uf'] ?? null;
+ $regiao = $_GET['regiao'] ?? null;
+ $ufsRegiao = ($regiao && isset($REGIOES[$regiao])) ? $REGIOES[$regiao] : null;
++// DAT03: mesma normalizacao de anuncios.php/mercado_painel.php, pra "uf=PR,SC" nao
++// virar uma comparacao literal contra uma unica sigla (ver market_scope.php).
++$ufsSelecionadas = $ufsRegiao ? null : painel_normaliza_ufs((string)($uf ?? ''), $UF_REGIAO);
+ 
+ $sql = "SELECT r.id, r.nome, r.cidade, r.uf, r.url_perfil, r.telefone, r.ativa_desde,
+                COUNT(a.id) AS total_historico,
+@@ -34,8 +40,10 @@ if ($ufsRegiao) {
+     $ph = implode(',', array_fill(0, count($ufsRegiao), '?'));
+     $sql .= " WHERE r.uf IN ($ph)";
+     foreach ($ufsRegiao as $u) { $params[] = $u; $types .= 's'; }
+-} elseif ($uf) {
+-    $sql .= ' WHERE r.uf = ?'; $params[] = strtoupper($uf); $types .= 's';
++} elseif ($ufsSelecionadas) {
++    $ph = implode(',', array_fill(0, count($ufsSelecionadas), '?'));
++    $sql .= " WHERE r.uf IN ($ph)";
++    foreach ($ufsSelecionadas as $u) { $params[] = $u; $types .= 's'; }
+ }
+ $sql .= ' GROUP BY r.id ORDER BY ativos DESC, saidas_detectadas DESC';
+ 
+diff --git a/oper-radar-api/minha_loja.php b/oper-radar-api/minha_loja.php
+index ffb0ed4..85150c3 100644
+--- a/oper-radar-api/minha_loja.php
++++ b/oper-radar-api/minha_loja.php
+@@ -2,9 +2,25 @@
+ /** Estoque próprio do membro autenticado. */
+ require_once __DIR__ . '/config.php';
+ require_once __DIR__ . '/lib/market_quality.php';
++require_once __DIR__ . '/lib/fipe_compat.php';
+ $usuario = exige_autenticacao();
+ $conn = conecta();
+ 
++/**
++ * Busca marca/modelo/ano_codigo do vínculo FIPE informado. Devolve null se o id não
++ * existir (evita FK órfã silenciosa virar "compatível" por ausência de dado).
++ */
++function loja_busca_fipe_vinculo(mysqli $conn, int $fipeId): ?array {
++    if ($fipeId <= 0) return null;
++    $st = $conn->prepare('SELECT fp.ano_codigo, fm.marca_fipe, fm.modelo_fipe
++        FROM fipe_preco fp JOIN fipe_modelo fm ON fm.id = fp.fipe_modelo_id WHERE fp.id = ?');
++    $st->bind_param('i', $fipeId);
++    $st->execute();
++    $linha = $st->get_result()->fetch_assoc();
++    $st->close();
++    return $linha ?: null;
++}
++
+ function le_corpo_estoque(): array {
+     $dados = json_decode(file_get_contents('php://input'), true);
+     return is_array($dados) ? $dados : [];
+@@ -67,9 +83,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+         $itens[] = $row;
+     }
+     $st->close();
+-    $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($itens, 'fipe_preco_id'));
++    // DAT01: um vínculo FIPE incompatível (marca/potência/ano divergentes do item) não
++    // pode alimentar comparativos. O vínculo continua gravado; apenas os campos
++    // derivados da FIPE saem do ar até revisão. Ver lib/fipe_compat.php.
+     foreach ($itens as &$row) {
+         $fipeId = (int)($row['fipe_preco_id'] ?? 0);
++        if ($fipeId > 0 && $row['modelo_fipe'] !== null) {
++            $avaliacao = oper_fipe_vinculo_compativel($row, $row['ano_fipe'], $row['marca_fipe'], $row['modelo_fipe']);
++            if (!$avaliacao['compativel']) {
++                $row['fipe_vinculo_status'] = 'incompativel';
++                $row['fipe_vinculo_motivo'] = implode('; ', $avaliacao['motivos']);
++                $row['preco_fipe'] = null;
++                $row['codigo_fipe'] = null;
++                $fipeId = 0; // isolado das estatisticas de mercado abaixo
++            } else {
++                $row['fipe_vinculo_status'] = 'compativel';
++                $row['fipe_vinculo_motivo'] = null;
++            }
++        } else {
++            $row['fipe_vinculo_status'] = $fipeId > 0 ? 'referencia_nao_encontrada' : 'sem_vinculo';
++            $row['fipe_vinculo_motivo'] = null;
++        }
++        $row['_fipe_id_valido'] = $fipeId;
++    }
++    unset($row);
++
++    $estatisticas = mercado_estatisticas_por_fipe($conn, array_column($itens, '_fipe_id_valido'));
++    foreach ($itens as &$row) {
++        $fipeId = (int)$row['_fipe_id_valido'];
++        unset($row['_fipe_id_valido']);
+         mercado_aplica_estatisticas($row, $estatisticas[$fipeId] ?? null, $row['preco_fipe']);
+         $row['anuncios_ativos'] = $row['anuncios_comparaveis'];
+     }
+@@ -101,6 +143,26 @@ if (mb_strlen($item['modelo']) < 2) {
+     envia_json(['erro' => 'Informe o modelo do veículo.']);
+ }
+ 
++// DAT01: bloqueia na origem um vínculo FIPE que já nasce incompatível com o item
++// (ano-modelo ou, na DAF, número de potência divergentes). Isso não impede cadastrar
++// o veículo — só exige uma referência FIPE coerente, ou nenhuma.
++if ($item['fipe_preco_id']) {
++    $vinculo = loja_busca_fipe_vinculo($conn, $item['fipe_preco_id']);
++    if ($vinculo === null) {
++        http_response_code(422);
++        envia_json(['erro' => 'Referência FIPE não encontrada.', 'codigo' => 'FIPE_REFERENCIA_INEXISTENTE']);
++    }
++    $avaliacao = oper_fipe_vinculo_compativel($item, $vinculo['ano_codigo'], $vinculo['marca_fipe'], $vinculo['modelo_fipe']);
++    if (!$avaliacao['compativel']) {
++        http_response_code(422);
++        envia_json([
++            'erro' => 'Referência FIPE incompatível com este veículo: ' . implode('; ', $avaliacao['motivos']) . '.',
++            'codigo' => 'FIPE_VINCULO_INCOMPATIVEL',
++            'motivos' => $avaliacao['motivos'],
++        ]);
++    }
++}
++
+ if ($acao === 'atualizar') {
+     $id = (int)($corpo['id'] ?? 0);
+     $st = $conn->prepare('UPDATE meu_estoque SET referencia_interna=?,titulo=?,marca=?,modelo=?,ano=?,preco_anunciado=?,cidade=?,uf=?,data_entrada=?,status=?,placa=?,fipe_preco_id=?,usar_comparativo=? WHERE id=? AND usuario_id=?');
+diff --git a/oper-radar-api/minha_loja_detalhe.php b/oper-radar-api/minha_loja_detalhe.php
+index 719f197..9dcf92f 100644
+--- a/oper-radar-api/minha_loja_detalhe.php
++++ b/oper-radar-api/minha_loja_detalhe.php
+@@ -4,6 +4,7 @@ require_once __DIR__ . '/config.php';
+ require_once __DIR__ . '/lib/market_quality.php';
+ require_once __DIR__ . '/lib/regional_insight.php';
+ require_once __DIR__ . '/lib/store_market.php';
++require_once __DIR__ . '/lib/fipe_compat.php';
+ $usuario = exige_autenticacao();
+ $conn = conecta();
+ 
+@@ -62,16 +63,31 @@ foreach (['preco_anunciado','preco_fipe'] as $campo) {
+ }
+ 
+ $fipeId = (int)($item['fipe_preco_id'] ?? 0);
+-if ($fipeId === 0 || (int)($item['usar_comparativo'] ?? 1) !== 1) {
++
++// DAT01: um vínculo FIPE incompatível com o item (ano-modelo ou, na DAF, potência
++// divergentes) é isolado aqui — mesmo já gravado, ele não pode sustentar a comparação
++// nacional/regional. O vínculo em si não é alterado; só a análise é bloqueada.
++$fipeIncompativel = null;
++if ($fipeId !== 0 && $item['modelo_fipe'] !== null) {
++    $avaliacaoVinculo = oper_fipe_vinculo_compativel($item, $item['ano_fipe'] ?? null, $item['marca_fipe'] ?? null, $item['modelo_fipe']);
++    if (!$avaliacaoVinculo['compativel']) {
++        $fipeIncompativel = implode('; ', $avaliacaoVinculo['motivos']);
++    }
++}
++
++if ($fipeId === 0 || $fipeIncompativel !== null || (int)($item['usar_comparativo'] ?? 1) !== 1) {
+     envia_json([
+         'item' => $item,
+         'mercado_nacional' => null,
+         'regioes' => [],
+         'melhor_regiao_observada' => null,
+         'historico_eventos' => ['disponivel' => loja_detalhe_tabela_existe($conn, 'anuncio_evento'), 'cobertura_dias' => 0],
+-        'nota' => $fipeId === 0
+-            ? 'Vincule uma referência FIPE para habilitar comparáveis equivalentes.'
+-            : 'Este veículo está fora da base comparativa por opção da loja.',
++        'fipe_vinculo_status' => $fipeIncompativel !== null ? 'incompativel' : ($fipeId === 0 ? 'sem_vinculo' : 'compativel'),
++        'nota' => $fipeIncompativel !== null
++            ? "Referência FIPE vinculada é incompatível com este veículo ({$fipeIncompativel}); comparação suspensa até revisão."
++            : ($fipeId === 0
++                ? 'Vincule uma referência FIPE para habilitar comparáveis equivalentes.'
++                : 'Este veículo está fora da base comparativa por opção da loja.'),
+     ]);
+ }
+ 
+diff --git a/oper-radar-api/tests/fipe_compat_test.php b/oper-radar-api/tests/fipe_compat_test.php
+new file mode 100644
+index 0000000..b1b9038
+--- /dev/null
++++ b/oper-radar-api/tests/fipe_compat_test.php
+@@ -0,0 +1,48 @@
++<?php
++require_once __DIR__ . '/../lib/fipe_compat.php';
++
++function verifica_fipe_compat($condicao, string $mensagem): void {
++    if (!$condicao) throw new RuntimeException($mensagem);
++}
++
++// Extração de potência DAF (mesma regra de fase2-fipe/fipe_sync.py:potencia_daf).
++verifica_fipe_compat(oper_fipe_potencia_daf('DAF XF 480 6x2 2024') === '480', 'potencia 480');
++verifica_fipe_compat(oper_fipe_potencia_daf('DAF XF105 460 8x2') === '460', 'potencia 460, ignora 105');
++verifica_fipe_compat(oper_fipe_potencia_daf('DAF XF105 FTS') === null, 'sem numero de potencia');
++verifica_fipe_compat(oper_fipe_potencia_daf(null) === null, 'texto nulo');
++
++// Ano embutido no ano_codigo da FIPE ("AAAA-N").
++verifica_fipe_compat(oper_fipe_ano_da_referencia('2024-3') === 2024, 'ano codigo com combustivel');
++verifica_fipe_compat(oper_fipe_ano_da_referencia('2018-1') === 2018, 'ano codigo diferente');
++verifica_fipe_compat(oper_fipe_ano_da_referencia(null) === null, 'ano codigo ausente');
++
++// Caso real da auditoria (D01, item #8252633): DAF XF 480 6x2 2024 vinculado a uma
++// referencia FIPE de outro ano-modelo.
++$item8252633 = ['marca' => 'DAF', 'modelo' => 'XF 480 6x2', 'titulo' => 'DAF XF 480 6x2', 'ano' => 2024];
++$r1 = oper_fipe_vinculo_compativel($item8252633, '2026-3', 'DAF', 'XF 480 FTT');
++verifica_fipe_compat($r1['compativel'] === false, 'D01/#8252633: ano diferente deve reprovar');
++
++// Caso real da auditoria (D01, item #8318650): DAF XF105 460 8x2 2016 vinculado a
++// "DAF 410 6x2" ano 2018 — potencia E ano divergem.
++$item8318650 = ['marca' => 'DAF', 'modelo' => 'XF105 460 8x2', 'titulo' => 'DAF XF105 460 8x2', 'ano' => 2016];
++$r2 = oper_fipe_vinculo_compativel($item8318650, '2018-3', 'DAF', 'XF105 FTS 410');
++verifica_fipe_compat($r2['compativel'] === false, 'D01/#8318650: potencia e ano devem reprovar');
++verifica_fipe_compat(count($r2['motivos']) === 2, 'D01/#8318650: duas divergencias registradas');
++
++// Vinculo coerente: mesma potencia, mesmo ano -> aprovado.
++$itemOk = ['marca' => 'DAF', 'modelo' => 'XF 480 6x2', 'titulo' => 'DAF XF 480 6x2', 'ano' => 2024];
++$r3 = oper_fipe_vinculo_compativel($itemOk, '2024-3', 'DAF', 'XF 480 FTT');
++verifica_fipe_compat($r3['compativel'] === true, 'vinculo coerente deve aprovar');
++verifica_fipe_compat($r3['motivos'] === [], 'vinculo coerente nao tem motivos');
++
++// Dado ausente nunca vira incompatibilidade (evita falso positivo por falta de info).
++$itemSemAno = ['marca' => 'DAF', 'modelo' => 'XF 480 6x2', 'titulo' => 'DAF XF 480 6x2', 'ano' => null];
++$r4 = oper_fipe_vinculo_compativel($itemSemAno, null, 'DAF', 'XF 480 FTT');
++verifica_fipe_compat($r4['compativel'] === true, 'sem ano do item nao reprova');
++
++// Marca fora do escopo DAF: so a checagem de ano se aplica.
++$itemVolvo = ['marca' => 'VOLVO', 'modelo' => 'FH 540', 'titulo' => 'VOLVO FH 540', 'ano' => 2020];
++$r5 = oper_fipe_vinculo_compativel($itemVolvo, '2020-1', 'VOLVO', 'FH 540');
++verifica_fipe_compat($r5['compativel'] === true, 'volvo com ano igual aprova sem checar potencia DAF');
++
++echo "fipe_compat_test=OK\n";
+diff --git a/oper-radar-api/tests/market_scope_test.php b/oper-radar-api/tests/market_scope_test.php
+new file mode 100644
+index 0000000..b395ee4
+--- /dev/null
++++ b/oper-radar-api/tests/market_scope_test.php
+@@ -0,0 +1,26 @@
++<?php
++require_once __DIR__ . '/../lib/market_scope.php';
++
++function confirma_escopo($condicao, string $mensagem): void {
++    if (!$condicao) throw new RuntimeException($mensagem);
++}
++
++$ufRegiao = [
++    'PR' => 'Sul', 'SC' => 'Sul', 'RS' => 'Sul',
++    'SP' => 'Sudeste', 'RJ' => 'Sudeste',
++];
++
++confirma_escopo(painel_normaliza_ufs('todas', $ufRegiao) === [], 'todas vira lista vazia');
++confirma_escopo(painel_normaliza_ufs('', $ufRegiao) === [], 'vazio vira lista vazia');
++confirma_escopo(painel_normaliza_ufs('PR', $ufRegiao) === ['PR'], 'uf unica');
++confirma_escopo(painel_normaliza_ufs('pr, sc', $ufRegiao) === ['PR', 'SC'], 'multiplas ufs, minuscula e espaco');
++confirma_escopo(painel_normaliza_ufs('PR,PR,SC', $ufRegiao) === ['PR', 'SC'], 'remove duplicata');
++confirma_escopo(painel_normaliza_ufs('PR,XX,SC', $ufRegiao) === ['PR', 'SC'], 'ignora sigla desconhecida');
++confirma_escopo(painel_normaliza_ufs('123,PR', $ufRegiao) === ['PR'], 'ignora entrada invalida');
++
++confirma_escopo(painel_regiao_unica([], $ufRegiao) === 'todas', 'lista vazia vira todas');
++confirma_escopo(painel_regiao_unica(['PR'], $ufRegiao) === 'Sul', 'uma uf, uma regiao');
++confirma_escopo(painel_regiao_unica(['PR', 'SC'], $ufRegiao) === 'Sul', 'duas ufs, mesma regiao');
++confirma_escopo(painel_regiao_unica(['PR', 'SP'], $ufRegiao) === 'todas', 'ufs de regioes diferentes');
++
++echo "market_scope_test=OK\n";
+-- 
+2.43.0
+
