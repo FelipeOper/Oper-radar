@@ -1046,3 +1046,53 @@ select option {
 /* Grid unico: o conteudo ocupa a area util inteira, ate --content-max (design-system/tokens/spacing.css). */
 .oc-main > * { max-width: var(--content-max); }
 .oc-lede { max-width: 72ch; color: var(--text-secondary); font-size: var(--fs-sm); line-height: 1.6; }
+
+/* ============================================================
+   Paletas escuras alternativas (Configuracoes > Aparencia).
+   Mesma estrutura do design system; so os tokens semanticos mudam.
+   Referencia visual: prototipos/versoes.html (B = dourado, C = azul).
+   ============================================================ */
+[data-theme="dourado"] {
+  --bg-app: #0C0B09; --bg-sunken: #080706;
+  --surface-1: #15130F; --surface-2: #1B1813; --surface-3: #27231B; --surface-hover: #201C16;
+  --surface-inverse: #F6F1E7; --surface-glass: rgba(21,19,15,.72);
+  --border-subtle: rgba(255,226,170,.06); --border-default: rgba(255,226,170,.10); --border-strong: rgba(255,226,170,.20);
+  --border-focus: #E0B15A;
+  --text-primary: #F6F1E7; --text-secondary: #A69C8A; --text-tertiary: #7A7060; --text-disabled: #4E473C;
+  --text-inverse: #15130F; --text-on-accent: #1A1206; --text-accent: #E0B15A; --text-link: #F0CB82;
+  --accent: #E0B15A; --accent-hover: #F0CB82; --accent-press: #C99A44;
+  --accent-soft: rgba(224,177,90,.12); --accent-soft-strong: rgba(224,177,90,.20);
+  --success: #7FD08A; --success-soft: rgba(127,208,138,.12); --success-text: #7FD08A;
+  --chart-1: #E0B15A; --chart-2: #F6F1E7; --chart-grid: rgba(255,226,170,.06);
+  --or-hero-bg: linear-gradient(135deg, #2A2214 0%, #1B1711 100%);
+}
+[data-theme="azul"] {
+  --bg-app: #090D13; --bg-sunken: #06090D;
+  --surface-1: #0F151F; --surface-2: #141B27; --surface-3: #1D2633; --surface-hover: #18202D;
+  --surface-inverse: #F2F6FC; --surface-glass: rgba(15,21,31,.72);
+  --border-subtle: rgba(160,190,255,.07); --border-default: rgba(160,190,255,.11); --border-strong: rgba(160,190,255,.20);
+  --border-focus: #3D86F5;
+  --text-primary: #F2F6FC; --text-secondary: #93A0B4; --text-tertiary: #6B7789; --text-disabled: #3F4958;
+  --text-inverse: #0F151F; --text-on-accent: #FFFFFF; --text-accent: #6EA6FF; --text-link: #6EA6FF;
+  --accent: #3D86F5; --accent-hover: #6EA6FF; --accent-press: #2F6FD6;
+  --accent-soft: rgba(61,134,245,.14); --accent-soft-strong: rgba(61,134,245,.22);
+  --success: #4CC38A; --success-soft: rgba(76,195,138,.12); --success-text: #4CC38A;
+  --chart-1: #3D86F5; --chart-2: #F2F6FC; --chart-grid: rgba(160,190,255,.06);
+  --or-hero-bg: linear-gradient(135deg, #12223D 0%, #0F1726 100%);
+}
+/* Heroi e item ativo: no verde o acento e solido (assinatura do design system);
+   no dourado e no azul o acento solido cansaria, entao vira superficie escura + acento pontual. */
+[data-theme="dourado"] .or-card--accent, [data-theme="azul"] .or-card--accent {
+  background: var(--or-hero-bg); color: var(--text-primary); border-color: var(--border-strong);
+}
+[data-theme="dourado"] .or-card--accent .or-stat__ic, [data-theme="azul"] .or-card--accent .or-stat__ic {
+  background: var(--accent); color: var(--text-on-accent);
+}
+[data-theme="dourado"] .or-card--accent .or-stat__delta, [data-theme="azul"] .or-card--accent .or-stat__delta { color: var(--accent); }
+[data-theme="dourado"] .or-navitem--active, [data-theme="dourado"] .or-navitem--active:hover,
+[data-theme="azul"] .or-navitem--active, [data-theme="azul"] .or-navitem--active:hover {
+  background: var(--accent-soft); color: var(--accent-hover); box-shadow: inset 0 0 0 1px var(--accent-soft-strong);
+}
+[data-theme="dourado"] .or-bottomnav__item--active .or-bottomnav__ic, [data-theme="azul"] .or-bottomnav__item--active .or-bottomnav__ic {
+  background: var(--accent-soft); color: var(--accent-hover);
+}

@@ -11,7 +11,7 @@ import {
   SlidersHorizontal, BarChart3, LinkIcon
 } from './icons.jsx';
 import {
-  T, THEMES, DEFAULT_UI_PREFERENCES,
+  T, THEMES, DEFAULT_UI_PREFERENCES, proximoTemaAlternado,
   loadUiPreferences, saveUiPreferences, resolveTheme,
   activateTheme, applyUiPreferences,
 } from './theme.js';
@@ -186,17 +186,17 @@ function RadarPulse({ ultimaColeta }) {
       <span style={{ position: 'relative', width: 10, height: 10, flexShrink: 0 }}>
         <span style={{
           position: 'absolute', inset: 0, borderRadius: '50%',
-          background: ativo ? T.positive : T.inkMuted,
+          background: ativo ? T.signal : T.inkMuted,
         }} />
         {ativo && <span style={{
           position: 'absolute', inset: -4, borderRadius: '50%',
-          border: `1px solid ${T.positive}`,
+          border: `1px solid ${T.signal}`,
           animation: 'radarPing 2.4s ease-out infinite',
         }} />}
       </span>
       <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, lineHeight: 1.4 }}>
         {ativo ? 'RADAR ATIVO' : 'AGUARDANDO COLETA'}<br />
-        <span style={{ color: ativo ? T.positive : T.inkMuted }}>
+        <span style={{ color: ativo ? T.signal : T.inkMuted }}>
           {horasAtras != null ? `última varredura há ${horasAtras}h` : 'sem dados ainda'}
         </span>
       </div>
@@ -2681,6 +2681,8 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
           {[
             { id: 'auto', label: 'Automático', description: 'Segue o aparelho', icon: Monitor, colors: [THEMES.dark.tokens.bg, THEMES.light.tokens.surface, THEMES.dark.tokens.signal] },
             { ...THEMES.dark, icon: Moon, colors: [THEMES.dark.tokens.bg, THEMES.dark.tokens.surface, THEMES.dark.tokens.signal] },
+            { ...THEMES.dourado, icon: Moon, colors: [THEMES.dourado.tokens.bg, THEMES.dourado.tokens.surface, THEMES.dourado.tokens.signal] },
+            { ...THEMES.azul, icon: Moon, colors: [THEMES.azul.tokens.bg, THEMES.azul.tokens.surface, THEMES.azul.tokens.signal] },
             { ...THEMES.light, icon: Sun, colors: [THEMES.light.tokens.bg, THEMES.light.tokens.surface, THEMES.light.tokens.signal] },
           ].map(opcao => {
             const ativo = preferencias.theme === opcao.id;
@@ -3041,7 +3043,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
       pagina={pagina} onNavegar={setPagina} titulo={tituloPagina} tituloRef={tituloRef}
       breadcrumbs={breadcrumbs} onVoltar={goBack} sessao={sessao} acoesPendentes={acoesPendentes}
       temaClaro={THEMES[temaResolvido]?.mode === 'light'}
-      onAlternarTema={() => onPreferencias({ theme: THEMES[temaResolvido]?.mode === 'light' ? 'dark' : 'light' })}
+      onAlternarTema={() => onPreferencias(proximoTemaAlternado(temaResolvido, preferencias.ultimoEscuro))}
       status={<RadarPulse ultimaColeta={kpis?.ultima_coleta} />}
     >
       {paginas[pagina]}

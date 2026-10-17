@@ -1,14 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { THEMES, DEFAULT_UI_PREFERENCES, migrateThemeId, resolveTheme } from '../src/theme.js';
+import { THEMES, DEFAULT_UI_PREFERENCES, migrateThemeId, resolveTheme, proximoTemaAlternado } from '../src/theme.js';
 
-test('design system define apenas os temas escuro e claro', () => {
-  assert.deepEqual(Object.keys(THEMES).sort(), ['dark', 'light']);
+test('temas: verde radar (padrao), dourado, azul aco e claro', () => {
+  assert.deepEqual(Object.keys(THEMES).sort(), ['azul', 'dark', 'dourado', 'light']);
   assert.equal(DEFAULT_UI_PREFERENCES.theme, 'dark');
+  assert.equal(THEMES.dark.label, 'Verde radar');
+  assert.equal(THEMES.dourado.mode, 'dark');
+  assert.equal(THEMES.azul.mode, 'dark');
+  assert.equal(THEMES.light.mode, 'light');
 });
 
-test('temas do design system mantem as mesmas chaves de token', () => {
-  assert.deepEqual(Object.keys(THEMES.dark.tokens).sort(), Object.keys(THEMES.light.tokens).sort());
+test('todos os temas mantem as mesmas chaves de token', () => {
+  const chaves = Object.keys(THEMES.dark.tokens).sort();
+  for (const tema of Object.values(THEMES)) assert.deepEqual(Object.keys(tema.tokens).sort(), chaves, tema.id);
+});
+
+test('alternar claro/escuro volta para o ultimo tema escuro escolhido', () => {
+  assert.deepEqual(proximoTemaAlternado('dourado', null), { theme: 'light', ultimoEscuro: 'dourado' });
+  assert.deepEqual(proximoTemaAlternado('light', 'dourado'), { theme: 'dourado', ultimoEscuro: 'dourado' });
+  assert.deepEqual(proximoTemaAlternado('light', null), { theme: 'dark', ultimoEscuro: null });
+  assert.deepEqual(proximoTemaAlternado('light', 'inexistente'), { theme: 'dark', ultimoEscuro: null });
+  assert.deepEqual(proximoTemaAlternado('dark', 'azul'), { theme: 'light', ultimoEscuro: 'dark' });
 });
 
 test('preferencias antigas migram para os temas do design system', () => {
@@ -16,6 +29,8 @@ test('preferencias antigas migram para os temas do design system', () => {
   assert.equal(migrateThemeId('white'), 'light');
   assert.equal(migrateThemeId('dark'), 'dark');
   assert.equal(migrateThemeId('light'), 'light');
+  assert.equal(migrateThemeId('dourado'), 'dourado');
+  assert.equal(migrateThemeId('azul'), 'azul');
   assert.equal(migrateThemeId('auto'), 'auto');
   assert.equal(migrateThemeId('inexistente'), null);
 });
