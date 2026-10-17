@@ -641,13 +641,13 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
           return (
             <button key={nome} disabled={!disponivel} aria-pressed={ativo} onClick={() => disponivel && onRegiao(nome)} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px',
-              background: ativo ? `${T.steel}22` : T.surface2, border: `1px solid ${ativo ? T.steel : T.line}`,
-              borderRadius: 10, color: ativo ? T.steel : T.ink,
+              ...estiloSelecao(ativo),
+              borderRadius: 10,
               cursor: disponivel ? 'pointer' : 'not-allowed', opacity: disponivel ? 1 : 0.35,
               fontFamily: T.fontBody, fontSize: 12, fontWeight: ativo ? 600 : 450, minWidth: 0,
             }} title={disponivel ? '' : 'Coleta ainda não iniciada nesta região'}>
               <MapPin size={12} /> {nome === 'todas' ? 'Brasil' : nome}
-              <span style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 10 }}>{fmtN(quantidade || 0)}</span>
+              <span style={{ fontFamily: T.fontMono, color: 'inherit', opacity: 0.6, fontSize: 10 }}>{fmtN(quantidade || 0)}</span>
             </button>
           );
         })}
@@ -660,9 +660,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
         <div style={filtroGridUfStyle}>
           <button aria-pressed={uf === 'todas'} onClick={() => onUf('todas')} style={{
             minHeight: 40, padding: '7px 9px', borderRadius: 10, cursor: 'pointer',
-            background: uf === 'todas' ? `${T.signal}20` : T.surface2,
-            border: `1px solid ${uf === 'todas' ? T.signal : T.line}`,
-            color: uf === 'todas' ? T.signal : T.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            ...estiloSelecao(uf === 'todas'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             fontFamily: T.fontBody, fontWeight: uf === 'todas' ? 600 : 450,
           }}><LayoutGrid size={12} /> Todos</button>
           {(REGIOES_UFS[regiao] || []).map(sigla => {
@@ -673,13 +671,11 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
             return (
               <button key={sigla} disabled={!disponivel} aria-pressed={ativo} onClick={() => disponivel && onUf(sigla)} style={{
                 minHeight: 40, padding: '7px 9px', borderRadius: 10,
-                background: ativo ? `${T.signal}20` : T.surface2,
-                border: `1px solid ${ativo ? T.signal : T.line}`,
-                color: ativo ? T.signal : T.ink, cursor: disponivel ? 'pointer' : 'not-allowed',
+                ...estiloSelecao(ativo), cursor: disponivel ? 'pointer' : 'not-allowed',
                 opacity: disponivel ? 1 : 0.35, fontFamily: T.fontBody,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 0,
               }} title={`${NOMES_UF[sigla]}${disponivel ? '' : ' — ainda sem dados coletados'}`} aria-label={`${NOMES_UF[sigla]}, ${fmtN(quantidade)} ${metrica}`}>
-                <MapPin size={12} style={{ color: ativo ? T.signal : T.steel, flexShrink: 0 }} />
+                <MapPin size={12} style={{ color: 'currentColor', flexShrink: 0 }} />
                 <strong style={{ fontSize: 12 }}>{sigla}</strong>
                 <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtN(quantidade)}</span>
               </button>
@@ -689,6 +685,13 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
       )}
     </Card>
   );
+}
+
+/* Selecao unica do design system: selecionado = --surface-inverse (igual a .or-tab--active). */
+function estiloSelecao(ativo) {
+  return ativo
+    ? { background: 'var(--surface-inverse)', border: '1px solid transparent', color: 'var(--text-inverse)' }
+    : { background: T.surface2, border: `1px solid ${T.line}`, color: T.ink };
 }
 
 /* ============================================================

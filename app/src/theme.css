@@ -956,7 +956,7 @@ select {
 .oc-cmp__lado { display: flex; flex-direction: column; gap: 12px; }
 .oc-cmp__modos { display: flex; flex-wrap: wrap; gap: 6px; }
 .oc-cmp__modo { min-height: 34px; padding: 0 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
-.oc-cmp__modo.is-on { border-color: var(--accent); color: var(--text-accent); background: var(--accent-soft); }
+.oc-cmp__modo.is-on { border-color: transparent; color: var(--text-inverse); background: var(--surface-inverse); }
 .oc-cmp__campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
 .oc-cmp__select { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-primary); font: inherit; }
 .oc-cmp__resultado { display: flex; flex-direction: column; gap: 14px; }
