@@ -1,0 +1,177 @@
+From 6ce24e3d1766070aebd28e91b6816ed8a4eaeb96 Mon Sep 17 00:00:00 2001
+From: Felipe Hilario <felipehilarioneo@gmail.com>
+Date: Sat, 17 Oct 2026 06:37:32 -0300
+Subject: [PATCH 01/16] chore: regua de layout e script de captura
+
+---
+ tools/check-layout.mjs  | 65 +++++++++++++++++++++++++++++++++++++++++
+ tools/package-lock.json | 39 +++++++++++++++++++++++++
+ tools/package.json      |  1 +
+ tools/shoot.mjs         | 29 ++++++++++++++++++
+ 4 files changed, 134 insertions(+)
+ create mode 100644 tools/check-layout.mjs
+ create mode 100644 tools/package-lock.json
+ create mode 100644 tools/package.json
+ create mode 100644 tools/shoot.mjs
+
+diff --git a/tools/check-layout.mjs b/tools/check-layout.mjs
+new file mode 100644
+index 0000000..84ff740
+--- /dev/null
++++ b/tools/check-layout.mjs
+@@ -0,0 +1,65 @@
++import { chromium } from 'playwright';
++const BASE = process.env.BASE || 'http://127.0.0.1:5180/oper-radar';
++const ROUTES = ['/', '/mercado', '/comparador', '/minha-loja', '/fipe', '/oportunidades', '/concorrencia', '/analise', '/acoes', '/configuracoes', '/conta'];
++const falhas = [];
++const b = await chromium.launch();
++
++async function medir(vw, vh, nome) {
++  const p = await b.newPage({ viewport: { width: vw, height: vh } });
++  for (const r of ROUTES) {
++    await p.goto(BASE + r, { waitUntil: 'networkidle' });
++    await p.waitForTimeout(500);
++    const m = await p.evaluate(() => {
++      const out = {};
++      out.overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
++      // 1. select cortado: texto da opcao escolhida mais largo que a area util
++      const ctx = document.createElement('canvas').getContext('2d');
++      out.selectsCortados = [...document.querySelectorAll('select')].filter(s => s.offsetParent).filter(s => {
++        const cs = getComputedStyle(s);
++        ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
++        const texto = s.options[s.selectedIndex]?.text || '';
++        const util = s.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
++        return ctx.measureText(texto).width > util + 1;
++      }).map(s => s.getAttribute('aria-label') || s.options[s.selectedIndex]?.text);
++      // 2. grid: a borda direita do conteudo tem de chegar a borda util do <main>
++      const main = document.querySelector('.oc-main');
++      const mr = main.getBoundingClientRect();
++      const direitaUtil = mr.right - parseFloat(getComputedStyle(main).paddingRight);
++      // caixa = elemento visivel com borda ou fundo proprio (pega <Card> com estilo inline, nao so .or-card)
++      const caixas = [...main.querySelectorAll('*')].filter(e => {
++        if (!e.offsetParent) return false;
++        const cs = getComputedStyle(e);
++        return parseFloat(cs.borderTopWidth) > 0 || (cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent');
++      });
++      out.folgaDireita = caixas.length ? Math.round(direitaUtil - Math.max(...caixas.map(c => c.getBoundingClientRect().right))) : 0;
++      // 3. lista vazia sem mensagem
++      out.listasVazias = [...main.querySelectorAll('.or-zebra-list')].filter(l => l.offsetParent && l.children.length === 0).length;
++      // 4. texto com reticencias em abas
++      out.abasTruncadas = [...main.querySelectorAll('[role=tablist] *')].filter(e => e.offsetParent && e.children.length === 0 && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent.trim()).slice(0, 5);
++      // 5. titulo do topo encostando no status (16px: o anel pulsante do RadarPulse vaza ~8px para fora da caixa)
++      const t = document.querySelector('.or-topbar__title'); const s = document.querySelector('.oc-topbar-status');
++      if (t && s && s.offsetParent) {
++        const h = [...t.querySelectorAll('*')].filter(e => e.children.length === 0 && e.textContent.trim()).pop() || t;
++        const rng = document.createRange(); rng.selectNodeContents(h);
++        const a = rng.getBoundingClientRect(), c = s.getBoundingClientRect();
++        out.respiroTitulo = Math.round(c.left - a.right);
++      }
++      return out;
++    });
++    const tag = `${nome} ${r}`;
++    if (m.overflow > 0) falhas.push(`${tag}: overflow horizontal ${m.overflow}px`);
++    if (m.selectsCortados.length) falhas.push(`${tag}: select cortado -> ${m.selectsCortados.join(', ')}`);
++    if (nome === 'desktop' && m.folgaDireita > 24) falhas.push(`${tag}: grid termina ${m.folgaDireita}px antes da borda`);
++    if (m.listasVazias) falhas.push(`${tag}: ${m.listasVazias} lista(s) vazia(s) sem mensagem`);
++    if (m.abasTruncadas.length) falhas.push(`${tag}: aba truncada -> ${m.abasTruncadas.join(' | ')}`);
++    if (m.respiroTitulo != null && m.respiroTitulo < 16) falhas.push(`${tag}: titulo a ${m.respiroTitulo}px do status`);
++  }
++  await p.close();
++}
++
++await medir(1440, 900, 'desktop');
++await medir(1024, 768, 'tablet');
++await medir(390, 844, 'mobile');
++await b.close();
++console.log(falhas.length ? falhas.join('\n') : 'OK - nenhuma falha de layout');
++process.exit(falhas.length ? 1 : 0);
+diff --git a/tools/package-lock.json b/tools/package-lock.json
+new file mode 100644
+index 0000000..a157b80
+--- /dev/null
++++ b/tools/package-lock.json
+@@ -0,0 +1,39 @@
++{
++  "name": "tools",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "dependencies": {
++        "playwright": ""
++      }
++    },
++    "node_modules/playwright": {
++      "version": "1.64.1",
++      "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.64.1.tgz",
++      "integrity": "sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright-core": "1.64.1"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/playwright-core": {
++      "version": "1.64.1",
++      "resolved": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.1.tgz",
++      "integrity": "sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==",
++      "license": "Apache-2.0",
++      "bin": {
++        "playwright-core": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    }
++  }
++}
+diff --git a/tools/package.json b/tools/package.json
+new file mode 100644
+index 0000000..b8ed01b
+--- /dev/null
++++ b/tools/package.json
+@@ -0,0 +1 @@
++{ "private": true, "type": "module", "dependencies": { "playwright": "1.64.1" } }
+diff --git a/tools/shoot.mjs b/tools/shoot.mjs
+new file mode 100644
+index 0000000..9ec287b
+--- /dev/null
++++ b/tools/shoot.mjs
+@@ -0,0 +1,29 @@
++import { chromium } from 'playwright';
++const BASE = 'http://127.0.0.1:5180/oper-radar';
++const OUT = process.argv[2];
++const ROUTES = ['', '/mercado', '/comparador', '/minha-loja', '/fipe', '/oportunidades', '/concorrencia', '/analise', '/acoes', '/configuracoes', '/conta'];
++const VIEWS = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
++const browser = await chromium.launch();
++const report = [];
++for (const view of VIEWS) {
++  const ctx = await browser.newContext({ viewport: { width: view.width, height: view.height }, deviceScaleFactor: 1 });
++  const page = await ctx.newPage();
++  const errors = [];
++  page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
++  page.on('pageerror', e => errors.push('PAGEERROR ' + e.message.slice(0, 200)));
++  for (const r of ROUTES) {
++    const name = (r || '/hoje').replace(/\//g, '_').replace(/^_/, '');
++    try {
++      await page.goto(BASE + (r || '/'), { waitUntil: 'networkidle', timeout: 20000 });
++      await page.waitForTimeout(800);
++      const file = `${OUT}/${view.name}-${name}.png`;
++      await page.screenshot({ path: file, fullPage: true });
++      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
++      report.push({ view: view.name, route: r || '/', file, horizontalOverflowPx: overflow });
++    } catch (e) { report.push({ view: view.name, route: r || '/', error: e.message.slice(0, 150) }); }
++  }
++  report.push({ view: view.name, consoleErrors: errors.slice(0, 10) });
++  await ctx.close();
++}
++await browser.close();
++console.log(JSON.stringify(report, null, 1));
+-- 
+2.55.0.windows.2
+

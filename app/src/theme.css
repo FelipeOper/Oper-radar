@@ -1160,3 +1160,707 @@ select option {
 @media (max-width: 640px) {
   .or-panorama-cards .or-stat__value, .oc-hoje__kpis .or-stat__value { overflow-wrap: normal; }
 }
+
+/* Chat IA */
+.oc-chat-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.oc-chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--or-surface);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.oc-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.oc-chat-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.oc-chat-msg--user {
+  justify-content: flex-end;
+}
+
+.oc-chat-bubble {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.oc-chat-msg--user .oc-chat-bubble {
+  background: var(--or-signal);
+  color: #000;
+}
+
+.oc-chat-msg--assistant .oc-chat-bubble {
+  background: var(--or-surface-2);
+  color: var(--or-ink);
+}
+
+.oc-chat-loading {
+  opacity: 0.6;
+}
+
+.oc-chat-copy {
+  background: none;
+  border: none;
+  color: var(--or-ink-muted);
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  min-height: auto;
+}
+
+.oc-chat-msg:hover .oc-chat-copy {
+  opacity: 1;
+}
+
+.oc-chat-copy:hover {
+  color: var(--or-signal);
+}
+
+.oc-chat-erro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--or-alert);
+  border-radius: 4px;
+  margin: 0 16px;
+}
+
+.oc-chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--or-line);
+  background: var(--or-surface);
+}
+
+.oc-chat-input {
+  flex: 1;
+  padding: 12px;
+  background: var(--or-surface-2);
+  border: 1px solid var(--or-line);
+  border-radius: 6px;
+  color: var(--or-ink);
+  font-family: inherit;
+}
+
+.oc-chat-input::placeholder {
+  color: var(--or-ink-muted);
+}
+
+.oc-chat-btn-send {
+  padding: 10px 14px;
+  background: var(--or-signal);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 120ms ease;
+  min-height: auto;
+}
+
+.oc-chat-btn-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Balloon Modal */
+.oc-balloon-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--or-signal);
+  color: #000;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  min-height: auto;
+}
+
+.oc-balloon-btn:hover {
+  transform: scale(1.1);
+}
+
+.oc-balloon-modal {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  width: 360px;
+  height: 500px;
+  background: var(--or-surface);
+  border: 1px solid var(--or-line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 998;
+}
+
+.oc-balloon-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--or-line);
+}
+
+.oc-balloon-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.oc-balloon-header > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.oc-balloon-link-btn {
+  background: none;
+  border: none;
+  color: var(--or-signal);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  min-height: auto;
+  text-decoration: underline;
+}
+
+.oc-balloon-close {
+  background: none;
+  border: none;
+  color: var(--or-ink-muted);
+  cursor: pointer;
+  padding: 4px;
+  min-height: auto;
+}
+
+.oc-balloon-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oc-balloon-msg {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  word-wrap: break-word;
+}
+
+.oc-balloon-msg--user {
+  background: var(--or-signal);
+  color: #000;
+  align-self: flex-end;
+  max-width: 80%;
+}
+
+.oc-balloon-msg--assistant {
+  background: var(--or-surface-2);
+  color: var(--or-ink);
+  align-self: flex-start;
+  max-width: 80%;
+}
+
+.oc-balloon-form {
+  display: flex;
+  gap: 6px;
+  padding: 12px;
+  border-top: 1px solid var(--or-line);
+}
+
+.oc-balloon-input {
+  flex: 1;
+  padding: 8px;
+  background: var(--or-surface-2);
+  border: 1px solid var(--or-line);
+  border-radius: 4px;
+  color: var(--or-ink);
+  font-size: 13px;
+  min-height: auto;
+}
+
+.oc-balloon-input::placeholder {
+  color: var(--or-ink-muted);
+}
+
+.oc-balloon-send {
+  padding: 6px 8px;
+  background: var(--or-signal);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: auto;
+}
+
+.oc-balloon-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Simulador */
+.oc-simulador-page {
+  display: grid;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.oc-simulador-header {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.oc-simulador-header h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.oc-simulador-header p {
+  color: var(--or-ink-muted);
+  margin: 0;
+}
+
+.oc-simulador-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 800px) {
+  .oc-simulador-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oc-simulador-entrada,
+.oc-simulador-metricas {
+  display: grid;
+  gap: 16px;
+}
+
+.oc-simulador-metricas {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 800px) {
+  .oc-simulador-metricas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oc-simulador-card {
+  background: var(--or-surface);
+  border: 1px solid var(--or-line);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.oc-simulador-card h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--or-ink-muted);
+  text-transform: uppercase;
+}
+
+.oc-simulador-valor {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--or-signal);
+  margin: 8px 0;
+}
+
+.oc-simulador-delta {
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.oc-simulador-delta.positivo {
+  background: rgba(70, 248, 75, 0.1);
+  color: var(--or-signal);
+}
+
+.oc-simulador-delta.negativo {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--or-alert);
+}
+
+.oc-simulador-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--or-surface-2);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.oc-simulador-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--or-signal);
+  cursor: pointer;
+}
+
+.oc-simulador-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--or-signal);
+  cursor: pointer;
+  border: none;
+}
+
+.oc-simulador-metrica {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.oc-simulador-numero {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--or-signal);
+}
+
+.oc-simulador-detalhe {
+  font-size: 13px;
+  color: var(--or-ink-muted);
+}
+
+.oc-simulador-barra {
+  height: 8px;
+  background: var(--or-surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 12px 0 0;
+}
+
+.oc-simulador-barra-fill {
+  height: 100%;
+  background: var(--or-signal);
+  transition: width 120ms ease;
+}
+
+.oc-simulador-insight {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--or-ink);
+  padding: 12px;
+  background: var(--or-surface-2);
+  border-radius: 4px;
+}
+
+.oc-simulador-comparadores {
+  margin-top: 24px;
+}
+
+.oc-simulador-comparadores h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.oc-simulador-lista {
+  background: var(--or-surface);
+  border: 1px solid var(--or-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.oc-simulador-item {
+  display: grid;
+  grid-template-columns: 40px 1fr 180px;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--or-line);
+}
+
+.oc-simulador-item:last-child {
+  border-bottom: none;
+}
+
+.oc-simulador-item--destaque {
+  background: rgba(70, 248, 75, 0.05);
+  border-left: 4px solid var(--or-signal);
+  padding-left: 16px;
+}
+
+.oc-simulador-item-rank {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--or-signal);
+}
+
+.oc-simulador-item-info {
+  min-width: 0;
+}
+
+.oc-simulador-item-titulo {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-simulador-item-ano {
+  font-size: 12px;
+  color: var(--or-ink-muted);
+  margin-top: 2px;
+}
+
+.oc-simulador-item-preco {
+  text-align: right;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.oc-simulador-icon-up {
+  color: var(--or-alert);
+}
+
+.oc-simulador-icon-down {
+  color: var(--or-signal);
+}
+
+/* Rotineiro */
+.oc-rotineiro-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.oc-rotineiro-header {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.oc-rotineiro-header h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.oc-rotineiro-header p {
+  color: var(--or-ink-muted);
+  margin: 0;
+}
+
+.oc-rotineiro-secao {
+  background: var(--or-surface);
+  border: 1px solid var(--or-line);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.oc-rotineiro-secao h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.oc-rotineiro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.oc-rotineiro-card {
+  background: var(--or-surface-2);
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+}
+
+.oc-rotineiro-card-titulo {
+  font-size: 13px;
+  color: var(--or-ink-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.oc-rotineiro-card-numero {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--or-signal);
+  margin-bottom: 4px;
+}
+
+.oc-rotineiro-card-detalhe {
+  font-size: 12px;
+  color: var(--or-ink-muted);
+}
+
+.oc-rotineiro-card-preco {
+  font-size: 12px;
+  color: var(--or-ink-muted);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--or-line);
+}
+
+.oc-rotineiro-lista {
+  display: grid;
+  gap: 12px;
+}
+
+.oc-rotineiro-item {
+  display: grid;
+  grid-template-columns: 32px 1fr 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: var(--or-surface-2);
+  border-radius: 6px;
+}
+
+.oc-rotineiro-item-rank {
+  text-align: center;
+  font-weight: 600;
+  color: var(--or-signal);
+}
+
+.oc-rotineiro-item-info {
+  min-width: 0;
+}
+
+.oc-rotineiro-item-nome {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.oc-rotineiro-item-meta {
+  font-size: 12px;
+  color: var(--or-ink-muted);
+  margin-top: 2px;
+}
+
+.oc-rotineiro-item-saidas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  font-size: 13px;
+  color: var(--or-alert);
+}
+
+.oc-rotineiro-faixas {
+  display: grid;
+  gap: 16px;
+}
+
+.oc-rotineiro-faixa {
+  display: grid;
+  grid-template-columns: 150px 1fr 40px;
+  align-items: center;
+  gap: 12px;
+}
+
+.oc-rotineiro-faixa-label {
+  font-size: 13px;
+  color: var(--or-ink-muted);
+}
+
+.oc-rotineiro-faixa-bar {
+  height: 8px;
+  background: var(--or-surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.oc-rotineiro-faixa-fill {
+  height: 100%;
+  background: var(--or-signal);
+}
+
+.oc-rotineiro-faixa-count {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.oc-rotineiro-rodape {
+  background: rgba(70, 248, 75, 0.05);
+  border: 1px solid rgba(70, 248, 75, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--or-signal);
+}
+
+.oc-rotineiro-rodape p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Logos com temas */
+.oc-mark-dark,
+.oc-mark-light {
+  filter: brightness(1);
+  transition: filter 180ms ease;
+}
+
+[data-theme="dourado"] .oc-mark-dark,
+[data-theme="dourado"] .oc-mark-light {
+  filter: hue-rotate(40deg) saturate(1.1) brightness(0.95);
+}
+
+[data-theme="azul"] .oc-mark-dark,
+[data-theme="azul"] .oc-mark-light {
+  filter: hue-rotate(200deg) saturate(1.2) brightness(1.05);
+}

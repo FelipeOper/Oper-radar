@@ -1,0 +1,37 @@
+## Complemento Farol — eco dos READMEs e backlog aberto (26/09/2026)
+
+Fonte: repo local, codigo das Releases 2.3–2.6, CLAUDE.md e HANDOFF. So leitura; sem endpoint, producao ou credencial.
+
+### READMEs versus codigo
+
+- `oper-radar-api/README.md:16-20` confere com `mercado_painel.php:84-107,195-205,214-225`: filtros, grupo marca+modelo+ano e serie selecionada.
+- `oper-radar-api/README.md:24-40` confere com `lib/market_quality.php:60-120,153-191`: amostra 5, quartis, mediana, confianca, exclusoes, preservacao.
+- `oper-radar-api/README.md:44-47` confere com `lib/vehicle_taxonomy.php:3-20` e `tests/vehicle_taxonomy_test.php`.
+- `oper-radar-api/README.md:51-57` confere com `eventos.php:13-16` e `lojista_detalhe.php:90-151`: modo parcial e saida observada sem presuncao de venda.
+- `oper-radar-api/README.md:67-70` confere com `kpis.php:79-83` e `app/src/App.jsx:773`: revalidados e herdados separados.
+- `app/README.md:21-24,26-29,33-45,49-55` confere com `app/src/navigation.js`, `app/src/useBrowserRoute.js`, `app/src/App.jsx:1038-1080,1378,2989-3030` e `app/public/.htaccess`.
+- Defasagem confirmada: omissao documental. Existem 21 PHP de topo e 12 libs; README API nao lista arquivos individuais. Faltam, entre outros, `analista.php`, `analista_status.php`, `insights.php`, `anuncio_detalhe.php`, `minha_loja_xml.php`, `lib/regional_insight.php`, `lib/competitor_history.php`, `lib/equivalent_group.php`, `lib/market_comparator.php`.
+- README app nao mapeia os 12 arquivos atuais de `app/src/` (`App.jsx`, `apiClient.js`, `dashboardLayout.js`, `dataState.js`, `domainRules.js`, `main.jsx`, `marketTaxonomy.js`, `navigation.js`, `theme.css`, `theme.js`, `useBrowserRoute.js`). Referencias a componentes separados (`ConcorrenciaBlocos.jsx`, `HojeBlocos.jsx`, `ComprarBlocos.jsx`, `ComparadorBlocos.jsx`, `MinhaLojaBlocos.jsx`) sao nomenclatura historica; arquivos nao existem hoje.
+- Nenhuma afirmacao factual falsa encontrada nos trechos lidos. Defasagem e por omissao/nomenclatura.
+
+### CLAUDE.md/HANDOFF versus T01–T17
+
+- `CLAUDE.md:275-278`: piso standard 42px/decisao 44px aberta. **T04**; decisao de produto ainda falta.
+- `CLAUDE.md:256-258,599-600`: `app/dist/assets.zip`, locks e sete READMEs. **T14** cobre docs; limpeza de artefato sem tarefa.
+- `CLAUDE.md:212,599-600`: confirmar commits/estado Git. Sem tarefa propria.
+- `HANDOFF:23`: navegador Mercado antigo. **T13**.
+- `HANDOFF:243`: Comparador autenticado (401). Sem tarefa propria.
+- `HANDOFF:244,248`: medir consultas 2.6. **T16**; upload cPanel e operacao bloqueada, nao tarefa de codigo.
+- `HANDOFF:244`: universo alem de caminhao. **T17** para fluxo; decisao pode ir a **T06**.
+- `HANDOFF:132,248`: telas restantes. **T12**; decisoes de auditoria. **T06**.
+- `HANDOFF:250(b)`: corrigir relatorio TERRA com DEMO renderizada. **T07**.
+- `HANDOFF:250(c)`: historico ORQUESTRADOR-ATIVO. **T14**.
+- `HANDOFF:193,211,220`: quarentena FIPE. **T10**; diferencas F3. **T11**; F4 e limite permanente.
+- `HANDOFF:193,218,235`: medicao F0b por dano e quartis nao confirmados. Sem tarefa; candidato **T18**.
+- `HANDOFF:153`: decisoes chips UF, Concorrencia, Hoje, monitor, Refinar, Oportunidade. **T06**.
+- `HANDOFF:42,51`: portar Concorrencia/Lojista. **T12**; backend dedicado pode virar **T19**.
+- `HANDOFF:74-86,99,104,126`: release/backup/upload. Nao e tarefa de codigo; depende de acesso/publicacao.
+- Coberturas adicionais: **T01** duplicatas, **T02** mobile, **T03** fixtures, **T05** numeros, **T08** fixture, **T09** href, **T15** ambiente, **T16** consultas, **T17** fluxos.
+- Sem correspondencia: Comparador autenticado, limpeza assets/locks, estado Git, F0b por dano, quartis F3. Sugerir **T18–T21**; nao editar QUADRO.
+
+Conclusao: READMEs nao mostram regressao factual nas Releases 2.3–2.6. Precisam mapa atual de arquivos e remocao de nomenclatura historica.
