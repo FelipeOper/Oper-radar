@@ -66,3 +66,7 @@ export const ChevronRight = phosphor('caret-right', 'ChevronRight');
 export const SlidersHorizontal = phosphor('sliders-horizontal', 'SlidersHorizontal');
 export const BarChart3 = phosphor('chart-bar', 'BarChart3');
 export const LinkIcon = phosphor('link', 'LinkIcon');
+export const Send = phosphor('paper-plane-tilt', 'Send');
+export const MessageCircle = phosphor('chat-circle', 'MessageCircle');
+export const Copy = phosphor('copy', 'Copy');
+export const AlertCircle = phosphor('warning-circle', 'AlertCircle');

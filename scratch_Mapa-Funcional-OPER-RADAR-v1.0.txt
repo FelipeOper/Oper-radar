@@ -1,0 +1,1336 @@
+
+OPER RADAR
+MAPA FUNCIONAL DO SISTEMA
+Arquitetura de navegação, comportamento, dados, acessibilidade e implementação
+Versão funcional 1.0
+31 ago 2026
+STATUS DO DOCUMENTOEspecificação para validação do gestor. Consolida o Plano Mestre v1.0, as Telas 1–16 e as decisões de fluxo tomadas durante a reformulação. Não comprova frontend, APIs, banco, permissões ou publicação em produção.
+Campo
+Definição
+Responsável
+Felipe Hilário
+Produto
+OPER RADAR — inteligência de mercado para caminhões e veículos pesados
+Fonte principal
+Plano Mestre de Redesign v1.0, data-base 29 ago 2026
+Governança
+Somente confirmação explícita do gestor altera o status de uma tela para APROVADA
+Escopo
+Desktop e mobile; dados de demonstração podem ilustrar comportamento, mas não substituir contratos reais
+Leitura recomendada: começar pelas decisões executivas e arquitetura; usar os capítulos de tela como contrato de implementação e os anexos como checklist de aceite.
+Sumário executivo
+DECISÃO ESTRUTURALO menu principal permanece curto. Submenus aparecem apenas para destinos recorrentes; estado, cidade, modelo, lojista, item e anúncio são drill-downs contextuais. Alertas e Radar IA são ferramentas globais.
+A hierarquia de mercado é Brasil → região → estado → cidade → lojista → anúncio.
+Minha Loja — SVD Seminovos permanece referência fixa de comparação quando aplicável.
+Mediana de anúncios equivalentes é a referência principal; FIPE permanece separada e rotulada.
+Verde/vermelho comunicam apenas movimento temporal. Diferenças estáticas usam azul-marinho/cinza.
+Saída de portal é saída detectada; não é venda confirmada.
+Toda leitura estratégica deve expor fonte, período, amostra, confiança e caminho para evidência.
+Rolagem infinita será híbrida: automática para fluidez e botão Carregar mais para acessibilidade e recuperação.
+Desktop é a superfície de comparação; mobile prioriza briefing, alertas, busca e ações rápidas sem remover contexto.
+O que este documento acrescenta
+Mapa completo de rotas, menus, submenus e retornos.
+Contrato de estado global e persistência de filtros.
+Especificação funcional das 16 telas.
+Estados loading, vazio, erro, baixa confiança, stale e sem permissão.
+Modelo de confiança, RBAC, telemetria, APIs e entidades propostos.
+Mapa de acessibilidade desktop/mobile e critérios WCAG 2.2 AA.
+Backlog de funções novas, prioridades e decisões pendentes.
+Sumário de capítulos
+Governança, escopo e princípios.
+Arquitetura de informação.
+Modelo de navegação e contexto.
+Fluxos ponta a ponta.
+Especificação das Telas 1–16.
+Estados universais.
+Dados, equivalência e confiança.
+Funções novas propostas.
+Acessibilidade e responsividade.
+Permissões e segurança.
+APIs, entidades e telemetria.
+Performance e observabilidade.
+Critérios de aceite, roadmap e decisões pendentes.
+1. Governança, escopo e princípios
+1.1 Regra de governança
+REGRA OBRIGATÓRIAMockup bonito não equivale a tela aprovada nem implementada. Cada tela precisa de origem, destino, comportamento, dados, estados, acessibilidade e confirmação explícita de Felipe Hilário.
+1.2 O produto é
+Sistema de inteligência comercial sobre anúncios monitorados.
+Ferramenta para CEO, gestor comercial, comprador, analista e operação de dados.
+Ambiente de comparação por grupos equivalentes, geografia e tempo.
+Base de evidências para decisões humanas, sem prescrever automaticamente preço ou compra.
+1.3 O produto não é
+Marketplace, catálogo de compra ou fluxo de negociação.
+Galeria de fotos de caminhões.
+Sistema que chama saída de anúncio de venda confirmada.
+Motor que mistura FIPE com mediana de anúncios.
+Assistente que inventa causa, tendência ou preço ideal sem evidência suficiente.
+1.4 Semântica obrigatória
+Conceito
+Regra funcional
+Tratamento visual
+Preço de mercado
+Mediana do grupo equivalente; média, mínimo, máximo e dispersão são contexto.
+Azul-marinho/cinza
+Diferença estática
+Comparação contra Brasil, UF, cidade ou Minha Loja em um mesmo instante.
+Neutro; nunca verde/vermelho
+Movimento temporal
+Variação ao longo do período monitorado.
+Verde para alta; vermelho para queda
+Saída detectada
+Anúncio deixou de ser observado após confirmações do coletor.
+Cinza; não usar Vendido
+FIPE
+Fonte externa e distinta; nunca substitui mediana de anúncios.
+Rótulo e fonte explícitos
+Minha Loja
+SVD Seminovos é referência fixa quando houver grupo comparável.
+Laranja restrito
+2. Arquitetura de informação
+Figura 1 — Arquitetura funcional consolidada
+2.1 Menu e submenus
+Nível
+Item
+Destino
+Regra
+Principal
+Visão estratégica
+Tela 1
+Entrada executiva; sem submenu obrigatório
+Principal
+Mercado
+Submenu
+Visão geral e Anúncios monitorados
+Principal
+Concorrência
+Submenu
+Visão geral e Comparador
+Principal
+Minha Loja
+Submenu
+Visão geral; detalhes ficam em drill-down
+Rodapé
+Configurações
+Submenu
+Conta e preferências; Saúde dos dados
+Global
+Sino
+Tela 14
+Presente no cabeçalho de todas as telas; contador de novos
+Global
+Radar IA
+Tela 13
+Botão flutuante; abre painel sobre a tela atual
+2.2 O que é submenu e o que é drill-down
+Submenu: destino recorrente que pode ser iniciado sem selecionar uma entidade anterior.
+Drill-down: página que depende de uma entidade ou recorte, como UF, cidade, modelo, lojista, item ou anúncio.
+Drill-down não polui o menu. Ele usa breadcrumb, título contextual e botão Voltar.
+A rota direta de um drill-down deve reconstruir o contexto mínimo a partir da URL.
+3. Modelo de navegação e contexto
+3.1 Estado global de análise
+Campo
+Definição
+geography
+país, região, UF e cidade; filtros filhos dependem do pai
+period
+Todo o período, data personalizada, 1 ano, 120, 90 ou 60 dias
+comparison
+Sem comparação ou período anterior equivalente
+segment
+categoria/tipo do veículo, como caminhões pesados
+equivalence
+grupo comparável normalizado e seus critérios
+base
+Minha Loja — SVD Seminovos, fixa quando aplicável
+origin
+rota, entidade, linha e posição necessárias para retornar
+dataFreshness
+última coleta, cobertura e status stale
+3.2 Regras de persistência
+Toda alteração relevante atualiza a URL sem apagar a rota anterior do histórico.
+Abrir um drill-down cria um snapshot de retorno: filtros, ordenação, lotes carregados e ID da linha de origem.
+Voltar restaura a linha por identidade; se a lista mudou, aproxima a posição e anuncia a mudança.
+Recarregar a página reconstrói o contexto pela URL e pelas preferências do usuário.
+Links compartilhados não carregam segredos; apenas IDs internos, filtros e recortes permitidos.
+No mobile, o primeiro Voltar fecha modal/painel; o segundo retorna à rota anterior.
+3.3 Dependência de filtros
+Alterar país reinicia região, UF e cidade.
+Alterar região reinicia UF e cidade; alterar UF reinicia cidade.
+Alterar segmento invalida o grupo equivalente quando incompatível.
+Alterar período mantém geografia e modelo, mas recalcula séries, amostra e confiança.
+Todo o período força Sem comparação por não existir período anterior equivalente completo.
+Filtros incompatíveis são removidos com aviso acessível; nunca falham silenciosamente.
+3.4 Rotas propostas
+Tela
+Rota proposta
+Natureza
+Tela 1 — Visão estratégica
+/visao-estrategica
+Área principal
+Tela 2 — Mercado nacional
+/mercado
+Área principal / submenu Visão geral
+Tela 3 — Mercado por estado
+/mercado/{regiao}/{uf}
+Drill-down contextual
+Tela 4 — Mercado por cidade
+/mercado/{regiao}/{uf}/{cidade}
+Drill-down contextual
+Tela 5 — Análise integrada de modelo
+/mercado/modelos/{grupo_equivalente}
+Drill-down reutilizável
+Tela 6 — Navegador de anúncios
+/mercado/anuncios
+Submenu recorrente + evidência
+Tela 7 — Detalhe do anúncio
+/mercado/anuncios/{anuncio_id}
+Detalhe contextual
+Tela 8 — Concorrência — visão geral
+/concorrencia
+Área principal / submenu Visão geral
+Tela 9 — Perfil do concorrente
+/concorrencia/lojistas/{lojista_id}
+Drill-down contextual
+Tela 10 — Comparador de concorrentes
+/concorrencia/comparador?participantes={ids}
+Submenu recorrente / análise final
+Tela 11 — Minha Loja — visão geral
+/minha-loja
+Área principal / submenu Visão geral
+Tela 12 — Minha Loja — modelo/item
+/minha-loja/itens/{item_id}
+Drill-down contextual
+Tela 13 — Radar IA
+Estado global: ?radar=open (PROPOSTA)
+Ferramenta global sobreposta
+Tela 14 — Alertas estratégicos
+/alertas
+Central global
+Tela 15 — Saúde dos dados
+/configuracoes/saude-dados
+Configurações &gt; submenu
+Tela 16 — Configurações e conta
+/configuracoes/conta?aba={aba}
+Configurações &gt; submenu
+As rotas são PROPOSTA de engenharia de fluxo; devem ser adaptadas ao roteador e ao backend existentes sem perder o contrato de estado.
+4. Fluxos ponta a ponta
+Figura 2 — Fluxo principal de Mercado e evidências
+4.1 Exploração geográfica
+O gestor abre Mercado nacional.
+Seleciona uma UF no mapa ou ranking.
+A Tela 3 recalcula o estado e preserva período, comparação e segmento.
+Seleciona uma cidade; a Tela 4 recalcula KPIs, modelos, lojistas e anúncios locais.
+Abre um modelo ou evidência sem perder o contexto geográfico.
+Volta e encontra filtros, grupo selecionado e posição restaurados.
+4.2 Da leitura à evidência
+Um KPI, insight, alerta ou resposta da IA apresenta uma afirmação.
+A interface mostra fonte, período, amostra e confiança.
+Ver evidências abre o Navegador de anúncios com filtros bloqueados e explicados.
+A linha abre o Detalhe do anúncio; o histórico prova preço/status observado.
+O retorno restaura a leitura original.
+4.3 Concorrência
+Ranking identifica participantes no recorte.
+Perfil detalha mix, preço e movimentos do lojista.
+Comparador recebe até quatro participantes; Minha Loja permanece fixa.
+Célula da comparação abre anúncios do participante e modelo correspondentes.
+4.4 Alertas e IA
+O sino global abre resumo; Ver todos abre a Tela 14.
+Alertas são eventos derivados de regras versionadas e apontam à análise relacionada.
+Radar IA herda o contexto da tela, mas explicita quando o usuário ampliou ou alterou o recorte.
+Sem confiança mínima, a IA recusa a conclusão e oferece abrir um recorte maior.
+5.1 Tela 1 — Visão estratégica
+Campo
+Contrato
+Natureza
+Área principal
+Status
+APROVADA
+Rota proposta
+/visao-estrategica
+Pergunta de negócio
+O que merece atenção agora?
+Origem
+Login, logo OPER RADAR ou item Visão estratégica.
+Destino
+Mercado, análise de modelo, alerta relacionado e evidências.
+Contexto inicial
+Brasil; filtros globais; Base Minha Loja fixa; período inicial Todo o período.
+Ações e navegação
+Alterar geografia, período e comparação.
+Abrir prioridade comercial na análise que a sustenta.
+Abrir movimentos relevantes e respectivas evidências.
+Acionar Radar IA com o contexto da página.
+Dados e dependências
+Consome: KPIs nacionais; pulso de preço e oferta; movimentos temporais; prioridades comerciais; confiança e cobertura.
+Estados e exceções
+Sem movimentos: explicar que não houve mudança relevante. Baixa confiança: ocultar priorização prescritiva e mostrar causa. Erro parcial: preservar KPIs válidos.
+Acessibilidade específica
+Resumo textual para o gráfico; prioridades em ordem de foco; ícones com nome acessível; verde/vermelho sempre acompanhados de sinal e texto.
+Telemetria mínima
+screen_view, filter_changed, priority_opened, evidence_opened, radar_opened
+CRITÉRIO DE ACEITEToda prioridade deve apontar para fonte, amostra, período, confiança e rota de evidência.
+5.2 Tela 2 — Mercado nacional
+Campo
+Contrato
+Natureza
+Área principal / submenu Visão geral
+Status
+APROVADA
+Rota proposta
+/mercado
+Pergunta de negócio
+Como oferta, preço e concentração se distribuem no Brasil?
+Origem
+Menu Mercado &gt; Visão geral.
+Destino
+Estado, análise de modelo, anúncios equivalentes.
+Contexto inicial
+Brasil; regiões/estados/cidades encadeados; filtros temporais e segmento.
+Ações e navegação
+Selecionar UF no mapa ou ranking.
+Selecionar grupo equivalente.
+Alternar volume e pressão competitiva.
+Abrir anúncios equivalentes.
+Dados e dependências
+Consome: mapa de oferta; contagem por UF; modelos equivalentes; mediana por região; séries de preço e oferta.
+Estados e exceções
+Mapa sem cobertura diferencia sem dado de zero anúncios. Falha no mapa não bloqueia tabela. Grupo sem amostra exibe motivo e alternativa de filtro.
+Acessibilidade específica
+Mapa possui tabela alternativa por UF; seleção não depende apenas de cor; cabeçalhos e linhas da tabela são navegáveis por teclado.
+Telemetria mínima
+market_country_view, geography_selected, model_group_selected, ads_opened
+CRITÉRIO DE ACEITESelecionar UF preserva todos os filtros e recalcula a Tela 3 sem perder o grupo escolhido.
+5.3 Tela 3 — Mercado por estado
+Campo
+Contrato
+Natureza
+Drill-down contextual
+Status
+APROVADA
+Rota proposta
+/mercado/{regiao}/{uf}
+Pergunta de negócio
+Como o mercado se comporta no estado escolhido?
+Origem
+Clique na UF da Tela 2 ou URL compartilhada.
+Destino
+Cidade, modelo, lojista e anúncios.
+Contexto inicial
+Herda país, região, período, comparação, segmento e grupo equivalente.
+Ações e navegação
+Selecionar cidade.
+Analisar modelo.
+Abrir lojista.
+Voltar ao Brasil preservando estado anterior e rolagem.
+Dados e dependências
+Consome: KPIs estaduais; cidades; modelo comparável; faixa estadual; lojistas; referência Minha Loja.
+Estados e exceções
+Estado sem cobertura mostra UFs cobertas e opção de voltar. Cidade sem dados permanece desabilitada com explicação.
+Acessibilidade específica
+Breadcrumb programático; botão Voltar com rótulo explícito; mapa estadual tem lista de cidades equivalente.
+Telemetria mínima
+market_state_view, city_selected, dealer_opened, back_restored
+CRITÉRIO DE ACEITEDiferenças estáticas contra Brasil/MG usam cor neutra; movimento temporal usa verde/vermelho.
+5.4 Tela 4 — Mercado por cidade
+Campo
+Contrato
+Natureza
+Drill-down contextual
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/mercado/{regiao}/{uf}/{cidade}
+Pergunta de negócio
+Qual é a oferta, o preço e a concorrência desta praça?
+Origem
+Clique em cidade na Tela 3.
+Destino
+Modelo, perfil de lojista e anúncios.
+Contexto inicial
+Herda todos os filtros; cidade substitui Todas as cidades.
+Ações e navegação
+Abrir concorrência completa.
+Analisar modelo.
+Abrir anúncio equivalente.
+Voltar ao estado preservando posição.
+Dados e dependências
+Consome: KPIs locais; participação no estado; concentração por lojista; medianas da cidade; amostra e confiança.
+Estados e exceções
+Cidade com amostra pequena não força confiança alta. Sem granularidade de bairro: não mostrar mapa fictício; usar concentração competitiva.
+Acessibilidade específica
+Barras horizontais têm tabela textual; amostra e confiança são lidas antes da ação; rótulos completos sem depender de tooltip.
+Telemetria mínima
+market_city_view, competitor_concentration_opened, city_model_selected
+CRITÉRIO DE ACEITEValidar KPI participação no estado, substituição do mapa e regra de confiança para amostra local.
+5.5 Tela 5 — Análise integrada de modelo
+Campo
+Contrato
+Natureza
+Drill-down reutilizável
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/mercado/modelos/{grupo_equivalente}
+Pergunta de negócio
+Como este modelo se posiciona em todos os recortes monitorados?
+Origem
+Analisar modelo a partir das Telas 2, 3 ou 4.
+Destino
+Anúncios filtrados e perfil de lojista.
+Contexto inicial
+Por padrão herda o recorte de origem; o gestor pode ampliar para Brasil.
+Ações e navegação
+Trocar recorte sem perder o grupo comparável.
+Abrir estado ou região.
+Abrir anúncios do modelo.
+Abrir lojista.
+Dados e dependências
+Consome: série de mediana; oferta ativa; regiões; top estados; top lojistas; Minha Loja.
+Estados e exceções
+Quando um recorte não tiver amostra, manter o modelo e oferecer recorte superior. Não estimar preço ausente.
+Acessibilidade específica
+Gráficos têm tabela alternativa; seleção de recorte usa combobox acessível; valores da Minha Loja têm rótulo textual.
+Telemetria mínima
+model_analysis_view, scope_changed, region_opened, model_ads_opened
+CRITÉRIO DE ACEITEDecidir formalmente se sempre abre no Brasil ou herda o recorte; recomendação: herdar e oferecer ampliar.
+5.6 Tela 6 — Navegador de anúncios
+Campo
+Contrato
+Natureza
+Submenu recorrente + evidência
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/mercado/anuncios
+Pergunta de negócio
+Quais anúncios sustentam esta leitura?
+Origem
+Mercado &gt; Anúncios monitorados ou botões Ver anúncios equivalentes.
+Destino
+Detalhe do anúncio e perfil do lojista.
+Contexto inicial
+Filtros, grupo equivalente e geografia chegam pela URL; acesso direto abre visão geral permitida ao papel.
+Ações e navegação
+Busca livre.
+Filtrar ano, condição, preço e status.
+Ordenar.
+Abrir linha.
+Carregar mais por rolagem infinita híbrida.
+Dados e dependências
+Consome: anúncio; lojista; localidade; ano; km; condição; preço; dias no ar; status.
+Estados e exceções
+Fim da lista anunciado. Erro de próximo lote mantém itens carregados e oferece Tentar novamente. Filtro sem resultado permite limpar filtros.
+Acessibilidade específica
+Rolagem infinita possui botão Carregar mais, aria-live com total carregado e foco estável; tabela pode alternar para cartões em mobile.
+Telemetria mínima
+ads_view, ads_search, ads_filter_changed, infinite_scroll_loaded, load_more_clicked, ad_opened
+CRITÉRIO DE ACEITEVoltar do detalhe restaura filtros, ordenação e posição por ID da linha, não apenas pixel.
+5.7 Tela 7 — Detalhe do anúncio
+Campo
+Contrato
+Natureza
+Detalhe contextual
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/mercado/anuncios/{anuncio_id}
+Pergunta de negócio
+Qual é a evidência individual e seu histórico?
+Origem
+Linha do Navegador de anúncios.
+Destino
+Perfil do lojista; voltar à lista.
+Contexto inicial
+Mantém token de retorno da lista e grupo comparável.
+Ações e navegação
+Ver perfil do lojista.
+Inspecionar histórico de preço/status.
+Voltar à lista.
+Copiar link interno.
+Dados e dependências
+Consome: atributos normalizados; preço atual; histórico; status; lojista; participação no cálculo.
+Estados e exceções
+Anúncio saído preserva histórico e mostra Saída detectada, nunca Vendido. Registro indisponível apresenta motivo e link de retorno.
+Acessibilidade específica
+Especificações em lista de definição; histórico tem descrição textual; status não depende de cor.
+Telemetria mínima
+ad_detail_view, dealer_profile_opened, return_to_ads
+CRITÉRIO DE ACEITEDefinir o layout do estado Saído e a evidência mínima para venda provável.
+5.8 Tela 8 — Concorrência — visão geral
+Campo
+Contrato
+Natureza
+Área principal / submenu Visão geral
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/concorrencia
+Pergunta de negócio
+Quem está movimentando e pressionando o mercado?
+Origem
+Menu Concorrência &gt; Visão geral.
+Destino
+Perfil do concorrente e Comparador.
+Contexto inicial
+Recorte geográfico, período e segmento; Base Minha Loja fixa.
+Ações e navegação
+Ordenar ranking.
+Abrir perfil.
+Selecionar até quatro participantes.
+Comparar selecionados.
+Dados e dependências
+Consome: lojistas ativos; entradas; saídas; novos participantes; ticket; movimento temporal.
+Estados e exceções
+Nenhum participante selecionado desabilita comparação e explica requisito. Saída é movimento de anúncio, não venda.
+Acessibilidade específica
+Seleção para comparação usa checkbox real; ações por linha têm nome do lojista; barras divergentes possuem lista equivalente.
+Telemetria mínima
+competition_view, competitor_selected, competitor_profile_opened, compare_started
+CRITÉRIO DE ACEITEDefinir regra explícita de concorrente direto da SVD.
+5.9 Tela 9 — Perfil do concorrente
+Campo
+Contrato
+Natureza
+Drill-down contextual
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/concorrencia/lojistas/{lojista_id}
+Pergunta de negócio
+Como este lojista forma preço e movimenta estoque?
+Origem
+Ver perfil na Tela 8, anúncios ou detalhe.
+Destino
+Comparador com lojista pré-selecionado e anúncios.
+Contexto inicial
+Herda geografia, período e segmento; perfil é identificado por ID estável.
+Ações e navegação
+Abrir anúncios do mix.
+Comparar com Minha Loja.
+Abrir histórico de entradas/saídas.
+Dados e dependências
+Consome: estoque; mix; ticket; tempo médio; movimento; modelos em comum com SVD.
+Estados e exceções
+Sem modelos em comum mostra explicação, não uma tabela vazia. Badge concorrente direto só aparece se a regra for satisfeita.
+Acessibilidade específica
+Badge possui texto e explicação; gráfico de entradas/saídas tem tabela; botão de comparação explicita os participantes.
+Telemetria mínima
+competitor_profile_view, competitor_ads_opened, compare_with_store
+CRITÉRIO DE ACEITEFonte e critério do badge Concorrente direto devem ser auditáveis.
+5.10 Tela 10 — Comparador de concorrentes
+Campo
+Contrato
+Natureza
+Submenu recorrente / análise final
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/concorrencia/comparador?participantes={ids}
+Pergunta de negócio
+Como participantes selecionados e Minha Loja se comparam?
+Origem
+Concorrência &gt; Comparador, seleção na Tela 8 ou perfil na Tela 9.
+Destino
+Anúncios de uma célula específica.
+Contexto inicial
+Até quatro participantes; Minha Loja fixa e não removível.
+Ações e navegação
+Adicionar/remover concorrente.
+Trocar modelo comum.
+Abrir anúncios da célula.
+Compartilhar comparação.
+Dados e dependências
+Consome: mediana por lojista/modelo; unidades; ausência de modelo comum; Minha Loja.
+Estados e exceções
+Participante sem modelo comum mostra travessão e explicação. Zero não substitui ausência. Comparação vazia orienta seleção.
+Acessibilidade específica
+Tabela é fonte principal; gráfico é complementar; Minha Loja identificada por texto, não apenas laranja.
+Telemetria mínima
+competitor_compare_view, participant_added, participant_removed, comparison_cell_opened
+CRITÉRIO DE ACEITEDefinir comportamento quando nenhum participante possuir qualquer modelo em comum.
+5.11 Tela 11 — Minha Loja — visão geral
+Campo
+Contrato
+Natureza
+Área principal / submenu Visão geral
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/minha-loja
+Pergunta de negócio
+Como o estoque da SVD está posicionado frente ao mercado equivalente?
+Origem
+Menu Minha Loja &gt; Visão geral.
+Destino
+Modelo/item da loja e anúncios equivalentes.
+Contexto inicial
+SVD Seminovos, Curitiba/PR; recortes comparativos configuráveis.
+Ações e navegação
+Abrir item/modelo.
+Ver recomendação entendida como leitura comparativa.
+Filtrar posição e alcance.
+Dados e dependências
+Consome: estoque; ticket; dias em estoque; modelos acima; preço SVD; mediana equivalente; alcance.
+Estados e exceções
+Item sem grupo comparável mostra Não comparável e os atributos faltantes. Nunca fabricar mediana.
+Acessibilidade específica
+Leituras Acima/Alinhado/Abaixo têm texto; valores estáticos permanecem neutros; tabela vira cartões ordenados no mobile.
+Telemetria mínima
+store_view, store_item_opened, store_position_filter_changed
+CRITÉRIO DE ACEITEFormalizar os limiares de Acima/Alinhado/Abaixo e manter linguagem não prescritiva.
+5.12 Tela 12 — Minha Loja — modelo/item
+Campo
+Contrato
+Natureza
+Drill-down contextual
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/minha-loja/itens/{item_id}
+Pergunta de negócio
+Quais evidências posicionam este item em cada geografia?
+Origem
+Linha da Tela 11.
+Destino
+Navegador de anúncios filtrado.
+Contexto inicial
+Item SVD fixo; grupo equivalente e recortes Brasil/Sul/UF.
+Ações e navegação
+Alternar recorte.
+Ver anúncios equivalentes.
+Voltar ao estoque.
+Dados e dependências
+Consome: preço SVD; medianas por recorte; diferença estática; amostra; confiança; distribuição.
+Estados e exceções
+Recorte insuficiente recebe baixa confiança/indisponível. Texto não sugere preço ideal ou obrigação de ação.
+Acessibilidade específica
+Distribuição tem descrição e tabela; marcador SVD possui rótulo; texto de leitura é simples e objetivo.
+Telemetria mínima
+store_item_view, store_scope_changed, store_evidence_opened
+CRITÉRIO DE ACEITEValidar o tom do texto para que seja evidência, nunca recomendação automática de preço.
+5.13 Tela 13 — Radar IA
+Campo
+Contrato
+Natureza
+Ferramenta global sobreposta
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+Estado global: ?radar=open (PROPOSTA)
+Pergunta de negócio
+O que os dados monitorados respondem sobre a pergunta do gestor?
+Origem
+Botão circular em qualquer tela.
+Destino
+Anúncios, modelo, concorrente ou recorte que sustentam a resposta.
+Contexto inicial
+Herda tela, filtros e entidade atual; usuário pode remover ou ampliar o contexto.
+Ações e navegação
+Perguntar.
+Inspecionar fonte/amostra/período/confiança.
+Abrir evidências.
+Limpar contexto.
+Salvar pergunta como alerta (PROPOSTA).
+Dados e dependências
+Consome: consulta; contexto; resposta; evidências; confiança; política de recusa.
+Estados e exceções
+Sem amostra suficiente: recusar conclusão e sugerir recorte maior. Erro da IA não esconde dados do painel. Conteúdo causal não comprovado deve ser bloqueado.
+Acessibilidade específica
+Dialog com foco preso, Esc fecha, foco retorna ao botão; mensagens têm papéis semânticos; resposta não depende de animação.
+Telemetria mínima
+radar_opened, radar_question_submitted, radar_refused, radar_evidence_opened, radar_closed
+CRITÉRIO DE ACEITEToda resposta contém fonte, período, amostra, confiança e caminho de evidência.
+5.14 Tela 14 — Alertas estratégicos
+Campo
+Contrato
+Natureza
+Central global
+Status
+MOCKUP CORRIGIDO — aprovação formal pendente
+Rota proposta
+/alertas
+Pergunta de negócio
+Quais mudanças relevantes exigem atenção?
+Origem
+Sino global com contador em todas as telas; popover com recentes e Ver todos.
+Destino
+Mercado, modelo, concorrente, Minha Loja ou anúncios relacionados.
+Contexto inicial
+Regras do usuário; geografia, modelos e frequência configurados.
+Ações e navegação
+Abrir alerta.
+Marcar como visualizado.
+Arquivar.
+Filtrar por tipo/status.
+Configurar regras.
+Dados e dependências
+Consome: tipo; prioridade; descrição; data; status; alvo; regra disparadora.
+Estados e exceções
+Sem alertas novos mostra histórico e estado saudável. Alerta cuja evidência expirou explica indisponibilidade. Contador sincroniza após leitura.
+Acessibilidade específica
+Sino tem nome e contador anunciado sem repetição; popover é navegável; prioridade/status usam texto; foco volta ao sino.
+Telemetria mínima
+alert_center_view, alert_opened, alert_read, alert_archived, alert_rule_changed
+CRITÉRIO DE ACEITESino é componente global; nenhum menu comercial fica ativo na central.
+5.15 Tela 15 — Saúde dos dados
+Campo
+Contrato
+Natureza
+Configurações &gt; submenu
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/configuracoes/saude-dados
+Pergunta de negócio
+A base está atualizada, coberta e confiável?
+Origem
+Configurações &gt; Saúde dos dados ou Fontes de dados &gt; Ver saúde dos dados.
+Destino
+Navegador de anúncios em duplicidade, quando aplicável.
+Contexto inicial
+Visão operacional; sem filtros comerciais; respeita permissão administrativa.
+Ações e navegação
+Inspecionar cobertura por UF.
+Abrir detalhes de falha.
+Abrir duplicidades mescladas.
+Atualizar diagnóstico.
+Dados e dependências
+Consome: fontes; última coleta; UFs; taxa de sucesso; falhas; duplicidades; confiança.
+Estados e exceções
+Fonte atrasada, coleta parcial e fonte indisponível recebem mensagens distintas. Diagnóstico terminal não cria decisão comercial direta.
+Acessibilidade específica
+Tabela densa mantém cabeçalhos; falhas usam ícone + texto; atualizações são anunciadas em região live moderada.
+Telemetria mínima
+data_health_view, source_issue_opened, duplicates_opened, health_refresh
+CRITÉRIO DE ACEITEConfirmar permanência em Configurações; recomendação funcional: manter como submenu administrativo.
+5.16 Tela 16 — Configurações e conta
+Campo
+Contrato
+Natureza
+Configurações &gt; submenu
+Status
+MOCKUP — aprovação formal pendente
+Rota proposta
+/configuracoes/conta?aba={aba}
+Pergunta de negócio
+Como administrar conta, usuários, fontes, permissões, preferências e método?
+Origem
+Configurações &gt; Conta e preferências.
+Destino
+Saúde dos dados pela aba Fontes de dados.
+Contexto inicial
+Aba na URL; preferências sincronizadas por usuário e dispositivo.
+Ações e navegação
+Alternar abas.
+Gerenciar usuários e permissões conforme papel.
+Inspecionar fontes.
+Definir preferências.
+Ler metodologia oficial.
+Dados e dependências
+Consome: conta; usuários; fontes; papéis; preferências; metodologia somente leitura.
+Estados e exceções
+Aba sem permissão permanece oculta ou bloqueada com motivo. Alteração de metodologia não ocorre na interface; exige Plano Mestre.
+Acessibilidade específica
+Tabs usam padrão tablist/tab/tabpanel; setas movem entre abas; foco e seleção são independentes; formulários têm labels e ajuda.
+Telemetria mínima
+settings_view, settings_tab_changed, preference_changed, permission_changed, data_health_opened
+CRITÉRIO DE ACEITEDefinir granularidade de permissões; Fontes de dados oferece rota explícita para Tela 15.
+6. Contrato universal de estados
+Figura 3 — Estados que toda tela precisa implementar
+Estado
+Comportamento obrigatório
+Ação oferecida
+Carregando
+Skeleton preserva a geometria; não mostrar zero temporário; cancelar requisição anterior quando filtro muda.
+Cancelar implícito / aguardar
+Vazio real
+Explicar que não há dados no recorte, distinguindo ausência de cobertura de zero anúncios.
+Ampliar recorte
+Vazio por filtro
+Listar filtros responsáveis sem apagar o contexto.
+Limpar filtros
+Erro parcial
+Manter componentes válidos e marcar somente o bloco que falhou.
+Tentar novamente
+Erro total
+Mensagem com request_id para suporte; nenhum dado antigo apresentado como atual.
+Recarregar / voltar
+Baixa confiança
+Mostrar dado com ressalva ou recusar insight; explicar fatores do score.
+Ver amostra / ampliar
+Stale
+Exibir última atualização e motivo; não misturar com estado atual sem rótulo.
+Atualizar
+Sem permissão
+Não vazar existência/conteúdo protegido; explicar papel necessário.
+Solicitar acesso / voltar
+Offline
+Preservar último estado em leitura, rotulado como offline; bloquear mutações.
+Reconectar
+6.1 Mensagens-padrão
+Sem dados neste recorte. Amplie a geografia ou o período para continuar.
+A amostra é insuficiente para uma leitura confiável. Nenhuma conclusão foi gerada.
+Dados atualizados pela última vez em {data_hora}. A coleta atual está atrasada.
+Não foi possível carregar este bloco. Os demais dados permanecem disponíveis.
+Você não possui permissão para esta configuração.
+7. Dados, equivalência e confiança
+Figura 4 — Linhagem funcional dos dados
+7.1 Grupo equivalente
+categoria e tipo do veículo;
+marca e modelo normalizados;
+configuração e tração;
+ano ou faixa curta;
+condição;
+carroceria/implemento quando relevante;
+quilometragem quando houver cobertura suficiente.
+7.2 Score de confiança — PROPOSTA
+A confiança não pode depender apenas do número de anúncios. A proposta abaixo combina quatro dimensões e explica o resultado ao usuário.
+Dimensão
+Peso
+Exemplo de pontuação
+Amostra válida
+40
+≥30: 40; 10–29: 28; 5–9: 16; &lt;5: 5
+Diversidade de lojistas
+25
+≥10: 25; 4–9: 17; 2–3: 8; 1: 0
+Frescor
+20
+≤24h: 20; ≤72h: 12; ≤7d: 5; &gt;7d: 0
+Completude
+15
+≥90%: 15; 75–89%: 10; 50–74%: 5; &lt;50%: 0
+Alta: score ≥80.
+Média: score de 55 a 79.
+Baixa: score &lt;55.
+Qualquer falha crítica de identidade/duplicidade pode rebaixar a classe, mesmo com amostra grande.
+Os limites são proposta e precisam de validação com o histórico real antes da produção.
+7.3 Status do anúncio
+Status interno
+Significado
+Exibição
+ATIVO
+Observado na coleta atual e validado.
+Ativo
+SAIDA_DETECTADA
+Ausente após a quantidade de confirmações definida.
+Saído do portal
+VENDA_PROVAVEL
+Saída com sinais adicionais, ainda não venda confirmada.
+Venda provável + confiança
+STALE
+Registro não revalidado dentro do SLA da fonte.
+Dados desatualizados
+DUPLICADO
+Mesmo anúncio/veículo identificado em mais de um registro.
+Mesclado / oculto da contagem
+INVALIDO
+Campos essenciais incoerentes ou insuficientes.
+Fora dos cálculos
+8. Funções novas propostas
+COMO LEREstas funções não estavam integralmente especificadas nos mockups. Foram incluídas para fechar lacunas de operação, rastreabilidade, acessibilidade e governança. P0 é essencial ao MVP funcional; P1 amplia valor; P2 é evolução.
+Prioridade
+Função
+Resultado esperado
+P0
+Estado e deep link reproduzível
+Filtros, entidade, ordenação e comparação ficam na URL. Permite compartilhar uma análise e reconstruir o estado após recarregar.
+P0
+Restauração de retorno
+Voltar restaura filtros, linha/entidade de referência, lote carregado e posição da lista; evita recomeçar a análise.
+P0
+Motor de confiança
+Calcula confiança por amostra, diversidade de lojistas, frescor e completude; impede conclusões fortes em amostra fraca.
+P0
+Linhagem e evidência
+Todo KPI, insight, alerta e resposta da IA expõe origem, período, amostra, confiança e link para anúncios sustentadores.
+P0
+Rolagem infinita híbrida
+Carregamento automático com botão acessível Carregar mais, recuperação de erro e fim de lista anunciado.
+P0
+Telemetria de produto
+Eventos padronizados para navegação, filtros, drill-down, evidências, alertas, IA e falhas; base para medir uso e regressão.
+P0
+Auditoria administrativa
+Registra alterações de usuários, papéis, fontes, regras de alerta e preferências com autor, data e antes/depois.
+P1
+Salvar visão
+Salva filtros, entidade, ordenação e comparação com nome do usuário. Pode ser reaberta sem reconstrução manual.
+P1
+Converter visão em alerta
+Transforma uma pesquisa/modelo/recorte salvo em regra de alerta, com limiar e frequência explícitos.
+P1
+Favoritos e monitoramento
+Favorita modelos, cidades e lojistas; alimenta briefing e alertas, sem criar recomendação automática.
+P1
+Exportação governada
+CSV para dados tabulares e PDF para briefing, respeitando filtros, permissão, fonte e carimbo de atualização.
+P1
+Resumo executivo agendado
+Digest diário/semanal de alertas e mudanças, configurável pelo gestor; canais ficam pendentes de decisão.
+P1
+Classificação de concorrente direto
+Regra auditável baseada em sobreposição de modelos, praça e faixa de preço; substitui badge manual.
+P1
+Detecção de saída provável
+Classifica saída com evidências e nível de confiança; nunca chama de venda confirmada sem integração de venda.
+P2
+Anotações internas
+Permite registrar observação em modelo/lojista/anúncio com autor e data; sem alterar o dado monitorado.
+P2
+Comparação de snapshots
+Compara duas datas/recortes salvos e evidencia o que mudou, mantendo diferença estática separada de movimento temporal.
+8.1 Regras para funções novas
+Nenhuma função nova pode criar recomendação automática de preço sem governança e confiança suficientes.
+Exportações carregam filtros, fonte, data de atualização e aviso de que preços são anunciados.
+Visões salvas e alertas são privados por padrão; compartilhamento exige permissão explícita.
+Anotações nunca alteram o dado coletado; ficam em camada separada e auditada.
+Toda automação pode ser desativada pelo usuário e registra sua regra disparadora.
+9. Acessibilidade e responsividade
+9.1 Meta
+CRITÉRIO MÍNIMOWCAG 2.2 nível AA, navegação completa por teclado, reflow a 320 CSS px e equivalência textual para gráficos e mapas.
+9.2 Mapa de controles
+Componente
+Teclado
+Leitor de tela / foco
+Mobile
+Sidebar/submenu
+Tab; Enter/Espaço abre; setas opcionais no grupo
+aria-expanded e item atual; foco não salta
+Menu lateral ou Mais; estado atual visível
+Tabs
+Setas movem; Home/End; Enter ativa se manual
+tablist/tab/tabpanel; aria-selected
+Rolagem horizontal com rótulo completo
+Combobox/filtro
+Setas, Enter, Esc; digitação busca
+label, valor, total de opções e erro
+Painel full-screen; Aplicar/Limpar fixos
+Tabela
+Tab apenas em ações; setas não obrigatórias
+th/headers, caption e ordem lógica
+Cartões ou tabela com primeira coluna fixa
+Gráfico/mapa
+Foco em pontos relevantes quando acionáveis
+Resumo + tabela alternativa
+Resumo primeiro; visual simplificado
+Rolagem infinita
+Botão Carregar mais sempre disponível
+aria-live anuncia lote e total
+Carga automática moderada; botão persistente
+Dialog/Radar IA
+Esc fecha; Tab preso; foco retorna
+role dialog, título e descrição
+Tela cheia; campo acima do teclado
+Sino/popover
+Enter abre; Esc fecha
+contador anunciado uma vez; foco retorna
+Popover ou folha inferior
+Toast
+Não captura foco
+aria-live polite/assertive conforme severidade
+Visível sem cobrir ação principal
+9.3 Regras visuais
+Contraste mínimo 4,5:1 para texto normal e 3:1 para texto grande/componentes.
+Foco com contorno de pelo menos 2 px e contraste de 3:1; nunca removido.
+Alvos de toque mínimos de 44 × 44 CSS px.
+Zoom de 200% sem perda de conteúdo ou ação; 400% com reflow quando aplicável.
+Cor nunca é a única indicação: sinal, texto, badge e ícone acompanham.
+prefers-reduced-motion elimina animação não essencial e preserva transições instantâneas.
+9.4 Breakpoints e comportamento
+Faixa
+Layout
+Prioridade
+≥1280 px
+Sidebar fixa, 12 colunas, comparação completa.
+Exploração e análise densa
+1024–1279 px
+Sidebar compacta; cards podem quebrar em 2 linhas.
+Análise com menor simultaneidade
+768–1023 px
+Sidebar recolhível; filtros em painel; duas colunas.
+Leitura e comparação moderada
+&lt;768 px
+Uma coluna; navegação compacta; filtros full-screen.
+Briefing, alertas, busca e ações rápidas
+9.5 Mobile por área
+Visão estratégica: KPIs em carrossel acessível ou pilha; prioridades antes de gráficos.
+Mercado: mapa substituído por ranking/lista como padrão; filtros em tela cheia.
+Concorrência: ranking em cartões; comparação horizontal com primeira coluna fixa e modo lista.
+Minha Loja: leitura e evidência primeiro; nenhum texto prescritivo.
+Radar IA: painel vira página cheia; evidências continuam acessíveis.
+Alertas: sino no topo; central em lista; ações de leitura/arquivo com confirmação acessível.
+10. Permissões e segurança
+10.1 Papéis — PROPOSTA
+Capacidade
+Gestor
+Analista
+Comercial
+Administrador
+Ver dashboards
+Sim
+Sim
+Sim
+Sim
+Comparar/exportar
+Sim
+Sim
+Limitado
+Sim
+Criar alertas/visões
+Sim
+Sim
+Sim
+Sim
+Ver Saúde dos dados
+Sim
+Leitura
+Não
+Sim
+Gerenciar usuários
+Conforme política
+Não
+Não
+Sim
+Gerenciar fontes
+Leitura
+Não
+Não
+Sim
+Alterar permissões
+Conforme política
+Não
+Não
+Sim
+Alterar metodologia
+Não pela interface
+Não
+Não
+Não pela interface
+10.2 Controles obrigatórios
+RBAC no backend; ocultar botão no frontend não é segurança.
+Segredos de coletores ficam somente no servidor e em cofre apropriado.
+Logs de auditoria para usuário, papel, fonte, alerta e preferência.
+Exportações recebem marca temporal, usuário, filtros e origem.
+Rate limit e proteção contra enumeração em anúncios, lojistas e consultas da IA.
+Radar IA não recebe segredos nem dados fora do escopo permitido ao usuário.
+Retenção de perguntas, exports e logs deve ser definida antes da produção.
+11. APIs, entidades e contratos
+11.1 Envelope de resposta — PROPOSTA
+Campo
+Definição
+data
+conteúdo solicitado
+meta.context
+geografia, período, comparação, segmento e grupo equivalente
+meta.source
+fonte(s), coleta e versão do normalizador
+meta.sample
+anúncios válidos, lojistas e cobertura
+meta.confidence
+score, classe e fatores
+meta.freshness
+última coleta, SLA e stale
+meta.request_id
+correlação para suporte e observabilidade
+links.evidence
+rota/consulta do Navegador de anúncios
+11.2 Endpoints sugeridos
+Método
+Endpoint
+Responsabilidade
+GET
+/api/v1/context/facets
+Filtros encadeados e disponibilidade
+GET
+/api/v1/market/summary
+KPIs do recorte
+GET
+/api/v1/market/geography
+Mapa/ranking geográfico
+GET
+/api/v1/market/models
+Grupos equivalentes e medianas
+GET
+/api/v1/market/models/{id}/series
+Séries de preço e oferta
+GET
+/api/v1/ads
+Busca, filtros e cursor da lista
+GET
+/api/v1/ads/{id}
+Detalhe e histórico
+GET
+/api/v1/dealers/{id}
+Perfil do lojista
+POST
+/api/v1/competitors/compare
+Comparação de participantes
+GET
+/api/v1/store/positioning
+Posição do estoque SVD
+GET
+/api/v1/store/items/{id}/evidence
+Leitura por item
+GET/POST/PATCH
+/api/v1/alerts e /alert-rules
+Central e regras
+POST
+/api/v1/radar/query
+Pergunta com contexto e evidências
+GET
+/api/v1/data-health
+Cobertura, falhas e confiança
+GET/PATCH
+/api/v1/settings
+Preferências permitidas
+GET/POST/PATCH
+/api/v1/users e /roles
+Administração RBAC
+11.3 Entidades mínimas
+Entidade
+Responsabilidade
+Source
+Fonte, SLA, credencial indireta e status operacional
+Capture
+Execução da coleta, tempos, contagens e falhas
+Listing
+Anúncio normalizado e identidade observada
+PriceObservation
+Preço/status por data para histórico
+Dealer
+Lojista, localidade e identidade consolidada
+VehicleNormalization
+Marca, modelo, configuração, ano, condição e atributos
+ComparableGroup
+Regra/versionamento do grupo equivalente
+StoreItem
+Item SVD e vínculo com grupo equivalente
+AlertRule / AlertEvent
+Regra configurada e ocorrência derivada
+SavedView
+Contexto de análise salvo pelo usuário
+User / Role
+Identidade e autorização
+AuditLog
+Rastro imutável de mutações administrativas
+11.4 Paginação por cursor
+Usar cursor opaco, não offset, para reduzir duplicação/salto quando novos anúncios entram.
+Resposta inclui next_cursor, has_more e total aproximado/confirmado.
+Ordenação possui desempate estável por ID.
+Filtros mudados invalidam cursor e cancelam requisição anterior.
+12. Telemetria, performance e observabilidade
+12.1 Eventos
+Evento
+Quando
+Payload mínimo
+screen_view
+Rota estabilizada
+screen, context_id, role
+filter_changed
+Filtro aplicado
+field, old, new, source
+drilldown_opened
+Entidade aberta
+origin, target_type, target_id
+back_restored
+Retorno concluído
+origin, restored_filters, restored_row
+evidence_opened
+Evidência solicitada
+claim_type, evidence_query
+infinite_scroll_loaded
+Lote automático
+cursor, count, latency
+load_more_clicked
+Fallback acessível
+cursor, count
+alert_opened
+Alerta aberto
+alert_id, type, target
+radar_question_submitted
+Pergunta enviada
+context_hash, confidence_result
+export_requested
+Exportação
+format, context_hash, rows
+permission_denied
+Ação bloqueada
+action, object, role
+ui_error
+Erro de interface/API
+request_id, component, code
+12.2 Orçamentos de performance — PROPOSTA
+Métrica
+Meta
+LCP desktop/mobile
+≤2,5 s no p75
+INP
+≤200 ms no p75
+CLS
+≤0,10
+API resumo/cache
+p95 ≤800 ms
+API análise pesada
+p95 ≤2,5 s com estado progressivo
+Troca de filtro
+feedback visual ≤100 ms; cancelamento de requisição anterior
+Lista
+virtualização a partir de 200 itens montados
+Bundle inicial
+carregamento por rota; gráficos/mapas sob demanda
+12.3 Métricas operacionais
+Monitorar: taxa de sucesso e duração por fonte; idade do dado por UF; duplicidade e registros inválidos; cobertura de grupo equivalente; taxa de erro de API e componente; respostas e recusas do Radar IA por confiança; alertas disparados, abertos e arquivados; tempo até evidência e taxa de retorno restaurado.
+13. Critérios de aceite e testes
+13.1 Gate por tela
+Objetivo ligado a uma área e pergunta de negócio.
+Origem, destino, Voltar e deep link definidos.
+Filtros e contexto inicial coerentes.
+KPIs possuem definição, fonte e amostra.
+Equivalência e Minha Loja aplicadas corretamente.
+Semântica de cor validada.
+Loading, vazio, erro, baixa confiança, stale e permissão desenhados.
+Teclado, leitor de tela, foco, contraste, zoom e mobile testados.
+Telemetria e request_id implementados.
+Aprovação explícita do gestor e Plano Mestre atualizados.
+13.2 Matriz de testes
+Camada
+Testes mínimos
+Unidade
+Normalização, equivalência, mediana, confiança, status e regras de alerta
+Contrato
+Schema de API, filtros, cursor, erros e metadados de evidência
+Integração
+Filtro → API → tabela/gráfico; alerta → destino; IA → evidência
+E2E
+Brasil→UF→cidade→modelo→anúncio→voltar; concorrente→comparador; fonte→saúde
+Visual
+Grades, quebra responsiva, estados e regressão por screenshot
+Acessibilidade
+axe + teste manual de teclado, leitor de tela, zoom e contraste
+Performance
+Web Vitals, p95, cancelamento, cache e listas grandes
+Segurança
+RBAC backend, IDOR, rate limit, exportação e logs
+13.3 Cenários E2E críticos
+Selecionar MG, abrir Belo Horizonte, abrir modelo, abrir anúncios, detalhe e retornar com estado intacto.
+Comparar TransMinas, BH Caminhões e SVD; abrir célula; voltar à comparação.
+Abrir alerta no sino e chegar ao modelo/recorte correto.
+Perguntar ao Radar IA e abrir os 38 anúncios/22 lojistas que sustentam a resposta de demonstração.
+Forçar amostra insuficiente e confirmar recusa segura.
+Simular fonte stale/falha e confirmar rebaixamento de confiança e Saúde dos dados.
+Testar rolagem infinita com erro no segundo lote e recuperação pelo botão Carregar mais.
+Usuário Comercial tenta abrir permissões e recebe bloqueio sem vazamento.
+14. Roadmap recomendado
+Fase
+Escopo
+Saída
+0 — Governança e dados
+Mapa de APIs, dicionário, confiança, equivalência, status e RBAC.
+Contratos aprovados
+1 — Casca global
+Router, URL state, sidebar/submenus, header, sino, filtros e estados.
+Navegação funcional
+2 — Mercado
+Telas 1–7, evidências, cursor e retorno restaurado.
+Exploração ponta a ponta
+3 — Concorrência
+Telas 8–10 e regra de concorrente direto.
+Perfis e comparação
+4 — Minha Loja
+Telas 11–12 e linguagem não prescritiva.
+Posicionamento SVD
+5 — Inteligência
+Radar IA, alertas, evidência, recusa e auditoria.
+Telas 13–14
+6 — Administração
+Saúde dos dados, conta, fontes, papéis e preferências.
+Telas 15–16
+7 — Qualidade
+Mobile, WCAG, performance, segurança, observabilidade e regressão.
+Release candidate
+14.1 Ordem de implementação interna
+Construir primeiro contratos e casca; não codificar 16 telas isoladas.
+Criar componentes reutilizáveis: filtro, KPI, tabela, estado, evidence link, confiança, badge e breadcrumb.
+Validar um fluxo vertical completo antes de replicar áreas.
+Automatizar testes e telemetria junto com o componente, não ao final.
+15. Decisões consolidadas e pendências
+15.1 Decisões consolidadas
+Decisão
+Resultado
+Menu
+Curto; submenus apenas para destinos recorrentes
+Drill-downs
+Estado, cidade, modelo, lojista, item e anúncio fora do menu
+Alertas
+Central global acessada pelo sino em todas as telas
+Radar IA
+Camada global com fonte, amostra, período, confiança e evidência
+Listagens
+Rolagem infinita híbrida; sem paginação numérica
+Configurações
+Conta e preferências + Saúde dos dados como submenus
+Fotos
+Proibidas como elemento do produto
+Dados de mockup
+Podem ser demonstrativos, mas coerentes e explicitamente identificados
+Cores
+Verde/vermelho só para movimento temporal; exceções operacionais explicitamente rotuladas
+15.2 Pendências para decisão do gestor
+Tema
+Decisão necessária
+Recomendação
+Permissões
+Granularidade de Usuários/Permissões.
+Adotar RBAC proposto e validar por ação.
+Confiança
+Score e limiares reais.
+Calibrar proposta com histórico e backtest.
+Concorrente direto
+Critério e fonte do badge.
+Sobreposição de modelo + praça + preço, auditável.
+Venda provável
+Quantidade e tipo de confirmações.
+Classificar com confiança; nunca venda confirmada.
+Cidade
+KPI participação no estado.
+Manter se definição e fonte forem estáveis.
+Análise de modelo
+Abrir no Brasil ou herdar origem.
+Herdar origem e oferecer ampliar.
+Comparador
+Nenhum modelo comum.
+Estado vazio explicativo e sugestão de remover participante.
+Alertas
+Canais e frequência padrão.
+In-app primeiro; demais canais após governança.
+Exportação
+Formatos e papéis.
+CSV + PDF governados no P1.
+Retenção
+Logs, perguntas IA, exports e alertas.
+Definir política antes da produção.
+16. Checklist final de handoff
+Produto
+Plano Mestre atualizado com status real de cada tela.
+Dicionário de termos e regras de equivalência versionados.
+Decisões pendentes com dono e prazo.
+Fluxos e mensagens de erro aprovados.
+Design
+Componentes desktop/mobile com estados completos.
+Sino global e submenus aplicados a todas as telas.
+Tabelas, gráficos e mapas com alternativas acessíveis.
+Tokens, foco, contraste e redução de movimento documentados.
+Engenharia
+Rotas e query params implementados.
+APIs com meta de fonte, amostra, confiança, freshness e request_id.
+Cursor, cancelamento, cache e virtualização testados.
+RBAC e logs no backend.
+Telemetria e alertas operacionais ativos.
+Qualidade
+E2E dos fluxos críticos aprovado.
+WCAG 2.2 AA verificada manual e automaticamente.
+Performance dentro dos orçamentos.
+Dados reais comparados com consultas de controle.
+Aprovação do gestor registrada.
+MARCO DE CONCLUSÃOO projeto visual termina quando os mockups estão aprovados. O produto funcional termina somente quando fluxos, dados, acessibilidade, permissões, performance e evidências passam pelo gate deste documento.

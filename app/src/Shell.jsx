@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Radar, BarChart3, Scale, Store, Search, Crosshair, Building2, Gauge, ListChecks,
+  Radar, BarChart3, Scale, Store, Search, Crosshair, Building2, Gauge, ListChecks, MessageCircle,
   Settings, UserRound, MoreHorizontal, ArrowLeft, ChevronRight, Moon, Sun,
 } from './icons.jsx';
 import markDark from '../../design-system/assets/mark-dark.png';
 import markLight from '../../design-system/assets/mark-light.png';
+import { IaBalloonModal } from './IaBalloonModal.jsx';
 
 /* Casca do app (sidebar, topbar, barra inferior) montada com as classes do design system.
    Componente apresentacional: navegacao, titulo e status chegam por props. */
@@ -18,6 +19,7 @@ export const NAV = [
   { id: 'oportunidades', rotulo: 'Oportunidades', icone: Crosshair, grupo: 'inteligencia' },
   { id: 'concorrentes', rotulo: 'Concorrência', icone: Building2, grupo: 'inteligencia' },
   { id: 'analise', rotulo: 'Análise', icone: Gauge, grupo: 'inteligencia' },
+  { id: 'chat', rotulo: 'Analista IA', icone: MessageCircle, grupo: 'inteligencia' },
   { id: 'acoes', rotulo: 'Plano de ação', icone: ListChecks, grupo: 'inteligencia' },
   { id: 'ajustes', rotulo: 'Configurações', icone: Settings, grupo: 'preferencias' },
   { id: 'conta', rotulo: 'Minha conta', icone: UserRound, grupo: 'preferencias' },
@@ -129,6 +131,8 @@ export function AppShell({
           <span className="or-bottomnav__ic"><MoreHorizontal size={20} />{acoesPendentes > 0 && <i className="oc-dot" />}</span><span>Mais</span>
         </button>
       </nav>
+
+      {pagina !== 'chat' && <IaBalloonModal onNavigateToChat={() => onNavegar('chat')} />}
     </div>
   );
 }
