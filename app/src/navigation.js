@@ -8,6 +8,8 @@ export const APP_ROUTES = [
   { page: 'concorrentes', path: '/concorrencia', title: 'Concorrência' },
   { page: 'analise', path: '/analise', title: 'Análise' },
   { page: 'chat', path: '/chat', title: 'Analista IA' },
+  { page: 'simulador', path: '/simulador', title: 'Simulador' },
+  { page: 'rotineiro', path: '/rotineiro', title: 'Insight Rotineiro' },
   { page: 'acoes', path: '/acoes', title: 'Plano de ação' },
   { page: 'ajustes', path: '/configuracoes', title: 'Configurações' },
   { page: 'conta', path: '/conta', title: 'Minha conta' },

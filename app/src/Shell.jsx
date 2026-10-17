@@ -20,6 +20,8 @@ export const NAV = [
   { id: 'concorrentes', rotulo: 'Concorrência', icone: Building2, grupo: 'inteligencia' },
   { id: 'analise', rotulo: 'Análise', icone: Gauge, grupo: 'inteligencia' },
   { id: 'chat', rotulo: 'Analista IA', icone: MessageCircle, grupo: 'inteligencia' },
+  { id: 'simulador', rotulo: 'Simulador', icone: SlidersHorizontal, grupo: 'inteligencia' },
+  { id: 'rotineiro', rotulo: 'Insight Rotineiro', icone: Flame, grupo: 'inteligencia' },
   { id: 'acoes', rotulo: 'Plano de ação', icone: ListChecks, grupo: 'inteligencia' },
   { id: 'ajustes', rotulo: 'Configurações', icone: Settings, grupo: 'preferencias' },
   { id: 'conta', rotulo: 'Minha conta', icone: UserRound, grupo: 'preferencias' },

@@ -31,6 +31,8 @@ import { AppShell, NAV } from './Shell.jsx';
 import { LoginLayout } from './Login.jsx';
 import { Evidencia } from './Evidencia.jsx';
 import { ChatPage } from './ChatPage.jsx';
+import { SimuladorPage } from './SimuladorPage.jsx';
+import { RotineiroPage } from './RotineiroPage.jsx';
 import { AlertaColeta, FeedMovimento, InsightsDoDia, RegioesSaidas, SecaoHoje } from './HojeBlocos.jsx';
 import { evidenciaKpis } from './hojeModel.js';
 import { OportunidadeRegional } from './MercadoBlocos.jsx';
@@ -3057,6 +3059,8 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
     analise: <PageAnalise />,
     acoes: <PagePlanoAcao />,
     chat: <ChatPage />,
+    simulador: <SimuladorPage />,
+    rotineiro: <RotineiroPage />,
     ajustes: <PageConfiguracoes preferencias={preferencias} onPreferencias={onPreferencias} onReset={onReset} temaResolvido={temaResolvido} />,
     conta: <PageConta sessao={sessao} onSessao={onSessao} onLogout={onLogout} />,
   };
