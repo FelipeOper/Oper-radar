@@ -682,7 +682,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
               }} title={`${NOMES_UF[sigla]}${disponivel ? '' : ' — ainda sem dados coletados'}`} aria-label={`${NOMES_UF[sigla]}, ${fmtN(quantidade)} ${metrica}`}>
                 <MapPin size={12} style={{ color: 'currentColor', flexShrink: 0 }} />
                 <strong style={{ fontSize: 12 }}>{sigla}</strong>
-                <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtN(quantidade)}</span>
+                <span style={{ color: 'inherit', opacity: 0.7, fontFamily: T.fontMono, fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtN(quantidade)}</span>
               </button>
             );
           })}
@@ -1134,7 +1134,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
                 return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })}
                   className="oc-oferta-linha" style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
-                  <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: volume >= maiorOferta ? T.signal : 'color-mix(in srgb, var(--text-primary) 70%, transparent)', borderRadius: 999 }} /></span>
+                  <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: volume >= maiorOferta ? T.signal : 'var(--or-bar-neutral)', borderRadius: 999 }} /></span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 12.5, textAlign: 'right', color: T.inkMuted }}>{fmtN(volume)}</span>
                 </button>;
               })}
@@ -1809,7 +1809,7 @@ function PageFipe({ onNavegar }) {
             <ScanLine size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: T.inkMuted }} />
             <input value={placaFormatada} onChange={e => setPlaca(e.target.value)} autoCapitalize="characters" autoCorrect="off" spellCheck="false"
               placeholder="Digite a placa — ABC1D23" aria-label="Placa do veículo" maxLength={7} className="oc-placa"
-              style={{ ...inputStyle, width: '100%', paddingLeft: 40, fontFamily: T.fontMono, textTransform: 'uppercase' }} />
+              style={{ ...inputStyle, fontSize: undefined, width: '100%', paddingLeft: 40, fontFamily: T.fontMono, textTransform: 'uppercase' }} />
           </div>
           <button disabled={consultando || statusPlaca?.configurado === false} style={{ ...inputStyle, flex: '0 0 auto', border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: consultando ? 'wait' : 'pointer', opacity: statusPlaca?.configurado === false ? 0.5 : 1 }}>
             {consultando ? 'Consultando…' : 'Consultar placa'}
@@ -2835,7 +2835,7 @@ function ListaOuVazio({ itens, children }) {
 
 /* Regra de dataviz do design system: so a maior barra em verde, as demais neutras. */
 function BarraH({ rotulo, valor, max, cor }) {
-  const preenchimento = cor || (valor >= max ? T.signal : 'color-mix(in srgb, var(--text-primary) 70%, transparent)');
+  const preenchimento = cor || (valor >= max ? T.signal : 'var(--or-bar-neutral)');
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
       <span style={{ width: 130, color: T.inkMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rotulo}</span>

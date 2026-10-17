@@ -286,7 +286,7 @@ select option {
 .oc-conc__controls { display:flex; gap:10px; flex-wrap:wrap; }
 .oc-conc__controls label.oc-conc__legacy { display:flex; align-items:center; gap:8px; flex:1 1 240px; padding:0 12px; background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--radius-md); }
 .oc-conc__controls input { width:100%; min-width:0; border:0; background:transparent; color:var(--text-primary); font:inherit; }
-.oc-conc__controls select,.oc-conc__sort select { width:100%; }
+.oc-conc__controls select { width:100%; }
 .oc-conc__controls select { flex:none; width:100%; }
 .oc-conc__metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr)); gap:10px; }
 .oc-conc__metrica { gap:8px; }
@@ -996,9 +996,12 @@ select option {
 .oc-cmp__modos { display: flex; flex-wrap: wrap; gap: 6px; }
 .oc-cmp__modo { min-height: 34px; padding: 0 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
 .oc-cmp__modo.is-on { border-color: transparent; color: var(--text-inverse); background: var(--surface-inverse); }
-.oc-cmp__campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.oc-cmp__campos > :last-child { grid-column: 1 / -1; }
-@media (max-width: 640px) { .oc-cmp__campos { grid-template-columns: minmax(0, 1fr); } }
+.oc-cmp__lado { container-type: inline-size; }
+.oc-cmp__campos { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+@container (min-width: 520px) {
+  .oc-cmp__campos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oc-cmp__campos > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
 .oc-cmp__select { width: 100%; }
 .oc-cmp__resultado { display: flex; flex-direction: column; gap: 14px; }
 .oc-cmp__tabela { display: flex; flex-direction: column; gap: 0; padding: 4px 16px; }
@@ -1081,7 +1084,7 @@ select option {
   --border-subtle: rgba(160,190,255,.07); --border-default: rgba(160,190,255,.11); --border-strong: rgba(160,190,255,.20);
   --border-focus: #3D86F5;
   --text-primary: #F2F6FC; --text-secondary: #93A0B4; --text-tertiary: #6B7789; --text-disabled: #3F4958;
-  --text-inverse: #0F151F; --text-on-accent: #FFFFFF; --text-accent: #6EA6FF; --text-link: #6EA6FF;
+  --text-inverse: #0F151F; --text-on-accent: #06101F; --text-accent: #6EA6FF; --text-link: #6EA6FF;
   --accent: #3D86F5; --accent-hover: #6EA6FF; --accent-press: #2F6FD6;
   --accent-soft: rgba(61,134,245,.14); --accent-soft-strong: rgba(61,134,245,.22);
   --success: #4CC38A; --success-soft: rgba(76,195,138,.12); --success-text: #4CC38A;
@@ -1122,7 +1125,7 @@ select option {
 
 /* Analise: blocos agregados em 2 x 2 (sem card orfao). */
 .oc-analise-blocos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 900px) { .oc-analise-blocos { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1180px) { .oc-analise-blocos { grid-template-columns: minmax(0, 1fr); } }
 
 /* Topbar do celular: so o ponto pulsante (texto completo no aria-label/title), como no UI kit.
    Na sidebar do desktop o texto continua visivel. */
@@ -1146,3 +1149,14 @@ select option {
 /* Mercado: linha de "Onde ha mais ofertas". No celular o nome divide espaco com a barra. */
 .oc-oferta-linha { display: grid; grid-template-columns: minmax(140px, 220px) 1fr 56px; }
 @media (max-width: 560px) { .oc-oferta-linha { grid-template-columns: minmax(0, 1fr) 96px 44px; } }
+
+/* Barra neutra dos rankings: um tom por tema, contraste >= 2:1 com o destaque (sem color-mix). */
+:root { --or-bar-neutral: rgba(255,255,255,.40); }
+[data-theme="dourado"] { --or-bar-neutral: rgba(246,241,231,.38); }
+[data-theme="azul"] { --or-bar-neutral: rgba(242,246,252,.26); }
+[data-theme="light"] { --or-bar-neutral: rgba(15,15,15,.22); }
+
+/* KPI no celular: depois da regra geral (overflow-wrap: anywhere), para o numero nao quebrar nos digitos. */
+@media (max-width: 640px) {
+  .or-panorama-cards .or-stat__value, .oc-hoje__kpis .or-stat__value { overflow-wrap: normal; }
+}

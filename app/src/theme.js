@@ -77,7 +77,7 @@ export const THEMES = {
       ink: '#F2F6FC',
       inkMuted: '#93A0B4',
       signal: '#3D86F5',
-      signalInk: '#FFFFFF',
+      signalInk: '#06101F',
       positive: '#4CC38A',
       alert: '#F07A7A',
       warning: '#F0A04B',
