@@ -977,7 +977,7 @@ function ModeloCard({ modelo, ativo, onSelecionar, periodo }) {
         <span style={{ fontFamily: T.fontMono, fontSize: 15, fontWeight: 700 }}>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(modelo.precos?.mediana)}</span>
         <span title={`Movimento de estoque (${periodo}): ${modelo.entradas_periodo ?? 0} entraram, ${modelo.saidas_periodo ?? 0} saíram — saldo líquido de ${fmtPctAssinado(modelo.movimento_pct)} sobre o estoque ativo. Não é variação de preço.`}
           aria-label={`Movimento de estoque em ${periodo}: ${modelo.entradas_periodo ?? 0} entraram, ${modelo.saidas_periodo ?? 0} saíram, saldo líquido de ${fmtPctAssinado(modelo.movimento_pct)} sobre o estoque ativo. Não é variação de preço.`}
-          style={{ fontFamily: T.fontMono, fontSize: 11, fontWeight: 600, color: T.steel, background: `${T.steel}18`, borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+          style={{ fontFamily: T.fontMono, fontSize: 11, fontWeight: 600, color: T.inkMuted, background: T.surface3, borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' }}>
           ↕ Estoque {fmtPctAssinado(modelo.movimento_pct)}
         </span>
       </div>
@@ -1128,7 +1128,7 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
                 return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })}
                   style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(140px, 220px) 1fr 56px', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
-                  <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: T.signal, borderRadius: 999 }} /></span>
+                  <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: volume >= maiorOferta ? T.signal : 'color-mix(in srgb, var(--text-primary) 70%, transparent)', borderRadius: 999 }} /></span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 12.5, textAlign: 'right', color: T.inkMuted }}>{fmtN(volume)}</span>
                 </button>;
               })}
@@ -2807,12 +2807,14 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
 /* ============================================================
    ANÁLISE — insights agregados + Analista IA
    ============================================================ */
+/* Regra de dataviz do design system: so a maior barra em verde, as demais neutras. */
 function BarraH({ rotulo, valor, max, cor }) {
+  const preenchimento = cor || (valor >= max ? T.signal : 'color-mix(in srgb, var(--text-primary) 70%, transparent)');
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
       <span style={{ width: 130, color: T.inkMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rotulo}</span>
       <div style={{ flex: 1, height: 8, background: T.surface2, borderRadius: 4, overflow: 'hidden' }}>
-        <div style={{ width: `${Math.max(3, valor / max * 100)}%`, height: '100%', background: cor || T.signal, borderRadius: 4 }} />
+        <div style={{ width: `${Math.max(3, valor / max * 100)}%`, height: '100%', background: preenchimento, borderRadius: 4 }} />
       </div>
       <span style={{ fontFamily: T.fontMono, fontSize: 11.5, width: 46, textAlign: 'right' }}>{fmtN(valor)}</span>
     </div>
@@ -2903,7 +2905,7 @@ function PageAnalise() {
             <SectionTitle sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</SectionTitle>
             <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(ins.por_cidade || []).slice(0, 8).map(c => (
-                <BarraH key={`${c.uf}-${c.cidade}`} rotulo={`${c.cidade}/${c.uf}`} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} cor={T.positive} />
+                <BarraH key={`${c.uf}-${c.cidade}`} rotulo={`${c.cidade}/${c.uf}`} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} />
               ))}
             </div>
           </Card>
@@ -2924,7 +2926,7 @@ function PageAnalise() {
             <SectionTitle sub="Distribuição do estoque ativo por preço">Faixas de preço</SectionTitle>
             <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(ins.faixas_preco || []).map(f => (
-                <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(1, ...(ins.faixas_preco || []).map(x => x.anuncios))} cor={T.alert} />
+                <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(1, ...(ins.faixas_preco || []).map(x => x.anuncios))} />
               ))}
             </div>
           </Card>
