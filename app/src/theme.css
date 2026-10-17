@@ -1113,3 +1113,7 @@ select option {
   .oc-fipe-abas { grid-template-columns: minmax(0, 1fr); }
   .oc-placa { font-size: 15px; letter-spacing: .06em; }
 }
+
+/* Analise: blocos agregados em 2 x 2 (sem card orfao). */
+.oc-analise-blocos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .oc-analise-blocos { grid-template-columns: minmax(0, 1fr); } }

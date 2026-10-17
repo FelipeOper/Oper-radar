@@ -225,13 +225,14 @@ function Card({ children, style, onClick, className = '' }) {
   );
 }
 
+/* KPI no mesmo padrao or-stat de Hoje e Mercado (design-system/components: StatCard). */
 function Kpi({ label, value, sub, tone }) {
   return (
-    <Card style={{ padding: '18px 20px' }}>
-      <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.inkMuted, fontFamily: T.fontBody, marginBottom: 10 }}>{label}</div>
-      <div style={{ fontFamily: T.fontDisplay, fontSize: 32, fontWeight: 600, color: tone || T.ink, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: T.inkMuted, marginTop: 8 }}>{sub}</div>}
-    </Card>
+    <article className="or-card or-stat oc-kpi" style={{ minWidth: 0 }}>
+      <div className="or-stat__top"><span className="or-stat__label">{label}</span></div>
+      <div className="or-stat__row"><span className="or-stat__value" style={tone ? { color: tone } : undefined}>{value}</span></div>
+      {sub && <p className="or-card__sub" style={{ margin: 0 }}>{sub}</p>}
+    </article>
   );
 }
 
@@ -2809,6 +2810,24 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
 /* ============================================================
    ANÁLISE — insights agregados + Analista IA
    ============================================================ */
+/* Titulo dentro de card: padrao or-card__title do design system (SectionTitle e para secao de pagina). */
+function CardTitulo({ children, sub }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <h3 className="or-card__title">{children}</h3>
+      {sub && <p className="or-card__sub">{sub}</p>}
+    </div>
+  );
+}
+
+/* Lista agregada da Analise: sem itens, diz que falta amostra em vez de mostrar card em branco. */
+function ListaOuVazio({ itens, children }) {
+  if (!itens || itens.length === 0) {
+    return <p className="or-card__sub" style={{ margin: '4px 0 0' }}>Amostra insuficiente neste recorte.</p>;
+  }
+  return <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>;
+}
+
 /* Regra de dataviz do design system: so a maior barra em verde, as demais neutras. */
 function BarraH({ rotulo, valor, max, cor }) {
   const preenchimento = cor || (valor >= max ? T.signal : 'color-mix(in srgb, var(--text-primary) 70%, transparent)');
@@ -2863,7 +2882,7 @@ function PageAnalise() {
       {erro && <EmptyState icon={Gauge} titulo="API indisponível" texto={`Não foi possível buscar ${API_BASE_URL}/insights.php — confirme se o arquivo foi publicado.`} />}
 
       {ins && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 14 }}>
+        <div className="or-panorama-cards" style={{ marginBottom: 14 }}>
           <Kpi label="FIPE vinculados" value={fmtN(ins.fipe?.vinculados || 0)} sub="ativos com preço comparável" />
           <Kpi label="Abaixo da FIPE" value={fmtN(ins.fipe?.abaixo_fipe || 0)} sub="candidatos para validação" tone={T.positive} />
           <Kpi label="Desvio mediano FIPE" value={ins.fipe?.desvio_mediano_pct == null ? '—' : `${ins.fipe.desvio_mediano_pct.toLocaleString('pt-BR')}%`} sub="amostra qualificada vs referência" />
@@ -2894,26 +2913,26 @@ function PageAnalise() {
       )}
 
       {ins && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
+        <div className="oc-analise-blocos">
           <Card>
-            <SectionTitle sub="Onde a oferta se concentra">Marcas com mais anúncios</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Onde a oferta se concentra">Marcas com mais anúncios</CardTitulo>
+            <ListaOuVazio itens={ins.por_marca}>
               {(ins.por_marca || []).slice(0, 8).map(m => (
                 <BarraH key={m.marca} rotulo={m.marca} valor={m.anuncios} max={ins.por_marca[0]?.anuncios || 1} />
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
           <Card>
-            <SectionTitle sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</CardTitulo>
+            <ListaOuVazio itens={ins.por_cidade}>
               {(ins.por_cidade || []).slice(0, 8).map(c => (
                 <BarraH key={`${c.uf}-${c.cidade}`} rotulo={`${c.cidade}/${c.uf}`} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} />
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
           <Card>
-            <SectionTitle sub="Saídas detectadas · estoque · idade média observada — sinais do movimento do mercado">Movimento dos concorrentes</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Saídas detectadas · estoque · idade média observada — sinais do movimento do mercado">Movimento dos concorrentes</CardTitulo>
+            <ListaOuVazio itens={ins.movimento_por_revenda || ins.giro_por_revenda}>
               {(ins.movimento_por_revenda || ins.giro_por_revenda || []).slice(0, 8).map(g => (
                 <div key={`${g.uf}-${g.revenda}`} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda} <small style={{ color: T.inkMuted }}>{g.uf}</small></span>
@@ -2922,15 +2941,15 @@ function PageAnalise() {
                   </span>
                 </div>
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
           <Card>
-            <SectionTitle sub="Distribuição do estoque ativo por preço">Faixas de preço</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Distribuição do estoque ativo por preço">Faixas de preço</CardTitulo>
+            <ListaOuVazio itens={ins.faixas_preco}>
               {(ins.faixas_preco || []).map(f => (
                 <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(1, ...(ins.faixas_preco || []).map(x => x.anuncios))} />
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
         </div>
       )}
