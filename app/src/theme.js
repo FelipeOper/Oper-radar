@@ -5,14 +5,18 @@ const STORAGE_KEY = 'oper-radar-ui-preferences-v1';
 /* Identidade unica: design system Oper Radar (design-system/tokens/colors.css).
    Os valores abaixo espelham os tokens semanticos do design system; o app le
    `T.*` em runtime e as classes `.or-*` de theme.css leem `--or-*`.
-   - dark  = "cockpit" (padrao do design system)
-   - light = tema claro do design system
+   - dark    = "Verde radar", cockpit escuro (padrao do design system)
+   - dourado = cockpit quente com acento dourado (versao premium do oper-radar-2)
+   - azul    = cockpit frio com acento azul aco (paleta testada no oper-radar-2)
+   - light   = tema claro do design system
+   dourado e azul so trocam a paleta: o CSS do design system e redefinido em theme.css
+   por [data-theme="dourado"] / [data-theme="azul"].
    No tema claro o verde radar (#46F84B) nao tem contraste como texto sobre branco;
    `signal` usa radar-800 (#007A22), o mesmo que o design system usa em --text-accent. */
 export const THEMES = {
   dark: {
     id: 'dark',
-    label: 'Escuro',
+    label: 'Verde radar',
     description: 'Cockpit escuro do Oper Radar. É o padrão.',
     mode: 'dark',
     tokens: {
@@ -32,6 +36,56 @@ export const THEMES = {
       lineStrong: 'rgba(255,255,255,0.22)',
       overlay: 'rgba(0,0,0,0.64)',
       nav: 'rgba(10,10,10,0.94)',
+      shadow: '0 20px 60px rgba(0,0,0,0.55)',
+    },
+  },
+  dourado: {
+    id: 'dourado',
+    label: 'Dourado',
+    description: 'Escuro quente, acento dourado. Versão premium.',
+    mode: 'dark',
+    tokens: {
+      bg: '#0C0B09',
+      surface: '#15130F',
+      surface2: '#1B1813',
+      surface3: '#27231B',
+      ink: '#F6F1E7',
+      inkMuted: '#A69C8A',
+      signal: '#E0B15A',
+      signalInk: '#1A1206',
+      positive: '#7FD08A',
+      alert: '#E8806B',
+      warning: '#F0A04B',
+      steel: '#8FB4E8',
+      line: 'rgba(255,226,170,0.08)',
+      lineStrong: 'rgba(255,226,170,0.18)',
+      overlay: 'rgba(0,0,0,0.64)',
+      nav: 'rgba(12,11,9,0.94)',
+      shadow: '0 20px 60px rgba(0,0,0,0.55)',
+    },
+  },
+  azul: {
+    id: 'azul',
+    label: 'Azul aço',
+    description: 'Escuro frio, acento azul. Sóbrio e corporativo.',
+    mode: 'dark',
+    tokens: {
+      bg: '#090D13',
+      surface: '#0F151F',
+      surface2: '#141B27',
+      surface3: '#1D2633',
+      ink: '#F2F6FC',
+      inkMuted: '#93A0B4',
+      signal: '#3D86F5',
+      signalInk: '#06101F',
+      positive: '#4CC38A',
+      alert: '#F07A7A',
+      warning: '#F0A04B',
+      steel: '#6EA6FF',
+      line: 'rgba(160,190,255,0.09)',
+      lineStrong: 'rgba(160,190,255,0.18)',
+      overlay: 'rgba(0,0,0,0.64)',
+      nav: 'rgba(9,13,19,0.94)',
       shadow: '0 20px 60px rgba(0,0,0,0.55)',
     },
   },
@@ -121,6 +175,15 @@ export function resolveTheme(themePreference, systemDark = true) {
   if (themePreference === 'auto') return systemDark ? 'dark' : 'light';
   const migrated = migrateThemeId(themePreference);
   return migrated && migrated !== 'auto' ? migrated : DEFAULT_UI_PREFERENCES.theme;
+}
+
+/* Botao sol/lua da topbar: do claro volta para o ultimo tema ESCURO escolhido
+   (dourado, azul ou verde), em vez de sempre cair no verde. */
+export function proximoTemaAlternado(temaAtual, ultimoEscuro) {
+  const atual = THEMES[migrateThemeId(temaAtual)] || THEMES.dark;
+  if (atual.mode === 'dark') return { theme: 'light', ultimoEscuro: atual.id };
+  const volta = THEMES[ultimoEscuro]?.mode === 'dark' ? ultimoEscuro : null;
+  return { theme: volta || 'dark', ultimoEscuro: volta };
 }
 
 export function activateTheme(themeId) {

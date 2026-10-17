@@ -11,7 +11,7 @@ import {
   SlidersHorizontal, BarChart3, LinkIcon
 } from './icons.jsx';
 import {
-  T, THEMES, DEFAULT_UI_PREFERENCES,
+  T, THEMES, DEFAULT_UI_PREFERENCES, proximoTemaAlternado,
   loadUiPreferences, saveUiPreferences, resolveTheme,
   activateTheme, applyUiPreferences,
 } from './theme.js';
@@ -181,22 +181,23 @@ function RadarPulse({ ultimaColeta }) {
     ? Math.round((Date.now() - new Date(ultimaColeta)) / 3600000)
     : null;
   const ativo = horasAtras != null && horasAtras < 24;
+  const resumo = `${ativo ? 'Radar ativo' : 'Aguardando coleta'} · ${horasAtras != null ? `última varredura há ${horasAtras}h` : 'sem dados ainda'}`;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div className="oc-radar" role="status" aria-label={resumo} title={resumo} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span style={{ position: 'relative', width: 10, height: 10, flexShrink: 0 }}>
         <span style={{
           position: 'absolute', inset: 0, borderRadius: '50%',
-          background: ativo ? T.positive : T.inkMuted,
+          background: ativo ? T.signal : T.inkMuted,
         }} />
         {ativo && <span style={{
           position: 'absolute', inset: -4, borderRadius: '50%',
-          border: `1px solid ${T.positive}`,
+          border: `1px solid ${T.signal}`,
           animation: 'radarPing 2.4s ease-out infinite',
         }} />}
       </span>
-      <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, lineHeight: 1.4 }}>
+      <div className="oc-radar__texto" aria-hidden="true" style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted, lineHeight: 1.4 }}>
         {ativo ? 'RADAR ATIVO' : 'AGUARDANDO COLETA'}<br />
-        <span style={{ color: ativo ? T.positive : T.inkMuted }}>
+        <span style={{ color: ativo ? T.signal : T.inkMuted }}>
           {horasAtras != null ? `última varredura há ${horasAtras}h` : 'sem dados ainda'}
         </span>
       </div>
@@ -225,13 +226,14 @@ function Card({ children, style, onClick, className = '' }) {
   );
 }
 
+/* KPI no mesmo padrao or-stat de Hoje e Mercado (design-system/components: StatCard). */
 function Kpi({ label, value, sub, tone }) {
   return (
-    <Card style={{ padding: '18px 20px' }}>
-      <div style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.inkMuted, fontFamily: T.fontBody, marginBottom: 10 }}>{label}</div>
-      <div style={{ fontFamily: T.fontDisplay, fontSize: 32, fontWeight: 600, color: tone || T.ink, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: T.inkMuted, marginTop: 8 }}>{sub}</div>}
-    </Card>
+    <article className="or-card or-stat oc-kpi" style={{ minWidth: 0 }}>
+      <div className="or-stat__top"><span className="or-stat__label">{label}</span></div>
+      <div className="or-stat__row"><span className="or-stat__value" style={tone ? { color: tone } : undefined}>{value}</span></div>
+      {sub && <p className="or-card__sub" style={{ margin: 0 }}>{sub}</p>}
+    </article>
   );
 }
 
@@ -604,6 +606,9 @@ const inputStyle = {
   boxSizing: 'border-box', maxWidth: '100%',
 };
 
+/* Select: acabamento vem do CSS global (theme.css, regra select). Inline so o que for de layout. */
+const selectStyle = { maxWidth: '100%' };
+
 const filtroGridRegiaoStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 122px), 1fr))', gap: 7 };
 const filtroGridUfStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 92px), 1fr))', gap: 7 };
 const filtroGridSegmentoStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 138px), 1fr))', gap: 7 };
@@ -641,13 +646,13 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
           return (
             <button key={nome} disabled={!disponivel} aria-pressed={ativo} onClick={() => disponivel && onRegiao(nome)} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, padding: '7px 9px',
-              background: ativo ? `${T.steel}22` : T.surface2, border: `1px solid ${ativo ? T.steel : T.line}`,
-              borderRadius: 10, color: ativo ? T.steel : T.ink,
+              ...estiloSelecao(ativo),
+              borderRadius: 10,
               cursor: disponivel ? 'pointer' : 'not-allowed', opacity: disponivel ? 1 : 0.35,
               fontFamily: T.fontBody, fontSize: 12, fontWeight: ativo ? 600 : 450, minWidth: 0,
             }} title={disponivel ? '' : 'Coleta ainda não iniciada nesta região'}>
               <MapPin size={12} /> {nome === 'todas' ? 'Brasil' : nome}
-              <span style={{ fontFamily: T.fontMono, color: T.inkMuted, fontSize: 10 }}>{fmtN(quantidade || 0)}</span>
+              <span style={{ fontFamily: T.fontMono, color: 'inherit', opacity: 0.6, fontSize: 10 }}>{fmtN(quantidade || 0)}</span>
             </button>
           );
         })}
@@ -660,9 +665,7 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
         <div style={filtroGridUfStyle}>
           <button aria-pressed={uf === 'todas'} onClick={() => onUf('todas')} style={{
             minHeight: 40, padding: '7px 9px', borderRadius: 10, cursor: 'pointer',
-            background: uf === 'todas' ? `${T.signal}20` : T.surface2,
-            border: `1px solid ${uf === 'todas' ? T.signal : T.line}`,
-            color: uf === 'todas' ? T.signal : T.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            ...estiloSelecao(uf === 'todas'), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             fontFamily: T.fontBody, fontWeight: uf === 'todas' ? 600 : 450,
           }}><LayoutGrid size={12} /> Todos</button>
           {(REGIOES_UFS[regiao] || []).map(sigla => {
@@ -673,15 +676,13 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
             return (
               <button key={sigla} disabled={!disponivel} aria-pressed={ativo} onClick={() => disponivel && onUf(sigla)} style={{
                 minHeight: 40, padding: '7px 9px', borderRadius: 10,
-                background: ativo ? `${T.signal}20` : T.surface2,
-                border: `1px solid ${ativo ? T.signal : T.line}`,
-                color: ativo ? T.signal : T.ink, cursor: disponivel ? 'pointer' : 'not-allowed',
+                ...estiloSelecao(ativo), cursor: disponivel ? 'pointer' : 'not-allowed',
                 opacity: disponivel ? 1 : 0.35, fontFamily: T.fontBody,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 0,
               }} title={`${NOMES_UF[sigla]}${disponivel ? '' : ' — ainda sem dados coletados'}`} aria-label={`${NOMES_UF[sigla]}, ${fmtN(quantidade)} ${metrica}`}>
-                <MapPin size={12} style={{ color: ativo ? T.signal : T.steel, flexShrink: 0 }} />
+                <MapPin size={12} style={{ color: 'currentColor', flexShrink: 0 }} />
                 <strong style={{ fontSize: 12 }}>{sigla}</strong>
-                <span style={{ color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtN(quantidade)}</span>
+                <span style={{ color: 'inherit', opacity: 0.7, fontFamily: T.fontMono, fontSize: 9.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fmtN(quantidade)}</span>
               </button>
             );
           })}
@@ -689,6 +690,13 @@ function SeletorGeografico({ facetas, regiao, uf, onRegiao, onUf, metrica = 'anu
       )}
     </Card>
   );
+}
+
+/* Selecao unica do design system: selecionado = --surface-inverse (igual a .or-tab--active). */
+function estiloSelecao(ativo) {
+  return ativo
+    ? { background: 'var(--surface-inverse)', border: '1px solid transparent', color: 'var(--text-inverse)' }
+    : { background: T.surface2, border: `1px solid ${T.line}`, color: T.ink };
 }
 
 /* ============================================================
@@ -971,7 +979,7 @@ function ModeloCard({ modelo, ativo, onSelecionar, periodo }) {
         <span style={{ fontFamily: T.fontMono, fontSize: 15, fontWeight: 700 }}>{modelo.precos?.confianca === 'insuficiente' ? 'Amostra insuf.' : fmtBRL(modelo.precos?.mediana)}</span>
         <span title={`Movimento de estoque (${periodo}): ${modelo.entradas_periodo ?? 0} entraram, ${modelo.saidas_periodo ?? 0} saíram — saldo líquido de ${fmtPctAssinado(modelo.movimento_pct)} sobre o estoque ativo. Não é variação de preço.`}
           aria-label={`Movimento de estoque em ${periodo}: ${modelo.entradas_periodo ?? 0} entraram, ${modelo.saidas_periodo ?? 0} saíram, saldo líquido de ${fmtPctAssinado(modelo.movimento_pct)} sobre o estoque ativo. Não é variação de preço.`}
-          style={{ fontFamily: T.fontMono, fontSize: 11, fontWeight: 600, color: T.steel, background: `${T.steel}18`, borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+          style={{ fontFamily: T.fontMono, fontSize: 11, fontWeight: 600, color: T.inkMuted, background: T.surface3, borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' }}>
           ↕ Estoque {fmtPctAssinado(modelo.movimento_pct)}
         </span>
       </div>
@@ -1030,28 +1038,32 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
   const maiorOferta = noEstado ? Math.max(1, ...(data.geografia?.cidades || []).map(item => item.anuncios)) : maxUf;
 
   return <section aria-label="Painel analítico do mercado" style={{ marginBottom: 28 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 14, padding: '12px 14px', marginBottom: 6 }}>
-      <span style={{ fontSize: 11.5, color: T.inkMuted, fontFamily: T.fontMono }}>Analisando:</span>
+    <div className="oc-contexto" style={{ background: T.surface2, border: `1px solid ${T.line}`, borderRadius: 14, padding: '12px 14px', marginBottom: 6 }}>
+      <div className="oc-contexto__chips">
+      <span style={{ fontSize: 11.5, color: T.inkMuted, fontFamily: T.fontMono, flex: 'none' }}>Analisando:</span>
       <FiltroChip aria="remover filtro de tipo" onRemover={contexto?.segmento && contexto.segmento !== 'todas' ? () => atualiza({ segmento: 'todas' }) : undefined}>{segmentoRotulo}</FiltroChip>
       {ufsAtuais.map(sigla => <FiltroChip key={sigla} aria={`remover filtro de estado ${NOMES_UF[sigla] || sigla}`} onRemover={() => alternarUf(sigla)}>{NOMES_UF[sigla] || sigla}</FiltroChip>)}
       {temCidade && <FiltroChip aria="remover filtro de cidade" onRemover={() => atualiza({ cidade: 'todas' })}>{escopo.cidade}</FiltroChip>}
       <FiltroChip aria="voltar ao período padrão" onRemover={periodo !== '30d' ? () => atualiza({ periodo: '30d' }) : undefined}>{PERIODO_ROTULOS[periodo] || periodo}</FiltroChip>
+      </div>
+      <div className="oc-contexto__acoes">
       <button type="button" onClick={() => setRefinarAberto(v => !v)} aria-expanded={refinarAberto} aria-controls="or-refinar-painel" className="or-refine-btn" style={{ fontSize: 13, fontWeight: 600, color: T.signalInk, background: T.signal, border: 'none', borderRadius: 999, padding: '8px 16px', cursor: 'pointer' }}>Refinar resultados</button>
       <button onClick={onAlternar} style={{ ...inputStyle, cursor: 'pointer', background: 'none' }}>Ocultar painel</button>
+      </div>
     </div>
 
     {refinarAberto && <Card id="or-refinar-painel" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         <label>
           <div style={rotuloFiltroStyle}>SEGMENTO</div>
-          <select value={contexto?.segmento || 'todas'} onChange={e => atualiza({ segmento: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+          <select value={contexto?.segmento || 'todas'} onChange={e => atualiza({ segmento: e.target.value })} style={{ ...selectStyle, width: '100%' }}>
             <option value="todas">Caminhões e implementos</option>
             {categoriasDoMercado('principal').map(cat => <option key={cat} value={cat}>{CATEGORIAS_MERCADO[cat]?.label || cat}</option>)}
           </select>
         </label>
         <label>
           <div style={rotuloFiltroStyle}>PERÍODO</div>
-          <select value={periodo} onChange={selecionaPeriodo} style={{ ...inputStyle, width: '100%' }}>
+          <select value={periodo} onChange={selecionaPeriodo} style={{ ...selectStyle, width: '100%' }}>
             <option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="180d">Últimos 180 dias</option><option value="12m">Últimos 12 meses</option>
           </select>
         </label>
@@ -1120,9 +1132,9 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
                 const nome = noEstado ? item.cidade : `${NOMES_UF[item.uf] || item.uf} · ${item.uf}`;
                 const volume = Number(item.anuncios || 0);
                 return <button key={`${nome}-${index}`} onClick={() => noEstado ? atualiza({ cidade: item.cidade }) : atualiza({ uf: item.uf, cidade: 'todas' })}
-                  style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', display: 'grid', gridTemplateColumns: 'minmax(140px, 220px) 1fr 56px', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
+                  className="oc-oferta-linha" style={{ border: 0, cursor: 'pointer', background: 'none', color: T.ink, fontFamily: T.fontBody, textAlign: 'left', alignItems: 'center', gap: 12, padding: '9px 16px' }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</span>
-                  <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: T.signal, borderRadius: 999 }} /></span>
+                  <span style={{ height: 6, background: T.surface3, borderRadius: 999, overflow: 'hidden' }}><span style={{ display: 'block', height: '100%', width: `${volume / maiorOferta * 100}%`, background: volume >= maiorOferta ? T.signal : 'var(--or-bar-neutral)', borderRadius: 999 }} /></span>
                   <span style={{ fontFamily: T.fontMono, fontSize: 12.5, textAlign: 'right', color: T.inkMuted }}>{fmtN(volume)}</span>
                 </button>;
               })}
@@ -1501,7 +1513,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
 
       <div style={{ ...rotuloFiltroStyle, marginTop: 2 }}>REFINAR OFERTAS</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-        <select aria-label="Ordenar anúncios" value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, flex: '1 1 190px' }}>
+        <select aria-label="Ordenar anúncios" value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...selectStyle, flex: '1 1 190px' }}>
           <option value="aleatorio">Amostra do mercado</option>
           <option value="recente">Mais recentes</option>
           <option value="preco_asc">Menor preço</option>
@@ -1521,40 +1533,40 @@ function PageMercado({ sessao, contexto, onContexto }) {
 
       {maisFiltros && (
         <Card id="mercado-filtros-avancados" style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
-          {filtrosDisponiveis.includes('tipo') && <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('tipo') && <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={selectStyle}>
             <option value="todos">{categoria === 'todas' ? 'Escolha uma categoria' : 'Todos os subtipos'}</option>
             {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{rotuloTipo(s.tipo)} ({s.n})</option>)}
           </select>}
-          {filtrosDisponiveis.includes('marca') && <select aria-label="Marca" value={marca} onChange={e => setMarca(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('marca') && <select aria-label="Marca" value={marca} onChange={e => setMarca(e.target.value)} style={selectStyle}>
             <option value="todas">Todas as marcas</option>
             {opcoesMarca.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
           </select>}
-          {filtrosDisponiveis.includes('carroceria') && <select aria-label="Carroceria ou configuração" value={carroceria} onChange={e => setCarroceria(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('carroceria') && <select aria-label="Carroceria ou configuração" value={carroceria} onChange={e => setCarroceria(e.target.value)} style={selectStyle}>
             <option value="todas">Todas as carrocerias</option>
             {opcoesCarroceria.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
           </select>}
-          {filtrosDisponiveis.includes('tracao') && <select aria-label="Tração ou configuração de eixos" value={tracao} onChange={e => setTracao(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('tracao') && <select aria-label="Tração ou configuração de eixos" value={tracao} onChange={e => setTracao(e.target.value)} style={selectStyle}>
             <option value="todas">Todas as trações</option>
             {opcoesTracao.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
           </select>}
-          <select aria-label="Situação do anúncio" value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
+          <select aria-label="Situação do anúncio" value={status} onChange={e => setStatus(e.target.value)} style={selectStyle}>
             <option value="ativo">No mercado</option>
             <option value="em_verificacao">Em verificação</option>
             <option value="saida_detectada">Saídas detectadas</option>
             <option value="todos">Todos (histórico)</option>
           </select>
-          {filtrosDisponiveis.includes('fipe') && <select aria-label="Situação do vínculo FIPE" value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('fipe') && <select aria-label="Situação do vínculo FIPE" value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={selectStyle}>
             <option value="todos">FIPE · todos</option>
             <option value="revisar">FIPE · precisa revisar</option>
             <option value="com_sugestao">FIPE · com sugestão</option>
             <option value="sem_sugestao">FIPE · dados insuficientes</option>
             <option value="vinculado">FIPE · vinculados</option>
           </select>}
-          <select aria-label="Cidade" value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+          <select aria-label="Cidade" value={cidade} onChange={e => setCidade(e.target.value)} style={selectStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as cidades de ${uf}`}</option>
             {cidades.map(c => <option key={`${c.uf}-${c.cidade}`} value={c.cidade}>{c.cidade} ({fmtN(c.n)})</option>)}
           </select>
-          <select aria-label="Revenda" value={revendaId} onChange={e => setRevendaId(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+          <select aria-label="Revenda" value={revendaId} onChange={e => setRevendaId(e.target.value)} style={selectStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as revendas de ${uf}`}</option>
             {revendas.map(r => <option key={r.id} value={String(r.id)}>{r.nome} · {r.cidade} ({fmtN(r.n)})</option>)}
           </select>
@@ -1756,12 +1768,12 @@ function PageFipe({ onNavegar }) {
     }
   };
 
-  return <div style={{ maxWidth: 1400 }}>
-    <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-8px 0 16px', maxWidth: 820 }}>
+  return <div>
+    <div className="oc-lede" style={{ margin: '-8px 0 16px' }}>
       Consulte um veículo pela placa ou pesquise diretamente no catálogo nacional de caminhões. Os dois caminhos cruzam a FIPE com o mercado monitorado pelo radar.
     </div>
 
-    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 18, maxWidth: 940 }}>
+    <div role="tablist" aria-label="Forma de consulta FIPE" className="oc-fipe-abas" style={{ marginBottom: 18 }}>
       {[
         { id: 'placa', titulo: 'Consultar por placa', texto: 'Identifique o veículo e encontre a FIPE', icone: ScanLine },
         { id: 'catalogo', titulo: 'Catálogo FIPE', texto: 'Busque por marca, modelo, ano ou código', icone: Search },
@@ -1777,14 +1789,14 @@ function PageFipe({ onNavegar }) {
           <Icone size={19} style={{ flexShrink: 0 }} />
           <span style={{ minWidth: 0 }}>
             <strong style={{ display: 'block', fontSize: 13 }}>{item.titulo}</strong>
-            <span style={{ display: 'block', color: T.inkMuted, fontSize: 10.5, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.texto}</span>
+            <span style={{ display: 'block', color: T.inkMuted, fontSize: 10.5, marginTop: 2, lineHeight: 1.35 }}>{item.texto}</span>
           </span>
         </button>;
       })}
     </div>
 
     {modo === 'fila' ? <PageFipeFila onNavegar={onNavegar} /> : modo === 'catalogo' ? <PageFipeCatalogo /> : <>
-      <Card style={{ padding: 18, maxWidth: 820 }}>
+      <Card style={{ padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
             <div style={{ fontFamily: T.fontDisplay, fontSize: 17, fontWeight: 600 }}>Identificar veículo</div>
@@ -1796,8 +1808,8 @@ function PageFipe({ onNavegar }) {
           <div style={{ position: 'relative', flex: '1 1 260px' }}>
             <ScanLine size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: T.inkMuted }} />
             <input value={placaFormatada} onChange={e => setPlaca(e.target.value)} autoCapitalize="characters" autoCorrect="off" spellCheck="false"
-              placeholder="Digite a placa — ABC1D23" aria-label="Placa do veículo" maxLength={7}
-              style={{ ...inputStyle, width: '100%', paddingLeft: 40, fontFamily: T.fontMono, fontSize: 17, letterSpacing: '0.12em', textTransform: 'uppercase' }} />
+              placeholder="Digite a placa — ABC1D23" aria-label="Placa do veículo" maxLength={7} className="oc-placa"
+              style={{ ...inputStyle, fontSize: undefined, width: '100%', paddingLeft: 40, fontFamily: T.fontMono, textTransform: 'uppercase' }} />
           </div>
           <button disabled={consultando || statusPlaca?.configurado === false} style={{ ...inputStyle, flex: '0 0 auto', border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: consultando ? 'wait' : 'pointer', opacity: statusPlaca?.configurado === false ? 0.5 : 1 }}>
             {consultando ? 'Consultando…' : 'Consultar placa'}
@@ -1858,8 +1870,8 @@ function PageFipeFila({ onNavegar }) {
   const resumo = data?.resumo;
   const categorias = data?.categorias || [];
 
-  return <div style={{ maxWidth: 1100 }}>
-    <div style={{ color: T.inkMuted, fontSize: 13, lineHeight: 1.6, margin: '-4px 0 16px', maxWidth: 820 }}>
+  return <div>
+    <div className="oc-lede" style={{ margin: '-4px 0 16px' }}>
       Anúncios de caminhão ativos sem referência FIPE vinculada, agrupados por marca e modelo. Sem
       vínculo não há mediana nem desvio pra esse anúncio em nenhuma tela do radar.
     </div>
@@ -1867,7 +1879,7 @@ function PageFipeFila({ onNavegar }) {
     {status === 'loading' && <div style={{ color: T.inkMuted, fontSize: 12.5 }}>Carregando fila…</div>}
     {erro && <div role="alert" style={{ color: T.alert, background: `${T.alert}12`, border: `1px solid ${T.alert}30`, borderRadius: 9, padding: 11, fontSize: 12.5 }}>Não foi possível carregar a fila agora.</div>}
 
-    {resumo && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 18, maxWidth: 820 }}>
+    {resumo && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 18 }}>
       {[
         ['COBERTURA', resumo.cobertura_pct == null ? '—' : `${resumo.cobertura_pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`, `${fmtN(resumo.vinculados)} de ${fmtN(resumo.total)} vinculados`],
         ['PENDENTES', fmtN(resumo.pendentes), 'sem referência FIPE'],
@@ -1945,7 +1957,7 @@ function PageFipeCatalogo() {
   const temFiltros = busca || marca !== 'todas' || modeloId !== 'todos' || ano !== 'todos';
 
   return (
-    <div style={{ maxWidth: 1400 }}>
+    <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: 12 }}>
         <Kpi label="Modelos de caminhão" value={facetas ? fmtN(facetas.resumo?.modelos) : '—'} sub={`${fmtN(facetas?.resumo?.marcas)} marcas no catálogo`} />
         <Kpi label="Preços disponíveis" value={facetas ? fmtN(facetas.resumo?.precos) : '—'} sub="anos e versões consultáveis" />
@@ -1963,28 +1975,28 @@ function PageFipeCatalogo() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10 }}>
           <label>
             <div style={rotuloFiltroStyle}>MARCA</div>
-            <select value={marca} onChange={e => { setMarca(e.target.value); setModeloId('todos'); setAno('todos'); }} style={{ ...inputStyle, width: '100%' }}>
+            <select value={marca} onChange={e => { setMarca(e.target.value); setModeloId('todos'); setAno('todos'); }} style={{ ...selectStyle, width: '100%' }}>
               <option value="todas">Todas as marcas</option>
               {(facetas?.marcas || []).map(item => <option key={item.marca} value={item.marca}>{item.marca} · {fmtN(item.modelos)}</option>)}
             </select>
           </label>
           <label>
             <div style={rotuloFiltroStyle}>MODELO / VERSÃO</div>
-            <select value={modeloId} disabled={marca === 'todas'} onChange={e => { setModeloId(e.target.value); setAno('todos'); }} style={{ ...inputStyle, width: '100%', opacity: marca === 'todas' ? 0.5 : 1 }}>
+            <select value={modeloId} disabled={marca === 'todas'} onChange={e => { setModeloId(e.target.value); setAno('todos'); }} style={{ ...selectStyle, width: '100%', opacity: marca === 'todas' ? 0.5 : 1 }}>
               <option value="todos">Todos os modelos</option>
               {(facetas?.modelos || []).map(item => <option key={item.id} value={item.id}>{item.modelo}</option>)}
             </select>
           </label>
           <label>
             <div style={rotuloFiltroStyle}>ANO MODELO</div>
-            <select value={ano} disabled={modeloId === 'todos'} onChange={e => setAno(e.target.value)} style={{ ...inputStyle, width: '100%', opacity: modeloId === 'todos' ? 0.5 : 1 }}>
+            <select value={ano} disabled={modeloId === 'todos'} onChange={e => setAno(e.target.value)} style={{ ...selectStyle, width: '100%', opacity: modeloId === 'todos' ? 0.5 : 1 }}>
               <option value="todos">Todos os anos</option>
               {(facetas?.anos || []).map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
           <label>
             <div style={rotuloFiltroStyle}>ORDENAR</div>
-            <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+            <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...selectStyle, width: '100%' }}>
               <option value="mercado">Mais presentes no radar</option>
               <option value="modelo">Marca e modelo</option>
               <option value="ano_desc">Ano mais recente</option>
@@ -2106,7 +2118,7 @@ function PageConta({ sessao, onSessao, onLogout }) {
     finally { setSalvando(false); }
   };
 
-  return <div style={{ maxWidth: 820 }}>
+  return <div>
     <SectionTitle sub="Seus dados, nível de acesso e segurança da conta">Área de membros</SectionTitle>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
       <Card>
@@ -2261,6 +2273,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }
   const deltaMercado = mercado?.amostra_suficiente && mercado?.preco_mediano > 0 && precoAtual > 0 ? Math.round((precoAtual / mercado.preco_mediano - 1) * 1000) / 10 : null;
   const abas = [['cadastro', 'Cadastro'], ['mercado', 'Mercado nacional'], ['regioes', `Regiões · ${regioes.length}`]];
   const campoStyle = { ...inputStyle, width: '100%' };
+  const campoSelectStyle = { ...selectStyle, width: '100%' };
   // Nome e flag de "desatualizada" usam dados.item (o veículo que a API de fato analisou), nunca o rascunho em
   // edição — senão um preço/UF trocado na tela sem salvar criaria uma ação com o nome novo e o número antigo
   // (achado do Codex). A orientação só é reativada depois de salvar, quando dados.item reflete o rascunho.
@@ -2294,9 +2307,9 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }
             <CampoMeuVeiculo rotulo="Ano"><input type="number" min="1950" max="2030" value={rascunho.ano || ''} onChange={e => alteraIdentificacao('ano', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Preço anunciado"><input type="number" min="0" step="1000" value={rascunho.preco_anunciado || ''} onChange={e => setRascunho(v => ({ ...v, preco_anunciado: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Cidade"><input value={rascunho.cidade || ''} onChange={e => setRascunho(v => ({ ...v, cidade: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
-            <CampoMeuVeiculo rotulo="UF"><select value={rascunho.uf || ''} onChange={e => setRascunho(v => ({ ...v, uf: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="UF"><select value={rascunho.uf || ''} onChange={e => setRascunho(v => ({ ...v, uf: e.target.value }))} style={{ ...campoSelectStyle, marginTop: 5 }}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Entrada no estoque"><input type="date" value={rascunho.data_entrada || ''} onChange={e => setRascunho(v => ({ ...v, data_entrada: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
-            <CampoMeuVeiculo rotulo="Status"><select value={rascunho.status} onChange={e => setRascunho(v => ({ ...v, status: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }}><option value="estoque">No estoque</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option></select></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Status"><select value={rascunho.status} onChange={e => setRascunho(v => ({ ...v, status: e.target.value }))} style={{ ...campoSelectStyle, marginTop: 5 }}><option value="estoque">No estoque</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option></select></CampoMeuVeiculo>
           </div><label style={{ display: 'flex', gap: 8, marginTop: 13, fontSize: 11.5 }}><input type="checkbox" checked={Boolean(Number(rascunho.usar_comparativo))} onChange={e => setRascunho(v => ({ ...v, usar_comparativo: e.target.checked ? 1 : 0 }))} /><span><strong>Usar nos comparativos internos</strong><br /><span style={{ color: T.inkMuted }}>O preço participa somente da área autenticada.</span></span></label></Card>
           <Card style={{ padding: 14 }}>
             <strong style={{ fontSize: 12.5 }}>Referência FIPE</strong>
@@ -2510,7 +2523,7 @@ function PageMinhaLoja({ sessao, onCriarAcao }) {
         <input aria-label="Ano do veículo" type="number" min="1950" max="2030" value={form.ano} onChange={e => { setForm(f => ({ ...f, ano: e.target.value })); setComparacao(null); setOpcoesFipeNovo([]); }} style={inputStyle} placeholder="Ano" />
         <input aria-label="Preço anunciado" type="number" min="0" step="1000" value={form.preco_anunciado} onChange={e => setForm(f => ({ ...f, preco_anunciado: e.target.value }))} style={inputStyle} placeholder="Preço anunciado" />
         <input aria-label="Cidade do veículo" value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} style={inputStyle} placeholder="Cidade" />
-        <select aria-label="Estado do veículo" value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={inputStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
+        <select aria-label="Estado do veículo" value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={selectStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
         <input aria-label="Data de entrada no estoque" type="date" value={form.data_entrada} onChange={e => setForm(f => ({ ...f, data_entrada: e.target.value }))} style={inputStyle} />
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 13 }}>
@@ -2531,10 +2544,10 @@ function PageMinhaLoja({ sessao, onCriarAcao }) {
     <SectionTitle sub="Preço próprio versus mediana do mercado nacional e FIPE, com a evidência de cada número">Seus veículos</SectionTitle>
     <Card style={{ padding: 12, marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 8 }}>
       <input aria-label="Buscar no estoque" value={buscaEstoque} onChange={e => setBuscaEstoque(e.target.value)} placeholder="Buscar marca, modelo ou referência..." style={{ ...inputStyle, width: '100%' }} />
-      <select aria-label="Filtrar estoque por status" value={statusEstoque} onChange={e => setStatusEstoque(e.target.value)} style={inputStyle}>
+      <select aria-label="Filtrar estoque por status" value={statusEstoque} onChange={e => setStatusEstoque(e.target.value)} style={selectStyle}>
         <option value="todos">Todos os status</option><option value="estoque">No estoque</option><option value="reservado">Reservados</option><option value="vendido">Vendidos</option>
       </select>
-      <select aria-label="Ordenar estoque" value={ordemEstoque} onChange={e => setOrdemEstoque(e.target.value)} style={inputStyle}>
+      <select aria-label="Ordenar estoque" value={ordemEstoque} onChange={e => setOrdemEstoque(e.target.value)} style={selectStyle}>
         <option value="posicao">Posição no mercado</option><option value="recente">Entrada mais recente</option><option value="antigo">Entrada mais antiga</option><option value="modelo">Marca e modelo</option><option value="preco_asc">Menor preço</option><option value="preco_desc">Maior preço</option>
       </select>
     </Card>
@@ -2571,8 +2584,8 @@ function DashboardOrderRow({ label, active, index, total, onToggle, onMove, size
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', border: `1px solid ${active ? T.lineStrong : T.line}`, borderRadius: 9, background: `var(--or-zebra-bg, ${active ? T.surface2 : 'transparent'})`, opacity: active ? 1 : 0.62 }}>
       <button type="button" aria-label={active ? `Ocultar ${label}` : `Mostrar ${label}`} aria-pressed={active} onClick={onToggle} style={{ minHeight: 30, minWidth: 30, padding: 4, border: 'none', borderRadius: 6, background: active ? `${T.positive}14` : T.surface2, color: active ? T.positive : T.inkMuted, cursor: 'pointer' }}>{active ? <Eye size={15} /> : <EyeOff size={15} />}</button>
       <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: active ? T.ink : T.inkMuted }}>{label}</span>
-      {active && size && <button type="button" aria-label={`Alterar largura de ${label}`} onClick={onSize} style={{ minHeight: 30, padding: '4px 8px', border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, fontFamily: T.fontMono, fontSize: 9.5, cursor: 'pointer' }}>{size === 'wide' ? 'LARGO' : '½'}</button>}
-      {active && <div style={{ display: 'flex', gap: 3 }}><button type="button" aria-label={`Mover ${label} para cima`} disabled={index === 0} onClick={() => onMove(-1)} style={{ minHeight: 30, minWidth: 30, border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.35 : 1 }}><ChevronUp size={14} /></button><button type="button" aria-label={`Mover ${label} para baixo`} disabled={index === total - 1} onClick={() => onMove(1)} style={{ minHeight: 30, minWidth: 30, border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, cursor: index === total - 1 ? 'default' : 'pointer', opacity: index === total - 1 ? 0.35 : 1 }}><ChevronDown size={14} /></button></div>}
+      {active && size && <button type="button" aria-label={`Alterar largura de ${label}`} onClick={onSize} style={{ minHeight: 'var(--control-sm)', padding: '4px 10px', border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, fontFamily: T.fontBody, fontSize: 11, cursor: 'pointer' }}>{size === 'wide' ? 'Largo' : 'Meia'}</button>}
+      {active && <div style={{ display: 'flex', gap: 3 }}><button type="button" aria-label={`Mover ${label} para cima`} disabled={index === 0} onClick={() => onMove(-1)} style={{ minHeight: 'var(--control-sm)', minWidth: 'var(--control-sm)', border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, cursor: index === 0 ? 'default' : 'pointer', opacity: index === 0 ? 0.35 : 1 }}><ChevronUp size={14} /></button><button type="button" aria-label={`Mover ${label} para baixo`} disabled={index === total - 1} onClick={() => onMove(1)} style={{ minHeight: 'var(--control-sm)', minWidth: 'var(--control-sm)', border: `1px solid ${T.line}`, borderRadius: 6, background: 'transparent', color: T.inkMuted, cursor: index === total - 1 ? 'default' : 'pointer', opacity: index === total - 1 ? 0.35 : 1 }}><ChevronDown size={14} /></button></div>}
     </div>
   );
 }
@@ -2664,7 +2677,7 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
   const progressoFipe = fipeStatus?.elegiveis
     ? Math.min(100, Math.round((Number(fipeStatus.vinculados_ativos || 0) / Number(fipeStatus.elegiveis)) * 100)) : 0;
   return (
-    <div style={{ maxWidth: 980 }}>
+    <div>
       <SectionTitle sub="Modelos prontos, KPIs e ordem dos blocos para desktop e celular">Personalização do painel</SectionTitle>
       <DashboardLayoutEditor value={preferencias.dashboardHoje} onSave={onPreferencias} />
       <SectionTitle sub="Tema, densidade e conforto de uso — preferências salvas neste navegador">Aparência</SectionTitle>
@@ -2674,6 +2687,8 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
           {[
             { id: 'auto', label: 'Automático', description: 'Segue o aparelho', icon: Monitor, colors: [THEMES.dark.tokens.bg, THEMES.light.tokens.surface, THEMES.dark.tokens.signal] },
             { ...THEMES.dark, icon: Moon, colors: [THEMES.dark.tokens.bg, THEMES.dark.tokens.surface, THEMES.dark.tokens.signal] },
+            { ...THEMES.dourado, icon: Moon, colors: [THEMES.dourado.tokens.bg, THEMES.dourado.tokens.surface, THEMES.dourado.tokens.signal] },
+            { ...THEMES.azul, icon: Moon, colors: [THEMES.azul.tokens.bg, THEMES.azul.tokens.surface, THEMES.azul.tokens.signal] },
             { ...THEMES.light, icon: Sun, colors: [THEMES.light.tokens.bg, THEMES.light.tokens.surface, THEMES.light.tokens.signal] },
           ].map(opcao => {
             const ativo = preferencias.theme === opcao.id;
@@ -2800,12 +2815,32 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
 /* ============================================================
    ANÁLISE — insights agregados + Analista IA
    ============================================================ */
+/* Titulo dentro de card: padrao or-card__title do design system (SectionTitle e para secao de pagina). */
+function CardTitulo({ children, sub }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <h3 className="or-card__title">{children}</h3>
+      {sub && <p className="or-card__sub">{sub}</p>}
+    </div>
+  );
+}
+
+/* Lista agregada da Analise: sem itens, diz que falta amostra em vez de mostrar card em branco. */
+function ListaOuVazio({ itens, children }) {
+  if (!itens || itens.length === 0) {
+    return <p className="or-card__sub" style={{ margin: '4px 0 0' }}>Amostra insuficiente neste recorte.</p>;
+  }
+  return <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>;
+}
+
+/* Regra de dataviz do design system: so a maior barra em verde, as demais neutras. */
 function BarraH({ rotulo, valor, max, cor }) {
+  const preenchimento = cor || (valor >= max ? T.signal : 'var(--or-bar-neutral)');
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
       <span style={{ width: 130, color: T.inkMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rotulo}</span>
       <div style={{ flex: 1, height: 8, background: T.surface2, borderRadius: 4, overflow: 'hidden' }}>
-        <div style={{ width: `${Math.max(3, valor / max * 100)}%`, height: '100%', background: cor || T.signal, borderRadius: 4 }} />
+        <div style={{ width: `${Math.max(3, valor / max * 100)}%`, height: '100%', background: preenchimento, borderRadius: 4 }} />
       </div>
       <span style={{ fontFamily: T.fontMono, fontSize: 11.5, width: 46, textAlign: 'right' }}>{fmtN(valor)}</span>
     </div>
@@ -2852,7 +2887,7 @@ function PageAnalise() {
       {erro && <EmptyState icon={Gauge} titulo="API indisponível" texto={`Não foi possível buscar ${API_BASE_URL}/insights.php — confirme se o arquivo foi publicado.`} />}
 
       {ins && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10, marginBottom: 14 }}>
+        <div className="or-panorama-cards" style={{ marginBottom: 14 }}>
           <Kpi label="FIPE vinculados" value={fmtN(ins.fipe?.vinculados || 0)} sub="ativos com preço comparável" />
           <Kpi label="Abaixo da FIPE" value={fmtN(ins.fipe?.abaixo_fipe || 0)} sub="candidatos para validação" tone={T.positive} />
           <Kpi label="Desvio mediano FIPE" value={ins.fipe?.desvio_mediano_pct == null ? '—' : `${ins.fipe.desvio_mediano_pct.toLocaleString('pt-BR')}%`} sub="amostra qualificada vs referência" />
@@ -2883,26 +2918,26 @@ function PageAnalise() {
       )}
 
       {ins && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
+        <div className="oc-analise-blocos">
           <Card>
-            <SectionTitle sub="Onde a oferta se concentra">Marcas com mais anúncios</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Onde a oferta se concentra">Marcas com mais anúncios</CardTitulo>
+            <ListaOuVazio itens={ins.por_marca}>
               {(ins.por_marca || []).slice(0, 8).map(m => (
                 <BarraH key={m.marca} rotulo={m.marca} valor={m.anuncios} max={ins.por_marca[0]?.anuncios || 1} />
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
           <Card>
-            <SectionTitle sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Concentração geográfica da oferta ativa">Cidades com mais estoque</CardTitulo>
+            <ListaOuVazio itens={ins.por_cidade}>
               {(ins.por_cidade || []).slice(0, 8).map(c => (
-                <BarraH key={`${c.uf}-${c.cidade}`} rotulo={`${c.cidade}/${c.uf}`} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} cor={T.positive} />
+                <BarraH key={`${c.uf}-${c.cidade}`} rotulo={`${c.cidade}/${c.uf}`} valor={c.anuncios} max={ins.por_cidade[0]?.anuncios || 1} />
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
           <Card>
-            <SectionTitle sub="Saídas detectadas · estoque · idade média observada — sinais do movimento do mercado">Movimento dos concorrentes</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Saídas detectadas · estoque · idade média observada — sinais do movimento do mercado">Movimento dos concorrentes</CardTitulo>
+            <ListaOuVazio itens={ins.movimento_por_revenda || ins.giro_por_revenda}>
               {(ins.movimento_por_revenda || ins.giro_por_revenda || []).slice(0, 8).map(g => (
                 <div key={`${g.uf}-${g.revenda}`} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.revenda} <small style={{ color: T.inkMuted }}>{g.uf}</small></span>
@@ -2911,15 +2946,15 @@ function PageAnalise() {
                   </span>
                 </div>
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
           <Card>
-            <SectionTitle sub="Distribuição do estoque ativo por preço">Faixas de preço</SectionTitle>
-            <div className="or-zebra-list or-zebra-rows" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <CardTitulo sub="Distribuição do estoque ativo por preço">Faixas de preço</CardTitulo>
+            <ListaOuVazio itens={ins.faixas_preco}>
               {(ins.faixas_preco || []).map(f => (
-                <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(1, ...(ins.faixas_preco || []).map(x => x.anuncios))} cor={T.alert} />
+                <BarraH key={f.faixa} rotulo={f.faixa} valor={f.anuncios} max={Math.max(1, ...(ins.faixas_preco || []).map(x => x.anuncios))} />
               ))}
-            </div>
+            </ListaOuVazio>
           </Card>
         </div>
       )}
@@ -3032,7 +3067,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
       pagina={pagina} onNavegar={setPagina} titulo={tituloPagina} tituloRef={tituloRef}
       breadcrumbs={breadcrumbs} onVoltar={goBack} sessao={sessao} acoesPendentes={acoesPendentes}
       temaClaro={THEMES[temaResolvido]?.mode === 'light'}
-      onAlternarTema={() => onPreferencias({ theme: THEMES[temaResolvido]?.mode === 'light' ? 'dark' : 'light' })}
+      onAlternarTema={() => onPreferencias(proximoTemaAlternado(temaResolvido, preferencias.ultimoEscuro))}
       status={<RadarPulse ultimaColeta={kpis?.ultima_coleta} />}
     >
       {paginas[pagina]}

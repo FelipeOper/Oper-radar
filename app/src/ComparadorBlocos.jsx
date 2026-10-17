@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiGet } from './apiClient.js';
 import { Evidencia } from './Evidencia.jsx';
-import { SecaoHoje } from './HojeBlocos.jsx';
+import { SecaoHoje, VazioHoje } from './HojeBlocos.jsx';
+import { Scale } from './icons.jsx';
 import { MODOS, diferencasMovimento, evidenciaLado, inteiro, linhasComparacao, pct, seletorValido, veredito } from './comparadorModel.js';
 
 /* Tela Comparador no formato da DEMO: dois lados, veredito com regra de amostra mínima, métricas lado a lado
@@ -19,8 +20,8 @@ const rotuloModelo = (modelo, marca) => {
   return prefixo && modelo.startsWith(prefixo) ? modelo.slice(prefixo.length) : modelo;
 };
 
-function Campo({ rotulo, children }) {
-  return <label className="or-field"><span className="or-field__label">{rotulo}</span>{children}</label>;
+function Campo({ rotulo, children, className = '' }) {
+  return <label className={`or-field ${className}`.trim()}><span className="or-field__label">{rotulo}</span>{children}</label>;
 }
 
 function SeletorLado({ titulo, lado, onChange, facetas }) {
@@ -176,7 +177,7 @@ export function PageComparador({ contexto, onContexto }) {
   return (
     <div className="oc-cmp">
       <SecaoHoje titulo="O que comparar" subtitulo="Cada lado combina marca, modelo ou marca + modelo com o próprio ano-modelo, para não misturar gerações e faixas de preço diferentes."
-        acao={<Campo rotulo="Janela de movimento"><select aria-label="Janela de movimento" className="oc-cmp__select" value={periodo} onChange={e => alteraPeriodo(e.target.value)}>
+        acao={<Campo rotulo="Janela de movimento" className="oc-cmp__janela"><select aria-label="Janela de movimento" className="oc-cmp__select" value={periodo} onChange={e => alteraPeriodo(e.target.value)}>
           {periodos.map(item => <option key={item.codigo} value={item.codigo}>{item.rotulo}</option>)}
         </select></Campo>}>
         {erroFacetas && <Alerta tom="danger" titulo="Catálogo indisponível" texto="Não foi possível carregar marcas e modelos para comparação." />}
@@ -184,7 +185,7 @@ export function PageComparador({ contexto, onContexto }) {
           <div className="or-card or-card--sunken"><h3 className="or-card__title" style={{ margin: '0 0 10px' }}>Lado A</h3><SeletorLado titulo="Lado A" lado={ladoA} onChange={setLadoA} facetas={facetas} /></div>
           <div className="or-card or-card--sunken"><h3 className="or-card__title" style={{ margin: '0 0 10px' }}>Lado B</h3><SeletorLado titulo="Lado B" lado={ladoB} onChange={setLadoB} facetas={facetas} /></div>
         </div>
-        {!prontos && !erroFacetas && <p className="or-card__sub" style={{ margin: '12px 0 0' }}>Complete os dois lados, incluindo o ano-modelo: a comparação aparece sozinha.</p>}
+        {!prontos && !erroFacetas && <div style={{ marginTop: 12 }}><VazioHoje icone={Scale} titulo="Escolha os dois lados" texto="Complete os dois lados, incluindo o ano-modelo: a comparação aparece sozinha." /></div>}
       </SecaoHoje>
       {carregando && <p role="status" className="or-card__sub">Calculando a comparação…</p>}
       {erro && <Alerta tom="danger" titulo="Não foi possível comparar" texto={erro} />}
