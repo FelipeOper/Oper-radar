@@ -604,6 +604,9 @@ const inputStyle = {
   boxSizing: 'border-box', maxWidth: '100%',
 };
 
+/* Select: acabamento vem do CSS global (theme.css, regra select). Inline so o que for de layout. */
+const selectStyle = { maxWidth: '100%' };
+
 const filtroGridRegiaoStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 122px), 1fr))', gap: 7 };
 const filtroGridUfStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 92px), 1fr))', gap: 7 };
 const filtroGridSegmentoStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 138px), 1fr))', gap: 7 };
@@ -1047,14 +1050,14 @@ function PainelMercadoAnalitico({ contexto, onContexto, visivel, onAlternar }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         <label>
           <div style={rotuloFiltroStyle}>SEGMENTO</div>
-          <select value={contexto?.segmento || 'todas'} onChange={e => atualiza({ segmento: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+          <select value={contexto?.segmento || 'todas'} onChange={e => atualiza({ segmento: e.target.value })} style={{ ...selectStyle, width: '100%' }}>
             <option value="todas">Caminhões e implementos</option>
             {categoriasDoMercado('principal').map(cat => <option key={cat} value={cat}>{CATEGORIAS_MERCADO[cat]?.label || cat}</option>)}
           </select>
         </label>
         <label>
           <div style={rotuloFiltroStyle}>PERÍODO</div>
-          <select value={periodo} onChange={selecionaPeriodo} style={{ ...inputStyle, width: '100%' }}>
+          <select value={periodo} onChange={selecionaPeriodo} style={{ ...selectStyle, width: '100%' }}>
             <option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="180d">Últimos 180 dias</option><option value="12m">Últimos 12 meses</option>
           </select>
         </label>
@@ -1504,7 +1507,7 @@ function PageMercado({ sessao, contexto, onContexto }) {
 
       <div style={{ ...rotuloFiltroStyle, marginTop: 2 }}>REFINAR OFERTAS</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-        <select aria-label="Ordenar anúncios" value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, flex: '1 1 190px' }}>
+        <select aria-label="Ordenar anúncios" value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...selectStyle, flex: '1 1 190px' }}>
           <option value="aleatorio">Amostra do mercado</option>
           <option value="recente">Mais recentes</option>
           <option value="preco_asc">Menor preço</option>
@@ -1524,40 +1527,40 @@ function PageMercado({ sessao, contexto, onContexto }) {
 
       {maisFiltros && (
         <Card id="mercado-filtros-avancados" style={{ padding: 14, marginBottom: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
-          {filtrosDisponiveis.includes('tipo') && <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('tipo') && <select aria-label="Subtipo do veículo" value={tipo} onChange={e => setTipo(e.target.value)} style={selectStyle}>
             <option value="todos">{categoria === 'todas' ? 'Escolha uma categoria' : 'Todos os subtipos'}</option>
             {subtipos.map(s => <option key={s.tipo} value={s.tipo}>{rotuloTipo(s.tipo)} ({s.n})</option>)}
           </select>}
-          {filtrosDisponiveis.includes('marca') && <select aria-label="Marca" value={marca} onChange={e => setMarca(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('marca') && <select aria-label="Marca" value={marca} onChange={e => setMarca(e.target.value)} style={selectStyle}>
             <option value="todas">Todas as marcas</option>
             {opcoesMarca.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
           </select>}
-          {filtrosDisponiveis.includes('carroceria') && <select aria-label="Carroceria ou configuração" value={carroceria} onChange={e => setCarroceria(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('carroceria') && <select aria-label="Carroceria ou configuração" value={carroceria} onChange={e => setCarroceria(e.target.value)} style={selectStyle}>
             <option value="todas">Todas as carrocerias</option>
             {opcoesCarroceria.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
           </select>}
-          {filtrosDisponiveis.includes('tracao') && <select aria-label="Tração ou configuração de eixos" value={tracao} onChange={e => setTracao(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('tracao') && <select aria-label="Tração ou configuração de eixos" value={tracao} onChange={e => setTracao(e.target.value)} style={selectStyle}>
             <option value="todas">Todas as trações</option>
             {opcoesTracao.map(item => <option key={item.valor} value={item.valor}>{item.valor} ({fmtN(item.n)})</option>)}
           </select>}
-          <select aria-label="Situação do anúncio" value={status} onChange={e => setStatus(e.target.value)} style={inputStyle}>
+          <select aria-label="Situação do anúncio" value={status} onChange={e => setStatus(e.target.value)} style={selectStyle}>
             <option value="ativo">No mercado</option>
             <option value="em_verificacao">Em verificação</option>
             <option value="saida_detectada">Saídas detectadas</option>
             <option value="todos">Todos (histórico)</option>
           </select>
-          {filtrosDisponiveis.includes('fipe') && <select aria-label="Situação do vínculo FIPE" value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={inputStyle}>
+          {filtrosDisponiveis.includes('fipe') && <select aria-label="Situação do vínculo FIPE" value={fipeFila} onChange={e => setFipeFila(e.target.value)} style={selectStyle}>
             <option value="todos">FIPE · todos</option>
             <option value="revisar">FIPE · precisa revisar</option>
             <option value="com_sugestao">FIPE · com sugestão</option>
             <option value="sem_sugestao">FIPE · dados insuficientes</option>
             <option value="vinculado">FIPE · vinculados</option>
           </select>}
-          <select aria-label="Cidade" value={cidade} onChange={e => setCidade(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+          <select aria-label="Cidade" value={cidade} onChange={e => setCidade(e.target.value)} style={selectStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as cidades de ${uf}`}</option>
             {cidades.map(c => <option key={`${c.uf}-${c.cidade}`} value={c.cidade}>{c.cidade} ({fmtN(c.n)})</option>)}
           </select>
-          <select aria-label="Revenda" value={revendaId} onChange={e => setRevendaId(e.target.value)} style={inputStyle} disabled={uf === 'todas'}>
+          <select aria-label="Revenda" value={revendaId} onChange={e => setRevendaId(e.target.value)} style={selectStyle} disabled={uf === 'todas'}>
             <option value="todas">{uf === 'todas' ? 'Escolha um estado primeiro' : `Todas as revendas de ${uf}`}</option>
             {revendas.map(r => <option key={r.id} value={String(r.id)}>{r.nome} · {r.cidade} ({fmtN(r.n)})</option>)}
           </select>
@@ -1966,28 +1969,28 @@ function PageFipeCatalogo() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 10 }}>
           <label>
             <div style={rotuloFiltroStyle}>MARCA</div>
-            <select value={marca} onChange={e => { setMarca(e.target.value); setModeloId('todos'); setAno('todos'); }} style={{ ...inputStyle, width: '100%' }}>
+            <select value={marca} onChange={e => { setMarca(e.target.value); setModeloId('todos'); setAno('todos'); }} style={{ ...selectStyle, width: '100%' }}>
               <option value="todas">Todas as marcas</option>
               {(facetas?.marcas || []).map(item => <option key={item.marca} value={item.marca}>{item.marca} · {fmtN(item.modelos)}</option>)}
             </select>
           </label>
           <label>
             <div style={rotuloFiltroStyle}>MODELO / VERSÃO</div>
-            <select value={modeloId} disabled={marca === 'todas'} onChange={e => { setModeloId(e.target.value); setAno('todos'); }} style={{ ...inputStyle, width: '100%', opacity: marca === 'todas' ? 0.5 : 1 }}>
+            <select value={modeloId} disabled={marca === 'todas'} onChange={e => { setModeloId(e.target.value); setAno('todos'); }} style={{ ...selectStyle, width: '100%', opacity: marca === 'todas' ? 0.5 : 1 }}>
               <option value="todos">Todos os modelos</option>
               {(facetas?.modelos || []).map(item => <option key={item.id} value={item.id}>{item.modelo}</option>)}
             </select>
           </label>
           <label>
             <div style={rotuloFiltroStyle}>ANO MODELO</div>
-            <select value={ano} disabled={modeloId === 'todos'} onChange={e => setAno(e.target.value)} style={{ ...inputStyle, width: '100%', opacity: modeloId === 'todos' ? 0.5 : 1 }}>
+            <select value={ano} disabled={modeloId === 'todos'} onChange={e => setAno(e.target.value)} style={{ ...selectStyle, width: '100%', opacity: modeloId === 'todos' ? 0.5 : 1 }}>
               <option value="todos">Todos os anos</option>
               {(facetas?.anos || []).map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
           <label>
             <div style={rotuloFiltroStyle}>ORDENAR</div>
-            <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
+            <select value={ordem} onChange={e => setOrdem(e.target.value)} style={{ ...selectStyle, width: '100%' }}>
               <option value="mercado">Mais presentes no radar</option>
               <option value="modelo">Marca e modelo</option>
               <option value="ano_desc">Ano mais recente</option>
@@ -2264,6 +2267,7 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }
   const deltaMercado = mercado?.amostra_suficiente && mercado?.preco_mediano > 0 && precoAtual > 0 ? Math.round((precoAtual / mercado.preco_mediano - 1) * 1000) / 10 : null;
   const abas = [['cadastro', 'Cadastro'], ['mercado', 'Mercado nacional'], ['regioes', `Regiões · ${regioes.length}`]];
   const campoStyle = { ...inputStyle, width: '100%' };
+  const campoSelectStyle = { ...selectStyle, width: '100%' };
   // Nome e flag de "desatualizada" usam dados.item (o veículo que a API de fato analisou), nunca o rascunho em
   // edição — senão um preço/UF trocado na tela sem salvar criaria uma ação com o nome novo e o número antigo
   // (achado do Codex). A orientação só é reativada depois de salvar, quando dados.item reflete o rascunho.
@@ -2297,9 +2301,9 @@ function PainelMeuVeiculo({ itemInicial, sessao, onClose, onSalvo, onCriarAcao }
             <CampoMeuVeiculo rotulo="Ano"><input type="number" min="1950" max="2030" value={rascunho.ano || ''} onChange={e => alteraIdentificacao('ano', e.target.value)} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Preço anunciado"><input type="number" min="0" step="1000" value={rascunho.preco_anunciado || ''} onChange={e => setRascunho(v => ({ ...v, preco_anunciado: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Cidade"><input value={rascunho.cidade || ''} onChange={e => setRascunho(v => ({ ...v, cidade: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
-            <CampoMeuVeiculo rotulo="UF"><select value={rascunho.uf || ''} onChange={e => setRascunho(v => ({ ...v, uf: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="UF"><select value={rascunho.uf || ''} onChange={e => setRascunho(v => ({ ...v, uf: e.target.value }))} style={{ ...campoSelectStyle, marginTop: 5 }}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select></CampoMeuVeiculo>
             <CampoMeuVeiculo rotulo="Entrada no estoque"><input type="date" value={rascunho.data_entrada || ''} onChange={e => setRascunho(v => ({ ...v, data_entrada: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }} /></CampoMeuVeiculo>
-            <CampoMeuVeiculo rotulo="Status"><select value={rascunho.status} onChange={e => setRascunho(v => ({ ...v, status: e.target.value }))} style={{ ...campoStyle, marginTop: 5 }}><option value="estoque">No estoque</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option></select></CampoMeuVeiculo>
+            <CampoMeuVeiculo rotulo="Status"><select value={rascunho.status} onChange={e => setRascunho(v => ({ ...v, status: e.target.value }))} style={{ ...campoSelectStyle, marginTop: 5 }}><option value="estoque">No estoque</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option></select></CampoMeuVeiculo>
           </div><label style={{ display: 'flex', gap: 8, marginTop: 13, fontSize: 11.5 }}><input type="checkbox" checked={Boolean(Number(rascunho.usar_comparativo))} onChange={e => setRascunho(v => ({ ...v, usar_comparativo: e.target.checked ? 1 : 0 }))} /><span><strong>Usar nos comparativos internos</strong><br /><span style={{ color: T.inkMuted }}>O preço participa somente da área autenticada.</span></span></label></Card>
           <Card style={{ padding: 14 }}>
             <strong style={{ fontSize: 12.5 }}>Referência FIPE</strong>
@@ -2513,7 +2517,7 @@ function PageMinhaLoja({ sessao, onCriarAcao }) {
         <input aria-label="Ano do veículo" type="number" min="1950" max="2030" value={form.ano} onChange={e => { setForm(f => ({ ...f, ano: e.target.value })); setComparacao(null); setOpcoesFipeNovo([]); }} style={inputStyle} placeholder="Ano" />
         <input aria-label="Preço anunciado" type="number" min="0" step="1000" value={form.preco_anunciado} onChange={e => setForm(f => ({ ...f, preco_anunciado: e.target.value }))} style={inputStyle} placeholder="Preço anunciado" />
         <input aria-label="Cidade do veículo" value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} style={inputStyle} placeholder="Cidade" />
-        <select aria-label="Estado do veículo" value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={inputStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
+        <select aria-label="Estado do veículo" value={form.uf} onChange={e => setForm(f => ({ ...f, uf: e.target.value }))} style={selectStyle}><option value="">UF</option>{Object.keys(NOMES_UF).sort().map(uf => <option key={uf}>{uf}</option>)}</select>
         <input aria-label="Data de entrada no estoque" type="date" value={form.data_entrada} onChange={e => setForm(f => ({ ...f, data_entrada: e.target.value }))} style={inputStyle} />
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 13 }}>
@@ -2534,10 +2538,10 @@ function PageMinhaLoja({ sessao, onCriarAcao }) {
     <SectionTitle sub="Preço próprio versus mediana do mercado nacional e FIPE, com a evidência de cada número">Seus veículos</SectionTitle>
     <Card style={{ padding: 12, marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))', gap: 8 }}>
       <input aria-label="Buscar no estoque" value={buscaEstoque} onChange={e => setBuscaEstoque(e.target.value)} placeholder="Buscar marca, modelo ou referência..." style={{ ...inputStyle, width: '100%' }} />
-      <select aria-label="Filtrar estoque por status" value={statusEstoque} onChange={e => setStatusEstoque(e.target.value)} style={inputStyle}>
+      <select aria-label="Filtrar estoque por status" value={statusEstoque} onChange={e => setStatusEstoque(e.target.value)} style={selectStyle}>
         <option value="todos">Todos os status</option><option value="estoque">No estoque</option><option value="reservado">Reservados</option><option value="vendido">Vendidos</option>
       </select>
-      <select aria-label="Ordenar estoque" value={ordemEstoque} onChange={e => setOrdemEstoque(e.target.value)} style={inputStyle}>
+      <select aria-label="Ordenar estoque" value={ordemEstoque} onChange={e => setOrdemEstoque(e.target.value)} style={selectStyle}>
         <option value="posicao">Posição no mercado</option><option value="recente">Entrada mais recente</option><option value="antigo">Entrada mais antiga</option><option value="modelo">Marca e modelo</option><option value="preco_asc">Menor preço</option><option value="preco_desc">Maior preço</option>
       </select>
     </Card>

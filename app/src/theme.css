@@ -60,8 +60,41 @@ circle:focus-visible {
   outline-offset: 2px;
 }
 
+/* Select no acabamento do .or-input do design system (40px, raio md, surface-2, seta propria).
+   Comportamento nativo preservado: teclado e seletor do celular. */
 select {
   max-width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  /* mesma altura dos inputs do app (42px), para alinhar lado a lado */
+  height: var(--or-control-min-height);
+  min-height: var(--or-control-min-height);
+  padding: 0 40px 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-2);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
+    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--text-primary);
+  font: 500 var(--fs-sm) / 1.2 var(--font-sans);
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+select:hover:not(:disabled) {
+  border-color: var(--border-default);
+}
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+select option {
+  background: var(--surface-1);
+  color: var(--text-primary);
 }
 
 .or-card-density {
@@ -253,7 +286,7 @@ select {
 .oc-conc__controls { display:flex; gap:10px; flex-wrap:wrap; }
 .oc-conc__controls label.oc-conc__legacy { display:flex; align-items:center; gap:8px; flex:1 1 240px; padding:0 12px; background:var(--surface-2); border:1px solid var(--border-subtle); border-radius:var(--radius-md); }
 .oc-conc__controls input { width:100%; min-width:0; border:0; background:transparent; color:var(--text-primary); font:inherit; }
-.oc-conc__controls select,.oc-conc__sort select { min-height:42px; padding:0 12px; border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-2); color:var(--text-primary); font:inherit; }
+.oc-conc__controls select,.oc-conc__sort select { width:100%; }
 .oc-conc__controls select { flex:none; width:100%; }
 .oc-conc__metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr)); gap:10px; }
 .oc-conc__metrica { gap:8px; }
@@ -945,7 +978,7 @@ select {
 .oc-loja__cartao { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .oc-loja__topo, .oc-loja__linha-preco, .oc-loja__rodape { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .oc-loja__controles { display: flex; align-items: center; gap: 6px; }
-.oc-loja__status { min-height: 32px; padding: 0 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 12px; }
+.oc-loja__status { height: var(--control-sm); min-height: var(--control-sm); padding: 0 32px 0 10px; border-radius: var(--radius-sm); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; font-size: var(--fs-xs); }
 .oc-loja__dados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .oc-loja__dado { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .oc-loja__preco { font: var(--type-kpi); }
@@ -958,7 +991,7 @@ select {
 .oc-cmp__modo { min-height: 34px; padding: 0 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
 .oc-cmp__modo.is-on { border-color: transparent; color: var(--text-inverse); background: var(--surface-inverse); }
 .oc-cmp__campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
-.oc-cmp__select { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-primary); font: inherit; }
+.oc-cmp__select { width: 100%; }
 .oc-cmp__resultado { display: flex; flex-direction: column; gap: 14px; }
 .oc-cmp__tabela { display: flex; flex-direction: column; gap: 0; padding: 4px 16px; }
 .oc-cmp__linha { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--border-subtle); align-items: baseline; overflow-wrap: anywhere; }
