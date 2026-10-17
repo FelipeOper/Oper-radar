@@ -969,7 +969,13 @@ select option {
 /* Duas colunas por padrao; quatro so quando a area de conteudo comporta (viewport >= 1180 px, ja descontada a sidebar). */
 .or-panorama-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (min-width: 1180px) { .or-panorama-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 420px) { .or-panorama-cards { grid-template-columns: minmax(0, 1fr); } }
+/* Mobile: KPIs em 2 x 2, como no UI kit do design system (reference/ui-kit-admin/mobile.html). */
+@media (max-width: 640px) {
+  .or-panorama-cards, .oc-hoje__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .or-panorama-cards .or-stat, .oc-hoje__kpis .or-stat { padding: var(--space-4); }
+  .or-panorama-cards .or-stat__value, .oc-hoje__kpis .or-stat__value { font-size: var(--fs-kpi-sm); overflow-wrap: normal; }
+}
+@media (max-width: 359px) { .or-panorama-cards, .oc-hoje__kpis { grid-template-columns: minmax(0, 1fr); } }
 .or-panorama-cards .or-stat__value, .oc-kpi .or-stat__value { white-space: normal; overflow-wrap: anywhere; }
 
 /* Minha Loja: resumo de posição e cartões dos veículos próprios. */
