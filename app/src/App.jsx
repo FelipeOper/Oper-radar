@@ -1767,7 +1767,7 @@ function PageFipe({ onNavegar }) {
       Consulte um veículo pela placa ou pesquise diretamente no catálogo nacional de caminhões. Os dois caminhos cruzam a FIPE com o mercado monitorado pelo radar.
     </div>
 
-    <div role="tablist" aria-label="Forma de consulta FIPE" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 18 }}>
+    <div role="tablist" aria-label="Forma de consulta FIPE" className="oc-fipe-abas" style={{ marginBottom: 18 }}>
       {[
         { id: 'placa', titulo: 'Consultar por placa', texto: 'Identifique o veículo e encontre a FIPE', icone: ScanLine },
         { id: 'catalogo', titulo: 'Catálogo FIPE', texto: 'Busque por marca, modelo, ano ou código', icone: Search },
@@ -1783,7 +1783,7 @@ function PageFipe({ onNavegar }) {
           <Icone size={19} style={{ flexShrink: 0 }} />
           <span style={{ minWidth: 0 }}>
             <strong style={{ display: 'block', fontSize: 13 }}>{item.titulo}</strong>
-            <span style={{ display: 'block', color: T.inkMuted, fontSize: 10.5, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.texto}</span>
+            <span style={{ display: 'block', color: T.inkMuted, fontSize: 10.5, marginTop: 2, lineHeight: 1.35 }}>{item.texto}</span>
           </span>
         </button>;
       })}
@@ -1802,8 +1802,8 @@ function PageFipe({ onNavegar }) {
           <div style={{ position: 'relative', flex: '1 1 260px' }}>
             <ScanLine size={17} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: T.inkMuted }} />
             <input value={placaFormatada} onChange={e => setPlaca(e.target.value)} autoCapitalize="characters" autoCorrect="off" spellCheck="false"
-              placeholder="Digite a placa — ABC1D23" aria-label="Placa do veículo" maxLength={7}
-              style={{ ...inputStyle, width: '100%', paddingLeft: 40, fontFamily: T.fontMono, fontSize: 17, letterSpacing: '0.12em', textTransform: 'uppercase' }} />
+              placeholder="Digite a placa — ABC1D23" aria-label="Placa do veículo" maxLength={7} className="oc-placa"
+              style={{ ...inputStyle, width: '100%', paddingLeft: 40, fontFamily: T.fontMono, textTransform: 'uppercase' }} />
           </div>
           <button disabled={consultando || statusPlaca?.configurado === false} style={{ ...inputStyle, flex: '0 0 auto', border: 'none', background: T.signal, color: T.signalInk, fontWeight: 700, cursor: consultando ? 'wait' : 'pointer', opacity: statusPlaca?.configurado === false ? 0.5 : 1 }}>
             {consultando ? 'Consultando…' : 'Consultar placa'}

@@ -1105,3 +1105,11 @@ select option {
   .oc-secao__cab:has(> .oc-cmp__janela) { flex-direction: column; align-items: stretch; }
   .oc-cmp__janela { width: 100%; }
 }
+
+/* FIPE: abas de forma de consulta. Texto de apoio quebra linha em vez de reticencias. */
+.oc-fipe-abas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.oc-placa { font-size: 17px; letter-spacing: .12em; }
+@media (max-width: 640px) {
+  .oc-fipe-abas { grid-template-columns: minmax(0, 1fr); }
+  .oc-placa { font-size: 15px; letter-spacing: .06em; }
+}
