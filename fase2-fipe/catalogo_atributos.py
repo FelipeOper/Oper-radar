@@ -7,9 +7,14 @@ from fipe_sync import (
 DIMS = ("serie", "geracao", "eixo", "emissao", "cabine", "cambio")
 
 
+def chave_familia(texto):
+    """Familia comercial, ou a serie quando a linha nao tem nome proprio (Scania R/G/P)."""
+    return familia_comercial(texto) or serie(texto)
+
+
 def atributos_do_modelo_fipe(marca_fipe, modelo_fipe):
     return {
-        "familia": familia_comercial(modelo_fipe),
+        "familia": chave_familia(modelo_fipe),
         "numero": numero_modelo(modelo_fipe),
         "serie": serie(modelo_fipe),
         "geracao": geracao_daf(modelo_fipe, nome_fipe=True),

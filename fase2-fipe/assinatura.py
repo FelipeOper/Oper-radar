@@ -2,9 +2,9 @@
 import hashlib
 from dataclasses import dataclass
 
-from catalogo_atributos import DIMS
+from catalogo_atributos import DIMS, chave_familia
 from fipe_sync import (
-    ano_modelo, cabine_daf, cambio_daf, eixo_do_anuncio, emissao_no_texto, familia_comercial,
+    ano_modelo, cabine_daf, cambio_daf, eixo_do_anuncio, emissao_no_texto,
     geracao_daf, normaliza, numero_modelo, serie, texto_anuncio,
 )
 
@@ -28,7 +28,7 @@ def atributos_do_anuncio(anuncio):
     eixo, conflito = eixo_do_anuncio(anuncio)
     return {
         "marca": " ".join(normaliza(anuncio.get("marca", "")).split()) or None,
-        "familia": familia_comercial(texto),
+        "familia": chave_familia(texto),
         "numero": numero_modelo(texto),
         "ano_modelo": ano_modelo(anuncio),
         "serie": serie(texto),

@@ -58,6 +58,15 @@ class AtributosDoAnuncioTest(unittest.TestCase):
         self.assertEqual("6X2", a["eixo"])
         self.assertEqual(2020, a["ano_modelo"])
 
+    def test_scania_usa_a_serie_como_familia_como_o_catalogo(self):
+        from catalogo_atributos import atributos_do_modelo_fipe
+        anuncio = atributos_do_anuncio({"titulo": "Scania R 440 A 6x2 2020/2020", "url": "", "marca": "SCANIA",
+                                        "modelo": "", "tracao": "", "ano_inicial": 2020, "ano_final": 2020})
+        fipe = atributos_do_modelo_fipe("SCANIA", "R 440 A 6x2")
+        self.assertEqual("R", anuncio["familia"])
+        self.assertEqual(fipe["familia"], anuncio["familia"])
+        self.assertEqual(fipe["numero"], anuncio["numero"])
+
     def test_conflito_de_eixo_vira_none(self):
         a = atributos_do_anuncio({"titulo": "Scania R 440 4x2", "url": "", "marca": "SCANIA",
                                   "modelo": "", "tracao": "6x4", "ano_inicial": 2020, "ano_final": 2020})

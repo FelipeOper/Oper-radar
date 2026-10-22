@@ -656,24 +656,51 @@ def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia,
     return atualizados
 
 
-def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianca=None):
+REGRA_VERSAO = 1  # incrementar a cada mudanca de regra de matching ou de evidencia
+
+
+def _assinatura_ativa():
+    return os.getenv("FIPE_ASSINATURA", "0") == "1"
+
+
+def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianca=None, assinatura_id=None):
     cur = conn.cursor()
-    cur.execute("""
-        UPDATE anuncio
-        SET fipe_preco_id=%s,
-            fipe_preco_automatico_id=%s,
-            fipe_match_confianca=%s,
-            fipe_match_confianca_automatico=%s,
-            fipe_match_status=%s,
-            fipe_match_status_automatico=%s,
-            fipe_match_motivo=%s,
-            fipe_match_motivo_automatico=%s,
-            fipe_vinculo_origem='automatico',
-            fipe_ultima_tentativa=NOW(),
-            fipe_tentativas=fipe_tentativas+1
-        WHERE id=%s
-    """, (preco_id, preco_id, confianca, confianca, status, status,
-          motivo[:160], motivo[:160], anuncio_id))
+    if _assinatura_ativa():
+        cur.execute("""
+            UPDATE anuncio
+            SET fipe_preco_id=%s,
+                fipe_preco_automatico_id=%s,
+                fipe_match_confianca=%s,
+                fipe_match_confianca_automatico=%s,
+                fipe_match_status=%s,
+                fipe_match_status_automatico=%s,
+                fipe_match_motivo=%s,
+                fipe_match_motivo_automatico=%s,
+                fipe_vinculo_origem='automatico',
+                fipe_assinatura_id=%s,
+                fipe_regra_versao=%s,
+                fipe_ultima_tentativa=NOW(),
+                fipe_tentativas=fipe_tentativas+1
+            WHERE id=%s
+        """, (preco_id, preco_id, confianca, confianca, status, status,
+              motivo[:160], motivo[:160], assinatura_id, REGRA_VERSAO, anuncio_id))
+    else:
+        cur.execute("""
+            UPDATE anuncio
+            SET fipe_preco_id=%s,
+                fipe_preco_automatico_id=%s,
+                fipe_match_confianca=%s,
+                fipe_match_confianca_automatico=%s,
+                fipe_match_status=%s,
+                fipe_match_status_automatico=%s,
+                fipe_match_motivo=%s,
+                fipe_match_motivo_automatico=%s,
+                fipe_vinculo_origem='automatico',
+                fipe_ultima_tentativa=NOW(),
+                fipe_tentativas=fipe_tentativas+1
+            WHERE id=%s
+        """, (preco_id, preco_id, confianca, confianca, status, status,
+              motivo[:160], motivo[:160], anuncio_id))
     conn.commit()
     cur.close()
 
@@ -1013,7 +1040,17 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                 sem_ano += 1
                 registra_resultado(conn, a["id"], "sem_ano", "ano-modelo ausente no anuncio")
                 continue
-            cands, info = escolhe(conn, _com_evidencia_do_detalhe(a))
+            a_motor = _com_evidencia_do_detalhe(a)
+            if _assinatura_ativa():
+                from vinculo_por_assinatura import resolve_por_assinatura
+                reuso = resolve_por_assinatura(conn, a_motor)
+                if reuso:
+                    registra_resultado(conn, a["id"], "vinculado", reuso.motivo,
+                                       preco_id=reuso.fipe_preco_id, confianca="alto",
+                                       assinatura_id=reuso.assinatura_id)
+                    vinculados += 1
+                    continue
+            cands, info = escolhe(conn, a_motor)
             if not cands:
                 if info.startswith("ambiguo"):
                     ambiguos += 1
@@ -1061,10 +1098,14 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                 continue
 
             escolhido, preco_id = precos_validos[0]
+            aid = None
+            if _assinatura_ativa() and info == "alto":
+                from vinculo_por_assinatura import grava_assinatura
+                aid = grava_assinatura(conn, a_motor, preco_id, origem="automatico")
             registra_resultado(
                 conn, a["id"], "vinculado",
                 f"{escolhido['marca_fipe']} | {escolhido['modelo_fipe']}",
-                preco_id=preco_id, confianca=info,
+                preco_id=preco_id, confianca=info, assinatura_id=aid,
             )
             vinculados += 1
             print(f"  [{info}] {a['titulo'][:38]:38} -> {escolhido['modelo_fipe'][:36]}")
