@@ -91,6 +91,11 @@ def _assinatura_do_anuncio(conn, anuncio):
     return monta_assinatura(attrs, dims)
 
 
+def hash_da_assinatura(conn, anuncio):
+    ass = _assinatura_do_anuncio(conn, anuncio)
+    return ass.hash if ass and ass.completa else None
+
+
 def resolve_por_assinatura(conn, anuncio):
     ass = _assinatura_do_anuncio(conn, anuncio)
     if ass is None or not ass.completa:
