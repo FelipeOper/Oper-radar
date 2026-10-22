@@ -14,6 +14,15 @@ def existe_tabela(conn, tabela):
     return existe
 
 
+def existe_coluna(conn, tabela, coluna):
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s AND COLUMN_NAME=%s", (tabela, coluna))
+    existe = cur.fetchone()[0] > 0
+    cur.close()
+    return existe
+
+
 TABELA_ATRIBUTO = """
 CREATE TABLE fipe_modelo_atributo (
     fipe_modelo_id INT NOT NULL PRIMARY KEY,
@@ -32,6 +41,34 @@ CREATE TABLE fipe_modelo_atributo (
 """
 
 
+TABELA_ASSINATURA = """
+CREATE TABLE fipe_assinatura (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    hash_assinatura     CHAR(40) NOT NULL,
+    marca               VARCHAR(40) NOT NULL,
+    familia             VARCHAR(40) NOT NULL,
+    numero              VARCHAR(16) NOT NULL,
+    ano_modelo          SMALLINT NOT NULL,
+    dims_discriminantes VARCHAR(80) NOT NULL,
+    valores             VARCHAR(200) NOT NULL,
+    fipe_preco_id       INT NOT NULL,
+    origem              VARCHAR(12) NOT NULL,
+    status              VARCHAR(12) NOT NULL DEFAULT 'ativa',
+    evidencias          INT NOT NULL DEFAULT 1,
+    criado_em           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_assinatura_hash (hash_assinatura),
+    KEY idx_assinatura_preco (fipe_preco_id),
+    CONSTRAINT fk_assinatura_preco FOREIGN KEY (fipe_preco_id) REFERENCES fipe_preco(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+"""
+
+COLUNAS_ANUNCIO = (
+    ("fipe_assinatura_id", "INT NULL"),
+    ("fipe_regra_versao", "SMALLINT NOT NULL DEFAULT 0"),
+)
+
+
 def migrar(conn):
     if not existe_tabela(conn, "fipe_modelo_atributo"):
         cur = conn.cursor()
@@ -40,6 +77,23 @@ def migrar(conn):
         print("Tabela fipe_modelo_atributo: criada")
     else:
         print("Tabela fipe_modelo_atributo: ja existe")
+
+    if not existe_tabela(conn, "fipe_assinatura"):
+        cur = conn.cursor()
+        cur.execute(TABELA_ASSINATURA)
+        cur.close()
+        print("Tabela fipe_assinatura: criada")
+    else:
+        print("Tabela fipe_assinatura: ja existe")
+
+    for nome, definicao in COLUNAS_ANUNCIO:
+        if not existe_coluna(conn, "anuncio", nome):
+            cur = conn.cursor()
+            cur.execute(f"ALTER TABLE anuncio ADD COLUMN {nome} {definicao}")
+            cur.close()
+            print(f"Coluna anuncio.{nome}: criada")
+        else:
+            print(f"Coluna anuncio.{nome}: ja existe")
     conn.commit()
 
 
