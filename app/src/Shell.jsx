@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Radar, BarChart3, Scale, Store, Search, Crosshair, Building2, Gauge, ListChecks, MessageCircle,
-  Settings, UserRound, MoreHorizontal, ArrowLeft, ChevronRight, Moon, Sun,
+  Settings, UserRound, MoreHorizontal, ArrowLeft, ChevronRight, Moon, Sun, SlidersHorizontal, Flame,
 } from './icons.jsx';
 import markDark from '../../design-system/assets/mark-dark.png';
 import markLight from '../../design-system/assets/mark-light.png';
