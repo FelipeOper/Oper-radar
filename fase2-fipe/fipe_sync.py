@@ -26,6 +26,8 @@ from urllib.parse import urlparse
 import requests
 import mysql.connector
 
+from monitoria import REGRA_VERSAO, faixa_estreita
+
 BASE = "https://fipe.parallelum.com.br/api/v2"
 PAUSA = float(os.getenv("FIPE_API_PAUSE", "1.0"))
 
@@ -491,10 +493,39 @@ def garante_marcas(conn, codigo_referencia=None):
     cur.close()
 
 
+def _com_evidencia_do_detalhe(anuncio):
+    if os.getenv("FIPE_USA_DETALHE", "0") != "1":
+        return anuncio
+    from evidencia_detalhe import aumenta_com_detalhe
+    return aumenta_com_detalhe(anuncio)
+
+
+def _monitoria_por_evento():
+    return os.getenv("FIPE_MONITORIA_EVENTOS", "0") == "1"
+
+
 def anuncios_pendentes(conn, limite):
+    colunas = "id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final"
+    eventos, params = [], []
+    if _monitoria_por_evento():
+        if os.getenv("FIPE_USA_DETALHE", "0") == "1":
+            colunas += ", descricao, opcionais, carroceria"
+            eventos.append("detalhe_coletado_em > fipe_ultima_tentativa")
+        if _assinatura_ativa():
+            eventos.append("fipe_regra_versao < %s")
+            params.append(REGRA_VERSAO)
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT MAX(atualizado_em) AS m FROM fipe_preco")
+        ultima_carga = cur.fetchone()["m"]
+        cur.close()
+        if ultima_carga is not None:
+            eventos.append("fipe_ultima_tentativa < %s")
+            params.append(ultima_carga)
+    clausula_eventos = "".join(
+        f" OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano') AND {e})" for e in eventos)
     cur = conn.cursor(dictionary=True)
-    cur.execute("""
-        SELECT id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final FROM anuncio
+    cur.execute(f"""
+        SELECT {colunas} FROM anuncio
         WHERE (fipe_preco_id IS NULL OR fipe_match_status LIKE 'reprocessar_%')
           AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
           AND tipo = 'Caminhao' AND status = 'ativo'
@@ -509,11 +540,12 @@ def anuncios_pendentes(conn, limite):
               OR fipe_match_status LIKE 'reprocessar_%'
               OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano')
                   AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 30 DAY))
+              {clausula_eventos}
           )
         ORDER BY (fipe_match_status LIKE 'reprocessar_%') DESC,
                  fipe_ultima_tentativa IS NULL DESC, fipe_ultima_tentativa ASC, id
         LIMIT %s
-    """, (limite,))
+    """, (*params, limite))
     rows = cur.fetchall()
     cur.close()
     return rows
@@ -646,24 +678,56 @@ def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia,
     return atualizados
 
 
-def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianca=None):
+def _assinatura_ativa():
+    return os.getenv("FIPE_ASSINATURA", "0") == "1"
+
+
+def _preco_fipe(conn, preco_id):
     cur = conn.cursor()
-    cur.execute("""
-        UPDATE anuncio
-        SET fipe_preco_id=%s,
-            fipe_preco_automatico_id=%s,
-            fipe_match_confianca=%s,
-            fipe_match_confianca_automatico=%s,
-            fipe_match_status=%s,
-            fipe_match_status_automatico=%s,
-            fipe_match_motivo=%s,
-            fipe_match_motivo_automatico=%s,
-            fipe_vinculo_origem='automatico',
-            fipe_ultima_tentativa=NOW(),
-            fipe_tentativas=fipe_tentativas+1
-        WHERE id=%s
-    """, (preco_id, preco_id, confianca, confianca, status, status,
-          motivo[:160], motivo[:160], anuncio_id))
+    cur.execute("SELECT preco FROM fipe_preco WHERE id=%s", (preco_id,))
+    linha = cur.fetchone()
+    cur.close()
+    return float(linha[0]) if linha and linha[0] is not None else 0.0
+
+
+def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianca=None, assinatura_id=None):
+    cur = conn.cursor()
+    if _assinatura_ativa():
+        cur.execute("""
+            UPDATE anuncio
+            SET fipe_preco_id=%s,
+                fipe_preco_automatico_id=%s,
+                fipe_match_confianca=%s,
+                fipe_match_confianca_automatico=%s,
+                fipe_match_status=%s,
+                fipe_match_status_automatico=%s,
+                fipe_match_motivo=%s,
+                fipe_match_motivo_automatico=%s,
+                fipe_vinculo_origem='automatico',
+                fipe_assinatura_id=%s,
+                fipe_regra_versao=%s,
+                fipe_ultima_tentativa=NOW(),
+                fipe_tentativas=fipe_tentativas+1
+            WHERE id=%s
+        """, (preco_id, preco_id, confianca, confianca, status, status,
+              motivo[:160], motivo[:160], assinatura_id, REGRA_VERSAO, anuncio_id))
+    else:
+        cur.execute("""
+            UPDATE anuncio
+            SET fipe_preco_id=%s,
+                fipe_preco_automatico_id=%s,
+                fipe_match_confianca=%s,
+                fipe_match_confianca_automatico=%s,
+                fipe_match_status=%s,
+                fipe_match_status_automatico=%s,
+                fipe_match_motivo=%s,
+                fipe_match_motivo_automatico=%s,
+                fipe_vinculo_origem='automatico',
+                fipe_ultima_tentativa=NOW(),
+                fipe_tentativas=fipe_tentativas+1
+            WHERE id=%s
+        """, (preco_id, preco_id, confianca, confianca, status, status,
+              motivo[:160], motivo[:160], anuncio_id))
     conn.commit()
     cur.close()
 
@@ -1003,7 +1067,17 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                 sem_ano += 1
                 registra_resultado(conn, a["id"], "sem_ano", "ano-modelo ausente no anuncio")
                 continue
-            cands, info = escolhe(conn, a)
+            a_motor = _com_evidencia_do_detalhe(a)
+            if _assinatura_ativa():
+                from vinculo_por_assinatura import resolve_por_assinatura
+                reuso = resolve_por_assinatura(conn, a_motor)
+                if reuso:
+                    registra_resultado(conn, a["id"], "vinculado", reuso.motivo,
+                                       preco_id=reuso.fipe_preco_id, confianca="alto",
+                                       assinatura_id=reuso.assinatura_id)
+                    vinculados += 1
+                    continue
+            cands, info = escolhe(conn, a_motor)
             if not cands:
                 if info.startswith("ambiguo"):
                     ambiguos += 1
@@ -1035,6 +1109,18 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                     precos_validos.append((c, preco_id))
 
             if len(precos_validos) > 1:
+                if os.getenv("FIPE_PROVISORIO", "0") == "1":
+                    precos = {pid: _preco_fipe(conn, pid) for _, pid in precos_validos}
+                    if faixa_estreita(list(precos.values())):
+                        ordenados = sorted(precos.items(), key=lambda kv: kv[1])
+                        mediana_id = ordenados[len(ordenados) // 2][0]
+                        registra_resultado(
+                            conn, a["id"], "vinculado",
+                            f"provisorio: {len(precos_validos)} variantes em faixa estreita",
+                            preco_id=mediana_id, confianca="provisorio",
+                        )
+                        vinculados += 1
+                        continue
                 ambiguos += 1
                 registra_resultado(
                     conn, a["id"], "ambiguo",
@@ -1051,10 +1137,14 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                 continue
 
             escolhido, preco_id = precos_validos[0]
+            aid = None
+            if _assinatura_ativa() and info == "alto":
+                from vinculo_por_assinatura import grava_assinatura
+                aid = grava_assinatura(conn, a_motor, preco_id, origem="automatico")
             registra_resultado(
                 conn, a["id"], "vinculado",
                 f"{escolhido['marca_fipe']} | {escolhido['modelo_fipe']}",
-                preco_id=preco_id, confianca=info,
+                preco_id=preco_id, confianca=info, assinatura_id=aid,
             )
             vinculados += 1
             print(f"  [{info}] {a['titulo'][:38]:38} -> {escolhido['modelo_fipe'][:36]}")

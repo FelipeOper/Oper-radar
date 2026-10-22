@@ -119,6 +119,27 @@ def main():
         if ativos_antigos:
             avisos.append(f"{ativos_antigos} anuncios ativos usam referencia FIPE anterior")
 
+        cur.execute("""
+            SELECT SUM(fipe_preco_id IS NULL AND fipe_match_status IS NULL) AS nunca,
+                   SUM(fipe_preco_id IS NULL AND fipe_match_status IN ('ambiguo','sem_match','sem_ano')) AS monitoria
+            FROM anuncio
+            WHERE tipo='Caminhao' AND status='ativo'
+        """)
+        cobertura_fipe = cur.fetchone()
+        nunca_fipe = int(cobertura_fipe["nunca"] or 0)
+        monitoria_fipe = int(cobertura_fipe["monitoria"] or 0)
+        if nunca_fipe > 500:
+            avisos.append(f"{nunca_fipe} caminhoes ativos nunca passaram pelo matching FIPE")
+        cur.execute("""
+            SELECT COUNT(*) AS n FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='fipe_assinatura'
+        """)
+        if int(cur.fetchone()["n"]):
+            cur.execute("SELECT COUNT(*) AS n FROM fipe_assinatura WHERE status='em_revisao'")
+            em_revisao = int(cur.fetchone()["n"])
+            if em_revisao:
+                avisos.append(f"{em_revisao} assinaturas FIPE aguardando revisao")
+
         estado = "CRITICO" if alertas else "ATENCAO" if avisos else "OK"
         print(f"OPER_RADAR_SAUDE={estado}")
         print(f"agora={agora:%Y-%m-%d %H:%M:%S}")
@@ -129,6 +150,7 @@ def main():
               f"revendas_revalidadas={int(ativos_ciclo['revendas_revalidadas'] or 0)}")
         print(f"ultimo_snapshot={ultimo_dia} dias_registrados={int(series['dias'] or 0)}")
         print(f"fipe_referencia={referencia} precos_anteriores={precos_antigos} ativos_anteriores={ativos_antigos}")
+        print(f"fipe_cobertura nunca_processados={nunca_fipe} em_monitoria={monitoria_fipe}")
         for item in avisos:
             print(f"AVISO: {item}")
         for item in alertas:

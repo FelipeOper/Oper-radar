@@ -20,6 +20,15 @@ class FipeHubContractTest(unittest.TestCase):
         self.assertIn("Catálogo FIPE", app)
         self.assertIn("function PageFipeCatalogo()", app)
 
+    def test_cobertura_fipe_expoe_causas_e_assinaturas(self):
+        status = (ROOT / "oper-radar-api" / "fipe_status.php").read_text(encoding="utf-8")
+        saude = (ROOT / "monitoramento" / "verificar_saude.py").read_text(encoding="utf-8")
+        for campo in ("vinculados_alto", "provisorios", "em_monitoria", "nunca_processados",
+                      "assinaturas_em_revisao"):
+            self.assertIn(campo, status)
+        self.assertIn("SHOW TABLES LIKE 'fipe_assinatura'", status)
+        self.assertIn("fipe_cobertura", saude)
+
     def test_comparativo_esta_nas_listagens_de_anuncios(self):
         app = (ROOT / "app" / "src" / "App.jsx").read_text(encoding="utf-8")
         api = (ROOT / "oper-radar-api" / "anuncios.php").read_text(encoding="utf-8")
