@@ -19,6 +19,7 @@ class ClassificaCausaTest(unittest.TestCase):
         self.assertEqual("vinculado_alto", classifica_causa(linha(fipe_preco_id=1, fipe_match_confianca="alto")))
         self.assertEqual("vinculado_medio", classifica_causa(linha(fipe_preco_id=1, fipe_match_confianca="medio")))
         self.assertEqual("vinculado_manual", classifica_causa(linha(fipe_preco_id=1, fipe_vinculo_origem="manual")))
+        self.assertEqual("vinculado_provisorio", classifica_causa(linha(fipe_preco_id=1, fipe_match_confianca="provisorio")))
 
     def test_fora_do_escopo_nao_e_pendencia(self):
         self.assertEqual("fora_escopo_tipo", classifica_causa(linha(tipo="Carreta")))

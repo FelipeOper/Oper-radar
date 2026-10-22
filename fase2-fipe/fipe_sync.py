@@ -26,6 +26,8 @@ from urllib.parse import urlparse
 import requests
 import mysql.connector
 
+from monitoria import REGRA_VERSAO, faixa_estreita
+
 BASE = "https://fipe.parallelum.com.br/api/v2"
 PAUSA = float(os.getenv("FIPE_API_PAUSE", "1.0"))
 
@@ -498,10 +500,29 @@ def _com_evidencia_do_detalhe(anuncio):
     return aumenta_com_detalhe(anuncio)
 
 
+def _monitoria_por_evento():
+    return os.getenv("FIPE_MONITORIA_EVENTOS", "0") == "1"
+
+
 def anuncios_pendentes(conn, limite):
     colunas = "id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final"
-    if os.getenv("FIPE_USA_DETALHE", "0") == "1":
-        colunas += ", descricao, opcionais, carroceria"
+    eventos, params = [], []
+    if _monitoria_por_evento():
+        if os.getenv("FIPE_USA_DETALHE", "0") == "1":
+            colunas += ", descricao, opcionais, carroceria"
+            eventos.append("detalhe_coletado_em > fipe_ultima_tentativa")
+        if _assinatura_ativa():
+            eventos.append("fipe_regra_versao < %s")
+            params.append(REGRA_VERSAO)
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT MAX(atualizado_em) AS m FROM fipe_preco")
+        ultima_carga = cur.fetchone()["m"]
+        cur.close()
+        if ultima_carga is not None:
+            eventos.append("fipe_ultima_tentativa < %s")
+            params.append(ultima_carga)
+    clausula_eventos = "".join(
+        f" OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano') AND {e})" for e in eventos)
     cur = conn.cursor(dictionary=True)
     cur.execute(f"""
         SELECT {colunas} FROM anuncio
@@ -519,11 +540,12 @@ def anuncios_pendentes(conn, limite):
               OR fipe_match_status LIKE 'reprocessar_%'
               OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano')
                   AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 30 DAY))
+              {clausula_eventos}
           )
         ORDER BY (fipe_match_status LIKE 'reprocessar_%') DESC,
                  fipe_ultima_tentativa IS NULL DESC, fipe_ultima_tentativa ASC, id
         LIMIT %s
-    """, (limite,))
+    """, (*params, limite))
     rows = cur.fetchall()
     cur.close()
     return rows
@@ -656,11 +678,16 @@ def atualiza_precos_mensais(conn, limite, codigo_referencia, mes_referencia,
     return atualizados
 
 
-REGRA_VERSAO = 1  # incrementar a cada mudanca de regra de matching ou de evidencia
-
-
 def _assinatura_ativa():
     return os.getenv("FIPE_ASSINATURA", "0") == "1"
+
+
+def _preco_fipe(conn, preco_id):
+    cur = conn.cursor()
+    cur.execute("SELECT preco FROM fipe_preco WHERE id=%s", (preco_id,))
+    linha = cur.fetchone()
+    cur.close()
+    return float(linha[0]) if linha and linha[0] is not None else 0.0
 
 
 def registra_resultado(conn, anuncio_id, status, motivo, preco_id=None, confianca=None, assinatura_id=None):
@@ -1082,6 +1109,18 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                     precos_validos.append((c, preco_id))
 
             if len(precos_validos) > 1:
+                if os.getenv("FIPE_PROVISORIO", "0") == "1":
+                    precos = {pid: _preco_fipe(conn, pid) for _, pid in precos_validos}
+                    if faixa_estreita(list(precos.values())):
+                        ordenados = sorted(precos.items(), key=lambda kv: kv[1])
+                        mediana_id = ordenados[len(ordenados) // 2][0]
+                        registra_resultado(
+                            conn, a["id"], "vinculado",
+                            f"provisorio: {len(precos_validos)} variantes em faixa estreita",
+                            preco_id=mediana_id, confianca="provisorio",
+                        )
+                        vinculados += 1
+                        continue
                 ambiguos += 1
                 registra_resultado(
                     conn, a["id"], "ambiguo",

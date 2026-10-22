@@ -9,7 +9,7 @@ from collections import Counter
 from pathlib import Path
 
 CAUSAS = (
-    "vinculado_alto", "vinculado_medio", "vinculado_manual",
+    "vinculado_alto", "vinculado_medio", "vinculado_manual", "vinculado_provisorio",
     "fora_escopo_tipo", "sem_marca", "sem_ano", "nunca_processado", "erro_api",
     "ano_ausente_no_cache", "ambiguo_eixo", "ambiguo_emissao", "ambiguo_cabine",
     "ambiguo_cambio", "ambiguo_linha_serie", "ambiguo_outros", "sem_candidato", "outros",
@@ -22,7 +22,10 @@ def classifica_causa(linha):
     if linha.get("fipe_preco_id"):
         if linha.get("fipe_vinculo_origem") == "manual":
             return "vinculado_manual"
-        return "vinculado_alto" if linha.get("fipe_match_confianca") == "alto" else "vinculado_medio"
+        confianca = linha.get("fipe_match_confianca")
+        if confianca == "provisorio":
+            return "vinculado_provisorio"
+        return "vinculado_alto" if confianca == "alto" else "vinculado_medio"
     if (linha.get("tipo") or "").strip().lower() != "caminhao":
         return "fora_escopo_tipo"
     if not linha.get("marca"):
