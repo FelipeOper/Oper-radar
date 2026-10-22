@@ -62,4 +62,21 @@ if ($colunaReferencia && $colunaReferencia->num_rows > 0) {
     ];
 }
 
-envia_json(array_merge($resumo, $precos, $mensal));
+$coberturaRow = $conn->query("
+    SELECT
+        SUM(fipe_preco_id IS NOT NULL AND fipe_match_confianca='alto') AS vinculados_alto,
+        SUM(fipe_preco_id IS NOT NULL AND fipe_match_confianca='provisorio') AS provisorios,
+        SUM(fipe_preco_id IS NULL AND fipe_match_status IN ('ambiguo','sem_match','sem_ano')) AS em_monitoria,
+        SUM(fipe_preco_id IS NULL AND fipe_match_status IS NULL) AS nunca_processados
+    FROM anuncio
+    WHERE tipo='Caminhao' AND status='ativo'
+")->fetch_assoc() ?: [];
+$cobertura = array_map(fn($valor) => (int)$valor, $coberturaRow);
+$cobertura['assinaturas_em_revisao'] = 0;
+$tabelaAssinatura = $conn->query("SHOW TABLES LIKE 'fipe_assinatura'");
+if ($tabelaAssinatura && $tabelaAssinatura->num_rows > 0) {
+    $cobertura['assinaturas_em_revisao'] = (int)$conn->query(
+        "SELECT COUNT(*) FROM fipe_assinatura WHERE status='em_revisao'")->fetch_row()[0];
+}
+
+envia_json(array_merge($resumo, $precos, $mensal, ['cobertura' => $cobertura]));
