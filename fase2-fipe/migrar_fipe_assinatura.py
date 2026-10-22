@@ -63,6 +63,22 @@ CREATE TABLE fipe_assinatura (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 """
 
+TABELA_AUDITORIA = """
+CREATE TABLE fipe_auditoria (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    anuncio_id    INT NOT NULL,
+    fipe_preco_id INT NOT NULL,
+    veredito      VARCHAR(10) NOT NULL,
+    observacao    VARCHAR(300) NULL,
+    usuario_id    INT NULL,
+    criado_em     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_auditoria (anuncio_id, fipe_preco_id),
+    KEY idx_auditoria_preco (fipe_preco_id, veredito),
+    CONSTRAINT fk_auditoria_anuncio FOREIGN KEY (anuncio_id) REFERENCES anuncio(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+"""
+
 COLUNAS_ANUNCIO = (
     ("fipe_assinatura_id", "INT NULL"),
     ("fipe_regra_versao", "SMALLINT NOT NULL DEFAULT 0"),
@@ -85,6 +101,14 @@ def migrar(conn):
         print("Tabela fipe_assinatura: criada")
     else:
         print("Tabela fipe_assinatura: ja existe")
+
+    if not existe_tabela(conn, "fipe_auditoria"):
+        cur = conn.cursor()
+        cur.execute(TABELA_AUDITORIA)
+        cur.close()
+        print("Tabela fipe_auditoria: criada")
+    else:
+        print("Tabela fipe_auditoria: ja existe")
 
     for nome, definicao in COLUNAS_ANUNCIO:
         if not existe_coluna(conn, "anuncio", nome):
