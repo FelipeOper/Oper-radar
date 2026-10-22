@@ -28,7 +28,10 @@ def resumo(c):
 
 if __name__ == "__main__":
     import mysql.connector
-    from fipe_sync import escolhe
+    from fipe_sync import _com_evidencia_do_detalhe, escolhe
+    colunas = "id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final"
+    if os.getenv("FIPE_USA_DETALHE", "0") == "1":
+        colunas += ", descricao, opcionais, carroceria"
     conn = mysql.connector.connect(
         host=os.getenv("OPER_RADAR_DB_HOST", "localhost"), user=os.environ["OPER_RADAR_DB_USER"],
         password=os.environ["OPER_RADAR_DB_PASS"], database=os.environ["OPER_RADAR_DB_NAME"], charset="utf8mb4")
@@ -36,13 +39,12 @@ if __name__ == "__main__":
     with open(sys.argv[1], newline="", encoding="utf-8") as f:
         for linha in csv.DictReader(f):
             cur = conn.cursor(dictionary=True)
-            cur.execute("SELECT id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final "
-                        "FROM anuncio WHERE id=%s", (linha["anuncio_id"],))
+            cur.execute(f"SELECT {colunas} FROM anuncio WHERE id=%s", (linha["anuncio_id"],))
             anuncio = cur.fetchone()
             cur.close()
             if not anuncio:
                 continue
-            res = compara(linha["fipe_modelo_id_esperado"], escolhe(conn, anuncio))
+            res = compara(linha["fipe_modelo_id_esperado"], escolhe(conn, _com_evidencia_do_detalhe(anuncio)))
             contagens[res] += 1
             if res == "erro":
                 erros.append((anuncio["id"], anuncio["titulo"]))

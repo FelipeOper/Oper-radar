@@ -491,10 +491,20 @@ def garante_marcas(conn, codigo_referencia=None):
     cur.close()
 
 
+def _com_evidencia_do_detalhe(anuncio):
+    if os.getenv("FIPE_USA_DETALHE", "0") != "1":
+        return anuncio
+    from evidencia_detalhe import aumenta_com_detalhe
+    return aumenta_com_detalhe(anuncio)
+
+
 def anuncios_pendentes(conn, limite):
+    colunas = "id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final"
+    if os.getenv("FIPE_USA_DETALHE", "0") == "1":
+        colunas += ", descricao, opcionais, carroceria"
     cur = conn.cursor(dictionary=True)
-    cur.execute("""
-        SELECT id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final FROM anuncio
+    cur.execute(f"""
+        SELECT {colunas} FROM anuncio
         WHERE (fipe_preco_id IS NULL OR fipe_match_status LIKE 'reprocessar_%')
           AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
           AND tipo = 'Caminhao' AND status = 'ativo'
@@ -1003,7 +1013,7 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                 sem_ano += 1
                 registra_resultado(conn, a["id"], "sem_ano", "ano-modelo ausente no anuncio")
                 continue
-            cands, info = escolhe(conn, a)
+            cands, info = escolhe(conn, _com_evidencia_do_detalhe(a))
             if not cands:
                 if info.startswith("ambiguo"):
                     ambiguos += 1
