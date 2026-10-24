@@ -150,6 +150,12 @@ def imprime(r):
     print("\nExemplos que A vincularia (titulo -> modelo FIPE, confianca):")
     for titulo, modelo, confianca in r["exemplos_ganho"]:
         print(f"   {titulo} -> {modelo} [{confianca}]")
+    print("\nO que ainda trava depois de detalhe + cabine (motivo, anuncios):")
+    for motivo, n in r["restante_motivos"].most_common(15):
+        print(f"   {n:>4}  {motivo}")
+    print("\nC mexe nestes (titulo, efeito, modelo FIPE):")
+    for titulo, efeito, modelo, motivo in r["exemplos_cabine"]:
+        print(f"   {titulo} | {efeito} | {modelo or motivo}")
     print("\nExemplos de provisorio B (titulo, variantes, precos FIPE):")
     for titulo, modelos, precos in r["exemplos_prov"]:
         print(f"   {titulo} | {modelos} | {precos}")
