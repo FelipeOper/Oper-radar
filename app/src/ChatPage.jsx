@@ -36,8 +36,8 @@ export function ChatPage() {
         messages: historyComNova.map(m => ({ role: m.role, content: m.content }))
       });
 
-      if (resp?.analise) {
-        setMessages([...historyComNova, { role: 'assistant', content: resp.analise }]);
+      if (resp?.resposta || resp?.analise) {
+        setMessages([...historyComNova, { role: 'assistant', content: resp.resposta || resp.analise }]);
       } else {
         setErro('Resposta vazia do analista.');
         setMessages(historyComNova.slice(0, -1));

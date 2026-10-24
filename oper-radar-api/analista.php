@@ -7,14 +7,14 @@
  * ele recebe um RESUMO REAL do banco (KPIs, movimento por revenda, concentrações e
  * tempo observado) e responde com base nesses dados — não em achismo.
  *
- * REQUISITO: definir ANTHROPIC_API_KEY em /.oper-radar.env no servidor (chave da API da
- * Anthropic, criada em console.anthropic.com — o custo das chamadas é da conta do dono da
- * chave). Nunca colar a chave direto no config.php: esse arquivo é versionado no GitHub
- * público do projeto.
+ * REQUISITO: um provedor de IA configurado em Configurações > Inteligência artificial (Claude, GPT, Gemini ou
+ * outro compativel com OpenAI). Reserva: ANTHROPIC_API_KEY em .oper-radar.env. O custo das chamadas é da conta
+ * dona da chave. Nunca colar a chave no config.php: esse arquivo é versionado no GitHub público do projeto.
  *
  * Protegido pela Fase 4 (autenticação) — exige sessão válida, como os demais endpoints.
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/ia_provedores.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Access-Control-Allow-Origin: *');
@@ -26,10 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 inicia_sessao_oper_radar();
 exige_autenticacao();
 
-if (!defined('ANTHROPIC_API_KEY') || ANTHROPIC_API_KEY === '') {
+$conn = conecta();
+$cfgIa = ia_config_ativa($conn);
+if (!$cfgIa) {
     http_response_code(503);
     envia_json(['erro' => 'chave_nao_configurada',
-        'mensagem' => 'Defina ANTHROPIC_API_KEY em .oper-radar.env no servidor para ativar o Analista.']);
+        'mensagem' => 'Configure um provedor de IA em Configurações > Inteligência artificial para ativar o Analista.']);
 }
 
 $body = json_decode(file_get_contents('php://input'), true);
@@ -38,7 +40,6 @@ if (!$messages) { http_response_code(400); envia_json(['erro' => 'sem_mensagens'
 $messages = array_slice($messages, -12); // janela de contexto: últimas 12 trocas
 
 /* ---- monta o contexto real a partir do banco ---- */
-$conn = conecta();
 function linhaUnica(mysqli $c, string $sql): array { $r = $c->query($sql); return $r ? ($r->fetch_assoc() ?: []) : []; }
 function linhas(mysqli $c, string $sql): array { $out = []; $r = $c->query($sql); if ($r) while ($row = $r->fetch_assoc()) $out[] = $row; return $out; }
 
@@ -84,38 +85,11 @@ $system = "Você é o Analista do OPER RADAR, plataforma de inteligência de mer
     . "cobrem somente os estados listados no contexto, com coleta 2x/dia. A FIPE e o histórico ainda estão "
     . "amadurecendo; diferencie saída detectada de venda comprovada e considere isso nas recomendações.\n\n" . $contexto;
 
-/* ---- chama a API da Anthropic ---- */
-$payload = json_encode([
-    'model' => 'claude-sonnet-4-5',
-    'max_tokens' => 1200,
-    'system' => $system,
-    'messages' => $messages,
-], JSON_UNESCAPED_UNICODE);
-
-$ch = curl_init('https://api.anthropic.com/v1/messages');
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST => true,
-    CURLOPT_POSTFIELDS => $payload,
-    CURLOPT_HTTPHEADER => [
-        'Content-Type: application/json',
-        'x-api-key: ' . ANTHROPIC_API_KEY,
-        'anthropic-version: 2023-06-01',
-    ],
-    CURLOPT_TIMEOUT => 60,
-]);
-$resposta = curl_exec($ch);
-$http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
-
-if ($resposta === false || $http >= 400) {
+/* ---- chama o provedor configurado ---- */
+$r = ia_chama($cfgIa, $system, $messages, 1200);
+if (!$r['ok']) {
     http_response_code(502);
-    envia_json(['erro' => 'falha_anthropic', 'status' => $http, 'detalhe' => substr((string)$resposta, 0, 400)]);
+    envia_json(['erro' => 'falha_provedor_ia', 'mensagem' => $r['erro'], 'status' => $r['status']]);
 }
-
-$dados = json_decode($resposta, true);
-$texto = '';
-foreach (($dados['content'] ?? []) as $bloco) {
-    if (($bloco['type'] ?? '') === 'text') { $texto .= $bloco['text']; }
-}
-envia_json(['resposta' => $texto]);
+// 'analise' e mantido porque o ChatPage e o balao antigos liam esse campo.
+envia_json(['resposta' => $r['texto'], 'analise' => $r['texto'], 'provedor' => $cfgIa['provedor']]);

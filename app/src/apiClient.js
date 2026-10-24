@@ -18,6 +18,6 @@ export async function apiPost(path, dados, csrf) {
   if (DEMO_MODE) return demoPost(path, { method: 'POST', body: JSON.stringify(dados), csrf });
   const resposta = await fetch(`${API_BASE_URL}/${path}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) }, body: JSON.stringify(dados) });
   const payload = await resposta.json().catch(() => ({}));
-  if (!resposta.ok) { const erro = new Error(payload.erro || 'Nao foi possivel concluir a operacao.'); erro.codigo = payload.codigo; throw erro; }
+  if (!resposta.ok) { const erro = new Error(payload.mensagem || payload.erro || 'Nao foi possivel concluir a operacao.'); erro.codigo = payload.codigo; throw erro; }
   return payload;
 }
