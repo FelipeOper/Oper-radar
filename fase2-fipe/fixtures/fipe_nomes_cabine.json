@@ -1,0 +1,137 @@
+{
+ "fonte": "API publica da FIPE (fipe.parallelum.com.br/api/v2/trucks), outubro/2026. Nomes reais do catalogo, escolhidos por padrao.",
+ "VOLVO": {
+  "GLOBETROTTER XL": [
+   "FH-420 GLOBETROTTER XL 4X2 (diesel) (E6)",
+   "FH-420 GLOBETROTTER XL 6X2 (diesel) (E6)",
+   "FH-420 GLOBETROTTER XL 6X4 (diesel) (E6)",
+   "FH-420 GLOBETROTTER XL 8X2 (diesel) (E6)",
+   "FH-460 GLOBETROTTER XL 4X2 (diesel) (E6)"
+  ],
+  "GLOBETROTTER": [
+   "FH 400 GLOBETROTTER 4x2 2p (diesel)",
+   "FH 400 GLOBETROTTER 6x2 2p (diesel)",
+   "FH 400 GLOBETROTTER 6x4 2p (diesel)",
+   "FH 440 GLOBETROTTER 4x2 2p (diesel)",
+   "FH 440 GLOBETROTTER 6x2 2p (diesel)"
+  ],
+  "NENHUM": [
+   "FH-420 4X2 2p (diesel) (E6)",
+   "FH-420 4x2 2p (diesel) (E5)",
+   "FH-420 6X2 2p (diesel) (E6)",
+   "FH-420 6X4 2p (diesel) (E6)",
+   "FH-420 6x2 2p (diesel) (E5)"
+  ]
+ },
+ "SCANIA": {
+  "HIGHLINE": [
+   "R-400 A 4x2 HIGHLINE 2p (diesel)(E5)",
+   "R-400 A 6x2 HIGHLINE 2p (diesel)(E5)",
+   "R-420 A 4x2 HIG. 3-Eixos/A 6x2 2p (die.)",
+   "R-420 A 4x2 HIGHLINE 2p (diesel)",
+   "R-420 A 6x4 HIGHLINE 2p (diesel)",
+   "R-420 LA 4x2 HZ HIG. 3-Eixos 2p (diesel)",
+   "R-420 LA 6x2 NA HIGHLINE 2p (diesel)"
+  ],
+  "TOPLINE": [
+   "R-113 H 360 4x2 Top-Line 2p (diesel)",
+   "T-113 H 320 4x2 Top-Line 2p (diesel)",
+   "T-113 H 360 4x2 Top-L. 3-Eixos 2p (die.)",
+   "T-113 H 360 4x2 Top-Line 2p (diesel)"
+  ],
+  "NENHUM": [
+   "G-360 B 6x2 2p (diesel)(E5)",
+   "G-360 B 6x2 2p (diesel)(E6)",
+   "G-360 B 6x4 2p (diesel)(E5)",
+   "G-360 B 8x2 2p (diesel)(E5)",
+   "G-360 B 8x2 2p (diesel)(E6)"
+  ]
+ },
+ "MERCEDES-BENZ": {
+  "LS": [
+   "Actros 2045 LS 4x2 2p (diesel)(E6)",
+   "Actros 2045 MP5 LS 4x2 2p (diesel)(E5)",
+   "Actros 2546 LS 6x2 2p (diesel)",
+   "Actros 2546 LS 6x2 2p (diesel) (E5)",
+   "Actros 2548 LS 6x2 2p (diesel)(E6)"
+  ],
+  "S": [
+   "Actros 2045 S 4x2 2p (diesel)(E6)",
+   "Actros 2548 S 6x2 2p (diesel)(E6)",
+   "Actros 2553 S 6x2 2p (diesel)(E6)",
+   "Actros 2646 S 6x4 2p (diesel) (E5)",
+   "Actros 2648 MP5 S 6x4 2p (diesel)(E5)"
+  ],
+  "S/LS": [
+   "Axor 2036 S/LS 2p (diesel) (E5)",
+   "Axor 2041 S/LS 2p (diesel) (E5)",
+   "Axor 2536 S/LS 6x2 2p (diesel) (E5)",
+   "Axor 2541 S/LS 6x2 2p (diesel) (E5)",
+   "Axor 2544 S/LS 6x2 2p (diesel) (E5)"
+  ],
+  "NENHUM": [
+   "Accelo 1016 2p (diesel) (E5)",
+   "Accelo 1017 4x2 2p (diesel) (E6)",
+   "Accelo 1117 4x2 2p (diesel) (E6)",
+   "Accelo 1316 6x2 2p (diesel)(E5)",
+   "Accelo 1317 6x2 2p (diesel)(E6)"
+  ]
+ },
+ "IVECO": {
+  "MEGA CAB": [
+   "S-WAY 480 Mega Cab 4x2 (diesel)(E6)",
+   "S-WAY 480 Mega Cab 6x2 (diesel)(E6)",
+   "S-WAY 540 Mega Cab 6x4 (diesel)(E6)"
+  ],
+  "GRAND CAB": [
+   "S-WAY 480 Grand Cab 4x2 (diesel)(E6)",
+   "S-WAY 480 Grand Cab 6x2 (diesel)(E6)",
+   "S-WAY 540 Grand Cab 6x4 (diesel)(E6)"
+  ],
+  "NENHUM": [
+   "S-WAY 480 4x2 (diesel)(E6)",
+   "S-WAY 480 6x2 (diesel)(E6)",
+   "STRALIS HI-WAY 490-S44T 4x2 (diesel)(E5)",
+   "STRALIS HI-WAY 490-S48T 4x2 (diesel)(E5)"
+  ]
+ },
+ "DAF": {
+  "SUPER SPACE": [
+   "XF FT480 4x2 Super Space Cab (Die.)(E6)",
+   "XF FT480 4x2 Super Space Cab (die)(E5)",
+   "XF FT530 4x2 Super Space Cab (Die.)(E6)",
+   "XF FT530 4x2 Super Space Cab (die)(E5)",
+   "XF FTS480 6x2 Super Space Cab (Die.)(E6)"
+  ],
+  "SPACE": [
+   "CF FAC 300 8X2 Space Cab Aut (Die)(E5)",
+   "CF FAC 300 8x2 Space Cab Mec (Die)(E5)",
+   "CF FAC 310 8X2 Space Cab Aut (Die.)(E6)",
+   "CF FAC 310 8x2 Space Cab Mec. (Die.)(E6)",
+   "CF FAC 340 8X2 Space Cab (Diesel)(E6)"
+  ],
+  "DAY": [
+   "CF FAC 360 8x2 Day Cab Aut (E6)",
+   "CF FAD 480 8X4 Day Cab Aut.(E6)",
+   "CF FAS 260 6x2 Day Cab Aut. (Diesel)(E6)",
+   "CF FAS 260 6x2 Day Cab Mec (Diesel)(E6)",
+   "CF FAS 280 6x2 Day Cab Aut (Die)(E5)"
+  ],
+  "SLEEPER": [
+   "CF FAC 300 8X2 Sleep. Cab Aut (Die)(E5)",
+   "CF FAC 310 8X2 Sleep. Cab Mec (Die.)(E6)",
+   "CF FAC 310 8X2 Sleep.Cab Aut. (Die.)(E6)",
+   "CF FAC 340 8X2 Sleeper Cab (Diesel)(E6)",
+   "CF FAC 360 8x2 Sleeper Cab Aut (E6)"
+  ]
+ },
+ "VOLKSWAGEN": {
+  "NENHUM": [
+   "17-250 E Constel. Tractor 4x2 2p (dies.)",
+   "19-320 E Constellation Titan Tractor 2p",
+   "19-360 Constellat. Tractor (diesel)(E5)",
+   "19-370 E Constel. Tractor 2p (diesel)",
+   "25-320 E Constellation 6x2 Titan Tractor"
+  ]
+ }
+}
