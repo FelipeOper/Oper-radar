@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { THEMES, DEFAULT_UI_PREFERENCES, migrateThemeId, resolveTheme, proximoTemaAlternado } from '../src/theme.js';
+import { readFileSync } from 'node:fs';
+import { THEMES, DEFAULT_UI_PREFERENCES, migrateThemeId, nomeVariavelTema, resolveTheme, proximoTemaAlternado } from '../src/theme.js';
 
 test('temas: verde radar (padrao), dourado, azul aco e claro', () => {
   assert.deepEqual(Object.keys(THEMES).sort(), ['azul', 'dark', 'dourado', 'light']);
@@ -40,4 +41,19 @@ test('resolveTheme segue o aparelho no automatico e cai no padrao se invalido', 
   assert.equal(resolveTheme('auto', false), 'light');
   assert.equal(resolveTheme('white', true), 'light');
   assert.equal(resolveTheme('lixo', true), 'dark');
+});
+
+test('nome da variável CSS de cada token: camelCase e número viram hífen (surface2 -> --or-surface-2)', () => {
+  assert.equal(nomeVariavelTema('surface2'), '--or-surface-2');
+  assert.equal(nomeVariavelTema('surface3'), '--or-surface-3');
+  assert.equal(nomeVariavelTema('inkMuted'), '--or-ink-muted');
+  assert.equal(nomeVariavelTema('bg'), '--or-bg');
+});
+
+test('toda variável --or-<nome>-<n> usada no CSS é gerada por algum token de tema (senão fica presa no escuro)', () => {
+  const css = readFileSync(new URL('../src/theme.css', import.meta.url), 'utf8');
+  const usadas = new Set([...css.matchAll(/var\(\s*(--or-[a-z]+-\d+)/g)].map(m => m[1]));
+  const geradas = new Set(Object.keys(THEMES.light.tokens).map(nomeVariavelTema));
+  assert.ok(usadas.size > 0);
+  for (const nome of usadas) assert.ok(geradas.has(nome), `${nome} não é gerada por nenhum token de tema`);
 });

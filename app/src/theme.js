@@ -191,6 +191,12 @@ export function activateTheme(themeId) {
   return activeTheme;
 }
 
+/* camelCase e números viram hífen: inkMuted -> --or-ink-muted, surface2 -> --or-surface-2. Sem o hífen
+   antes do número, o CSS (que usa --or-surface-2) nunca recebia o valor do tema e ficava preso no escuro. */
+export function nomeVariavelTema(chave) {
+  return `--or-${chave.replace(/[A-Z]|\d+/g, trecho => `-${trecho.toLowerCase()}`)}`;
+}
+
 export function applyUiPreferences(preferences, resolvedThemeId) {
   if (typeof document === 'undefined') return;
   const theme = activateTheme(resolvedThemeId);
@@ -202,6 +208,6 @@ export function applyUiPreferences(preferences, resolvedThemeId) {
   root.style.colorScheme = theme.mode;
 
   Object.entries(theme.tokens).forEach(([key, value]) => {
-    root.style.setProperty(`--or-${key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`, value);
+    root.style.setProperty(nomeVariavelTema(key), value);
   });
 }
