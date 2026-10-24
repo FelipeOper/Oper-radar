@@ -5,7 +5,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _sem_banco  # noqa: F401
-from simula_ganho import avalia_anuncio, classifica_ganho, resume
+import os
+
+from simula_ganho import avalia_anuncio, classifica_ganho, flag_cabine, resume
 
 ANUNCIO = {"id": 1, "titulo": "Scania R450 2020/2020", "url": "", "marca": "SCANIA", "tracao": "", "modelo": "",
            "ano_inicial": 2020, "ano_final": 2020}
@@ -69,6 +71,22 @@ class ResumoTest(unittest.TestCase):
 
     def test_vazio_nao_divide_por_zero(self):
         self.assertEqual(0.0, resume([])["ganho_pct"])
+
+
+class FlagCabineTest(unittest.TestCase):
+    def test_liga_e_restaura_o_ambiente(self):
+        os.environ.pop("FIPE_CABINE_MARCAS", None)
+        with flag_cabine("1"):
+            self.assertEqual("1", os.environ["FIPE_CABINE_MARCAS"])
+        self.assertNotIn("FIPE_CABINE_MARCAS", os.environ)
+
+    def test_restaura_valor_anterior_mesmo_com_erro(self):
+        os.environ["FIPE_CABINE_MARCAS"] = "0"
+        with self.assertRaises(RuntimeError):
+            with flag_cabine("1"):
+                raise RuntimeError
+        self.assertEqual("0", os.environ["FIPE_CABINE_MARCAS"])
+        os.environ.pop("FIPE_CABINE_MARCAS")
 
 
 if __name__ == "__main__":
