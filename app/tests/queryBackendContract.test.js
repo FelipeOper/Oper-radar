@@ -230,6 +230,6 @@ test('Fila de vinculação FIPE (01/10/2026): fipe_fila_categorias.php agrupa os
   assert.match(app, /function PageFipeFila\({ onNavegar }\)/);
   assert.match(app, /useApi\('fipe_fila_categorias\.php'\)/);
   assert.match(app, /onNavegar\?\.\('mercado', \{ marca: cat\.marca, busca: cat\.modelo \}\)/);
-  assert.match(app, /<PageFipe onNavegar={\(page, context\) => navigate\(page, \{ context \}\)} \/>/);
+  assert.match(app, /<PageFipe sessao={sessao} onNavegar={\(page, context\) => navigate\(page, \{ context \}\)} \/>/);
   assert.match(read('app/src/demoFixtures.js'), /fipe_fila_categorias\.php/);
 });

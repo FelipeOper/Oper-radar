@@ -31,6 +31,7 @@ import { AppShell, NAV } from './Shell.jsx';
 import { LoginLayout } from './Login.jsx';
 import { Evidencia } from './Evidencia.jsx';
 import { ChatPage } from './ChatPage.jsx';
+import { FipeAuditoria } from './FipeAuditoria.jsx';
 import { SimuladorPage } from './SimuladorPage.jsx';
 import { RotineiroPage } from './RotineiroPage.jsx';
 import { AlertaColeta, FeedMovimento, InsightsDoDia, RegioesSaidas, SecaoHoje } from './HojeBlocos.jsx';
@@ -1742,7 +1743,7 @@ function PageOportunidades({ onCriarAcao }) {
 /* ============================================================
    CENTRAL FIPE — placa e catálogo local em fluxos separados
    ============================================================ */
-function PageFipe({ onNavegar }) {
+function PageFipe({ onNavegar, sessao }) {
   const { data: statusPlaca } = useApi('placa_consulta.php?modo=status');
   const [modo, setModo] = useState('placa');
   const [placa, setPlaca] = useState('');
@@ -1781,6 +1782,7 @@ function PageFipe({ onNavegar }) {
         { id: 'placa', titulo: 'Consultar por placa', texto: 'Identifique o veículo e encontre a FIPE', icone: ScanLine },
         { id: 'catalogo', titulo: 'Catálogo FIPE', texto: 'Busque por marca, modelo, ano ou código', icone: Search },
         { id: 'fila', titulo: 'Vinculação pendente', texto: 'Anúncios sem FIPE, por categoria', icone: LinkIcon },
+        { id: 'auditoria', titulo: 'Auditoria de vínculos', texto: 'Confira FIPE × anúncios por modelo, lojista ou região', icone: ShieldCheck },
       ].map(item => {
         const Icone = item.icone;
         const ativo = modo === item.id;
@@ -1798,7 +1800,7 @@ function PageFipe({ onNavegar }) {
       })}
     </div>
 
-    {modo === 'fila' ? <PageFipeFila onNavegar={onNavegar} /> : modo === 'catalogo' ? <PageFipeCatalogo /> : <>
+    {modo === 'auditoria' ? <FipeAuditoria sessao={sessao} onNavegar={onNavegar} /> : modo === 'fila' ? <PageFipeFila onNavegar={onNavegar} /> : modo === 'catalogo' ? <PageFipeCatalogo /> : <>
       <Card style={{ padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
@@ -3053,7 +3055,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
     mercado: <PageMercado sessao={sessao} contexto={contexto} onContexto={updateContext} />,
     comparador: <PageComparador contexto={contexto} onContexto={updateContext} />,
     'minha-loja': <PageMinhaLoja sessao={sessao} onCriarAcao={criarAcao} />,
-    fipe: <PageFipe onNavegar={(page, context) => navigate(page, { context })} />,
+    fipe: <PageFipe sessao={sessao} onNavegar={(page, context) => navigate(page, { context })} />,
     oportunidades: <PageOportunidades onCriarAcao={criarAcao} />,
     concorrentes: <PageConcorrencia />,
     analise: <PageAnalise />,
