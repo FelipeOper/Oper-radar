@@ -112,17 +112,20 @@ def roda(conn, amostra, semente):
             com = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
         with flag_cabine("1"):
             com_cabine = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
-        if com_cabine["resultado"] != "vincula":
-            restante_motivos[(com_cabine.get("motivo") or com_cabine["resultado"])[:55]] += 1
-            chave_motivo = (com_cabine.get("motivo") or com_cabine["resultado"])[:55]
+        with flag_cabine("1"), flag_ambiente("FIPE_EIXO_FLEX", "1"):
+            com_eixo = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
+        if com_eixo["resultado"] != "vincula":
+            chave_motivo = (com_eixo.get("motivo") or (
+                f"multiplo: {len(com_eixo['modelos'])} FIPEs com preco no ano" if com_eixo["resultado"] == "multiplo"
+                else com_eixo["resultado"]))[:55]
+            restante_motivos[chave_motivo] += 1
             if len(exemplos_motivo[chave_motivo]) < 3:
                 try:
-                    proximos = [c["modelo_fipe"] for _, _, c in melhores_candidatos(conn, a, quantos=3)]
+                    proximos = com_eixo.get("modelos") or [
+                        c["modelo_fipe"] for _, _, c in melhores_candidatos(conn, a, quantos=3)]
                 except Exception:
                     proximos = []
                 exemplos_motivo[chave_motivo].append((a["titulo"][:70], a.get("tracao"), proximos))
-        with flag_cabine("1"), flag_ambiente("FIPE_EIXO_FLEX", "1"):
-            com_eixo = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
         cat_eixo = classifica_ganho(base, com_eixo)
         eixo_flex.append(cat_eixo)
         if cat_eixo.startswith("ganha") and len(exemplos_eixo) < 12:
@@ -170,7 +173,7 @@ def imprime(r):
     print("\nExemplos que A vincularia (titulo -> modelo FIPE, confianca):")
     for titulo, modelo, confianca in r["exemplos_ganho"]:
         print(f"   {titulo} -> {modelo} [{confianca}]")
-    print("\nO que ainda trava depois de detalhe + cabine (motivo, anuncios):")
+    print("\nO que ainda trava depois de detalhe + cabine + eixo flexivel (motivo, anuncios):")
     for motivo, n in r["restante_motivos"].most_common(15):
         print(f"   {n:>4}  {motivo}")
         for titulo, tracao, proximos in r["exemplos_motivo"].get(motivo, []):
