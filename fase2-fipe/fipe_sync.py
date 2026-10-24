@@ -853,6 +853,30 @@ def gera_sugestoes_pendentes(conn, lote=5000):
     return {"analisados": len(anuncios), "com_sugestao": com_sugestao, "opcoes": total_sugestoes}
 
 
+def _cabine_marcas_ligada():
+    return os.environ.get("FIPE_CABINE_MARCAS", "0") == "1"
+
+
+def filtra_cabine_marca(marca, texto, validos):
+    """Cabine/teto das marcas que nao sao DAF (Volvo, Scania, Mercedes, Iveco). Devolve (validos, erro)."""
+    from cabine import cabine_compativel, cabine_marca
+    rotulo_anuncio = cabine_marca(texto, marca)
+    rotulos = [cabine_marca(v[2]["modelo_fipe"], marca) for v in validos]
+    if rotulo_anuncio:
+        compativeis = [(v, r) for v, r in zip(validos, rotulos) if cabine_compativel(rotulo_anuncio, r)]
+        if compativeis:
+            if rotulo_anuncio == "ALTO" and len({r for _, r in compativeis}) > 1:
+                return None, "ambiguo cabine (teto alto: " + "/".join(sorted({r for _, r in compativeis})) + ")"
+            return [v for v, _ in compativeis], None
+        if any(rotulos):
+            return None, f"sem match cabine {rotulo_anuncio}"
+        return validos, None  # o catalogo nao diferencia cabine nesta linha
+    distintos = set(rotulos)
+    if len(distintos) > 1:
+        return None, "ambiguo cabine (" + "/".join(sorted(r or "SEM TAG" for r in distintos)) + ")"
+    return validos, None
+
+
 def escolhe(conn, anuncio):
     """Devolve (candidatos, confianca) ou (None, motivo).
 
@@ -937,6 +961,11 @@ def escolhe(conn, anuncio):
         if len(todas_as_cabines) > 1:
             rotulo = "/".join(sorted(c or "SEM TAG" for c in todas_as_cabines))
             return None, f"ambiguo cabine ({rotulo})"
+
+    if _cabine_marcas_ligada() and not daf:
+        validos, erro_cabine = filtra_cabine_marca(anuncio.get("marca", ""), texto, validos)
+        if erro_cabine:
+            return None, erro_cabine
 
     hr_anuncio = tem_modificador_hr(texto)
     hr_candidatos = {tem_modificador_hr(c["modelo_fipe"]) for _, _, c in validos}
