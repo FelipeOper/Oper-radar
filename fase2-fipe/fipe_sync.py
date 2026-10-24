@@ -274,6 +274,15 @@ def eixos(s: str):
     return EIXO_CONFIGURACAO_DAF.get(configuracao)
 
 
+def _eixo_flex_ligado():
+    return os.environ.get("FIPE_EIXO_FLEX", "0") == "1"
+
+
+def eixos_todos(s: str):
+    """Todos os eixos escritos no nome (a FIPE as vezes junta dois: '4x2 3-Eixos/ A 6x2')."""
+    return {f"{a}X{b}" for a, b in re.findall(r"\b(\d)\s?X\s?(\d)\b", normaliza(s))}
+
+
 def eixo_do_anuncio(anuncio: dict):
     """Retorna (eixo, conflito), sem esconder divergencias entre titulo, URL e detalhe."""
     encontrados = set()
@@ -908,6 +917,7 @@ def escolhe(conn, anuncio):
         elif daf and any(emissao_no_texto(v[2]["modelo_fipe"]) for v in validos):
             return None, f"sem match emissao {emissao}"
 
+    eixo_flex_usado = False
     eixo_anuncio, conflito_eixo = eixo_do_anuncio(anuncio)
     if conflito_eixo:
         return None, conflito_eixo
@@ -916,6 +926,13 @@ def escolhe(conn, anuncio):
         filtrados = [v for v in validos if eixos(v[2]["modelo_fipe"]) == eixo_anuncio] if eixo_p0 else [
             v for v in validos if eixos(v[2]["modelo_fipe"]) in (eixo_anuncio, None)
         ]
+        if not filtrados and eixo_p0 and not familia_restrita and _eixo_flex_ligado():
+            # A FIPE nem sempre escreve o eixo no nome ("1418 2p", "8-150 E Delivery") ou junta dois
+            # ("G-380 A 4x2 3-Eixos/ A 6x2"): nome sem eixo nao contradiz o anuncio. Vale so como medio.
+            filtrados = [v for v in validos if eixo_anuncio in eixos_todos(v[2]["modelo_fipe"])] or [
+                v for v in validos if not eixos_todos(v[2]["modelo_fipe"])
+            ]
+            eixo_flex_usado = bool(filtrados)
         if filtrados:
             validos = filtrados
         elif familia_restrita or eixo_p0:
@@ -1067,7 +1084,7 @@ def escolhe(conn, anuncio):
     if familia_restrita and (len(validos) != 1 or validos[0][0] < 0.95):
         return None, (f"ambiguo {len(validos)} candidatos" if len(validos) != 1
                       else "sem match de alta confianca")
-    confianca = "alto" if validos[0][0] >= 0.95 else "medio"
+    confianca = "alto" if validos[0][0] >= 0.95 and not eixo_flex_usado else "medio"
     return [c for _, _, c in validos], confianca
 
 
