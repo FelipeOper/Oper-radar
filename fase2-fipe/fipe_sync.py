@@ -195,6 +195,17 @@ def numero_modelo(s: str):
     return numeros[0] if numeros else None
 
 
+def _nomes_alias_ligado():
+    return os.environ.get("FIPE_NOMES_ALIAS", "0") == "1"
+
+
+def numeros_juntos(s: str) -> set:
+    """Numeros de dois grupos unidos: '17 280' vira '17280' (a FIPE escreve '17-280')."""
+    base = unicodedata.normalize("NFD", texto_sem_anos(s) or "").encode("ascii", "ignore").decode().upper()
+    grupos = re.findall(r"\d+", base)
+    return {e + d for e, d in zip(grupos, grupos[1:]) if 1 <= len(e) <= 2 and 2 <= len(d) <= 3}
+
+
 def codigo_modelo_iveco(s: str):
     """Codigo composto IVECO: 240E25 e 240E28 sao modelos diferentes."""
     m = re.search(r"\b(\d{2,3})\s*E\s*(\d{2})\b", normaliza(texto_sem_anos(s)))
@@ -470,6 +481,13 @@ def avalia(titulo: str, modelo_fipe: str):
         return 0.90, f"codigo IVECO {codigo_iveco_t} sem eixo/cabine confirmados"
 
     n_t, n_f = numero_modelo(titulo), numero_modelo(modelo_fipe)
+    if _nomes_alias_ligado():
+        if not n_t and not n_f:
+            # "Delivery Express" nao tem numero nem no anuncio nem na FIPE: o nome inteiro e a identidade.
+            if palavras_chave(titulo) and palavras_chave(titulo) == palavras_chave(modelo_fipe):
+                return 0.90, "nome sem numero (palavras iguais)"
+        elif n_t and n_f and n_t != n_f and (n_f in numeros_juntos(titulo) or n_t in numeros_juntos(modelo_fipe)):
+            n_t = n_f = n_f if n_f in numeros_juntos(titulo) else n_t
     if not n_t or not n_f or n_t != n_f:
         return 0.0, "numero difere"
     s_t, s_f = serie(titulo), serie(modelo_fipe)
