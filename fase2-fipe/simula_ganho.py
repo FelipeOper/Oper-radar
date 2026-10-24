@@ -26,17 +26,21 @@ ORDER BY RAND(%s) LIMIT %s
 
 
 @contextmanager
-def flag_cabine(valor):
-    """Liga/desliga FIPE_CABINE_MARCAS so durante a simulacao, sem tocar no ambiente de quem chamou."""
-    anterior = os.environ.get("FIPE_CABINE_MARCAS")
-    os.environ["FIPE_CABINE_MARCAS"] = valor
+def flag_ambiente(nome, valor):
+    """Liga/desliga uma flag so durante a simulacao, sem tocar no ambiente de quem chamou."""
+    anterior = os.environ.get(nome)
+    os.environ[nome] = valor
     try:
         yield
     finally:
         if anterior is None:
-            os.environ.pop("FIPE_CABINE_MARCAS", None)
+            os.environ.pop(nome, None)
         else:
-            os.environ["FIPE_CABINE_MARCAS"] = anterior
+            os.environ[nome] = anterior
+
+
+def flag_cabine(valor):
+    return flag_ambiente("FIPE_CABINE_MARCAS", valor)
 
 
 def avalia_anuncio(conn, anuncio, codigo_referencia):
@@ -97,8 +101,9 @@ def roda(conn, amostra, semente):
     anuncios = cur.fetchall()
     cur.close()
 
-    detalhe, provisorios, ambos, cabine = [], [], [], []
+    detalhe, provisorios, ambos, cabine, eixo_flex = [], [], [], [], []
     exemplos_cabine, restante_motivos = [], Counter()
+    exemplos_eixo = []
     exemplos_motivo = defaultdict(list)
     por_marca, por_motivo, exemplos_ganho, exemplos_prov = Counter(), Counter(), [], []
     for a in anuncios:
@@ -116,6 +121,12 @@ def roda(conn, amostra, semente):
                 except Exception:
                     proximos = []
                 exemplos_motivo[chave_motivo].append((a["titulo"][:70], a.get("tracao"), proximos))
+        with flag_cabine("1"), flag_ambiente("FIPE_EIXO_FLEX", "1"):
+            com_eixo = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
+        cat_eixo = classifica_ganho(base, com_eixo)
+        eixo_flex.append(cat_eixo)
+        if cat_eixo.startswith("ganha") and len(exemplos_eixo) < 12:
+            exemplos_eixo.append((a["titulo"][:60], a.get("tracao"), com_eixo["modelo"], com_eixo["confianca"]))
         cat_cabine = classifica_ganho(base, com_cabine)
         cabine.append(cat_cabine)
         if cat_cabine != "continua" and cat_cabine != "igual" and len(exemplos_cabine) < 12:
@@ -135,7 +146,7 @@ def roda(conn, amostra, semente):
             exemplos_prov.append((a["titulo"][:60], prov["modelos"], [round(p) for p in prov["precos"]]))
     return {"amostra": len(anuncios), "detalhe": resume(detalhe), "provisorio": resume(
         ["ganha_alto" if p == "ganha_provisorio" else "continua" for p in provisorios]),
-        "combinado": resume(ambos), "cabine": resume(cabine), "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos, "exemplos_motivo": exemplos_motivo,
+        "combinado": resume(ambos), "cabine": resume(cabine), "eixo_flex": resume(eixo_flex), "exemplos_eixo": exemplos_eixo, "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos, "exemplos_motivo": exemplos_motivo,
         "por_marca": por_marca, "por_motivo": por_motivo,
         "exemplos_ganho": exemplos_ganho, "exemplos_prov": exemplos_prov}
 
@@ -145,6 +156,7 @@ def imprime(r):
     for nome, chave in (("A) evidencia do detalhe (FIPE_USA_DETALHE)", "detalhe"),
                         ("B) vinculo provisorio por faixa de preco (FIPE_PROVISORIO)", "provisorio"),
                         ("C) detalhe + cabine por marca (FIPE_USA_DETALHE + FIPE_CABINE_MARCAS)", "cabine"),
+                        ("D) detalhe + cabine + eixo flexivel (FIPE_EIXO_FLEX)", "eixo_flex"),
                         ("A + B combinados", "combinado")):
         s = r[chave]
         print(f"{nome}: ganharia {s['ganho']} de {s['total']} ({s['ganho_pct']}%)")
@@ -166,6 +178,9 @@ def imprime(r):
     print("\nC mexe nestes (titulo, efeito, modelo FIPE):")
     for titulo, efeito, modelo, motivo in r["exemplos_cabine"]:
         print(f"   {titulo} | {efeito} | {modelo or motivo}")
+    print("\nD vincularia (titulo, tracao, modelo FIPE, confianca):")
+    for titulo, tracao, modelo, confianca in r["exemplos_eixo"]:
+        print(f"   {titulo} | {tracao} | {modelo} [{confianca}]")
     print("\nExemplos de provisorio B (titulo, variantes, precos FIPE):")
     for titulo, modelos, precos in r["exemplos_prov"]:
         print(f"   {titulo} | {modelos} | {precos}")
