@@ -161,6 +161,36 @@ export function demoDesloca(valor, deltaMs) {
   if (valor && typeof valor === 'object') return Object.fromEntries(Object.entries(valor).map(([chave, item]) => [chave, demoDesloca(item, deltaMs)]));
   return valor;
 }
+const auditoriaGrupos = [
+  { fipe_preco_id: 501, marca_fipe: 'DAF', modelo_fipe: 'XF FTT 530 6x4 Space Cab (E6)', ano_codigo: '2023-3', preco: 905000, total: 6, auditados: 2, corretos: 1, errados: 1, manuais: 1, exemplo: 'DAF XF 530 6x4 Space Cab' },
+  { fipe_preco_id: 502, marca_fipe: 'Scania', modelo_fipe: 'R 450 A 6x2', ano_codigo: '2021-3', preco: 498000, total: 4, auditados: 0, corretos: 0, errados: 0, manuais: 0, exemplo: 'Scania R 450 6x2 Highline' },
+  { fipe_preco_id: 503, marca_fipe: 'Volvo', modelo_fipe: 'FH 540 6x4', ano_codigo: '2020-3', preco: 462000, total: 3, auditados: 3, corretos: 3, errados: 0, manuais: 0, exemplo: 'Volvo FH 540 6x4 Globetrotter' },
+];
+const auditoriaAnuncios = {
+  501: [
+    { id: 9101, titulo: 'DAF XF 530 6x4 Space Cab 2023/2023', url: 'https://exemplo.invalid/9101', marca: 'DAF', modelo: 'XF 530', tracao: '6x4', ano_inicial: 2023, ano_final: 2023, preco: 899000, fipe_match_confianca: 'alto', origem: 'automatico', fipe_match_motivo: 'DAF | XF FTT 530 6x4 Space Cab (E6)', revenda_id: 11, revenda: 'Rota Exemplo Caminhoes', cidade: 'Curitiba', uf: 'PR', veredito: null, observacao: null },
+    { id: 9102, titulo: 'DAF XF 530 6x4 Super Space Cab 2023/2023', url: 'https://exemplo.invalid/9102', marca: 'DAF', modelo: 'XF 530', tracao: '6x4', ano_inicial: 2023, ano_final: 2023, preco: 931000, fipe_match_confianca: 'alto', origem: 'automatico', fipe_match_motivo: 'DAF | XF FTT 530 6x4 Space Cab (E6)', revenda_id: 12, revenda: 'Patio Demonstracao', cidade: 'Campinas', uf: 'SP', veredito: 'errado', observacao: null },
+    { id: 9103, titulo: 'DAF XF 530 6x4 Space Cab 2023/2023', url: 'https://exemplo.invalid/9103', marca: 'DAF', modelo: 'XF 530', tracao: '6x4', ano_inicial: 2023, ano_final: 2023, preco: 905000, fipe_match_confianca: 'manual', origem: 'manual', fipe_match_motivo: 'Curadoria manual', revenda_id: 11, revenda: 'Rota Exemplo Caminhoes', cidade: 'Curitiba', uf: 'PR', veredito: 'correto', observacao: null },
+    { id: 9104, titulo: 'DAF XF 530 6x4 Space 2023', url: 'https://exemplo.invalid/9104', marca: 'DAF', modelo: 'XF 530', tracao: '6x4', ano_inicial: 2023, ano_final: 2023, preco: 912000, fipe_match_confianca: 'alto', origem: 'automatico', fipe_match_motivo: 'assinatura 3fa91c02ab', revenda_id: 13, revenda: 'Sul Pesados', cidade: 'Joinville', uf: 'SC', veredito: null, observacao: null },
+  ],
+  502: [
+    { id: 9201, titulo: 'Scania R 450 A 6x2 Highline 2021/2021', url: 'https://exemplo.invalid/9201', marca: 'Scania', modelo: 'R 450', tracao: '6x2', ano_inicial: 2021, ano_final: 2021, preco: 489000, fipe_match_confianca: 'alto', origem: 'automatico', fipe_match_motivo: 'Scania | R 450 A 6x2', revenda_id: 12, revenda: 'Patio Demonstracao', cidade: 'Campinas', uf: 'SP', veredito: null, observacao: null },
+  ],
+  503: [
+    { id: 9301, titulo: 'Volvo FH 540 6x4 Globetrotter 2020/2020', url: 'https://exemplo.invalid/9301', marca: 'Volvo', modelo: 'FH 540', tracao: '6x4', ano_inicial: 2020, ano_final: 2020, preco: 455000, fipe_match_confianca: 'alto', origem: 'automatico', fipe_match_motivo: 'Volvo | FH 540 6x4', revenda_id: 11, revenda: 'Rota Exemplo Caminhoes', cidade: 'Curitiba', uf: 'PR', veredito: 'correto', observacao: null },
+  ],
+};
+function auditoriaDemo(params) {
+  const resumo = { total: 13, auditados: 5, corretos: 4, errados: 1, grupos: 3, nao_auditados: 8, precisao_pct: 80 };
+  if (params.get('visao') === 'anuncios') {
+    const id = Number(params.get('fipe_preco_id'));
+    return { resumo, fipe_preco_id: id, anuncios: auditoriaAnuncios[id] || [] };
+  }
+  const somenteNaoAuditados = (params.get('estado') || 'nao_auditados') === 'nao_auditados';
+  const grupos = somenteNaoAuditados ? auditoriaGrupos.filter(g => g.auditados < g.total) : auditoriaGrupos;
+  return { resumo, grupos, tem_mais: false, proximo_offset: grupos.length };
+}
+
 export function demoGet(input, agora = Date.now()) {
   return demoDesloca(demoGetBase(input), demoDeslocamentoMs(agora));
 }
@@ -186,6 +216,7 @@ function demoGetBase(input) {
   if (path === 'placa_consulta.php') { if (params.get('modo') === 'status') return { disponivel: true, configurado: false, modo: 'demo' }; return { placa: params.get('placa'), veiculo: { marca: 'Volvo', modelo: 'FH 540', ano_modelo: 2021, cidade: 'Curitiba', uf: 'PR' }, fipes, mercado: fipes[0] }; }
   if (path === 'fipe_consulta.php') return { itens: fipes, fipes, total: fipes.length, resultado: fipes[0], consultado_em: today };
   if (path === 'fipe_fila_categorias.php') return fipeFilaCategorias;
+  if (path === 'fipe_auditoria.php') return auditoriaDemo(params);
   if (path === 'insights.php') return { kpis: { fipe: { vinculados: 8, abaixo_fipe: 3, desvio_mediano_pct: -1.6 }, cobertura: { ufs: 3 } }, por_cidade: [{ cidade: 'Curitiba', uf: 'PR', anuncios: 322 }], lojistas: [{ revenda: 'Rota Exemplo Caminhoes', uf: 'PR', anuncios: 18 }], atualizado_em: today };
   if (path === 'analista_status.php') return { disponivel: true, configurado: true, modo: 'demo', aviso: 'Resposta local ficticia; sem contexto de backend.' };
   if (path === 'auth.php') return DEMO_SESSION;
