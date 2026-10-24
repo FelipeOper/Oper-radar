@@ -886,7 +886,38 @@ def filtra_cabine_marca(marca, texto, validos):
     return validos, None
 
 
-def escolhe(conn, anuncio):
+def provisorio_de_ambiguidade(conn, info, concorrentes, obtem_preco_id):
+    """Ambiguidade de linha, eixo ou cabine cujas FIPEs custam quase o mesmo: devolve (preco_id mediano, n) ou None.
+
+    Emissao fica de fora (E5 e E6 sao especificacoes legais distintas). A faixa estreita (5%) e a trava: se as
+    variantes valem muito diferente, a duvida custa caro e o anuncio segue sem vinculo.
+    """
+    if not info.startswith("ambiguo") or info.startswith("ambiguo emissao") or not 2 <= len(concorrentes) <= 8:
+        return None
+    precos = {}
+    for c in concorrentes:
+        preco_id = obtem_preco_id(c)
+        if preco_id:
+            precos[preco_id] = _preco_fipe(conn, preco_id)
+    if len(precos) < 2 or not faixa_estreita(list(precos.values())):
+        return None
+    ordenados = sorted(precos.items(), key=lambda kv: kv[1])
+    return ordenados[len(ordenados) // 2][0], len(precos)
+
+
+def _ambiguo(saida, validos, info):
+    """Devolve a ambiguidade e, se o chamador pediu, os candidatos que ainda concorriam."""
+    if saida is not None:
+        saida[:] = [c for _, _, c in validos]
+    return None, info
+
+
+def escolhe(conn, anuncio, ambiguos_out=None):
+    """Escolhe os candidatos FIPE do anuncio. Em ambiguidade, ambiguos_out (lista) recebe os que concorriam."""
+    return _escolhe(conn, anuncio, ambiguos_out)
+
+
+def _escolhe(conn, anuncio, saida):
     """Devolve (candidatos, confianca) ou (None, motivo).
 
     Regras, nesta ordem:
@@ -943,12 +974,12 @@ def escolhe(conn, anuncio):
         if emissao_no_texto(c["modelo_fipe"])
     }
     if not emissao and len(emissoes_candidatas) > 1:
-        return None, "ambiguo emissao (" + "/".join(sorted(emissoes_candidatas)) + ")"
+        return _ambiguo(saida, validos, "ambiguo emissao (" + "/".join(sorted(emissoes_candidatas)) + ")")
 
     if daf and not eixo_anuncio:
         eixos_daf = {eixos(c["modelo_fipe"]) for _, _, c in validos if eixos(c["modelo_fipe"])}
         if len(eixos_daf) > 1:
-            return None, "ambiguo eixo (" + "/".join(sorted(eixos_daf)) + ")"
+            return _ambiguo(saida, validos, "ambiguo eixo (" + "/".join(sorted(eixos_daf)) + ")")
 
     texto = texto_anuncio(anuncio)
     if re.search(r"\bOFF\s+ROAD\b", normaliza(texto)):
@@ -977,11 +1008,14 @@ def escolhe(conn, anuncio):
         todas_as_cabines = {cabine_daf(c["modelo_fipe"]) for _, _, c in validos}
         if len(todas_as_cabines) > 1:
             rotulo = "/".join(sorted(c or "SEM TAG" for c in todas_as_cabines))
-            return None, f"ambiguo cabine ({rotulo})"
+            return _ambiguo(saida, validos, f"ambiguo cabine ({rotulo})")
 
     if _cabine_marcas_ligada() and not daf:
+        validos_antes_da_cabine = validos
         validos, erro_cabine = filtra_cabine_marca(anuncio.get("marca", ""), texto, validos)
         if erro_cabine:
+            if erro_cabine.startswith("ambiguo"):
+                return _ambiguo(saida, validos_antes_da_cabine, erro_cabine)
             return None, erro_cabine
 
     hr_anuncio = tem_modificador_hr(texto)
@@ -992,7 +1026,7 @@ def escolhe(conn, anuncio):
             return None, "sem match modificador HR"
         validos = com_hr
     elif len(hr_candidatos) > 1:
-        return None, "ambiguo modificador HR"
+        return _ambiguo(saida, validos, "ambiguo modificador HR")
 
     cambio_anuncio = cambio_daf(texto)
     cambios_candidatos = {cambio_daf(c["modelo_fipe"]) for _, _, c in validos if cambio_daf(c["modelo_fipe"])}
@@ -1003,7 +1037,7 @@ def escolhe(conn, anuncio):
         elif daf and cambios_candidatos:
             return None, f"sem match cambio {cambio_anuncio}"
     elif len(cambios_candidatos) > 1:
-        return None, "ambiguo cambio (" + "/".join(sorted(cambios_candidatos)) + ")"
+        return _ambiguo(saida, validos, "ambiguo cambio (" + "/".join(sorted(cambios_candidatos)) + ")")
 
     # 3) linhas conflitantes: dois conjuntos nao-vazios e sem interseccao
     chaves = [palavras_chave(c["modelo_fipe"]) for _, _, c in validos]
@@ -1012,12 +1046,12 @@ def escolhe(conn, anuncio):
         for j_ in range(i_ + 1, len(nao_vazias)):
             if not mesma_linha(nao_vazias[i_], nao_vazias[j_]):
                 conflito = "/".join(sorted(nao_vazias[i_] | nao_vazias[j_]))[:26]
-                return None, f"ambiguo linha ({conflito})"
+                return _ambiguo(saida, validos, f"ambiguo linha ({conflito})")
 
     # 4) sem eixo no anuncio, o nome base nao prova qual variante se aplica.
     eixos_expl = {e for e in (eixos(c["modelo_fipe"]) for _, _, c in validos) if e}
     if len(eixos_expl) > 1:
-        return None, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")"
+        return _ambiguo(saida, validos, "ambiguo eixo (" + "/".join(sorted(eixos_expl))[:22] + ")")
 
     # DAF CF nao tem letra de configuracao (FT/FTS/FTT) pra avalia() confirmar o modelo: o score
     # fica travado em 0.90 ("potencia") mesmo quando o candidato e o unico certo. Decisao aprovada:
@@ -1066,9 +1100,9 @@ def escolhe(conn, anuncio):
         # DAF/IVECO tem portao proprio mais abaixo (familia_restrita), com sua mensagem; aqui
         # so cobre as outras marcas, pra nao duplicar o mesmo motivo com texto diferente.
         if len(validos) != 1:
-            return None, f"ambiguo eixo {eixo_anuncio}: {len(validos)} candidatos"
+            return _ambiguo(saida, validos, f"ambiguo eixo {eixo_anuncio}: {len(validos)} candidatos")
         if validos[0][0] < 0.95:
-            return None, f"ambiguo eixo {eixo_anuncio}: confianca insuficiente"
+            return _ambiguo(saida, validos, f"ambiguo eixo {eixo_anuncio}: confianca insuficiente")
 
     # Serie/geracao explicita so autoriza vinculo com um unico modelo confirmado.
     exige_identidade = (
@@ -1077,13 +1111,14 @@ def escolhe(conn, anuncio):
     )
     if exige_identidade:
         if len(validos) != 1:
-            return None, f"ambiguo serie/geracao ({len(validos)} candidatos)"
+            return _ambiguo(saida, validos, f"ambiguo serie/geracao ({len(validos)} candidatos)")
         if validos[0][0] < 0.95:
             return None, "sem match serie/geracao sem alta confianca"
 
     if familia_restrita and (len(validos) != 1 or validos[0][0] < 0.95):
-        return None, (f"ambiguo {len(validos)} candidatos" if len(validos) != 1
-                      else "sem match de alta confianca")
+        if len(validos) != 1:
+            return _ambiguo(saida, validos, f"ambiguo {len(validos)} candidatos")
+        return None, "sem match de alta confianca"
     confianca = "alto" if validos[0][0] >= 0.95 and not eixo_flex_usado else "medio"
     return [c for _, _, c in validos], confianca
 
@@ -1148,8 +1183,20 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
                                        assinatura_id=reuso.assinatura_id)
                     vinculados += 1
                     continue
-            cands, info = escolhe(conn, a_motor)
+            concorrentes = []
+            cands, info = escolhe(conn, a_motor, concorrentes)
             if not cands:
+                if os.getenv("FIPE_PROVISORIO", "0") == "1" and concorrentes:
+                    achado = provisorio_de_ambiguidade(
+                        conn, info, concorrentes,
+                        lambda c: (busca_ou_cria_preco(conn, c, ano_modelo(a), codigo_referencia, mes_referencia)
+                                   if permitir_api else busca_preco_cache(conn, c, ano_modelo(a), codigo_referencia)))
+                    if achado:
+                        registra_resultado(
+                            conn, a["id"], "vinculado", f"provisorio: {info} ({achado[1]} FIPEs em faixa estreita)",
+                            preco_id=achado[0], confianca="provisorio")
+                        vinculados += 1
+                        continue
                 if info.startswith("ambiguo"):
                     ambiguos += 1
                     registra_resultado(conn, a["id"], "ambiguo", info)
