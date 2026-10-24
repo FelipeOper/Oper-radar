@@ -6,11 +6,11 @@ Nao grava nada. Uso: python simula_ganho.py [--amostra 600] [--semente 42]
 """
 import argparse
 import os
-from collections import Counter
+from collections import Counter, defaultdict
 from contextlib import contextmanager
 
 from evidencia_detalhe import aumenta_com_detalhe
-from fipe_sync import _preco_fipe, ano_modelo, busca_preco_cache, escolhe
+from fipe_sync import _preco_fipe, ano_modelo, busca_preco_cache, escolhe, melhores_candidatos
 from monitoria import faixa_estreita
 
 LIMITE_CANDIDATOS = 8
@@ -99,6 +99,7 @@ def roda(conn, amostra, semente):
 
     detalhe, provisorios, ambos, cabine = [], [], [], []
     exemplos_cabine, restante_motivos = [], Counter()
+    exemplos_motivo = defaultdict(list)
     por_marca, por_motivo, exemplos_ganho, exemplos_prov = Counter(), Counter(), [], []
     for a in anuncios:
         with flag_cabine("0"):
@@ -108,6 +109,13 @@ def roda(conn, amostra, semente):
             com_cabine = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
         if com_cabine["resultado"] != "vincula":
             restante_motivos[(com_cabine.get("motivo") or com_cabine["resultado"])[:55]] += 1
+            chave_motivo = (com_cabine.get("motivo") or com_cabine["resultado"])[:55]
+            if len(exemplos_motivo[chave_motivo]) < 3:
+                try:
+                    proximos = [c["modelo_fipe"] for _, _, c in melhores_candidatos(conn, a, quantos=3)]
+                except Exception:
+                    proximos = []
+                exemplos_motivo[chave_motivo].append((a["titulo"][:70], a.get("tracao"), proximos))
         cat_cabine = classifica_ganho(base, com_cabine)
         cabine.append(cat_cabine)
         if cat_cabine != "continua" and cat_cabine != "igual" and len(exemplos_cabine) < 12:
@@ -127,7 +135,7 @@ def roda(conn, amostra, semente):
             exemplos_prov.append((a["titulo"][:60], prov["modelos"], [round(p) for p in prov["precos"]]))
     return {"amostra": len(anuncios), "detalhe": resume(detalhe), "provisorio": resume(
         ["ganha_alto" if p == "ganha_provisorio" else "continua" for p in provisorios]),
-        "combinado": resume(ambos), "cabine": resume(cabine), "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos,
+        "combinado": resume(ambos), "cabine": resume(cabine), "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos, "exemplos_motivo": exemplos_motivo,
         "por_marca": por_marca, "por_motivo": por_motivo,
         "exemplos_ganho": exemplos_ganho, "exemplos_prov": exemplos_prov}
 
@@ -153,6 +161,8 @@ def imprime(r):
     print("\nO que ainda trava depois de detalhe + cabine (motivo, anuncios):")
     for motivo, n in r["restante_motivos"].most_common(15):
         print(f"   {n:>4}  {motivo}")
+        for titulo, tracao, proximos in r["exemplos_motivo"].get(motivo, []):
+            print(f"          ex: {titulo} | tracao={tracao} | FIPE proxima: {proximos}")
     print("\nC mexe nestes (titulo, efeito, modelo FIPE):")
     for titulo, efeito, modelo, motivo in r["exemplos_cabine"]:
         print(f"   {titulo} | {efeito} | {modelo or motivo}")
