@@ -39,3 +39,15 @@ test('icones vem do adaptador Phosphor, sem lucide', () => {
   assert.doesNotMatch(shell, /lucide-react/);
   assert.match(icons, /ph-\$\{name\}/);
 });
+
+test('menu lateral: grupos em dropdown acessível e barra recolhível só com ícones', () => {
+  assert.match(shell, /aria-expanded=\{aberto\}/);
+  assert.match(shell, /aria-controls=\{idLista\}/);
+  assert.match(shell, /hidden=\{!aberto\}/);
+  assert.match(shell, /or-sidebar--collapsed/);
+  assert.match(shell, /aria-pressed=\{recolhida\}/);
+  assert.match(shell, /'Expandir menu' : 'Recolher menu'/);
+  assert.match(shell, /title=\{recolhida \? rotulo : undefined\}/);
+  assert.match(shell, /salvaPreferencia\(armazenamentoLocal\(\)/);
+  assert.doesNotMatch(shell, /localStorage\.(get|set)Item/);
+});

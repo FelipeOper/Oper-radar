@@ -1925,3 +1925,29 @@ select option {
 @media (max-width: 640px) {
   .oc-aud__filtros { grid-template-columns:minmax(0, 1fr); }
 }
+
+
+/* Menu lateral: grupos em dropdown e barra recolhivel (so icones). A parte recolhida reaproveita
+   .or-sidebar--collapsed do design system; aqui entram o que o app acrescenta. */
+.oc-sidebar { transition: width var(--dur-slow) var(--ease-out); }
+.oc-sidebar .or-navitem { position: relative; }
+.oc-sidebar__brand .oc-sidebar__toggle { flex: none; width: 34px; height: 34px; min-height: 34px; margin-left: auto; }
+.oc-sidebar__grupo {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  background: transparent; border: 0; border-radius: var(--radius-md); color: var(--text-tertiary);
+  cursor: pointer; text-align: left;
+}
+.oc-sidebar__grupo:hover { color: var(--text-secondary); }
+.oc-sidebar__grupo:focus-visible, .oc-sidebar__toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.oc-sidebar__seta { flex: none; transition: transform var(--dur-base, .2s) var(--ease-out); }
+.oc-sidebar__grupo[aria-expanded='false'] .oc-sidebar__seta { transform: rotate(-90deg); }
+.oc-sidebar__lista { display: flex; flex-direction: column; gap: 4px; }
+.oc-sidebar__lista[hidden] { display: none; }
+.or-sidebar--collapsed .oc-sidebar__brand { flex-direction: column; gap: 10px; padding: 4px 0 14px; }
+.or-sidebar--collapsed .oc-sidebar__brand .oc-sidebar__toggle { margin-left: 0; }
+.or-sidebar--collapsed .oc-sidebar__lista { align-items: center; }
+.or-sidebar--collapsed .or-sidebar__foot > :not(.oc-user) { display: none; }
+.or-sidebar--collapsed .oc-user { width: 44px; justify-content: center; padding: 6px; }
+.or-sidebar--collapsed .oc-user__text { display: none; }
+.or-sidebar--collapsed .oc-dot { top: 6px; right: 6px; }
+@media (prefers-reduced-motion: reduce) { .oc-sidebar, .oc-sidebar__seta { transition: none; } }

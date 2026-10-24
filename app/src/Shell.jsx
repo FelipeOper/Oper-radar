@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Radar, BarChart3, Scale, Store, Search, Crosshair, Building2, Gauge, ListChecks, MessageCircle,
-  Settings, UserRound, MoreHorizontal, ArrowLeft, ChevronRight, Moon, Sun, SlidersHorizontal, Flame,
+  Settings, UserRound, MoreHorizontal, ArrowLeft, ChevronRight, ChevronDown, Moon, Sun, SlidersHorizontal, Flame, PanelLeft,
 } from './icons.jsx';
 import markDark from '../../design-system/assets/mark-dark.png';
 import markLight from '../../design-system/assets/mark-light.png';
 import { IaBalloonModal } from './IaBalloonModal.jsx';
+import { abreGrupoDaPagina, alternaGrupo, alternaRecolhida, grupoAberto, lePreferencia, salvaPreferencia } from './sidebarModel.js';
 
 /* Casca do app (sidebar, topbar, barra inferior) montada com as classes do design system.
    Componente apresentacional: navegacao, titulo e status chegam por props. */
@@ -36,6 +37,10 @@ const IDS_BARRA_INFERIOR = ['hoje', 'mercado', 'minha-loja', 'oportunidades'];
 export const NAV_MOBILE_PRINCIPAL = NAV.filter(item => IDS_BARRA_INFERIOR.includes(item.id));
 export const NAV_MOBILE_MAIS = NAV.filter(item => !IDS_BARRA_INFERIOR.includes(item.id));
 
+function armazenamentoLocal() {
+  try { return window.localStorage; } catch { return undefined; }
+}
+
 function Marca({ className = '' }) {
   return <>
     <img className={`mark oc-mark-dark ${className}`.trim()} src={markDark} alt="" />
@@ -48,29 +53,52 @@ export function AppShell({
   temaClaro, onAlternarTema, status, children,
 }) {
   const [maisAberto, setMaisAberto] = useState(false);
+  const [preferencia, setPreferencia] = useState(() => lePreferencia(armazenamentoLocal()));
+  const recolhida = preferencia.recolhida;
+  useEffect(() => { salvaPreferencia(armazenamentoLocal(), preferencia); }, [preferencia]);
+  useEffect(() => { setPreferencia(p => abreGrupoDaPagina(p, NAV, pagina)); }, [pagina]);
   const navegar = id => { onNavegar(id); setMaisAberto(false); };
   const item = ({ id, rotulo, icone: Icone }) => {
     const ativo = pagina === id;
+    const pendencias = id === 'acoes' && acoesPendentes > 0;
     return <button key={id} type="button" className={`or-navitem${ativo ? ' or-navitem--active' : ''}`}
-      aria-current={ativo ? 'page' : undefined} onClick={() => navegar(id)}>
+      aria-current={ativo ? 'page' : undefined} title={recolhida ? rotulo : undefined}
+      aria-label={recolhida ? (pendencias ? `${rotulo}, ${acoesPendentes} pendentes` : rotulo) : undefined}
+      onClick={() => navegar(id)}>
       <Icone size={19} />
       <span className="or-navitem__label">{rotulo}</span>
-      {id === 'acoes' && acoesPendentes > 0 && <span className="or-navitem__badge">{acoesPendentes}</span>}
+      {pendencias && <span className="or-navitem__badge">{acoesPendentes}</span>}
+      {pendencias && recolhida && <i className="oc-dot" aria-hidden="true" />}
     </button>;
   };
   const mais = NAV_MOBILE_MAIS.some(n => n.id === pagina) || maisAberto;
 
   return (
     <div className="oc-shell">
-      <nav className="or-sidebar oc-sidebar" aria-label="Principal">
-        <div className="or-sidebar__brand"><Marca /><strong>OPER RADAR</strong></div>
-        {NAV_GRUPOS.map(grupo => <React.Fragment key={grupo.id}>
-          <div className="or-sidebar__section">{grupo.rotulo}</div>
-          {NAV.filter(n => n.grupo === grupo.id).map(item)}
-        </React.Fragment>)}
+      <nav className={`or-sidebar oc-sidebar${recolhida ? ' or-sidebar--collapsed' : ''}`} aria-label="Principal">
+        <div className="or-sidebar__brand oc-sidebar__brand">
+          <Marca />
+          {!recolhida && <strong>OPER RADAR</strong>}
+          <button type="button" className="or-iconbtn or-iconbtn--outline oc-sidebar__toggle" aria-pressed={recolhida}
+            aria-label={recolhida ? 'Expandir menu' : 'Recolher menu'} title={recolhida ? 'Expandir menu' : 'Recolher menu'}
+            onClick={() => setPreferencia(alternaRecolhida)}><PanelLeft size={18} /></button>
+        </div>
+        {NAV_GRUPOS.map(grupo => {
+          const aberto = recolhida || grupoAberto(preferencia, grupo.id);
+          const idLista = `oc-menu-${grupo.id}`;
+          return <React.Fragment key={grupo.id}>
+            {recolhida
+              ? <div className="or-sidebar__section" role="separator" />
+              : <button type="button" className="or-sidebar__section oc-sidebar__grupo" aria-expanded={aberto} aria-controls={idLista}
+                onClick={() => setPreferencia(p => alternaGrupo(p, grupo.id))}>
+                <span>{grupo.rotulo}</span><ChevronDown size={14} className="oc-sidebar__seta" />
+              </button>}
+            <div id={idLista} className="oc-sidebar__lista" hidden={!aberto}>{NAV.filter(n => n.grupo === grupo.id).map(item)}</div>
+          </React.Fragment>;
+        })}
         <div className="or-sidebar__foot">
           {status}
-          <button type="button" className="oc-user" onClick={() => navegar('conta')} aria-label="Minha conta">
+          <button type="button" className="oc-user" onClick={() => navegar('conta')} aria-label="Minha conta" title={recolhida ? 'Minha conta' : undefined}>
             <span className="oc-user__avatar"><UserRound size={16} /></span>
             <span className="oc-user__text"><strong>{sessao.usuario.nome}</strong><small>{sessao.usuario.papel}</small></span>
           </button>

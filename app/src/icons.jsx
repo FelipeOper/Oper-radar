@@ -70,3 +70,4 @@ export const Send = phosphor('paper-plane-tilt', 'Send');
 export const MessageCircle = phosphor('chat-circle', 'MessageCircle');
 export const Copy = phosphor('copy', 'Copy');
 export const AlertCircle = phosphor('warning-circle', 'AlertCircle');
+export const PanelLeft = phosphor('sidebar-simple', 'PanelLeft');
