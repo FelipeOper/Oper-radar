@@ -98,14 +98,16 @@ def roda(conn, amostra, semente):
     cur.close()
 
     detalhe, provisorios, ambos, cabine = [], [], [], []
-    exemplos_cabine = []
+    exemplos_cabine, restante_motivos = [], Counter()
     por_marca, por_motivo, exemplos_ganho, exemplos_prov = Counter(), Counter(), [], []
     for a in anuncios:
         with flag_cabine("0"):
             base = avalia_anuncio(conn, a, codigo)
             com = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
         with flag_cabine("1"):
-            com_cabine = avalia_anuncio(conn, a, codigo)
+            com_cabine = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
+        if com_cabine["resultado"] != "vincula":
+            restante_motivos[(com_cabine.get("motivo") or com_cabine["resultado"])[:55]] += 1
         cat_cabine = classifica_ganho(base, com_cabine)
         cabine.append(cat_cabine)
         if cat_cabine != "continua" and cat_cabine != "igual" and len(exemplos_cabine) < 12:
@@ -125,7 +127,7 @@ def roda(conn, amostra, semente):
             exemplos_prov.append((a["titulo"][:60], prov["modelos"], [round(p) for p in prov["precos"]]))
     return {"amostra": len(anuncios), "detalhe": resume(detalhe), "provisorio": resume(
         ["ganha_alto" if p == "ganha_provisorio" else "continua" for p in provisorios]),
-        "combinado": resume(ambos), "cabine": resume(cabine), "exemplos_cabine": exemplos_cabine,
+        "combinado": resume(ambos), "cabine": resume(cabine), "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos,
         "por_marca": por_marca, "por_motivo": por_motivo,
         "exemplos_ganho": exemplos_ganho, "exemplos_prov": exemplos_prov}
 
@@ -134,7 +136,7 @@ def imprime(r):
     print(f"Amostra: {r['amostra']} anuncios sem vinculo (elegiveis, nao manuais)\n")
     for nome, chave in (("A) evidencia do detalhe (FIPE_USA_DETALHE)", "detalhe"),
                         ("B) vinculo provisorio por faixa de preco (FIPE_PROVISORIO)", "provisorio"),
-                        ("C) cabine por marca (FIPE_CABINE_MARCAS)", "cabine"),
+                        ("C) detalhe + cabine por marca (FIPE_USA_DETALHE + FIPE_CABINE_MARCAS)", "cabine"),
                         ("A + B combinados", "combinado")):
         s = r[chave]
         print(f"{nome}: ganharia {s['ganho']} de {s['total']} ({s['ganho_pct']}%)")
