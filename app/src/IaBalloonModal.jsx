@@ -28,8 +28,8 @@ export function IaBalloonModal({ onNavigateToChat }) {
       const resp = await apiPost('analista.php', {
         messages: [...messages, novaMsg]
       });
-      if (resp?.analise) {
-        setMessages(prev => [...prev, { role: 'assistant', content: resp.analise }]);
+      if (resp?.resposta || resp?.analise) {
+        setMessages(prev => [...prev, { role: 'assistant', content: resp.resposta || resp.analise }]);
       }
     } catch (e) {
       console.error('Chat error:', e);

@@ -49,6 +49,7 @@ import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostr
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
 import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
+import { mascaraChave, podeConfigurarIa, resumoEmUso, validaFormularioIa } from './iaConfigModel.js';
 import { DEMO_SESSION } from './demoFixtures.js';
 
 /* ============================================================
@@ -2671,7 +2672,136 @@ function DashboardLayoutEditor({ value, onSave }) {
   );
 }
 
-function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvido }) {
+function PainelIa({ sessao }) {
+  const admin = podeConfigurarIa(sessao?.usuario?.papel);
+  const [estado, setEstado] = useState(null);
+  const [erroCarga, setErroCarga] = useState(null);
+  const [aberto, setAberto] = useState(null);
+  const [form, setForm] = useState({ chave: '', modelo: '', base_url: '', ativar: true });
+  const [mostrarChave, setMostrarChave] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [ocupado, setOcupado] = useState(null);
+
+  useEffect(() => {
+    if (!admin || DEMO_MODE) return undefined;
+    let vivo = true;
+    apiGet('ia_config.php', { useCache: false })
+      .then(d => { if (vivo) setEstado(d); })
+      .catch(e => { if (vivo) setErroCarga(e.message || 'Não foi possível carregar.'); });
+    return () => { vivo = false; };
+  }, [admin]);
+
+  if (!admin) {
+    return <Card><div style={{ color: T.inkMuted, fontSize: 13 }}>Somente administradores configuram o provedor de IA. Peça a quem administra o Radar.</div></Card>;
+  }
+  if (DEMO_MODE) return <Card><div style={{ color: T.inkMuted, fontSize: 13 }}>Indisponível no modo demonstração.</div></Card>;
+  if (erroCarga) return <Card><div style={{ color: T.alert, fontSize: 13 }}>{erroCarga}</div></Card>;
+  if (!estado) return <Card><div style={{ color: T.inkMuted, fontSize: 13 }}>Carregando provedores...</div></Card>;
+
+  const resumo = resumoEmUso(estado.em_uso, estado.provedores);
+  const abrir = p => {
+    setAberto(p.provedor); setMsg(null); setMostrarChave(false);
+    setForm({ chave: '', modelo: p.modelo || p.modelo_padrao || '', base_url: p.base_url || '', ativar: !p.configurado || p.ativo });
+  };
+  const rodar = async (p, dados, rotulo, aoTerminar) => {
+    setOcupado(p.provedor); setMsg(null);
+    try {
+      const r = await apiPost('ia_config.php', { provedor: p.provedor, ...dados }, sessao.csrf);
+      if (r.provedores) setEstado({ provedores: r.provedores, em_uso: r.em_uso });
+      aoTerminar?.(r);
+    } catch (e) {
+      setMsg({ tipo: 'erro', texto: e.message || `Não foi possível ${rotulo}.` });
+    } finally { setOcupado(null); }
+  };
+  const salvar = p => {
+    const erro = validaFormularioIa({ pedeUrl: p.pede_url, jaConfigurado: p.configurado, chave: form.chave, modelo: form.modelo, baseUrl: form.base_url });
+    if (erro) { setMsg({ tipo: 'erro', texto: erro }); return; }
+    rodar(p, { acao: 'salvar', chave: form.chave.trim(), modelo: form.modelo.trim(), base_url: form.base_url.trim(), ativar: form.ativar }, 'salvar',
+      () => { setAberto(null); setForm(f => ({ ...f, chave: '' })); setMsg({ tipo: 'ok', texto: `${p.rotulo} salvo.` }); });
+  };
+  const testar = p => rodar(p, { acao: 'testar' }, 'testar', r => setMsg(r.ok
+    ? { tipo: 'ok', texto: `${p.rotulo}: conexão funcionando (modelo ${r.modelo}).` }
+    : { tipo: 'erro', texto: `${p.rotulo}: ${r.erro}` }));
+  const usar = p => rodar(p, { acao: 'salvar', ativar: true, modelo: p.modelo, base_url: p.base_url || '' }, 'ativar',
+    () => setMsg({ tipo: 'ok', texto: `Agora o Analista usa ${p.rotulo}.` }));
+  const remover = p => {
+    if (!window.confirm(`Remover a chave de ${p.rotulo}?`)) return;
+    rodar(p, { acao: 'remover' }, 'remover', () => { setAberto(null); setMsg({ tipo: 'ok', texto: `${p.rotulo} removido.` }); });
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: resumo.ativo ? T.positive : T.inkMuted }}>
+          <ShieldCheck size={18} /><strong style={{ fontSize: 13.5 }}>{resumo.texto}</strong>
+        </div>
+        <div style={{ color: T.inkMuted, fontSize: 12, lineHeight: 1.55, marginTop: 8 }}>
+          A chave fica cifrada no servidor e não aparece de novo depois de salva. O custo das respostas é cobrado pelo provedor, na conta dona da chave.
+        </div>
+        {msg && <div role="status" style={{ marginTop: 10, fontSize: 12.5, color: msg.tipo === 'ok' ? T.positive : T.alert }}>{msg.texto}</div>}
+      </Card>
+      {estado.provedores.map(p => {
+        const editando = aberto === p.provedor;
+        const trabalhando = ocupado === p.provedor;
+        return (
+          <Card key={p.provedor}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 650, fontSize: 14 }}>{p.rotulo}</div>
+                <div style={{ color: T.inkMuted, fontSize: 11.5, marginTop: 3, fontFamily: T.fontMono }}>
+                  {mascaraChave(p.chave_final)}{p.configurado && p.modelo ? ` · ${p.modelo}` : ''}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                {p.ativo && <Tag tone="sinal">EM USO</Tag>}
+                {p.configurado && !p.ativo && <button disabled={trabalhando} onClick={() => usar(p)} style={{ ...inputStyle, cursor: 'pointer' }}>Usar este</button>}
+                {p.configurado && <button disabled={trabalhando} onClick={() => testar(p)} style={{ ...inputStyle, cursor: 'pointer' }}>{trabalhando ? 'Testando...' : 'Testar'}</button>}
+                <button onClick={() => (editando ? setAberto(null) : abrir(p))} style={{ ...inputStyle, cursor: 'pointer' }}>{editando ? 'Fechar' : p.configurado ? 'Editar' : 'Configurar'}</button>
+              </div>
+            </div>
+            {editando && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 12, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
+                <label style={{ display: 'block' }}>
+                  <div style={rotuloFiltroStyle}>CHAVE DA API {p.configurado ? '(deixe vazio para manter a atual)' : ''}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input type={mostrarChave ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={form.chave}
+                      onChange={e => setForm({ ...form, chave: e.target.value })} placeholder={p.configurado ? mascaraChave(p.chave_final) : 'Cole a chave aqui'}
+                      style={{ ...inputStyle, flex: 1, minWidth: 0, fontFamily: T.fontMono }} />
+                    <button type="button" aria-label={mostrarChave ? 'Ocultar chave' : 'Mostrar chave'} onClick={() => setMostrarChave(v => !v)} style={{ ...inputStyle, cursor: 'pointer' }}>
+                      {mostrarChave ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </label>
+                <label style={{ display: 'block' }}>
+                  <div style={rotuloFiltroStyle}>MODELO</div>
+                  <input list={`modelos-${p.provedor}`} value={form.modelo} onChange={e => setForm({ ...form, modelo: e.target.value })}
+                    placeholder={p.modelo_padrao || 'ex.: meta-llama/llama-3.1-70b-instruct'} style={{ ...inputStyle, width: '100%' }} />
+                  <datalist id={`modelos-${p.provedor}`}>{p.modelos_sugeridos.map(m => <option key={m} value={m} />)}</datalist>
+                </label>
+                {p.pede_url && (
+                  <label style={{ display: 'block', gridColumn: '1 / -1' }}>
+                    <div style={rotuloFiltroStyle}>ENDEREÇO DA API (URL BASE, HTTPS)</div>
+                    <input value={form.base_url} onChange={e => setForm({ ...form, base_url: e.target.value })} placeholder="https://openrouter.ai/api/v1" style={{ ...inputStyle, width: '100%' }} />
+                  </label>
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, gridColumn: '1 / -1' }}>
+                  <input type="checkbox" checked={form.ativar} onChange={e => setForm({ ...form, ativar: e.target.checked })} />
+                  Usar este provedor no Analista IA
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', gridColumn: '1 / -1' }}>
+                  <button disabled={trabalhando} onClick={() => salvar(p)} style={{ ...inputStyle, cursor: 'pointer', color: T.signal, borderColor: T.signal }}><Save size={14} style={{ verticalAlign: -3, marginRight: 6 }} />{trabalhando ? 'Salvando...' : 'Salvar'}</button>
+                  {p.configurado && <button disabled={trabalhando} onClick={() => remover(p)} style={{ ...inputStyle, cursor: 'pointer', color: T.alert }}>Remover chave</button>}
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function PageConfiguracoes({ sessao, preferencias, onPreferencias, onReset, temaResolvido }) {
   const { data: fipeStatus, erro: fipeErro } = useApi('fipe_status.php');
   const { data: facetas } = useApi('facetas.php?status=ativo');
   const ufsAtivas = Object.entries(facetas?.por_uf || {}).filter(([, n]) => n > 0).map(([uf]) => uf).sort();
@@ -2710,6 +2840,8 @@ function PageConfiguracoes({ preferencias, onPreferencias, onReset, temaResolvid
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 16 }}><span style={{ color: T.inkMuted, fontSize: 11.5 }}>Tema ativo: {THEMES[temaResolvido]?.label || temaResolvido}</span><button onClick={onReset} style={{ ...inputStyle, cursor: 'pointer' }}><RotateCcw size={14} style={{ verticalAlign: -3, marginRight: 6 }} />Restaurar padrão</button></div>
       </Card>
+      <SectionTitle sub="Provedor que responde o Analista IA: Claude, GPT, Gemini ou outro compatível">Inteligência artificial</SectionTitle>
+      <PainelIa sessao={sessao} />
       <SectionTitle sub="Saúde operacional, cobertura e frequência da varredura">Radar</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
       <Card>
@@ -3063,7 +3195,7 @@ function RadarApp({ sessao, onSessao, onLogout, preferencias, onPreferencias, on
     chat: <ChatPage />,
     simulador: <SimuladorPage />,
     rotineiro: <RotineiroPage />,
-    ajustes: <PageConfiguracoes preferencias={preferencias} onPreferencias={onPreferencias} onReset={onReset} temaResolvido={temaResolvido} />,
+    ajustes: <PageConfiguracoes sessao={sessao} preferencias={preferencias} onPreferencias={onPreferencias} onReset={onReset} temaResolvido={temaResolvido} />,
     conta: <PageConta sessao={sessao} onSessao={onSessao} onLogout={onLogout} />,
   };
 
