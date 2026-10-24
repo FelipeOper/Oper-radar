@@ -22,9 +22,9 @@ def roda_provisorio(info, concorrentes, ids):
 
 
 class ProvisorioDeAmbiguidadeTest(unittest.TestCase):
-    def test_faixa_estreita_devolve_o_preco_mediano(self):
+    def test_faixa_estreita_devolve_a_mediana_inferior(self):
         achado = roda_provisorio("ambiguo cabine (GLOBETROTTER/SEM TAG)", [{"id": 1}, {"id": 2}], {1: 10, 2: 11})
-        self.assertEqual(11, achado[0])
+        self.assertEqual(10, achado[0])
         self.assertEqual(2, achado[1])
 
     def test_faixa_larga_nao_vincula(self):

@@ -902,7 +902,9 @@ def provisorio_de_ambiguidade(conn, info, concorrentes, obtem_preco_id):
     if len(precos) < 2 or not faixa_estreita(list(precos.values())):
         return None
     ordenados = sorted(precos.items(), key=lambda kv: kv[1])
-    return ordenados[len(ordenados) // 2][0], len(precos)
+    # Mediana inferior: com duas variantes fica a mais barata. Anuncio sem evidencia da versao cara nao
+    # pode parecer mais barato que o mercado so porque a FIPE tem uma versao melhor equipada.
+    return ordenados[(len(ordenados) - 1) // 2][0], len(precos)
 
 
 def _ambiguo(saida, validos, info):
