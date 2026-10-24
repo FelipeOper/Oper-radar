@@ -4,7 +4,16 @@
  * GET kpis.php  ->  { revendas_monitoradas, anuncios_ativos, saidas_detectadas_mes, desvio_medio_fipe, ultima_coleta }
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/escopo_setor.php';
 $conn = conecta();
+
+// Escopo de setor: por padrao so caminhoes + carretas. Agro, construcao e demais ficam fora da conta e aparecem em por_setor.
+// ?setor=todos soma tudo; ?setor=<categoria> (ex.: agricolas) mostra um setor so.
+$escopo = oper_escopo_setor($_GET['setor'] ?? null);
+$condicaoA = oper_escopo_sql($escopo, 'a.tipo');
+$condicaoS = oper_escopo_sql($escopo, 'tipo');
+$eA = $condicaoA !== '' ? " AND $condicaoA" : '';
+$eS = $condicaoS !== '' ? " AND $condicaoS" : '';
 
 $revendas = $conn->query('SELECT COUNT(*) AS n FROM revenda')->fetch_assoc()['n'];
 $ciclo = $conn->query("
@@ -23,7 +32,7 @@ $stmtAtivos = $conn->prepare("
         WHERE sucesso=1 AND revenda_id IS NOT NULL
           AND DATE(timestamp)=? AND janela=?
     ) c ON c.revenda_id=a.revenda_id
-    WHERE a.status='ativo'
+    WHERE a.status='ativo'$eA
 ");
 $stmtAtivos->bind_param('ss', $ciclo['dia'], $ciclo['janela']);
 $stmtAtivos->execute();
@@ -32,19 +41,20 @@ $stmtAtivos->close();
 $anunciosAtivos = (int)($ativosCiclo['total'] ?? 0);
 $anunciosRevalidados = (int)($ativosCiclo['revalidados'] ?? 0);
 $anunciosHerdados = $anunciosAtivos - $anunciosRevalidados;
-$revendasComEstoque = $conn->query("SELECT COUNT(DISTINCT revenda_id) AS n FROM anuncio WHERE status='ativo'")->fetch_assoc()['n'];
+$revendasComEstoque = $conn->query("SELECT COUNT(DISTINCT revenda_id) AS n FROM anuncio WHERE status='ativo'$eS")->fetch_assoc()['n'];
 
 $movimento48h = $conn->query("
     SELECT
       SUM(CASE WHEN primeira_vez_visto >= DATE_SUB(NOW(), INTERVAL 48 HOUR) THEN 1 ELSE 0 END) entradas,
       SUM(CASE WHEN status='removido_confirmado' AND data_remocao >= DATE_SUB(NOW(), INTERVAL 48 HOUR) THEN 1 ELSE 0 END) saidas
     FROM anuncio
+    WHERE 1=1$eS
 ")->fetch_assoc();
 
 $saidasDetectadasMes = $conn->query("
     SELECT COUNT(*) AS n FROM anuncio
     WHERE status = 'removido_confirmado'
-      AND data_remocao >= DATE_FORMAT(NOW(), '%Y-%m-01')
+      AND data_remocao >= DATE_FORMAT(NOW(), '%Y-%m-01')$eS
 ")->fetch_assoc()['n'];
 
 // desvio_medio_fipe foi DESCONTINUADO (24/09/2026): era uma media simples sem a qualidade de preco, a amostra minima e as regras de
@@ -54,9 +64,15 @@ $vinculadosAlta = (int)$conn->query("
     SELECT COUNT(*) AS n FROM anuncio a
     JOIN fipe_preco f ON f.id = a.fipe_preco_id
     WHERE a.status='ativo' AND a.preco IS NOT NULL AND f.preco IS NOT NULL
-      AND a.fipe_match_confianca='alto'
+      AND a.fipe_match_confianca='alto'$eA
 ")->fetch_assoc()['n'];
 $desvioMedioFipe = null;
+
+$porSetor = [];
+$r = $conn->query("SELECT tipo, COUNT(*) AS n FROM anuncio WHERE status='ativo' GROUP BY tipo");
+$linhasPorTipo = [];
+while ($row = $r->fetch_assoc()) $linhasPorTipo[] = $row;
+$porSetor = oper_contagem_por_setor($linhasPorTipo);
 
 $ultimaColeta = $conn->query('SELECT MAX(timestamp) AS t FROM execucao_coleta')->fetch_assoc()['t'];
 
@@ -75,6 +91,8 @@ foreach ($REGIOES as $nome => $ufs) {
 }
 
 envia_json([
+    'escopo' => $escopo,
+    'por_setor' => $porSetor,
     'revendas_monitoradas' => (int) $revendas,
     'revendas_com_estoque' => (int) $revendasComEstoque,
     'anuncios_ativos' => (int) $anunciosAtivos,
