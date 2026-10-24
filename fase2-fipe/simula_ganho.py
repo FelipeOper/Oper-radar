@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from evidencia_detalhe import aumenta_com_detalhe
 from fipe_sync import (_preco_fipe, ano_modelo, busca_preco_cache, eixo_do_anuncio, eixos_todos, emissao_no_texto,
-                       emissao_preferida, escolhe, melhores_candidatos)
+                       emissao_preferida, escolhe, melhores_candidatos, provisorio_de_ambiguidade)
 from monitoria import faixa_estreita
 
 LIMITE_CANDIDATOS = 8
@@ -44,12 +44,19 @@ def flag_cabine(valor):
     return flag_ambiente("FIPE_CABINE_MARCAS", valor)
 
 
-def avalia_anuncio(conn, anuncio, codigo_referencia):
+def avalia_anuncio(conn, anuncio, codigo_referencia, provisorio_ambiguo=False):
     """Mesma decisao do processa_anuncios (cache local, sem API), sem gravar."""
     ano = ano_modelo(anuncio)
     if ano is None:
         return {"resultado": "rejeitado", "motivo": "sem ano"}
-    candidatos, info = escolhe(conn, anuncio)
+    concorrentes = []
+    candidatos, info = escolhe(conn, anuncio, concorrentes)
+    if not candidatos and provisorio_ambiguo and concorrentes:
+        achado = provisorio_de_ambiguidade(conn, info, concorrentes,
+                                           lambda c: busca_preco_cache(conn, c, ano, codigo_referencia))
+        if achado:
+            return {"resultado": "vincula", "confianca": "provisorio", "preco_id": achado[0],
+                    "modelo": f"{info} -> {achado[1]} FIPEs em faixa estreita"}
     if not candidatos:
         return {"resultado": "rejeitado", "motivo": info}
     if len(candidatos) > LIMITE_CANDIDATOS:
@@ -139,7 +146,8 @@ def roda(conn, amostra, semente):
     anuncios = cur.fetchall()
     cur.close()
 
-    detalhe, provisorios, ambos, cabine, eixo_flex = [], [], [], [], []
+    detalhe, provisorios, ambos, cabine, eixo_flex, prov_amb = [], [], [], [], [], []
+    exemplos_prov_amb, ganho_prov_amb_marca = [], Counter()
     exemplos_cabine, restante_motivos = [], Counter()
     exemplos_eixo = []
     faixas = defaultdict(Counter)
@@ -173,6 +181,14 @@ def roda(conn, amostra, semente):
             faixas[tipo][balde] += 1
             if est and balde == "ate 5%" and len(exemplos_faixa) < 10:
                 exemplos_faixa.append((a["titulo"][:55], [round(x) for x in est[0]], est[1]))
+        with flag_cabine("1"), flag_ambiente("FIPE_EIXO_FLEX", "1"):
+            com_prov = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo, provisorio_ambiguo=True)
+        cat_prov = classifica_ganho(base, com_prov)
+        prov_amb.append(cat_prov)
+        if cat_prov.startswith("ganha") and com_prov["confianca"] == "provisorio":
+            ganho_prov_amb_marca[a["marca"]] += 1
+            if len(exemplos_prov_amb) < 12:
+                exemplos_prov_amb.append((a["titulo"][:55], com_prov["modelo"]))
         cat_eixo = classifica_ganho(base, com_eixo)
         eixo_flex.append(cat_eixo)
         if cat_eixo.startswith("ganha") and len(exemplos_eixo) < 12:
@@ -196,7 +212,7 @@ def roda(conn, amostra, semente):
             exemplos_prov.append((a["titulo"][:60], prov["modelos"], [round(p) for p in prov["precos"]]))
     return {"amostra": len(anuncios), "detalhe": resume(detalhe), "provisorio": resume(
         ["ganha_alto" if p == "ganha_provisorio" else "continua" for p in provisorios]),
-        "combinado": resume(ambos), "cabine": resume(cabine), "eixo_flex": resume(eixo_flex), "exemplos_eixo": exemplos_eixo, "faixas": faixas, "exemplos_faixa": exemplos_faixa, "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos, "exemplos_motivo": exemplos_motivo,
+        "combinado": resume(ambos), "cabine": resume(cabine), "eixo_flex": resume(eixo_flex), "exemplos_eixo": exemplos_eixo, "prov_amb": resume(prov_amb), "exemplos_prov_amb": exemplos_prov_amb, "prov_amb_marca": ganho_prov_amb_marca, "faixas": faixas, "exemplos_faixa": exemplos_faixa, "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos, "exemplos_motivo": exemplos_motivo,
         "por_marca": por_marca, "por_motivo": por_motivo,
         "exemplos_ganho": exemplos_ganho, "exemplos_prov": exemplos_prov}
 
@@ -207,6 +223,7 @@ def imprime(r):
                         ("B) vinculo provisorio por faixa de preco (FIPE_PROVISORIO)", "provisorio"),
                         ("C) detalhe + cabine por marca (FIPE_USA_DETALHE + FIPE_CABINE_MARCAS)", "cabine"),
                         ("D) detalhe + cabine + eixo flexivel (FIPE_EIXO_FLEX)", "eixo_flex"),
+                        ("E) D + provisorio de ambiguidade (FIPE_PROVISORIO estendido)", "prov_amb"),
                         ("A + B combinados", "combinado")):
         s = r[chave]
         print(f"{nome}: ganharia {s['ganho']} de {s['total']} ({s['ganho_pct']}%)")
@@ -225,6 +242,9 @@ def imprime(r):
         print(f"   {n:>4}  {motivo}")
         for titulo, tracao, proximos in r["exemplos_motivo"].get(motivo, []):
             print(f"          ex: {titulo} | tracao={tracao} | FIPE proxima: {proximos}")
+    print("\nE por marca:", dict(r["prov_amb_marca"].most_common(8)))
+    for titulo, o_que in r["exemplos_prov_amb"]:
+        print(f"      E provisorio: {titulo} | {o_que}")
     print("\nAmbiguos: quanto custa a duvida? (ESTIMATIVA pelo preco das FIPEs que ainda concorrem)")
     for tipo, baldes in sorted(r["faixas"].items(), key=lambda kv: -sum(kv[1].values())):
         print(f"   {tipo:<28} {dict(baldes)}")
