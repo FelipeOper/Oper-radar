@@ -504,7 +504,27 @@ def _monitoria_por_evento():
     return os.getenv("FIPE_MONITORIA_EVENTOS", "0") == "1"
 
 
-def anuncios_pendentes(conn, limite):
+def _fila_justa():
+    return os.getenv("FIPE_FILA_JUSTA", "0") == "1"
+
+
+def registra_aguardando_cache(conn, anuncio_id):
+    """Marca a tentativa de quem espera o preco do ano no cache, para nao ocupar o topo da fila a cada rodada."""
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE anuncio
+        SET fipe_match_status='aguardando_cache',
+            fipe_match_motivo='preco do ano-modelo ainda nao esta no cache FIPE',
+            fipe_ultima_tentativa=NOW(),
+            fipe_tentativas=fipe_tentativas+1
+        WHERE id=%s AND fipe_preco_id IS NULL
+          AND COALESCE(fipe_vinculo_origem, 'automatico') <> 'manual'
+    """, (anuncio_id,))
+    conn.commit()
+    cur.close()
+
+
+def anuncios_pendentes(conn, limite, com_api=False):
     colunas = "id, titulo, url, marca, modelo, tracao, ano_inicial, ano_final"
     eventos, params = [], []
     if _monitoria_por_evento():
@@ -523,6 +543,11 @@ def anuncios_pendentes(conn, limite):
             params.append(ultima_carga)
     clausula_eventos = "".join(
         f" OR (fipe_match_status IN ('sem_match', 'ambiguo', 'sem_ano') AND {e})" for e in eventos)
+    if _fila_justa():
+        # Quem esperava o cache nao recebia tentativa e ocupava o topo da fila. Agora a tentativa fica registrada:
+        # com API (bootstrap) volta sempre, no modo local so depois de um dia.
+        clausula_eventos += (" OR fipe_match_status = 'aguardando_cache'" if com_api else
+                             " OR (fipe_match_status = 'aguardando_cache' AND fipe_ultima_tentativa <= DATE_SUB(NOW(), INTERVAL 1 DAY))")
     cur = conn.cursor(dictionary=True)
     cur.execute(f"""
         SELECT {colunas} FROM anuncio
@@ -1045,7 +1070,7 @@ def roda_debug(conn):
 
 
 def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None, mes_referencia=None):
-    pendentes = anuncios_pendentes(conn, lote)
+    pendentes = anuncios_pendentes(conn, lote, com_api=permitir_api)
     if not permitir_api:
         origem = "somente cache local"
     elif max_req == 0:
@@ -1131,6 +1156,8 @@ def processa_anuncios(conn, lote=200, permitir_api=True, codigo_referencia=None,
             if not precos_validos:
                 if not permitir_api:
                     aguardando_cache += 1
+                    if _fila_justa():
+                        registra_aguardando_cache(conn, a["id"])
                     continue
                 sem_ano += 1
                 registra_resultado(conn, a["id"], "sem_ano", f"ano-modelo {modelo_ano} ausente nos candidatos FIPE")

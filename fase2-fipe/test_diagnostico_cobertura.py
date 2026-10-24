@@ -52,6 +52,7 @@ class ClassificaCausaTest(unittest.TestCase):
         self.assertEqual("nunca_processado", classifica_causa(linha()))
         self.assertEqual("erro_api", classifica_causa(linha(fipe_match_status="erro_api")))
         self.assertEqual("ano_ausente_no_cache", classifica_causa(linha(fipe_match_status="sem_ano")))
+        self.assertEqual("ano_ausente_no_cache", classifica_causa(linha(fipe_match_status="aguardando_cache")))
         self.assertEqual("sem_candidato", classifica_causa(
             linha(fipe_match_status="sem_match", fipe_match_motivo="sem match")))
 
