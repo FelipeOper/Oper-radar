@@ -38,7 +38,7 @@ def classifica_causa(linha):
         return "nunca_processado"
     if status == "erro_api":
         return "erro_api"
-    if status == "sem_ano":
+    if status in ("sem_ano", "aguardando_cache"):
         return "ano_ausente_no_cache"
     if "eixo" in motivo:
         return "ambiguo_eixo"

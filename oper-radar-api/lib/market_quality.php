@@ -217,17 +217,27 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
  */
 function mercado_coluna_conjunto_existe(): bool {
     static $existe = null;
-    if ($existe === null) {
-        $existe = false;
-        try {
-            $conexao = conecta();
-            $resultado = $conexao->query("SHOW COLUMNS FROM anuncio LIKE 'conjunto'");
-            $existe = $resultado && $resultado->num_rows > 0;
-            $conexao->close();
-        } catch (Throwable $e) {
-            $existe = false;
-        }
+    if ($existe !== null) return $existe;
+
+    // Cache em arquivo: sem ele cada requisicao abriria uma conexao a mais no banco (limite baixo na hospedagem
+    // compartilhada). "Existe" vale por 1 hora; "ainda nao existe" so por 30 s, para a migracao valer logo.
+    $arquivo = sys_get_temp_dir() . '/oper-radar-coluna-conjunto-' . md5(__DIR__) . '.txt';
+    $idade = is_file($arquivo) ? time() - (int)@filemtime($arquivo) : PHP_INT_MAX;
+    $guardado = $idade < 3600 ? trim((string)@file_get_contents($arquivo)) : '';
+    if ($guardado === '1' || ($guardado === '0' && $idade < 30)) {
+        return $existe = ($guardado === '1');
     }
+
+    $existe = false;
+    try {
+        $conexao = conecta();
+        $resultado = $conexao->query("SHOW COLUMNS FROM anuncio LIKE 'conjunto'");
+        $existe = $resultado && $resultado->num_rows > 0;
+        $conexao->close();
+    } catch (Throwable $e) {
+        return $existe = false;
+    }
+    @file_put_contents($arquivo, $existe ? '1' : '0');
     return $existe;
 }
 
