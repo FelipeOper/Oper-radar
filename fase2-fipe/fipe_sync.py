@@ -482,10 +482,14 @@ def avalia(titulo: str, modelo_fipe: str):
 
     n_t, n_f = numero_modelo(titulo), numero_modelo(modelo_fipe)
     if _nomes_alias_ligado():
-        if not n_t and not n_f:
+        if not n_f and (not n_t or re.fullmatch(r"19[5-9]\d|20[0-3]\d", n_t)):
+            # Ano solto no slug da url ("delivery-express 2021 3 4") nao e numero de modelo.
             # "Delivery Express" nao tem numero nem no anuncio nem na FIPE: o nome inteiro e a identidade.
-            if palavras_chave(titulo) and palavras_chave(titulo) == palavras_chave(modelo_fipe):
-                return 0.90, "nome sem numero (palavras iguais)"
+            # O texto do anuncio traz cidade, url e marca, entao as palavras da FIPE precisam estar CONTIDAS nele
+            # (e ser pelo menos duas, para nao casar um nome generico de uma palavra so).
+            palavras_fipe = palavras_chave(modelo_fipe)
+            if len(palavras_fipe) >= 2 and palavras_fipe <= palavras_chave(titulo):
+                return 0.90, "nome sem numero (palavras da FIPE contidas no anuncio)"
         elif n_t and n_f and n_t != n_f and (n_f in numeros_juntos(titulo) or n_t in numeros_juntos(modelo_fipe)):
             n_t = n_f = n_f if n_f in numeros_juntos(titulo) else n_t
     if not n_t or not n_f or n_t != n_f:
