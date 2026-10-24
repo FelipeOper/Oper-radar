@@ -55,7 +55,7 @@ $faixas = consulta($conn, 'faixas_preco', "
 
 $fipeLinhas = consulta($conn, 'fipe', "
     SELECT a.id, a.fipe_preco_id, a.preco, a.titulo, a.preco_texto_bruto,
-           COALESCE(a.ano_final,a.ano_inicial) AS ano, a.carroceria, a.tipo, f.preco AS preco_fipe
+           COALESCE(a.ano_final,a.ano_inicial) AS ano, a.carroceria, " . mercado_col_conjunto() . ", a.tipo, f.preco AS preco_fipe
     FROM anuncio a JOIN fipe_preco f ON f.id=a.fipe_preco_id
     WHERE a.status='ativo' AND a.preco IS NOT NULL AND a.preco>0
       AND f.preco IS NOT NULL AND f.preco>0");

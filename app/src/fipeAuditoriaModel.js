@@ -20,8 +20,14 @@ export const CONFIANCAS_VINCULO = [
   ['manual', 'Manual (curadoria)'],
 ];
 
+export const FILTROS_CONJUNTO = [
+  ['', 'Conjunto: qualquer'],
+  ['sim', 'Só conjuntos (cavalo + carreta)'],
+  ['nao', 'Sem conjuntos'],
+];
+
 export const FILTROS_INICIAIS = Object.freeze({
-  marca: '', modelo: '', revenda: '', cidade: '', uf: '', regiao: '', confianca: '', estado: 'nao_auditados',
+  marca: '', modelo: '', revenda: '', cidade: '', uf: '', regiao: '', confianca: '', conjunto: '', estado: 'nao_auditados',
 });
 
 export function montaConsulta(filtros, extras = {}) {
@@ -84,4 +90,18 @@ export function recalculaResumo(resumo) {
     nao_auditados: Math.max(0, resumo.total - resumo.auditados),
     precisao_pct: julgados > 0 ? Math.round((1000 * resumo.corretos) / julgados) / 10 : null,
   };
+}
+
+/* Conjunto = cavalo + carreta vendidos juntos. O preço é do conjunto e a FIPE é só a do cavalo, então o servidor
+   tira o anúncio das comparações com a FIPE. valor: true (é conjunto), false (não é) ou null (volta ao automático). */
+export function aplicaConjunto(anuncio, valor) {
+  if (valor === null) return { ...anuncio, conjunto: null, conjunto_origem: null };
+  return { ...anuncio, conjunto: valor ? 1 : 0, conjunto_origem: 'manual' };
+}
+
+export function rotuloConjunto(anuncio) {
+  const origem = anuncio?.conjunto_origem === 'manual' ? 'manual' : 'automático';
+  if (anuncio?.conjunto === 1) return `Conjunto · ${origem}`;
+  if (anuncio?.conjunto === 0 && anuncio?.conjunto_origem === 'manual') return 'Não é conjunto · manual';
+  return null;
 }

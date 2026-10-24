@@ -113,3 +113,11 @@ verifica(mercado_desvio_fipe_amostra($semImpl) === 5, 'implemento fora da amostr
 verifica(mercado_desvio_fipe_mediano_pct($semImpl) === 0.0, 'mediana so com cavalo/chassi');
 
 echo "market_quality_test=OK\n";
+
+// Conjunto (cavalo + carreta vendidos juntos): preco do conjunto nao se compara com a FIPE do cavalo.
+verifica(mercado_conjunto_registro(['conjunto' => 1]) === true, 'conjunto marcado');
+verifica(mercado_conjunto_registro(['conjunto' => 0]) === false && mercado_conjunto_registro([]) === false, 'sem marca nao e conjunto');
+verifica(mercado_carroceria_comparavel_fipe(['carroceria' => 'CAVALO MECANICO', 'conjunto' => 1]) === false, 'conjunto fora da FIPE');
+verifica(mercado_carroceria_comparavel_fipe(['carroceria' => 'CAVALO MECANICO', 'conjunto' => 0]) === true, 'cavalo isolado segue comparavel');
+verifica(mercado_carroceria_comparavel_fipe(['carroceria' => 'CAVALO MECANICO']) === true, 'query antiga sem a chave segue como era');
+

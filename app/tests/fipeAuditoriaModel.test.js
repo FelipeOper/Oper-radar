@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FILTROS_INICIAIS, aplicaVeredito, contextoParaCorrigir, montaConsulta, podeAuditar, progressoGrupo,
-  recalculaResumo, rotuloPrecisao, statusGrupo,
+  FILTROS_INICIAIS, aplicaConjunto, aplicaVeredito, contextoParaCorrigir, montaConsulta, podeAuditar, progressoGrupo,
+  recalculaResumo, rotuloConjunto, rotuloPrecisao, statusGrupo,
 } from '../src/fipeAuditoriaModel.js';
 
 test('a consulta omite filtros vazios e leva só o que foi preenchido', () => {
@@ -76,4 +76,29 @@ test('o resumo recalcula não auditados e precisão depois de um clique', () => 
   assert.equal(r.grupos, 2);
   assert.equal(recalculaResumo({ total: 10, auditados: 0, corretos: 0, errados: 0 }).precisao_pct, null);
   assert.equal(recalculaResumo({ total: 3, auditados: 3, corretos: 2, errados: 1 }).precisao_pct, 66.7);
+});
+
+test('marcar conjunto grava como manual; "não é conjunto" também é uma decisão manual', () => {
+  const base = { id: 1, conjunto: 0, conjunto_origem: 'automatico' };
+  assert.deepEqual(aplicaConjunto(base, true), { id: 1, conjunto: 1, conjunto_origem: 'manual' });
+  assert.deepEqual(aplicaConjunto({ ...base, conjunto: 1 }, false), { id: 1, conjunto: 0, conjunto_origem: 'manual' });
+  assert.equal(base.conjunto, 0);
+});
+
+test('voltar ao automático limpa a decisão manual', () => {
+  assert.deepEqual(aplicaConjunto({ id: 1, conjunto: 1, conjunto_origem: 'manual' }, null), { id: 1, conjunto: null, conjunto_origem: null });
+});
+
+test('rótulo do conjunto diz de onde veio a decisão e some quando não há o que dizer', () => {
+  assert.equal(rotuloConjunto({ conjunto: 1, conjunto_origem: 'automatico' }), 'Conjunto · automático');
+  assert.equal(rotuloConjunto({ conjunto: 1, conjunto_origem: 'manual' }), 'Conjunto · manual');
+  assert.equal(rotuloConjunto({ conjunto: 0, conjunto_origem: 'manual' }), 'Não é conjunto · manual');
+  assert.equal(rotuloConjunto({ conjunto: 0, conjunto_origem: 'automatico' }), null);
+  assert.equal(rotuloConjunto({ conjunto: null, conjunto_origem: null }), null);
+  assert.equal(rotuloConjunto({}), null);
+});
+
+test('o filtro de conjunto vai na consulta só quando escolhido', () => {
+  assert.match(montaConsulta({ ...FILTROS_INICIAIS, conjunto: 'sim' }), /conjunto=sim/);
+  assert.doesNotMatch(montaConsulta(FILTROS_INICIAIS), /conjunto=/);
 });

@@ -66,7 +66,7 @@ try {
     // Universo comparável: caminhão sem implemento de 2006 em diante (mesmas regras do desvio FIPE; ver lib/oportunidade_compra.php).
     $universo = mercado_sql_carroceria_comparavel() . mercado_sql_ano_minimo(OPER_RADAR_ANO_MINIMO_FIPE);
     $anuncios = compra_linhas($conn, "SELECT a.id, a.url, a.titulo, a.marca, a.modelo, $ano AS ano, a.preco, a.preco_texto_bruto,
-            a.carroceria, a.tipo, f.preco AS preco_fipe, a.fipe_match_confianca,
+            a.carroceria, " . mercado_col_conjunto() . ", a.tipo, f.preco AS preco_fipe, a.fipe_match_confianca,
             r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf, a.primeira_vez_visto
         FROM anuncio a
         JOIN revenda r ON r.id=a.revenda_id

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, ExternalLink, Pencil, ShieldCheck, Undo2, X } from './icons.jsx';
+import { Check, ChevronDown, ChevronRight, ExternalLink, LinkIcon, Pencil, ShieldCheck, Undo2, X } from './icons.jsx';
 import { apiGet, apiPost } from './apiClient.js';
 import {
-  CONFIANCAS_VINCULO, ESTADOS_AUDITORIA, FILTROS_INICIAIS, REGIOES, UFS, aplicaVeredito, contextoParaCorrigir,
-  montaConsulta, podeAuditar, progressoGrupo, recalculaResumo, rotuloPrecisao, statusGrupo,
+  CONFIANCAS_VINCULO, ESTADOS_AUDITORIA, FILTROS_CONJUNTO, FILTROS_INICIAIS, REGIOES, UFS, aplicaConjunto, aplicaVeredito,
+  contextoParaCorrigir, montaConsulta, podeAuditar, progressoGrupo, recalculaResumo, rotuloConjunto, rotuloPrecisao, statusGrupo,
 } from './fipeAuditoriaModel.js';
 
 const inteiro = v => Number(v ?? 0).toLocaleString('pt-BR');
@@ -43,6 +43,7 @@ function Filtros({ rascunho, setRascunho, onAplicar, onLimpar }) {
     {lista('uf', 'Estado', [['', 'Todos os estados'], ...UFS.map(uf => [uf, uf])])}
     {lista('regiao', 'Região', [['', 'Todas as regiões'], ...REGIOES.map(r => [r, r])])}
     {lista('confianca', 'Tipo de vínculo', CONFIANCAS_VINCULO)}
+    {lista('conjunto', 'Conjunto', FILTROS_CONJUNTO)}
     {lista('estado', 'Situação', ESTADOS_AUDITORIA)}
     <div className="oc-aud__filtros-acoes">
       <button type="submit" className="or-btn or-btn--primary">Aplicar filtros</button>
@@ -51,14 +52,17 @@ function Filtros({ rascunho, setRascunho, onAplicar, onLimpar }) {
   </form>;
 }
 
-function LinhaAnuncio({ anuncio, grupo, podeEditar, onJulgar, onCorrigir }) {
+function LinhaAnuncio({ anuncio, grupo, podeEditar, onJulgar, onCorrigir, onConjunto }) {
   const veredito = anuncio.veredito || null;
+  const rotulo = rotuloConjunto(anuncio);
+  const eConjunto = anuncio.conjunto === 1;
   const ano = anuncio.ano_final || anuncio.ano_inicial || '—';
   return <li className={`oc-aud__item oc-aud__item--${veredito || 'pendente'}`}>
     <div className="oc-aud__item-corpo">
       <a className="oc-aud__item-titulo" href={anuncio.url} target="_blank" rel="noreferrer">{anuncio.titulo} <ExternalLink size={12} /></a>
       <div className="oc-aud__meta">{anuncio.revenda} · {anuncio.cidade}/{anuncio.uf} · ano {ano} · {anuncio.tracao || 'tração não informada'} · {brl(anuncio.preco)}</div>
-      <div className="oc-aud__meta"><span className="or-tag">{rotuloVinculo(anuncio)}</span> {anuncio.fipe_match_motivo}</div>
+      <div className="oc-aud__meta"><span className="or-tag">{rotuloVinculo(anuncio)}</span> {rotulo && <span className={`or-tag oc-aud__tag-conjunto${eConjunto ? ' is-on' : ''}`}>{rotulo}</span>} {anuncio.fipe_match_motivo}</div>
+      {eConjunto && <div className="oc-aud__meta">O preço inclui a carreta, então este anúncio fica fora das comparações com a FIPE do cavalo.</div>}
     </div>
     <div className="oc-aud__acoes" role="group" aria-label={`Veredito para ${anuncio.titulo}`}>
       {podeEditar ? <>
@@ -68,12 +72,17 @@ function LinhaAnuncio({ anuncio, grupo, podeEditar, onJulgar, onCorrigir }) {
           aria-pressed={veredito === 'errado'} onClick={() => onJulgar(grupo, anuncio, 'errado')}><X size={14} /> Errado</button>
         {veredito === 'errado' && <button type="button" className="or-btn or-btn--sm or-btn--ghost" onClick={() => onCorrigir(anuncio)}><Pencil size={14} /> Corrigir</button>}
         {veredito && <button type="button" className="or-btn or-btn--sm or-btn--ghost" aria-label="Desfazer veredito" title="Desfazer veredito" onClick={() => onJulgar(grupo, anuncio, null)}><Undo2 size={14} /></button>}
+        <button type="button" className={`or-btn or-btn--sm or-btn--secondary oc-aud__btn oc-aud__btn--conjunto${eConjunto ? ' is-on' : ''}`}
+          aria-pressed={eConjunto} title="Cavalo + carreta vendidos juntos: o preço do conjunto sai da comparação com a FIPE"
+          onClick={() => onConjunto(grupo, anuncio, !eConjunto)}><LinkIcon size={14} /> Conjunto</button>
+        {anuncio.conjunto_origem === 'manual' && <button type="button" className="or-btn or-btn--sm or-btn--ghost"
+          title="Devolver ao classificador automático" onClick={() => onConjunto(grupo, anuncio, null)}>Voltar ao automático</button>}
       </> : <span className="oc-aud__somente-leitura">{veredito === 'correto' ? 'Correto' : veredito === 'errado' ? 'Errado' : 'Não auditado'}</span>}
     </div>
   </li>;
 }
 
-function CartaoGrupo({ grupo, aberto, podeEditar, confirmando, onAlternar, onJulgar, onCorrigir, onPedirLote, onConfirmarLote, onCancelarLote }) {
+function CartaoGrupo({ grupo, aberto, podeEditar, confirmando, onAlternar, onJulgar, onCorrigir, onConjunto, onPedirLote, onConfirmarLote, onCancelarLote }) {
   const status = statusGrupo(grupo);
   const progresso = progressoGrupo(grupo);
   const restantes = aberto?.anuncios?.filter(a => !a.veredito).length || 0;
@@ -102,7 +111,7 @@ function CartaoGrupo({ grupo, aberto, podeEditar, confirmando, onAlternar, onJul
             : <button type="button" className="or-btn or-btn--sm or-btn--secondary" onClick={() => onPedirLote(grupo)}><Check size={14} /> Marcar os {inteiro(restantes)} restantes como corretos</button>}
         </div>}
         <ul className="oc-aud__lista or-zebra-list">
-          {aberto.anuncios.map(a => <LinhaAnuncio key={a.id} anuncio={a} grupo={grupo} podeEditar={podeEditar} onJulgar={onJulgar} onCorrigir={onCorrigir} />)}
+          {aberto.anuncios.map(a => <LinhaAnuncio key={a.id} anuncio={a} grupo={grupo} podeEditar={podeEditar} onJulgar={onJulgar} onCorrigir={onCorrigir} onConjunto={onConjunto} />)}
         </ul>
         {aberto.anuncios.length >= 100 && <p className="oc-aud__meta">Mostrando os 100 primeiros anúncios deste grupo. Refine pelos filtros para ver os demais.</p>}
       </>}
@@ -177,6 +186,24 @@ export function FipeAuditoria({ sessao, onNavegar }) {
     }
   };
 
+  const atualizaAnuncio = (idGrupo, idAnuncio, mudanca) => {
+    setAbertos(a => a[idGrupo] ? { ...a, [idGrupo]: { ...a[idGrupo], anuncios: a[idGrupo].anuncios.map(x => x.id === idAnuncio ? { ...x, ...mudanca } : x) } } : a);
+  };
+
+  const marcaConjunto = async (grupo, anuncio, valor) => {
+    const id = grupo.fipe_preco_id;
+    const antes = { conjunto: anuncio.conjunto, conjunto_origem: anuncio.conjunto_origem };
+    const { conjunto, conjunto_origem: origem } = aplicaConjunto(anuncio, valor);
+    setAviso('');
+    atualizaAnuncio(id, anuncio.id, { conjunto, conjunto_origem: origem });
+    try {
+      await apiPost('fipe_auditoria.php', { acao: 'conjunto', anuncio_id: anuncio.id, valor }, sessao.csrf);
+    } catch (e) {
+      atualizaAnuncio(id, anuncio.id, antes);
+      setAviso(e.message);
+    }
+  };
+
   const confirmaLote = async grupo => {
     const id = grupo.fipe_preco_id;
     const ids = (abertos[id]?.anuncios || []).filter(a => !a.veredito).map(a => a.id);
@@ -227,7 +254,7 @@ export function FipeAuditoria({ sessao, onNavegar }) {
 
       <div className="oc-aud__grupos">
         {carga.grupos.map(g => <CartaoGrupo key={g.fipe_preco_id} grupo={g} aberto={abertos[g.fipe_preco_id]} podeEditar={podeEditar}
-          confirmando={confirmando === g.fipe_preco_id} onAlternar={alterna} onJulgar={julga}
+          confirmando={confirmando === g.fipe_preco_id} onAlternar={alterna} onJulgar={julga} onConjunto={marcaConjunto}
           onCorrigir={anuncio => onNavegar?.('mercado', contextoParaCorrigir(anuncio))}
           onPedirLote={grupo => setConfirmando(grupo.fipe_preco_id)} onConfirmarLote={confirmaLote} onCancelarLote={() => setConfirmando(null)} />)}
       </div>
