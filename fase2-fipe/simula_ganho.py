@@ -7,6 +7,7 @@ Nao grava nada. Uso: python simula_ganho.py [--amostra 600] [--semente 42]
 import argparse
 import os
 from collections import Counter
+from contextlib import contextmanager
 
 from evidencia_detalhe import aumenta_com_detalhe
 from fipe_sync import _preco_fipe, ano_modelo, busca_preco_cache, escolhe
@@ -22,6 +23,20 @@ WHERE tipo = 'Caminhao' AND status = 'ativo' AND fipe_preco_id IS NULL
   AND marca IS NOT NULL AND COALESCE(ano_final, ano_inicial) IS NOT NULL
 ORDER BY RAND(%s) LIMIT %s
 """
+
+
+@contextmanager
+def flag_cabine(valor):
+    """Liga/desliga FIPE_CABINE_MARCAS so durante a simulacao, sem tocar no ambiente de quem chamou."""
+    anterior = os.environ.get("FIPE_CABINE_MARCAS")
+    os.environ["FIPE_CABINE_MARCAS"] = valor
+    try:
+        yield
+    finally:
+        if anterior is None:
+            os.environ.pop("FIPE_CABINE_MARCAS", None)
+        else:
+            os.environ["FIPE_CABINE_MARCAS"] = anterior
 
 
 def avalia_anuncio(conn, anuncio, codigo_referencia):
@@ -82,11 +97,20 @@ def roda(conn, amostra, semente):
     anuncios = cur.fetchall()
     cur.close()
 
-    detalhe, provisorios, ambos = [], [], []
+    detalhe, provisorios, ambos, cabine = [], [], [], []
+    exemplos_cabine = []
     por_marca, por_motivo, exemplos_ganho, exemplos_prov = Counter(), Counter(), [], []
     for a in anuncios:
-        base = avalia_anuncio(conn, a, codigo)
-        com = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
+        with flag_cabine("0"):
+            base = avalia_anuncio(conn, a, codigo)
+            com = avalia_anuncio(conn, aumenta_com_detalhe(a), codigo)
+        with flag_cabine("1"):
+            com_cabine = avalia_anuncio(conn, a, codigo)
+        cat_cabine = classifica_ganho(base, com_cabine)
+        cabine.append(cat_cabine)
+        if cat_cabine != "continua" and cat_cabine != "igual" and len(exemplos_cabine) < 12:
+            exemplos_cabine.append((a["titulo"][:60], cat_cabine, com_cabine.get("modelo") or base.get("modelo"),
+                                    com_cabine.get("motivo")))
         categoria = classifica_ganho(base, com)
         detalhe.append(categoria)
         prov = provisorio(conn, base)
@@ -101,7 +125,8 @@ def roda(conn, amostra, semente):
             exemplos_prov.append((a["titulo"][:60], prov["modelos"], [round(p) for p in prov["precos"]]))
     return {"amostra": len(anuncios), "detalhe": resume(detalhe), "provisorio": resume(
         ["ganha_alto" if p == "ganha_provisorio" else "continua" for p in provisorios]),
-        "combinado": resume(ambos), "por_marca": por_marca, "por_motivo": por_motivo,
+        "combinado": resume(ambos), "cabine": resume(cabine), "exemplos_cabine": exemplos_cabine,
+        "por_marca": por_marca, "por_motivo": por_motivo,
         "exemplos_ganho": exemplos_ganho, "exemplos_prov": exemplos_prov}
 
 
@@ -109,6 +134,7 @@ def imprime(r):
     print(f"Amostra: {r['amostra']} anuncios sem vinculo (elegiveis, nao manuais)\n")
     for nome, chave in (("A) evidencia do detalhe (FIPE_USA_DETALHE)", "detalhe"),
                         ("B) vinculo provisorio por faixa de preco (FIPE_PROVISORIO)", "provisorio"),
+                        ("C) cabine por marca (FIPE_CABINE_MARCAS)", "cabine"),
                         ("A + B combinados", "combinado")):
         s = r[chave]
         print(f"{nome}: ganharia {s['ganho']} de {s['total']} ({s['ganho_pct']}%)")
