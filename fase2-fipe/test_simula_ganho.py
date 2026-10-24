@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _sem_banco  # noqa: F401
 import os
 
-from simula_ganho import avalia_anuncio, classifica_ganho, flag_cabine, resume
+from simula_ganho import avalia_anuncio, classifica_ganho, balde_de_faixa, flag_cabine, resume
 
 ANUNCIO = {"id": 1, "titulo": "Scania R450 2020/2020", "url": "", "marca": "SCANIA", "tracao": "", "modelo": "",
            "ano_inicial": 2020, "ano_final": 2020}
@@ -87,6 +87,15 @@ class FlagCabineTest(unittest.TestCase):
                 raise RuntimeError
         self.assertEqual("0", os.environ["FIPE_CABINE_MARCAS"])
         os.environ.pop("FIPE_CABINE_MARCAS")
+
+
+class BaldeDeFaixaTest(unittest.TestCase):
+    def test_baldes(self):
+        self.assertEqual("ate 5%", balde_de_faixa([100000, 104000]))
+        self.assertEqual("5% a 10%", balde_de_faixa([100000, 108000]))
+        self.assertEqual("acima de 10%", balde_de_faixa([476000, 499000, 600000]))
+        self.assertEqual("sem precos", balde_de_faixa([100000]))
+        self.assertEqual("sem precos", balde_de_faixa([None, 0]))
 
 
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ from collections import Counter, defaultdict
 from contextlib import contextmanager
 
 from evidencia_detalhe import aumenta_com_detalhe
-from fipe_sync import _preco_fipe, ano_modelo, busca_preco_cache, escolhe, melhores_candidatos
+from fipe_sync import (_preco_fipe, ano_modelo, busca_preco_cache, eixo_do_anuncio, eixos_todos, emissao_no_texto,
+                       emissao_preferida, escolhe, melhores_candidatos)
 from monitoria import faixa_estreita
 
 LIMITE_CANDIDATOS = 8
@@ -93,6 +94,43 @@ def provisorio(conn, resultado):
     return {"precos": precos, "modelos": resultado["modelos"]} if faixa_estreita(precos) else None
 
 
+def faixa_da_ambiguidade(conn, anuncio, codigo_referencia):
+    """ESTIMATIVA: precos no ano dos candidatos de topo que o motor ainda considerava, para ver se a duvida custa pouco.
+
+    Reaproxima o conjunto que o motor tinha na mao: candidatos de score proximo ao topo, com o mesmo eixo (ou sem
+    eixo no nome) e a mesma emissao. Devolve (precos, modelos) ou None quando nao ha pelo menos dois precos.
+    """
+    ano = ano_modelo(anuncio)
+    if ano is None:
+        return None
+    candidatos = [v for v in melhores_candidatos(conn, anuncio, quantos=12) if v[0] >= 0.5]
+    if not candidatos:
+        return None
+    topo = candidatos[0][0]
+    candidatos = [v for v in candidatos if v[0] >= topo - 0.05]
+    eixo, _ = eixo_do_anuncio(anuncio)
+    if eixo:
+        candidatos = [v for v in candidatos if not eixos_todos(v[2]["modelo_fipe"]) or eixo in eixos_todos(v[2]["modelo_fipe"])]
+    emissao, _ = emissao_preferida(anuncio)
+    if emissao:
+        candidatos = [v for v in candidatos if emissao_no_texto(v[2]["modelo_fipe"]) in (emissao, None)]
+    precos, modelos = [], []
+    for _, _, c in candidatos[:8]:
+        preco_id = busca_preco_cache(conn, c, ano, codigo_referencia)
+        if preco_id:
+            precos.append(_preco_fipe(conn, preco_id))
+            modelos.append(c["modelo_fipe"])
+    return (precos, modelos) if len(precos) >= 2 else None
+
+
+def balde_de_faixa(precos):
+    validos = [float(p) for p in precos if p and float(p) > 0]
+    if len(validos) < 2:
+        return "sem precos"
+    folga = (max(validos) - min(validos)) / min(validos)
+    return "ate 5%" if folga <= 0.05 else "5% a 10%" if folga <= 0.10 else "acima de 10%"
+
+
 def roda(conn, amostra, semente):
     cur = conn.cursor(dictionary=True)
     cur.execute("SELECT MAX(referencia_codigo) AS codigo FROM fipe_preco")
@@ -104,6 +142,8 @@ def roda(conn, amostra, semente):
     detalhe, provisorios, ambos, cabine, eixo_flex = [], [], [], [], []
     exemplos_cabine, restante_motivos = [], Counter()
     exemplos_eixo = []
+    faixas = defaultdict(Counter)
+    exemplos_faixa = []
     exemplos_motivo = defaultdict(list)
     por_marca, por_motivo, exemplos_ganho, exemplos_prov = Counter(), Counter(), [], []
     for a in anuncios:
@@ -126,6 +166,13 @@ def roda(conn, amostra, semente):
                 except Exception:
                     proximos = []
                 exemplos_motivo[chave_motivo].append((a["titulo"][:70], a.get("tracao"), proximos))
+        if (com_eixo.get("motivo") or "").startswith("ambiguo"):
+            tipo = com_eixo["motivo"].split(" (")[0].split(":")[0][:28]
+            est = faixa_da_ambiguidade(conn, a, codigo)
+            balde = balde_de_faixa(est[0]) if est else "sem precos"
+            faixas[tipo][balde] += 1
+            if est and balde == "ate 5%" and len(exemplos_faixa) < 10:
+                exemplos_faixa.append((a["titulo"][:55], [round(x) for x in est[0]], est[1]))
         cat_eixo = classifica_ganho(base, com_eixo)
         eixo_flex.append(cat_eixo)
         if cat_eixo.startswith("ganha") and len(exemplos_eixo) < 12:
@@ -149,7 +196,7 @@ def roda(conn, amostra, semente):
             exemplos_prov.append((a["titulo"][:60], prov["modelos"], [round(p) for p in prov["precos"]]))
     return {"amostra": len(anuncios), "detalhe": resume(detalhe), "provisorio": resume(
         ["ganha_alto" if p == "ganha_provisorio" else "continua" for p in provisorios]),
-        "combinado": resume(ambos), "cabine": resume(cabine), "eixo_flex": resume(eixo_flex), "exemplos_eixo": exemplos_eixo, "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos, "exemplos_motivo": exemplos_motivo,
+        "combinado": resume(ambos), "cabine": resume(cabine), "eixo_flex": resume(eixo_flex), "exemplos_eixo": exemplos_eixo, "faixas": faixas, "exemplos_faixa": exemplos_faixa, "exemplos_cabine": exemplos_cabine, "restante_motivos": restante_motivos, "exemplos_motivo": exemplos_motivo,
         "por_marca": por_marca, "por_motivo": por_motivo,
         "exemplos_ganho": exemplos_ganho, "exemplos_prov": exemplos_prov}
 
@@ -178,6 +225,11 @@ def imprime(r):
         print(f"   {n:>4}  {motivo}")
         for titulo, tracao, proximos in r["exemplos_motivo"].get(motivo, []):
             print(f"          ex: {titulo} | tracao={tracao} | FIPE proxima: {proximos}")
+    print("\nAmbiguos: quanto custa a duvida? (ESTIMATIVA pelo preco das FIPEs que ainda concorrem)")
+    for tipo, baldes in sorted(r["faixas"].items(), key=lambda kv: -sum(kv[1].values())):
+        print(f"   {tipo:<28} {dict(baldes)}")
+    for titulo, precos, modelos in r["exemplos_faixa"]:
+        print(f"      ate 5%: {titulo} | {precos} | {modelos}")
     print("\nC mexe nestes (titulo, efeito, modelo FIPE):")
     for titulo, efeito, modelo, motivo in r["exemplos_cabine"]:
         print(f"   {titulo} | {efeito} | {modelo or motivo}")
