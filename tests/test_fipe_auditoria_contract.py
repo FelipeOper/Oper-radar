@@ -19,8 +19,11 @@ class FipeAuditoriaContractTest(unittest.TestCase):
 
     def test_nao_mexe_no_vinculo_do_anuncio(self):
         fonte = php()
-        for escrita in (r"UPDATE\s+anuncio\b", r"DELETE\s+FROM\s+anuncio\b", r"INSERT\s+INTO\s+anuncio\b"):
+        for escrita in (r"DELETE\s+FROM\s+anuncio\b", r"INSERT\s+INTO\s+anuncio\b"):
             self.assertNotRegex(fonte, escrita)
+        # A unica escrita em anuncio e a marcacao de conjunto; o vinculo FIPE nunca e tocado aqui.
+        for coluna in re.findall(r"UPDATE\s+anuncio\s+SET\s+(\w+)", fonte):
+            self.assertEqual("conjunto", coluna)
 
     def test_entrada_do_usuario_nunca_entra_no_sql(self):
         fonte = php()

@@ -188,7 +188,7 @@ if ($cursorDados !== null) {
 }
 $clausulaPagina = $wherePagina ? ' WHERE ' . implode(' AND ', $wherePagina) : '';
 
-$sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo, a.carroceria, a.tracao,
+$sql = "SELECT a.id AS anuncio_id, a.anuncio_portal_id, a.url, a.titulo, a.tipo, a.marca, a.modelo, a.carroceria, " . mercado_col_conjunto() . ", a.tracao,
                a.ano_inicial, a.ano_final,
                a.ano_inicial AS ano_fabricacao, a.ano_final AS ano_modelo, a.cor,
                COALESCE(CONCAT(a.quilometragem_manual, ' km'), a.km_ou_horas) AS quilometragem,

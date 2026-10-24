@@ -5,7 +5,9 @@
  * GET  fipe_auditoria.php?visao=grupos&marca=&modelo=&revenda=&uf=&regiao=&cidade=&confianca=&estado=
  *      Grupos = uma referencia FIPE (modelo + ano) com os anuncios vinculados a ela.
  * GET  fipe_auditoria.php?visao=anuncios&fipe_preco_id=123 (+ os mesmos filtros)
- * POST fipe_auditoria.php {acao: veredito | veredito_lote | limpar, ...}  (admin/gestor + CSRF)
+ * POST fipe_auditoria.php {acao: veredito | veredito_lote | limpar | conjunto, ...}  (admin/gestor + CSRF)
+ *      conjunto: marca o anuncio como cavalo + carreta vendidos juntos (valor true/false) ou devolve a
+ *      decisao ao classificador automatico (valor null). E a unica escrita em `anuncio` deste endpoint.
  *
  * O veredito vale para o PAR (anuncio, referencia FIPE): se o vinculo mudar depois, a
  * auditoria antiga deixa de valer sozinha e o anuncio volta a aparecer como nao auditado.
@@ -13,6 +15,7 @@
  */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/market_scope.php';
+require_once __DIR__ . '/lib/market_quality.php';
 
 $conn = conecta();
 
@@ -90,6 +93,12 @@ function aud_filtros(array $get, array $regioes, array $ufRegiao, bool $comEstad
             $where[] = 'r.uf IN (' . implode(',', array_fill(0, count($ufs), '?')) . ')';
             foreach ($ufs as $sigla) { $params[] = $sigla; $tipos .= 's'; }
         }
+    }
+
+    if (mercado_coluna_conjunto_existe()) {
+        $conjunto = (string)($get['conjunto'] ?? '');
+        if ($conjunto === 'sim') $where[] = 'a.conjunto = 1';
+        elseif ($conjunto === 'nao') $where[] = 'COALESCE(a.conjunto, 0) = 0';
     }
 
     $confianca = (string)($get['confianca'] ?? '');
@@ -180,6 +189,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             envia_json(['ok' => true, 'gravados' => (int)$gravados]);
         }
 
+        if ($acao === 'conjunto') {
+            if (!mercado_coluna_conjunto_existe()) {
+                throw new InvalidArgumentException('Atualize o servidor (migracao) para marcar conjuntos.');
+            }
+            $anuncioId = (int)($dados['anuncio_id'] ?? 0);
+            if ($anuncioId <= 0) throw new InvalidArgumentException('Informe o anuncio.');
+            $existe = aud_consulta($conn, 'SELECT id FROM anuncio WHERE id = ?', 'i', [$anuncioId]);
+            if (!$existe) throw new InvalidArgumentException('Anuncio nao encontrado.');
+            $valor = $dados['valor'] ?? null;
+            if ($valor === null) {
+                $st = $conn->prepare('UPDATE anuncio SET conjunto = NULL, conjunto_origem = NULL WHERE id = ?');
+                $st->bind_param('i', $anuncioId);
+                $novoValor = null;
+                $origem = null;
+            } else {
+                $novoValor = $valor ? 1 : 0;
+                $origem = 'manual';
+                $st = $conn->prepare("UPDATE anuncio SET conjunto = ?, conjunto_origem = 'manual' WHERE id = ?");
+                $st->bind_param('ii', $novoValor, $anuncioId);
+            }
+            $st->execute();
+            $st->close();
+            envia_json(['ok' => true, 'anuncio_id' => $anuncioId, 'conjunto' => $novoValor, 'conjunto_origem' => $origem]);
+        }
+
         if ($acao === 'limpar') {
             $anuncioId = (int)($dados['anuncio_id'] ?? 0);
             $fipeId = (int)($dados['fipe_preco_id'] ?? 0);
@@ -234,6 +268,7 @@ try {
         }
         $linhas = aud_consulta($conn, "SELECT a.id, a.titulo, a.url, a.marca, a.modelo, a.tracao,
                 a.ano_inicial, a.ano_final, a.preco, a.fipe_match_confianca,
+                " . mercado_col_conjunto() . ", " . (mercado_coluna_conjunto_existe() ? 'a.conjunto_origem' : 'NULL AS conjunto_origem') . ",
                 COALESCE(a.fipe_vinculo_origem, 'automatico') AS origem, a.fipe_match_motivo,
                 r.id AS revenda_id, r.nome AS revenda, r.cidade, r.uf,
                 au.veredito, au.observacao
@@ -242,6 +277,7 @@ try {
         foreach ($linhas as &$linha) {
             $linha = aud_inteiros($linha, ['id', 'revenda_id']);
             $linha['preco'] = $linha['preco'] === null ? null : (float)$linha['preco'];
+            $linha['conjunto'] = $linha['conjunto'] === null ? null : (int)$linha['conjunto'];
         }
         unset($linha);
         envia_json(['resumo' => $resumo, 'fipe_preco_id' => $fipeId, 'anuncios' => $linhas]);

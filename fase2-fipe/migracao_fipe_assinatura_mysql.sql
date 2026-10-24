@@ -39,7 +39,9 @@ CREATE TABLE fipe_assinatura (
 
 ALTER TABLE anuncio
     ADD COLUMN fipe_assinatura_id INT NULL,
-    ADD COLUMN fipe_regra_versao SMALLINT NOT NULL DEFAULT 0;
+    ADD COLUMN fipe_regra_versao SMALLINT NOT NULL DEFAULT 0,
+    ADD COLUMN conjunto TINYINT NULL,
+    ADD COLUMN conjunto_origem VARCHAR(12) NULL;
 
 CREATE TABLE fipe_auditoria (
     id            INT AUTO_INCREMENT PRIMARY KEY,

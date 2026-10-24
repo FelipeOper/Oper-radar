@@ -210,6 +210,37 @@ function mercado_aplica_estatisticas(array &$linha, ?array $stats, ?float $preco
     }
 }
 
+/**
+ * CONJUNTO (cavalo + carreta vendidos juntos): o preco anunciado e do conjunto, mas a FIPE vinculada e so a do cavalo.
+ * Comparar os dois infla o desvio e as medianas, entao o conjunto sai de toda comparacao com a FIPE.
+ * A coluna anuncio.conjunto vem de uma migracao: antes dela o app segue como era (nenhum anuncio e conjunto).
+ */
+function mercado_coluna_conjunto_existe(): bool {
+    static $existe = null;
+    if ($existe === null) {
+        $existe = false;
+        try {
+            $conexao = conecta();
+            $resultado = $conexao->query("SHOW COLUMNS FROM anuncio LIKE 'conjunto'");
+            $existe = $resultado && $resultado->num_rows > 0;
+            $conexao->close();
+        } catch (Throwable $e) {
+            $existe = false;
+        }
+    }
+    return $existe;
+}
+
+/** Trecho de SELECT (alias a): a coluna real quando existe; senao uma constante 0 com o mesmo nome. */
+function mercado_col_conjunto(): string {
+    return mercado_coluna_conjunto_existe() ? 'a.conjunto' : '0 AS conjunto';
+}
+
+/** O registro e um conjunto? Falha ABERTA de proposito: sem a chave 'conjunto' (query antiga) nao e conjunto. */
+function mercado_conjunto_registro(array $registro): bool {
+    return (int)($registro['conjunto'] ?? 0) === 1;
+}
+
 /** O ano-modelo permite comparar com a FIPE? Falha FECHADA: sem a chave 'ano', ano nulo ou <= 2005 nao e comparavel. */
 function mercado_ano_comparavel_fipe(array $registro): bool {
     $ano = (int)($registro['ano'] ?? 0);
@@ -225,6 +256,7 @@ const OPER_RADAR_CARROCERIAS_FIPE = ['CAVALO MECÂNICO', 'CAVALO MECANICO', 'CHA
 
 /** A carroceria permite comparar com a FIPE? Falha FECHADA: sem a chave 'carroceria' nao e comparavel. Vazio ou valor canonico e. */
 function mercado_carroceria_comparavel_fipe(array $registro): bool {
+    if (mercado_conjunto_registro($registro)) return false;
     if (!array_key_exists('carroceria', $registro)) return false;
     $valor = trim((string)($registro['carroceria'] ?? ''));
     if ($valor === '') return true;
@@ -240,7 +272,8 @@ function mercado_tipo_comparavel_fipe(array $registro): bool {
 /** Trecho SQL equivalente (alias a): tipo Caminhao e carroceria vazia ou na mesma lista exata (IN, sem LIKE). */
 function mercado_sql_carroceria_comparavel(): string {
     $lista = implode(',', array_map(fn($x) => "'" . $x . "'", OPER_RADAR_CARROCERIAS_FIPE));
-    return " AND a.tipo='Caminhao' AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(TRIM(a.carroceria)) IN (" . $lista . "))";
+    $semConjunto = mercado_coluna_conjunto_existe() ? ' AND COALESCE(a.conjunto,0)=0' : '';
+    return " AND a.tipo='Caminhao' AND (a.carroceria IS NULL OR TRIM(a.carroceria)='' OR UPPER(TRIM(a.carroceria)) IN (" . $lista . "))" . $semConjunto;
 }
 
 /** Trecho SQL que restringe estatisticas a anuncios de ano-modelo >= $anoMinimo (null = sem restricao). $anoMinimo e int do codigo. */

@@ -82,6 +82,8 @@ CREATE TABLE fipe_auditoria (
 COLUNAS_ANUNCIO = (
     ("fipe_assinatura_id", "INT NULL"),
     ("fipe_regra_versao", "SMALLINT NOT NULL DEFAULT 0"),
+    ("conjunto", "TINYINT NULL"),
+    ("conjunto_origem", "VARCHAR(12) NULL"),
 )
 
 
