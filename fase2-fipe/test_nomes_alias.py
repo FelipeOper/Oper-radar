@@ -35,6 +35,14 @@ class NomesAliasTest(unittest.TestCase):
         self.assertEqual(0.0, com_flag("DELIVERY EXPRESS 2021/2022", "Delivery Express 2p (diesel)(E5)", "0")[0])
         self.assertEqual(0.90, com_flag("DELIVERY EXPRESS 2021/2022", "Delivery Express 2p (diesel)(E5)")[0])
 
+    def test_texto_real_do_anuncio_com_cidade_url_e_marca(self):
+        texto = ("DELIVERY EXPRESS 2021/2021 veiculo sao-paulo sp caminhao volkswagen delivery-express 2021 "
+                 "3 4-4x2 DELIVERY EXPRESS 3/4 4x2")
+        self.assertEqual(0.90, com_flag(texto, "Delivery Express 2p (diesel)(E5)")[0])
+
+    def test_nome_de_uma_palavra_so_nao_casa_por_contencao(self):
+        self.assertEqual(0.0, com_flag("METEOR veiculo curitiba pr caminhao", "Meteor 2p (diesel)")[0])
+
     def test_nome_sem_numero_com_palavras_diferentes_nao_casa(self):
         self.assertEqual(0.0, com_flag("DELIVERY 2021", "Delivery Express 2p (diesel)(E5)")[0])
 
