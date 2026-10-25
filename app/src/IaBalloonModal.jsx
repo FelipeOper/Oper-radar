@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Send, MessageCircle } from './icons.jsx';
 import { apiPost } from './apiClient.js';
+import { TextoIa } from './TextoIa.jsx';
 
 export function IaBalloonModal({ onNavigateToChat }) {
   const [aberto, setAberto] = useState(false);
@@ -78,7 +79,7 @@ export function IaBalloonModal({ onNavigateToChat }) {
       <div className="oc-balloon-messages">
         {messages.map((msg, idx) => (
           <div key={idx} className={`oc-balloon-msg oc-balloon-msg--${msg.role}`}>
-            {msg.content}
+            {msg.role === 'assistant' ? <TextoIa texto={msg.content} /> : msg.content}
           </div>
         ))}
         {enviando && (
