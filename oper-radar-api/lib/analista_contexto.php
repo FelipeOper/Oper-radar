@@ -90,52 +90,61 @@ function analista_estatisticas(array $precos): ?array {
 
 function analista_brl(float $v): string { return 'R$ ' . number_format($v, 0, ',', '.'); }
 
+function analista_faixa(?array $e): string {
+    return $e ? analista_brl($e['min']) . ' a ' . analista_brl($e['max']) . ' (mediana ' . analista_brl($e['mediana']) . ', amostra ' . $e['n'] . ')' : 'sem preco informado';
+}
+
 /**
  * Monta o bloco de texto com os dados do modelo. $anuncios: linhas ja filtradas por marca+modelo, cada uma com
- * preco, ano, status, dias (observado), uf, cidade, titulo, preco_fipe (pode ser null), confianca, saida_90d (0/1).
+ * preco, ano, status, dias (observado), uf, cidade, titulo, preco_fipe (pode ser null), saida_90d (0/1).
+ * Quando o gestor pergunta um ano-modelo, preco, FIPE, tempo, saidas, estados e exemplos so olham ESSE ano:
+ * misturar anos produziria uma conta (ex.: FIPE de 2021 aplicada a um 2026) que nao existe.
  */
 function analista_bloco_modelo(string $rotulo, ?int $ano, array $anuncios): string {
     $ativos = array_values(array_filter($anuncios, fn($a) => $a['status'] === 'ativo'));
-    $saidas = count(array_filter($anuncios, fn($a) => !empty($a['saida_90d'])));
-    $txt = "DADOS DO MODELO PERGUNTADO ($rotulo" . ($ano ? ", ano-modelo $ano" : '') . "):\n";
-    if (!$ativos) {
-        return $txt . "- Nenhum anuncio ativo encontrado no Radar para esse recorte. $saidas saida(s) detectada(s) nos ultimos 90 dias.\n";
+    $txt = "DADOS DO MODELO ($rotulo" . ($ano ? ", ano-modelo $ano" : '') . "):\n";
+    if (!$ativos && !array_filter($anuncios, fn($a) => !empty($a['saida_90d']))) {
+        return $txt . "- Nenhum anuncio no Radar para esse recorte (ativo ou saido nos ultimos 90 dias).\n";
     }
-    $txt .= '- Anuncios ativos no Radar com esse modelo: ' . count($ativos) . ($ano ? ' (todos os anos-modelo)' : '') . ".\n";
     $porAno = [];
     foreach ($ativos as $a) $porAno[(int)$a['ano']][] = $a['preco'];
-    ksort($porAno);
-    foreach ($porAno as $a => $precos) {
-        $e = analista_estatisticas($precos);
-        $txt .= "  * ano-modelo $a: " . count($precos) . ' anuncio(s)' . ($e ? ", preco ({$e['n']} com valor): min " . analista_brl($e['min']) . ', mediana ' . analista_brl($e['mediana']) . ', max ' . analista_brl($e['max']) : ', sem preco informado') . ".\n";
-    }
-    if ($ano) {
-        $doAno = array_values(array_filter($ativos, fn($a) => (int)$a['ano'] === $ano));
-        $e = analista_estatisticas(array_column($doAno, 'preco'));
-        $txt .= "- Recorte do ano-modelo $ano: " . count($doAno) . ' anuncio(s)' . ($e ? ', preco de ' . analista_brl($e['min']) . ' a ' . analista_brl($e['max']) . ' (mediana ' . analista_brl($e['mediana']) . ", amostra {$e['n']})" : ', sem preco') . ".\n";
-        if (!$doAno) $txt .= "  Nao ha anuncio desse ano-modelo no Radar: nao ha preco de mercado observado para ele, so para os anos acima.\n";
-    }
-    $comFipe = array_values(array_filter($ativos, fn($a) => !empty($a['preco_fipe']) && $a['preco'] > 0 && ($a['ano'] ?? null) !== null));
-    if ($comFipe) {
-        $desvios = array_map(fn($a) => ($a['preco'] / $a['preco_fipe'] - 1) * 100, $comFipe);
-        sort($desvios);
-        $fipes = analista_estatisticas(array_column($comFipe, 'preco_fipe'));
-        $txt .= '- FIPE: ' . count($comFipe) . ' anuncio(s) com vinculo (mediana FIPE ' . analista_brl($fipes['mediana']) . '); preco anunciado fica em mediana '
-            . number_format(analista_percentil($desvios, 0.5), 1, ',', '.') . "% em relacao a FIPE. Vinculos 'medio'/'provisorio' sao aproximados.\n";
+    krsort($porAno);
+    $txt .= '- Ativos no Radar: ' . count($ativos) . ' no total'
+        . ($porAno ? ' (' . implode(', ', array_map(fn($y, $p) => "$y: " . count($p), array_keys($porAno), $porAno)) . ')' : '') . ".\n";
+
+    $recorte = $ano ? array_values(array_filter($anuncios, fn($a) => (int)$a['ano'] === $ano)) : $anuncios;
+    $recAtivos = array_values(array_filter($recorte, fn($a) => $a['status'] === 'ativo'));
+    $rotuloRec = $ano ? "ano-modelo $ano" : 'todos os anos';
+    if ($ano && !$recAtivos) {
+        $txt .= "- Ano-modelo $ano: NENHUM anuncio ativo no Radar. Nao ha preco de mercado observado para esse ano; so existe para os outros anos acima.\n";
+        $outros = [];
+        foreach ($porAno as $y => $p) { $e = analista_estatisticas($p); if ($e) $outros[] = "$y: mediana " . analista_brl($e['mediana']) . " (amostra {$e['n']})"; }
+        if ($outros) $txt .= '- Referencia de OUTROS anos (nao serve como preco do ' . $ano . '): ' . implode('; ', array_slice($outros, 0, 4)) . ".\n";
     } else {
-        $txt .= "- FIPE: nenhum anuncio desse recorte tem vinculo FIPE; nao ha referencia FIPE confiavel aqui.\n";
+        $txt .= "- Preco ($rotuloRec): " . analista_faixa(analista_estatisticas(array_column($recAtivos, 'preco'))) . ".\n";
+        $comFipe = array_values(array_filter($recAtivos, fn($a) => !empty($a['preco_fipe']) && $a['preco'] > 0));
+        if ($comFipe) {
+            $desvios = array_map(fn($a) => ($a['preco'] / $a['preco_fipe'] - 1) * 100, $comFipe);
+            sort($desvios);
+            $fipes = analista_estatisticas(array_column($comFipe, 'preco_fipe'));
+            $txt .= "- FIPE ($rotuloRec): " . count($comFipe) . ' anuncio(s) com vinculo, FIPE ' . analista_brl($fipes['mediana']) . '; preco anunciado fica '
+                . number_format(analista_percentil($desvios, 0.5), 1, ',', '.') . "% em relacao a FIPE (mediana). Vinculo pode ser aproximado.\n";
+        } else {
+            $txt .= "- FIPE ($rotuloRec): nenhum anuncio com vinculo FIPE; sem referencia FIPE confiavel.\n";
+        }
+        $dias = array_map('floatval', array_column($recAtivos, 'dias'));
+        sort($dias);
+        $txt .= "- Tempo no Radar ($rotuloRec): mediana " . (int)analista_percentil($dias, 0.5) . ' dias.';
+        $ufs = [];
+        foreach ($recAtivos as $a) $ufs[$a['uf'] ?? '?'] = ($ufs[$a['uf'] ?? '?'] ?? 0) + 1;
+        arsort($ufs);
+        $txt .= ' Estados: ' . implode(', ', array_map(fn($u, $n) => "$u $n", array_keys(array_slice($ufs, 0, 5, true)), array_slice($ufs, 0, 5, true))) . ".\n";
+        usort($recAtivos, fn($a, $b) => ($a['preco'] <=> $b['preco']));
+        foreach (array_slice($recAtivos, 0, 4) as $a) {
+            $txt .= '  * ' . mb_substr((string)$a['titulo'], 0, 50) . ' | ' . ($a['preco'] > 0 ? analista_brl((float)$a['preco']) : 'sem preco') . ' | ' . ($a['cidade'] ?? '?') . '/' . ($a['uf'] ?? '?') . "\n";
+        }
     }
-    $dias = array_column($ativos, 'dias');
-    sort($dias);
-    $txt .= '- Tempo observado no Radar (mediana): ' . (int)analista_percentil(array_map('floatval', $dias), 0.5) . " dias. Saidas detectadas em 90 dias: $saidas (ausencia confirmada, nao prova venda).\n";
-    $ufs = [];
-    foreach ($ativos as $a) $ufs[$a['uf'] ?? '?'] = ($ufs[$a['uf'] ?? '?'] ?? 0) + 1;
-    arsort($ufs);
-    $txt .= '- Onde estao: ' . implode(', ', array_map(fn($u, $n) => "$u $n", array_keys(array_slice($ufs, 0, 6, true)), array_slice($ufs, 0, 6, true))) . ".\n";
-    usort($ativos, fn($a, $b) => ($a['preco'] <=> $b['preco']));
-    $txt .= "- Exemplos (do mais barato ao mais caro):\n";
-    foreach (array_slice($ativos, 0, 8) as $a) {
-        $txt .= '  * ' . mb_substr((string)$a['titulo'], 0, 60) . ' | ' . ($a['preco'] > 0 ? analista_brl((float)$a['preco']) : 'sem preco') . ' | ' . ($a['cidade'] ?? '?') . '/' . ($a['uf'] ?? '?') . ' | ' . (int)$a['dias'] . "d\n";
-    }
+    $saidas = count(array_filter($recorte, fn($a) => !empty($a['saida_90d'])));
+    $txt .= "- Saidas detectadas em 90 dias ($rotuloRec): $saidas (ausencia confirmada em duas coletas; nao prova venda).\n";
     return $txt;
 }

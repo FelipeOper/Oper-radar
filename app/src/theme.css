@@ -1957,3 +1957,11 @@ select option {
 @media (max-width: 1100px) { .oc-aud__filtros-acoes { grid-column: 1 / -1; } }
 .oc-aud__btn--conjunto.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px var(--accent); }
 .oc-aud__tag-conjunto.is-on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+
+
+/* Resposta da IA: parágrafos, negrito e listas legíveis (TextoIa) */
+.oc-ia-texto p { margin: 0 0 8px; }
+.oc-ia-texto ul { margin: 0 0 8px; padding-left: 18px; }
+.oc-ia-texto li { margin: 0 0 3px; }
+.oc-ia-texto > :last-child { margin-bottom: 0; }
+.oc-ia-texto strong { font-weight: 650; }

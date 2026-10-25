@@ -43,14 +43,29 @@ verifica(analista_estatisticas([123456])['mediana'] == 123456, 'um valor so');
 
 // bloco
 $ativo = fn($ano, $preco, $fipe = null, $uf = 'SP') => ['status' => 'ativo', 'ano' => $ano, 'preco' => $preco, 'preco_fipe' => $fipe, 'dias' => 20, 'uf' => $uf, 'cidade' => 'X', 'titulo' => 'VOLVO FH 540'];
-$anuncios = [$ativo(2024, 800000, 780000), $ativo(2024, 820000, 780000, 'PR'), $ativo(2023, 700000), ['status' => 'removido_confirmado', 'saida_90d' => 1, 'ano' => 2022, 'preco' => 600000, 'dias' => 40, 'uf' => 'SP', 'cidade' => 'X', 'titulo' => 'VOLVO FH 540']];
+$saida = fn($ano) => ['status' => 'removido_confirmado', 'saida_90d' => 1, 'ano' => $ano, 'preco' => 600000, 'dias' => 40, 'uf' => 'SP', 'cidade' => 'X', 'titulo' => 'VOLVO FH 540'];
+$anuncios = [$ativo(2024, 800000, 780000), $ativo(2024, 820000, 780000, 'PR'), $ativo(2023, 700000), $saida(2022), $saida(2022), $saida(2024)];
+
+// ano pedido SEM anuncio: nao pode usar FIPE nem saidas de outros anos como se fossem do ano pedido
 $b = analista_bloco_modelo('VOLVO FH 540', 2026, $anuncios);
-verifica(str_contains($b, 'ativos no Radar com esse modelo: 3'), 'conta so ativos');
-verifica(str_contains($b, 'Nao ha anuncio desse ano-modelo no Radar'), 'avisa que nao ha o ano pedido (2026)');
-verifica(str_contains($b, 'ano-modelo 2024: 2 anuncio'), 'estatistica por ano');
-verifica(str_contains($b, 'FIPE: 2 anuncio'), 'fipe');
-verifica(str_contains($b, 'Saidas detectadas em 90 dias: 1'), 'saidas');
-$vazio = analista_bloco_modelo('VOLVO FH 999', null, []);
-verifica(str_contains($vazio, 'Nenhum anuncio ativo encontrado'), 'sem dados diz que nao ha');
+verifica(str_contains($b, 'Ativos no Radar: 3 no total (2024: 2, 2023: 1)'), 'total e por ano');
+verifica(str_contains($b, 'Ano-modelo 2026: NENHUM anuncio ativo'), 'avisa que nao ha o ano pedido');
+verifica(str_contains($b, 'nao serve como preco do 2026'), 'referencia de outros anos marcada como nao aplicavel');
+verifica(!str_contains($b, 'FIPE (') && !str_contains($b, 'Tempo no Radar'), 'sem FIPE nem tempo de outro ano');
+verifica(str_contains($b, 'Saidas detectadas em 90 dias (ano-modelo 2026): 0'), 'saidas so do ano pedido (zero em 2026)');
+
+// ano pedido COM anuncios: tudo recortado nele
+$b = analista_bloco_modelo('VOLVO FH 540', 2024, $anuncios);
+verifica(str_contains($b, 'Preco (ano-modelo 2024): R$ 800.000 a R$ 820.000 (mediana R$ 810.000, amostra 2)'), 'preco do ano');
+verifica(str_contains($b, 'FIPE (ano-modelo 2024): 2 anuncio(s) com vinculo, FIPE R$ 780.000'), 'fipe do ano');
+verifica(str_contains($b, 'Saidas detectadas em 90 dias (ano-modelo 2024): 1'), 'saidas do ano');
+
+// sem ano pedido: todos os anos
+$b = analista_bloco_modelo('VOLVO FH 540', null, $anuncios);
+verifica(str_contains($b, 'Preco (todos os anos)') && str_contains($b, 'Saidas detectadas em 90 dias (todos os anos): 3'), 'sem ano usa todos');
+
+// sem nada
+verifica(str_contains(analista_bloco_modelo('VOLVO FH 999', null, []), 'Nenhum anuncio no Radar'), 'sem dados diz que nao ha');
+verifica(strlen(analista_bloco_modelo('VOLVO FH 540', null, $anuncios)) < 1500, 'bloco enxuto');
 
 echo "analista_contexto_test ok\n";

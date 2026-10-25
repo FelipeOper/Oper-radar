@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, Copy, Check, AlertCircle } from './icons.jsx';
 import { apiPost, API_BASE_URL } from './apiClient.js';
+import { TextoIa } from './TextoIa.jsx';
 
 export function ChatPage() {
   const [messages, setMessages] = useState([
@@ -63,7 +64,7 @@ export function ChatPage() {
           {messages.map((msg, idx) => (
             <div key={idx} className={`oc-chat-msg oc-chat-msg--${msg.role}`}>
               <div className="oc-chat-bubble">
-                {msg.content}
+                {msg.role === 'assistant' ? <TextoIa texto={msg.content} /> : msg.content}
               </div>
               <button
                 className="oc-chat-copy"

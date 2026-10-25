@@ -49,6 +49,7 @@ import { desvioFipeExibivel, evidenciaPanorama, leituraOportunidade, textoAmostr
 import { useBrowserRoute } from './useBrowserRoute.js';
 import { resolveDataState } from './dataState.js';
 import { API_BASE_URL, DEMO_MODE, apiGet, apiFetch, apiPost } from './apiClient.js';
+import { TextoIa } from './TextoIa.jsx';
 import { mascaraChave, podeConfigurarIa, resumoEmUso, validaFormularioIa } from './iaConfigModel.js';
 import { DEMO_SESSION } from './demoFixtures.js';
 
@@ -3117,8 +3118,8 @@ function PageAnalise() {
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%',
               background: m.role === 'user' ? `${T.signal}1F` : T.surface2,
               border: `1px solid ${m.role === 'user' ? `${T.signal}40` : T.line}`,
-              borderRadius: 12, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap',
-            }}>{m.content}</div>
+              borderRadius: 12, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: m.role === 'user' ? 'pre-wrap' : 'normal',
+            }}>{m.role === 'assistant' ? <TextoIa texto={m.content} /> : m.content}</div>
           ))}
           {pensando && <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.inkMuted }}>ANALISANDO OS DADOS…</div>}
           {chatErro && (
